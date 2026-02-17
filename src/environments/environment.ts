@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://localhost:56164/api', 
-  hubUrl: 'https://localhost:56164/hubs/tracking', 
+  apiUrl: 'https://regibazarapi.onrender.com/api',
+  hubUrl: 'https://regibazarapi.onrender.com/hubs/tracking',
   frontendUrl: 'http://localhost:4200'
 };
