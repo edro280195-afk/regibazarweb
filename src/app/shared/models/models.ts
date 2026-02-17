@@ -1,0 +1,161 @@
+// ── Auth ──
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  name: string;
+  expiresAt: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
+// ── Orders ──
+export interface OrderSummary {
+  id: number;
+  clientName: string;
+  clientType?: string; // 'Nueva' | 'Frecuente'
+  clientPhone?: string;
+  clientAddress?: string;
+  orderType: string;      // 'Delivery' | 'PickUp'
+  postponedAt?: string;   // Fecha ISO
+  postponedNote?: string; // Motivo
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  status: string; // 'Pending', 'InRoute', 'Delivered', 'NotDelivered', 'Canceled', 'Postponed'
+  clientLink: string;
+  accessToken: string;
+  expiresAt: string;
+  items: OrderItem[];
+  createdAt: string; // ISO Date
+}
+
+export interface OrderItem {
+  id: number;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface ExcelUploadResult {
+  ordersCreated: number;
+  clientsCreated: number;
+  orders: OrderSummary[];
+  warnings: string[];
+}
+
+export interface ManualOrderRequest {
+  clientName: string;
+  clientPhone?: string;
+  clientAddress?: string;
+  orderType: string;
+  items: { productName: string; quantity: number; unitPrice: number }[];
+}
+
+// ── Routes ──
+export interface DeliveryRoute {
+  id: number;
+  driverToken: string;
+  driverLink: string;
+  status: string;
+  createdAt: string;
+  startedAt?: string;
+  deliveries: RouteDelivery[];
+  driverLocation?: {
+    latitude: number;
+    longitude: number;
+    lastUpdate: string;
+  };
+}
+
+export interface RouteDelivery {
+  id: number;        // <--- Agrega esto
+  address?: string;
+  deliveryId: number;
+  orderId: number;
+  sortOrder: number;
+  clientName: string;
+  clientAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  status: string;
+  total: number;
+  deliveredAt?: string;
+  notes?: string;
+  failureReason?: string;
+  evidenceUrls: string[];
+}
+
+// ── Client View ──
+export interface ClientOrderView {
+  clientName: string;
+  items: OrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  status: string;
+  estimatedArrival?: string;
+  driverLocation?: DriverLocation;
+  queuePosition?: number;
+  totalDeliveries?: number;
+  isCurrentDelivery: boolean;
+  deliveriesAhead?: number;
+  clientLatitude?: number;
+  clientLongitude?: number;
+}
+
+export interface DriverLocation {
+  latitude: number;
+  longitude: number;
+  lastUpdate: string;
+}
+
+// ── Dashboard ──
+export interface Dashboard {
+  totalClients: number;
+  totalOrders: number;
+  pendingOrders: number;
+  deliveredOrders: number;
+  notDeliveredOrders: number;
+  activeRoutes: number;
+  totalRevenue: number;
+}
+
+// ── Client entity ──
+export interface Client {
+  id: number;
+  name: string;
+  phone?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  orderCount: number;
+  tag?: string;
+}
+
+// ── Suppliers ──
+export interface Supplier {
+  id: number;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Investment {
+  id: number;
+  supplierId: number;
+  amount: number;
+  date: string; // ISO
+  notes?: string;
+  createdAt: string;
+}
