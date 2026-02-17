@@ -159,3 +159,30 @@ export interface Investment {
   notes?: string;
   createdAt: string;
 }
+
+export interface DriverExpense {
+  id: number;
+  driverId: number;
+  driverName?: string;
+  amount: number;
+  expenseType: string; // 'Gasolina', 'Comida', 'Otros'
+  date: string; // ISO
+  notes?: string;
+  evidenceUrl?: string; // Foto del ticket
+  createdAt: string;
+}
+
+export interface FinancialReport {
+  period: string; // '2023-Q1', '2023-Q2' (Quincena)
+  startDate: string;
+  endDate: string;
+  totalIncome: number;
+  totalInvestment: number;
+  totalExpenses: number;
+  netProfit: number;
+  details: {
+    investments: Investment[];
+    incomes: OrderSummary[]; // Or a simplified version
+    expenses: DriverExpense[];
+  };
+}

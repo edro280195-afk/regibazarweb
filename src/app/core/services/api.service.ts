@@ -164,4 +164,31 @@ export class ApiService {
   deleteInvestment(supplierId: number, investmentId: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/suppliers/${supplierId}/investments/${investmentId}`);
   }
+
+  // ── Driver Expenses ──
+  addDriverExpense(driverToken: string, data: any): Observable<any> {
+    const fd = new FormData();
+    fd.append('amount', data.amount);
+    fd.append('expenseType', data.expenseType);
+    fd.append('notes', data.notes || '');
+    if (data.photo) {
+      fd.append('photo', data.photo);
+    }
+    return this.http.post(`${this.url}/driver/${driverToken}/expenses`, fd);
+  }
+
+  getDriverExpenses(period?: string): Observable<import('../../shared/models/models').DriverExpense[]> {
+    let params = '';
+    if (period) params = `?period=${period}`;
+    return this.http.get<import('../../shared/models/models').DriverExpense[]>(`${this.url}/admin/expenses${params}`);
+  }
+
+  // ── Financials ──
+  getFinancialReport(startDate: string, endDate: string): Observable<import('../../shared/models/models').FinancialReport> {
+    // If backend doesn't support this yet, we might need to fetch all and aggregate FE side.
+    // implementing as if backend exists or we mock it.
+    return this.http.get<import('../../shared/models/models').FinancialReport>(
+      `${this.url}/admin/financials?startDate=${startDate}&endDate=${endDate}`
+    );
+  }
 }

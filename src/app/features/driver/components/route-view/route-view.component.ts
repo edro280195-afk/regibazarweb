@@ -44,6 +44,10 @@ import * as L from 'leaflet';
           🗺️ Ver Ruta Completa en Google Maps
         </button>
 
+        <button class="btn-expense" (click)="openExpenseModal()">
+          ⛽ Registrar Gasto (Gas/Comida)
+        </button>
+
 
         <!-- Reorder Toggle -->
         @if (r.status === 'Pending') {
@@ -232,6 +236,48 @@ import * as L from 'leaflet';
           </div>
         </div>
       }
+
+      <!-- Expense Modal -->
+      @if (showExpenseModal()) {
+        <div class="modal-overlay" (click)="closeExpenseModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <h3>⛽ Registrar Gasto</h3>
+            
+            <div class="form-group">
+              <label>Tipo de Gasto</label>
+              <div class="expense-types">
+                <button [class.selected]="expenseForm.type === 'Gasolina'" (click)="expenseForm.type = 'Gasolina'">Gasolina ⛽</button>
+                <button [class.selected]="expenseForm.type === 'Comida'" (click)="expenseForm.type = 'Comida'">Comida 🍔</button>
+                <button [class.selected]="expenseForm.type === 'Otro'" (click)="expenseForm.type = 'Otro'">Otro 🔧</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Monto $</label>
+              <input type="number" [(ngModel)]="expenseForm.amount" placeholder="Ej. 500" class="input-lg">
+            </div>
+
+            <div class="form-group">
+              <label>Nota (Opcional)</label>
+              <input type="text" [(ngModel)]="expenseForm.notes" placeholder="Detalles..." class="input-text">
+            </div>
+            
+            <div class="form-group">
+               <label class="photo-btn" [class.has-file]="!!expenseForm.photo">
+                  {{ expenseForm.photo ? '📸 Foto lista' : '📸 Foto del ticket (Opcional)' }}
+                  <input type="file" accept="image/*" capture="environment" (change)="onExpensePhoto($event)" hidden>
+               </label>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-cancel" (click)="closeExpenseModal()">Cancelar</button>
+              <button class="btn-confirm" (click)="submitExpense()" [disabled]="!expenseForm.amount || expenseForm.amount <= 0 || submittingExpense()">
+                 {{ submittingExpense() ? 'Guardando...' : 'Registrar Gasto' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -292,6 +338,16 @@ import * as L from 'leaflet';
       display: flex; align-items: center; justify-content: center; gap: 0.5rem;
       transition: all 0.2s;
       &:hover { background: #f0fdf4; transform: translateY(-2px); }
+    }
+    
+    .btn-expense {
+      width: 100%; padding: 0.8rem; border: none; border-radius: 1rem;
+      background: white; border: 2px dashed #EF4444; color: #EF4444;
+      font-weight: 700; font-size: 0.95rem; margin-bottom: 1.5rem;
+      box-shadow: 0 4px 10px rgba(239,68,68,0.15); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      transition: all 0.2s;
+      &:hover { background: #fee2e2; transform: translateY(-2px); }
     }
     .coords-info { font-size: 0.7rem; color: #666; font-family: monospace; display: block; margin-top: 2px; }
 
@@ -578,6 +634,40 @@ import * as L from 'leaflet';
     .btn-move-big.up { background: #E0F2FE; color: #0284C7; }
     .btn-move-big.down { background: #F0FDF4; color: #16A34A; }
     .btn-move-big:disabled { opacity: 0.3; background: #f3f4f6; color: #9ca3af; }
+
+    /* EXPENSE FORM */
+    .expense-types { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .expense-types button {
+      flex: 1; padding: 0.6rem; border: 1.5px solid var(--border-soft);
+      background: var(--bg-main); border-radius: 0.75rem; font-weight: 600;
+      color: var(--text-medium); cursor: pointer; font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .expense-types button.selected {
+      background: rgba(255,107,157,0.1); border-color: var(--pink-400); color: var(--pink-600);
+    }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 700; color: #666; margin-bottom: 0.3rem; }
+    .input-lg {
+      width: 100%; padding: 0.8rem; font-size: 1.2rem; font-weight: 700;
+      border: 1.5px solid var(--border-soft); border-radius: 0.8rem;
+      text-align: center; color: var(--text-dark); box-sizing: border-box;
+    }
+    .input-text {
+      width: 100%; padding: 0.7rem; font-size: 0.9rem;
+      border: 1.5px solid var(--border-soft); border-radius: 0.8rem; box-sizing: border-box;
+    }
+    .has-file { background: #d1fae5 !important; border-color: #34d399 !important; color: #065f46 !important; }
+    .modal-actions { display: flex; gap: 0.8rem; margin-top: 1.5rem; }
+    .btn-cancel {
+      flex: 1; padding: 0.8rem; background: #f3f4f6; color: #4b5563;
+      border: none; border-radius: 0.8rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-confirm {
+      flex: 2; padding: 0.8rem; background: linear-gradient(135deg, var(--pink-400), var(--pink-500));
+      color: white; border: none; border-radius: 0.8rem; font-weight: 700; cursor: pointer;
+      &:disabled { opacity: 0.5; }
+    }
   `]
 })
 export class RouteViewComponent implements OnInit, OnDestroy {
@@ -590,6 +680,11 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   failModalId = signal(0);
   selectedReason = signal('');
   toastMsg = signal('');
+
+  // Expenses
+  showExpenseModal = signal(false);
+  submittingExpense = signal(false);
+  expenseForm = { type: 'Gasolina', amount: null as number | null, notes: '', photo: null as File | null };
 
   isReordering = signal(false);
   customReason = '';
@@ -684,6 +779,48 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
     this.plotRoute(route);
     this.showToast('✅ Mapa actualizado con direcciones');
+  }
+
+  // ═══ EXPENSES ═══
+  openExpenseModal() {
+    this.expenseForm = { type: 'Gasolina', amount: null, notes: '', photo: null };
+    this.showExpenseModal.set(true);
+  }
+
+  closeExpenseModal() {
+    this.showExpenseModal.set(false);
+  }
+
+  onExpensePhoto(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.expenseForm.photo = file;
+    }
+  }
+
+  submitExpense() {
+    if (!this.expenseForm.amount || this.expenseForm.amount <= 0) return;
+
+    this.submittingExpense.set(true);
+    const data = {
+      amount: this.expenseForm.amount,
+      expenseType: this.expenseForm.type,
+      notes: this.expenseForm.notes,
+      photo: this.expenseForm.photo
+    };
+
+    this.api.addDriverExpense(this.token, data).subscribe({
+      next: () => {
+        this.submittingExpense.set(false);
+        this.closeExpenseModal();
+        this.showToast('⛽ Gasto registrado exitosamente');
+      },
+      error: (err) => {
+        this.submittingExpense.set(false);
+        console.error(err);
+        this.showToast('❌ Error al registrar gasto');
+      }
+    });
   }
 
   // ═══ MAP ═══

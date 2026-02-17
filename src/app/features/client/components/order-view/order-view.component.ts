@@ -150,34 +150,51 @@ import * as L from 'leaflet';
         <!-- Payment Info -->
         <div class="payment-section">
           <h3>Formas de Pago 💸</h3>
-          <p class="pay-hint">Puedes realizar tu pago por transferencia o depósito ✨</p>
+          <p class="pay-hint">Elige la opción que prefieras para tu pago ✨</p>
           
-          <div class="pay-card">
+          <!-- 1. TRANSFERENCIAS (BANAMEX) -->
+          <div class="pay-card banamex">
             <div class="pay-header">
-              <span class="pay-icon">💳</span>
+              <span class="pay-icon">🏦</span>
               <div>
-                <strong>Transferencia / Depósito</strong>
-                <span class="bank-name">BBVA Bancomer</span>
+                <strong>Transferencia (Preferido)</strong>
+                <span class="bank-name">Citibanamex</span>
               </div>
             </div>
             <div class="card-details">
               <div class="card-row">
                 <span class="card-label">Tarjeta:</span>
-                <span class="card-num">4152 3134 5678 9010</span>
-                <button class="btn-copy-card" (click)="copyText('4152313456789010')">Copiar</button>
+                <span class="card-num">5256 7861 3758 3898</span>
+                <button class="btn-copy-card" (click)="copyText('5256786137583898')">Copiar</button>
               </div>
               <div class="card-row">
                 <span class="card-label">Nombre:</span>
-                <span class="card-name">Miel de Osito S.A.</span>
+                <span class="card-name">Sandra Y Vara Portilla</span>
               </div>
             </div>
           </div>
 
-          <div class="store-logos">
-             <div class="store-badge">🏪 OXXO</div>
-             <div class="store-badge">🏪 7-Eleven</div>
-             <div class="store-badge">🏪 Farmacias</div>
+          <!-- 2. DEPÓSITOS (OXXO) -->
+          <div class="pay-card oxxo">
+            <div class="pay-header">
+              <span class="pay-icon">🏪</span>
+              <div>
+                <strong>Depósito OXXO</strong>
+                <span class="bank-name">Tarjeta Spin / Saldazo</span>
+              </div>
+            </div>
+            <div class="card-details">
+              <div class="card-row">
+                <span class="card-label">Tarjeta:</span>
+                <span class="card-num">4152 3144 9667 1333</span>
+                <button class="btn-copy-card" (click)="copyText('4152314496671333')">Copiar</button>
+              </div>
+            </div>
+            <div class="store-logos">
+              <div class="store-badge">🏪 OXXO</div>
+            </div>
           </div>
+
         </div>
         <p class="footer-msg">Hecho con 💗 para ti</p>
       }

@@ -48,6 +48,10 @@ import { AuthService } from '../../../../core/services/auth.service';
              (click)="sidebarOpen = false">
             <span class="nav-icon">📦</span> Proveedores
           </a>
+          <a routerLink="/admin/financials" routerLinkActive="active"
+             (click)="sidebarOpen = false">
+            <span class="nav-icon">📈</span> Finanzas
+          </a>
         </nav>
 
         <div class="sidebar-footer">
