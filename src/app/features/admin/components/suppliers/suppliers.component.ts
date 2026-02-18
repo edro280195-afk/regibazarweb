@@ -137,9 +137,26 @@ import { Supplier, Investment } from '../../../../shared/models/models';
                   </div>
                 </div>
 
-                <!-- Formulario rápido inversión -->
-                <div class="add-investment-box">
+                  <div class="add-investment-box">
                   <h4>➕ Nueva Inversión</h4>
+                  
+                  <!-- Currency Row -->
+                  <div class="inv-form-row">
+                    <div class="field">
+                      <label>Moneda</label>
+                      <select [(ngModel)]="newInvestment.currency" (change)="onCurrencyChange()">
+                        <option value="MXN">MXN (Pesos)</option>
+                        <option value="USD">USD (Dólares)</option>
+                      </select>
+                    </div>
+                    @if (newInvestment.currency === 'USD') {
+                      <div class="field">
+                        <label>Tipo de Cambio</label>
+                        <input type="number" [(ngModel)]="newInvestment.exchangeRate" placeholder="Ej. 20.50">
+                      </div>
+                    }
+                  </div>
+
                   <div class="inv-form-row">
                     <div class="field">
                       <label>Monto $</label>
@@ -155,7 +172,7 @@ import { Supplier, Investment } from '../../../../shared/models/models';
                            (keydown.enter)="addInvestment()">
                   </div>
                   <button class="btn-add-inv" (click)="addInvestment()"
-                          [disabled]="!newInvestment.amount || newInvestment.amount <= 0 || savingInvestment()">
+                          [disabled]="!newInvestment.amount || newInvestment.amount <= 0 || (newInvestment.currency === 'USD' && !newInvestment.exchangeRate) || savingInvestment()">
                     @if (savingInvestment()) { <span class="spinner"></span> }
                     Registrar Inversión
                   </button>
@@ -175,7 +192,15 @@ import { Supplier, Investment } from '../../../../shared/models/models';
                         <span class="month">{{ inv.date | date:'MMM yy' }}</span>
                       </div>
                       <div class="inv-details">
-                        <span class="inv-amount">$ {{ inv.amount | number:'1.2-2' }}</span>
+                        <div class="amount-row">
+                          <span class="inv-amount">
+                            {{ inv.currency === 'USD' ? '$ ' + (inv.amount | number:'1.2-2') + ' USD' : '$ ' + (inv.amount | number:'1.2-2') + ' MXN' }}
+                          </span>
+                          @if (inv.currency === 'USD') {
+                            <span class="inv-converted">≈ $ {{ (inv.amount * inv.exchangeRate) | number:'1.2-2' }} MXN</span>
+                            <span class="inv-rate-badge">TC: {{ inv.exchangeRate }}</span>
+                          }
+                        </div>
                         <span class="inv-note">{{ inv.notes || 'Inversión registrada' }}</span>
                       </div>
                       <button class="btn-remove-inv" (click)="confirmDeleteInvestment(inv)" title="Eliminar inversión">
@@ -407,7 +432,7 @@ import { Supplier, Investment } from '../../../../shared/models/models';
       .inv-form-row { display: flex; gap: 0.8rem; margin-bottom: 0.6rem; }
       .field { flex: 1; }
       label { display: block; font-size: 0.7rem; font-weight: 700; margin-bottom: 0.3rem; color: var(--pink-600); text-transform: uppercase; letter-spacing: 0.3px; }
-      input {
+      input, select {
         width: 100%; padding: 0.65rem 0.8rem; border: 1.5px solid rgba(255,157,191,0.2);
         border-radius: 0.7rem; font-family: var(--font-body); background: var(--bg-main); box-sizing: border-box;
         color: var(--text-dark);
@@ -443,7 +468,13 @@ import { Supplier, Investment } from '../../../../shared/models/models';
 
     .inv-details {
       flex: 1; display: flex; flex-direction: column; min-width: 0;
+      .amount-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
       .inv-amount { font-weight: 800; font-size: 1rem; color: #2e7d32; }
+      .inv-converted { font-size: 0.8rem; color: #666; font-weight: 600; }
+      .inv-rate-badge { 
+        font-size: 0.65rem; background: #e0f2f1; color: #00695c; 
+        padding: 2px 6px; border-radius: 4px; font-weight: 700; 
+      }
       .inv-note { font-size: 0.82rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
 
@@ -501,11 +532,15 @@ export class SuppliersComponent implements OnInit {
 
   // ── Forms ──
   supplierForm = { name: '', contactName: '', phone: '', notes: '' };
-  newInvestment = { amount: 0, date: this.todayStr(), notes: '' };
+  newInvestment = { amount: 0, date: this.todayStr(), notes: '', currency: 'MXN', exchangeRate: 1 };
 
   // ── Computed ──
   totalInvested = computed(() =>
-    this.investments().reduce((sum, inv) => sum + Number(inv.amount), 0)
+    this.investments().reduce((sum, inv) => {
+      const amount = Number(inv.amount);
+      const rate = inv.currency === 'USD' ? Number(inv.exchangeRate || 1) : 1;
+      return sum + (amount * rate);
+    }, 0)
   );
 
   constructor(
@@ -709,7 +744,15 @@ export class SuppliersComponent implements OnInit {
   // ═══════════════════════════════════════════
 
   private resetInvestmentForm(): void {
-    this.newInvestment = { amount: 0, date: this.todayStr(), notes: '' };
+    this.newInvestment = { amount: 0, date: this.todayStr(), notes: '', currency: 'MXN', exchangeRate: 1 };
+  }
+
+  onCurrencyChange(): void {
+    if (this.newInvestment.currency === 'MXN') {
+      this.newInvestment.exchangeRate = 1;
+    } else {
+      this.newInvestment.exchangeRate = 0; // Reset to force user input or set a default like 20
+    }
   }
 
   private todayStr(): string {

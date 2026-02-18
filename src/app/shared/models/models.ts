@@ -159,6 +159,10 @@ export interface Investment {
   date: string; // ISO
   notes?: string;
   createdAt: string;
+  // Multi-currency
+  currency: string; // 'MXN' | 'USD'
+  exchangeRate: number;
+  totalInPesos?: number; // Calculated for UI
 }
 
 export interface DriverExpense {

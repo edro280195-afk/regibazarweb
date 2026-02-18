@@ -136,6 +136,14 @@ export class ApiService {
     return this.http.post<OrderSummary>(`${this.url}/orders/${orderId}/items`, item);
   }
 
+  updateOrder(id: number, data: any): Observable<OrderSummary> {
+    return this.http.put<OrderSummary>(`${this.url}/orders/${id}`, data);
+  }
+
+  updateOrderItem(orderId: number, itemId: number, data: any): Observable<OrderSummary> {
+    return this.http.put<OrderSummary>(`${this.url}/orders/${orderId}/items/${itemId}`, data);
+  }
+
   deleteAllOrders() {
     return this.http.delete(`${this.url}/orders/wipe`);
   }
@@ -189,8 +197,6 @@ export class ApiService {
 
   // ── Financials ──
   getFinancialReport(startDate: string, endDate: string): Observable<import('../../shared/models/models').FinancialReport> {
-    // If backend doesn't support this yet, we might need to fetch all and aggregate FE side.
-    // implementing as if backend exists or we mock it.
     return this.http.get<import('../../shared/models/models').FinancialReport>(
       `${this.url}/admin/financials?startDate=${startDate}&endDate=${endDate}`
     );

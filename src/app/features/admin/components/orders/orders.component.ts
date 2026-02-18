@@ -40,6 +40,13 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
 
             <div class="edit-modal-body">
               <div class="edit-section">
+                <label class="field-label">👤 Cliente</label>
+                <input type="text" [(ngModel)]="editData.clientName" placeholder="Nombre" class="fancy-input">
+                <input type="text" [(ngModel)]="editData.clientAddress" placeholder="Dirección" class="fancy-input" style="margin-top: 5px">
+                <input type="text" [(ngModel)]="editData.clientPhone" placeholder="Teléfono" class="fancy-input" style="margin-top: 5px">
+              </div>
+
+              <div class="edit-section">
                 <label class="field-label">📦 Método de Entrega</label>
                 <div class="type-switch">
                   <button [class.active]="editData.orderType === 'Delivery'" (click)="editData.orderType = 'Delivery'">
@@ -130,12 +137,21 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                   <span class="preview-name">{{ newItem.productName }}</span>
                   <span class="preview-total">$ {{ (newItem.quantity * newItem.unitPrice) | number:'1.2-2' }}</span>
                 </div>
+
+
               }
 
-              <button class="btn-add-item" (click)="addItemToOrder()" 
-                      [disabled]="!newItem.productName || newItem.unitPrice <= 0">
-                ✨ Agregar al pedido
-              </button>
+              @if (editingItem()) {
+                 <button class="btn-add-item info" (click)="saveItemChanges()" 
+                        [disabled]="!newItem.productName || newItem.unitPrice <= 0">
+                  💾 Guardar cambios
+                </button>
+              } @else {
+                <button class="btn-add-item" (click)="addItemToOrder()" 
+                        [disabled]="!newItem.productName || newItem.unitPrice <= 0">
+                  ✨ Agregar al pedido
+                </button>
+              }
 
               <!-- Items ya en el pedido -->
               @if (drawerOrder()?.items?.length) {
@@ -378,7 +394,8 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                       <span class="name">{{ item.productName }}</span>
                       <span class="price">$ {{ item.lineTotal | number:'1.0-0' }}</span>
                       @if (order.status === 'Pending') {
-                        <button class="btn-del-item" (click)="$event.stopPropagation(); askDeleteItem(order, item)">✕</button>
+                        <button class="btn-icon-mini edit" (click)="$event.stopPropagation(); openEditItem(order, item)" title="Editar">✏️</button>
+                        <button class="btn-icon-mini delete" (click)="$event.stopPropagation(); askDeleteItem(order, item)" title="Eliminar">✕</button>
                       }
                     </div>
                   }
@@ -987,9 +1004,15 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     }
 
     /* 🌸 MODAL & DRAWER BASE STYLES REUSED 🌸 */
-    /* NOTE: .modal-overlay and .modal-card are already defined above.
-       These were duplicates causing dark mode issues (background: white override).
-       Removed to let the themed definitions at the top of the file take effect. */
+    .btn-icon-mini {
+      width: 24px; height: 24px; border-radius: 50%; border: none; 
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0; margin-left: 4px;
+      transition: transform 0.2s;
+    }
+    .btn-icon-mini:hover { transform: scale(1.1); }
+    .btn-icon-mini.edit { background: #e0f2fe; color: #0284c7; }
+    .btn-icon-mini.delete { background: #fee2e2; color: #ef4444; }
   `]
 })
 export class OrdersComponent implements OnInit {
@@ -1012,7 +1035,15 @@ export class OrdersComponent implements OnInit {
 
   // ── Modals ──
   orderToEdit = signal<OrderSummary | null>(null);
-  editData = { status: '', orderType: '', postponedAt: '', postponedNote: '' };
+  editData = {
+    status: '',
+    orderType: '',
+    postponedAt: '',
+    postponedNote: '',
+    clientName: '',
+    clientAddress: '',
+    clientPhone: ''
+  };
 
   // ── Drawer ──
   drawerOrder = signal<OrderSummary | null>(null);
@@ -1129,7 +1160,10 @@ export class OrdersComponent implements OnInit {
       status: order.status,
       orderType: order.orderType,
       postponedAt: order.postponedAt ? new Date(order.postponedAt).toISOString().slice(0, 16) : '',
-      postponedNote: order.postponedNote || ''
+      postponedNote: order.postponedNote || '',
+      clientName: order.clientName,
+      clientAddress: order.clientAddress || '',
+      clientPhone: order.clientPhone || ''
     };
   }
 
@@ -1142,10 +1176,14 @@ export class OrdersComponent implements OnInit {
       orderType: this.editData.orderType,
       postponedAt: (this.editData.status === 'Postponed' && this.editData.postponedAt)
         ? this.editData.postponedAt : null,
-      postponedNote: this.editData.postponedNote || null
+      postponedNote: this.editData.postponedNote || null,
+      clientName: this.editData.clientName,
+      clientAddress: this.editData.clientAddress,
+      clientPhone: this.editData.clientPhone
     };
 
-    this.api.updateOrderStatus(order.id, payload).subscribe({
+    // Use updateOrder for top-level updates (status, type, client info)
+    this.api.updateOrder(order.id, payload).subscribe({
       next: (updated) => {
         const current = this.orders();
         const idx = current.findIndex(o => o.id === order.id);
@@ -1158,6 +1196,55 @@ export class OrdersComponent implements OnInit {
         this.showToast('¡Pedido actualizado! ✨💅');
       },
       error: () => this.showToast('Error al guardar 😿', true)
+    });
+  }
+
+  // ═══════════════ DRAWER: EDIT ITEM ═══════════════
+  // We'll reuse the drawer for editing items too, or create a specific mode
+  editingItem = signal<OrderItem | null>(null);
+
+  openEditItem(order: OrderSummary, item: OrderItem): void {
+    this.drawerOrder.set(order); // We need the order context
+    this.editingItem.set(item);
+
+    // Pre-fill form with item data
+    this.newItem = {
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice
+    };
+
+    setTimeout(() => this.drawerOpen.set(true), 30);
+  }
+
+  saveItemChanges(): void {
+    const order = this.drawerOrder();
+    const item = this.editingItem();
+
+    if (!order || !item || !this.newItem.productName.trim() || this.newItem.unitPrice <= 0) return;
+
+    const payload = {
+      productName: this.newItem.productName.trim(),
+      quantity: this.newItem.quantity,
+      unitPrice: this.newItem.unitPrice
+    };
+
+    this.api.updateOrderItem(order.id, item.id, payload).subscribe({
+      next: (updatedOrder) => {
+        // Update local state
+        const current = this.orders();
+        const idx = current.findIndex(o => o.id === order.id);
+        if (idx !== -1) {
+          current[idx] = updatedOrder;
+          this.orders.set([...current]);
+          this.applyFilter();
+        }
+
+        // Refresh drawer order context if needed, or close
+        this.closeDrawer();
+        this.showToast('¡Artículo actualizado! ✨');
+      },
+      error: () => this.showToast('Error al actualizar artículo 😿', true)
     });
   }
 
@@ -1213,6 +1300,7 @@ export class OrdersComponent implements OnInit {
 
   openDrawer(order: OrderSummary): void {
     this.drawerOrder.set(order);
+    this.editingItem.set(null); // Reset edit mode
     this.newItem = { productName: '', quantity: 1, unitPrice: 0 };
     // Small delay for animation
     setTimeout(() => this.drawerOpen.set(true), 30);
@@ -1220,7 +1308,10 @@ export class OrdersComponent implements OnInit {
 
   closeDrawer(): void {
     this.drawerOpen.set(false);
-    setTimeout(() => this.drawerOrder.set(null), 350);
+    setTimeout(() => {
+      this.drawerOrder.set(null);
+      this.editingItem.set(null);
+    }, 350);
   }
 
   focusField(field: string): void {
