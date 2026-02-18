@@ -440,7 +440,7 @@ function normalizeForMatch(text: string): string {
                   }
                 </div>
                 <div class="order-link">
-                  <input type="text" [value]="order.clientLink" readonly #linkInput>
+                  <input type="text" [value]="order.trackingUrl" readonly #linkInput>
                   <button class="btn-copy" (click)="copyLink(linkInput)">📋 Copiar</button>
                 </div>
               </div>
@@ -1004,6 +1004,7 @@ export class UploadExcelComponent implements OnInit, OnDestroy {
     this.uploading.set(true); this.error.set('');
     this.api.createManualOrder({ clientName: this.manualClient, clientType: (this.manualClientType as 'Nueva' | 'Frecuente') || undefined, orderType: this.manualOrderType, items: validItems }).subscribe({
       next: (order) => {
+        console.log('📦 Response completo:', JSON.stringify(order, null, 2));
         this.result.set({ ordersCreated: 1, clientsCreated: 0, orders: [order], warnings: [] });
         this.uploading.set(false); this.manualClient = ''; this.manualClientType = '';
         this.manualOrderType = 'Delivery'; this.autoDetected.set(false);

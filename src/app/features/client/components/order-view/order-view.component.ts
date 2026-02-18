@@ -182,8 +182,18 @@ import * as L from 'leaflet';
         <div class="payment-section">
           <h3>Formas de Pago 💸</h3>
           <p class="pay-hint">Elige la opción que prefieras para tu pago ✨</p>
-          
-          <!-- 1. TRANSFERENCIAS (BANAMEX) -->
+          <!-- 1. EFECTIVO -->
+          <div class="pay-card cash">
+            <div class="pay-header">
+              <span class="pay-icon">💵</span>
+              <div>
+                <strong>Pago en Efectivo (Al recibir pedido)</strong>
+                <span class="bank-name">Contar con monto exacto de preferencia</span>
+              </div>
+            </div>
+            <p class="cash-hint">Prepara tu cambio exacto para agilizar la entrega ✨</p>
+          </div>
+          <!-- 2. TRANSFERENCIAS (BANAMEX) -->
           <div class="pay-card banamex">
             <div class="pay-header">
               <span class="pay-icon">🏦</span>
@@ -205,6 +215,8 @@ import * as L from 'leaflet';
             </div>
           </div>
 
+          
+
           <!-- 2. DEPÓSITOS (OXXO) -->
           <div class="pay-card oxxo">
             <div class="pay-header">
@@ -224,24 +236,12 @@ import * as L from 'leaflet';
             <div class="store-logos">
               <div class="store-badge">🏪 OXXO</div>
             </div>
-          </div>
-
-          <!-- 3. EFECTIVO -->
-          <div class="pay-card cash">
-            <div class="pay-header">
-              <span class="pay-icon">💵</span>
-              <div>
-                <strong>Pago en Efectivo (Al recibir pedido)</strong>
-                <span class="bank-name">Contar con monto exacto de preferencia</span>
-              </div>
-            </div>
-            <p class="cash-hint">Prepara tu cambio exacto para agilizar la entrega ✨</p>
-          </div>
+          </div>          
 
         </div>
         
         <!-- LOYALTY WIDGET -->
-        @if (loyalty(); as l) {
+        <!-- @if (loyalty(); as l) {
            <div class="loyalty-widget" [attr.data-tier]="l.tier">
              <div class="l-header">
                <span class="l-icon">💎</span>
@@ -256,7 +256,7 @@ import * as L from 'leaflet';
              </div>
              <p class="l-hint">¡Sigue comprando para subir de nivel! ✨</p>
            </div>
-        }
+        } -->
 
         <p class="footer-msg">Hecho con 💗 para ti</p>
       }

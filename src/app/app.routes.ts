@@ -29,6 +29,11 @@ export const routes: Routes = [
           .then(m => m.OrdersComponent)
       },
       {
+        path: 'orders/:id',
+        loadComponent: () => import('./features/admin/components/orders/order-detail/order-detail.component')
+          .then(m => m.OrderDetailComponent)
+      },
+      {
         path: 'routes',
         loadComponent: () => import('./features/admin/components/route-manager/route-manager.component')
           .then(m => m.RouteManagerComponent)

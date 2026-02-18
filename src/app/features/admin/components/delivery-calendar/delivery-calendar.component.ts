@@ -1,15 +1,15 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { OrderSummary } from '../../../../shared/models/models';
-import { RouterModule } from '@angular/router';
 
 @Component({
-  selector: 'app-delivery-calendar',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
-  template: `
+    selector: 'app-delivery-calendar',
+    standalone: true,
+    imports: [CommonModule, FormsModule],
+    template: `
     <div class="calendar-page fade-in">
       
       <!-- HEADER & CONTROLS -->
@@ -27,7 +27,6 @@ import { RouterModule } from '@angular/router';
 
         <div class="view-toggles">
           <button class="btn-toggle active">Mes</button>
-          <!-- <button class="btn-toggle">Semana</button> -->
         </div>
       </div>
 
@@ -79,7 +78,7 @@ import { RouterModule } from '@angular/router';
              
              <div class="orders-list">
                @for (order of selectedOrders(); track order.id) {
-                 <div class="order-item" [routerLink]="['/admin/orders']" [state]="{ highlightId: order.id }">
+                 <div class="order-item" (click)="goToOrder(order.id); $event.stopPropagation()">
                    <div class="time-col">
                      @if (order.deliveryTime) {
                        <span class="time">{{ order.deliveryTime }}</span>
@@ -115,7 +114,7 @@ import { RouterModule } from '@angular/router';
 
     </div>
   `,
-  styles: [`
+    styles: [`
     :host { display: block; padding: 2rem; max-width: 1400px; margin: 0 auto; }
     .fade-in { animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -166,7 +165,7 @@ import { RouterModule } from '@angular/router';
       &.today { background: #fffbe6; .day-number { background: var(--pink-500); color: white; } }
       &.selected { background: var(--pink-50); box-shadow: inset 0 0 0 2px var(--pink-300); }
     }
-    .day-cell:nth-child(7n) { border-right: none; } /* Remove right border for last col */
+    .day-cell:nth-child(7n) { border-right: none; }
 
     .day-number {
       width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -240,132 +239,123 @@ import { RouterModule } from '@angular/router';
   `]
 })
 export class DeliveryCalendarComponent implements OnInit {
-  orders = signal<OrderSummary[]>([]);
-  currentDate = signal(new Date());
-  selectedDate = signal<Date | null>(null);
+    orders = signal<OrderSummary[]>([]);
+    currentDate = signal(new Date());
+    selectedDate = signal<Date | null>(null);
 
-  weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-  // Computeds for Calendar Logic
-  currentYear = computed(() => this.currentDate().getFullYear());
-  currentMonthName = computed(() => {
-    return this.currentDate().toLocaleString('es-MX', { month: 'long' });
-  });
-
-  daysInMonth = computed(() => {
-    const year = this.currentDate().getFullYear();
-    const month = this.currentDate().getMonth();
-    const days = new Date(year, month + 1, 0).getDate();
-    return Array.from({ length: days }, (_, i) => new Date(year, month, i + 1));
-  });
-
-  emptyStartDays = computed(() => {
-    const year = this.currentDate().getFullYear();
-    const month = this.currentDate().getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    return Array(firstDay).fill(0);
-  });
-
-  selectedOrders = computed(() => {
-    const date = this.selectedDate();
-    if (!date) return [];
-    return this.getOrdersForDate(date);
-  });
-
-  constructor(private api: ApiService) { }
-
-  ngOnInit() {
-    this.loadOrders();
-  }
-
-  loadOrders() {
-    this.api.getOrders().subscribe(data => {
-      this.orders.set(data);
+    // Computeds for Calendar Logic
+    currentYear = computed(() => this.currentDate().getFullYear());
+    currentMonthName = computed(() => {
+        return this.currentDate().toLocaleString('es-MX', { month: 'long' });
     });
-  }
 
-  changeMonth(delta: number) {
-    const current = this.currentDate();
-    this.currentDate.set(new Date(current.getFullYear(), current.getMonth() + delta, 1));
-    this.selectedDate.set(null); // Deselect on month change
-  }
-
-  selectDate(date: Date) {
-    this.selectedDate.set(date);
-  }
-
-  isToday(date: Date): boolean {
-    const today = new Date();
-    return date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-  }
-
-  isSelected(date: Date): boolean {
-    const sel = this.selectedDate();
-    return !!sel && sel.getTime() === date.getTime();
-  }
-
-  getOrdersForDate(date: Date): OrderSummary[] {
-    const orders = this.orders();
-
-    return orders.filter(o => {
-      let targetDate: Date;
-
-      // 1. Caso: POSPUESTO (Manda la fecha manual)
-      if (o.status === 'Postponed' && o.postponedAt) {
-        targetDate = new Date(o.postponedAt);
-      }
-      // 2. Caso: PICKUP (Manda fecha de recolección o creación)
-      else if (o.orderType === 'PickUp') {
-        // Si tienes campo pickupDate úsalo, si no, usa createdAt
-        targetDate = new Date(o.createdAt);
-      }
-      // 3. Caso: DELIVERY (Lógica de Domingos)
-      else {
-        const created = o.createdAt;
-        // ¡OJO AQUÍ! Aseguramos que si viene null, sea 'Nueva'
-        const cType = (o.clientType || 'Nueva');
-
-        targetDate = this.calculateDeliveryDate(created, cType);
-      }
-
-      // Comparamos solo día/mes/año (ignorando horas)
-      return targetDate.getDate() === date.getDate() &&
-        targetDate.getMonth() === date.getMonth() &&
-        targetDate.getFullYear() === date.getFullYear();
+    daysInMonth = computed(() => {
+        const year = this.currentDate().getFullYear();
+        const month = this.currentDate().getMonth();
+        const days = new Date(year, month + 1, 0).getDate();
+        return Array.from({ length: days }, (_, i) => new Date(year, month, i + 1));
     });
-  }
 
-  private calculateDeliveryDate(createdStr: string, clientType: string): Date {
-    const created = new Date(createdStr);
-    const delivery = new Date(created); // Copia para no mutar
+    emptyStartDays = computed(() => {
+        const year = this.currentDate().getFullYear();
+        const month = this.currentDate().getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        return Array(firstDay).fill(0);
+    });
 
-    // Día de la semana (0 = Domingo, 1 = Lunes...)
-    const dayOfWeek = created.getDay();
+    selectedOrders = computed(() => {
+        const date = this.selectedDate();
+        if (!date) return [];
+        return this.getOrdersForDate(date);
+    });
 
-    // Días que faltan para el PRÓXIMO Domingo
-    // Ej: Si es Viernes(5), faltan 2. Si es Domingo(0), faltan 7 (próximo).
-    let daysUntilNextSunday = (7 - dayOfWeek);
-    if (dayOfWeek === 0) daysUntilNextSunday = 7; // Si se creó en Domingo, pasa al siguiente
+    constructor(private api: ApiService, private router: Router) { }
 
-    // Regla Base: Todas se entregan el próximo Domingo
-    let totalDaysToAdd = daysUntilNextSunday;
-
-    // Regla Extra: Si es Frecuente, se salta un domingo (+7 días extra)
-    // PERO SOLO SI ES EXPLÍCITAMENTE 'Frecuente'
-    if (clientType && clientType.trim() === 'Frecuente') {
-      totalDaysToAdd += 7;
+    ngOnInit() {
+        this.loadOrders();
     }
 
-    delivery.setDate(created.getDate() + totalDaysToAdd);
-    return delivery;
-  }
+    loadOrders() {
+        this.api.getOrders().subscribe(data => {
+            this.orders.set(data);
+        });
+    }
 
-  statusLabel(s: string): string {
-    const map: Record<string, string> = {
-      'Pending': 'Pendiente', 'InRoute': 'En Ruta', 'Delivered': 'Entregado', 'Canceled': 'Cancelado', 'Postponed': 'Pospuesto'
-    };
-    return map[s] || s;
-  }
+    changeMonth(delta: number) {
+        const current = this.currentDate();
+        this.currentDate.set(new Date(current.getFullYear(), current.getMonth() + delta, 1));
+        this.selectedDate.set(null);
+    }
+
+    selectDate(date: Date) {
+        this.selectedDate.set(date);
+    }
+
+    isToday(date: Date): boolean {
+        const today = new Date();
+        return date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
+    }
+
+    isSelected(date: Date): boolean {
+        const sel = this.selectedDate();
+        return !!sel && sel.getTime() === date.getTime();
+    }
+
+    getOrdersForDate(date: Date): OrderSummary[] {
+        const orders = this.orders();
+
+        return orders.filter(o => {
+            let targetDate: Date;
+
+            if (o.status === 'Postponed' && o.postponedAt) {
+                targetDate = new Date(o.postponedAt);
+            }
+            else if (o.orderType === 'PickUp') {
+                targetDate = new Date(o.createdAt);
+            }
+            else {
+                const created = o.createdAt;
+                const cType = (o.clientType || 'Nueva');
+                targetDate = this.calculateDeliveryDate(created, cType);
+            }
+
+            return targetDate.getDate() === date.getDate() &&
+                targetDate.getMonth() === date.getMonth() &&
+                targetDate.getFullYear() === date.getFullYear();
+        });
+    }
+
+    private calculateDeliveryDate(createdStr: string, clientType: string): Date {
+        const created = new Date(createdStr);
+        const delivery = new Date(created);
+
+        const dayOfWeek = created.getDay();
+
+        let daysUntilNextSunday = (7 - dayOfWeek);
+        if (dayOfWeek === 0) daysUntilNextSunday = 7;
+
+        let totalDaysToAdd = daysUntilNextSunday;
+
+        if (clientType && clientType.trim() === 'Frecuente') {
+            totalDaysToAdd += 7;
+        }
+
+        delivery.setDate(created.getDate() + totalDaysToAdd);
+        return delivery;
+    }
+
+    goToOrder(id: number): void {
+        this.router.navigate(['/admin/orders', id]);
+    }
+
+    statusLabel(s: string): string {
+        const map: Record<string, string> = {
+            'Pending': 'Pendiente', 'InRoute': 'En Ruta', 'Delivered': 'Entregado', 'Canceled': 'Cancelado', 'Postponed': 'Pospuesto'
+        };
+        return map[s] || s;
+    }
 }

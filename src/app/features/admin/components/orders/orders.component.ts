@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
 import { WhatsAppService } from '../../../../core/services/whatsapp.service';
@@ -391,7 +392,7 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
                [class.selection-mode]="selectionMode()"
                [class.selected]="selectedIds().has(order.id)"
                [attr.data-status]="order.status"
-               (click)="selectionMode() ? toggleOrder(order.id) : null">
+               (click)="selectionMode() ? toggleOrder(order.id) : goToOrder(order.id)">
             
             @if (selectionMode() && selectedIds().has(order.id)) {
               <div class="selection-stamp">
@@ -480,9 +481,9 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
                 <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
               </div>
               <div class="card-buttons">
-                <button class="action-btn edit" (click)="openEdit(order)" title="Gestionar">⚙️</button>
-                <button class="action-btn link" (click)="copyLink(order.clientLink)" title="Copiar Link">📋</button>
-                <button class="action-btn delete" (click)="askDeleteOrder(order)" title="Eliminar">🗑️</button>
+                <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.trackingUrl)" title="Copiar Link">📋</button>
+                <button class="action-btn delete" (click)="$event.stopPropagation(); askDeleteOrder(order)" title="Eliminar">🗑️</button>
+                <span class="action-arrow" title="Ver detalle">→</span>
               </div>
             </div>
           </div>
@@ -1123,6 +1124,12 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
     }
 
     /* 🌸 MODAL & DRAWER BASE STYLES REUSED 🌸 */
+    .action-arrow {
+      font-size: 1.2rem; font-weight: 800; color: var(--pink-300);
+      transition: all 0.2s; cursor: pointer;
+    }
+    .order-card:hover .action-arrow { color: var(--pink-500); transform: translateX(3px); }
+
     .btn-icon-mini {
       width: 24px; height: 24px; border-radius: 50%; border: none; 
       display: flex; align-items: center; justify-content: center;
@@ -1228,7 +1235,8 @@ export class OrdersComponent implements OnInit {
   constructor(
     private api: ApiService,
     private confirm: ConfirmationService,
-    private whatsapp: WhatsAppService
+    private whatsapp: WhatsAppService,
+    private router: Router
   ) { }
 
   ngOnInit(): void {
@@ -1624,6 +1632,10 @@ export class OrdersComponent implements OnInit {
   }
 
   // ═══════════════ UTILITIES ═══════════════
+
+  goToOrder(id: number): void {
+    this.router.navigate(['/admin/orders', id]);
+  }
 
   copyLink(link: string): void {
     navigator.clipboard.writeText(link);
