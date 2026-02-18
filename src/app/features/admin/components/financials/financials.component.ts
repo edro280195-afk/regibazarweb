@@ -5,10 +5,10 @@ import { ApiService } from '../../../../core/services/api.service';
 import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../../../shared/models/models';
 
 @Component({
-    selector: 'app-financials',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-financials',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="financials-page">
       <header class="page-header">
         <div>
@@ -134,7 +134,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
 
     </div>
   `,
-    styles: [`
+  styles: [`
     .financials-page { max-width: 1200px; animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -147,7 +147,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
 
     .date-controls {
       display: flex; gap: 1rem; align-items: flex-end;
-      background: white; padding: 1rem; border-radius: 1rem;
+      background: var(--bg-card); padding: 1rem; border-radius: 1rem;
       box-shadow: var(--shadow-sm); border: 1px solid var(--border-soft);
     }
     .control-group {
@@ -171,7 +171,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
       display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;
     }
     .summary-card {
-      background: white; padding: 1.5rem; border-radius: 1.5rem;
+      background: var(--bg-card); padding: 1.5rem; border-radius: 1.5rem;
       border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm);
       display: flex; align-items: center; gap: 1rem;
       transition: transform 0.2s;
@@ -202,7 +202,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
 
     /* DETAILS */
     .details-section {
-      background: white; border-radius: 1.5rem; border: 1px solid var(--border-soft);
+      background: var(--bg-card); border-radius: 1.5rem; border: 1px solid var(--border-soft);
       box-shadow: var(--shadow-sm); overflow: hidden;
     }
     .tabs {
@@ -211,7 +211,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
         padding: 1rem 1.5rem; border: none; background: none; cursor: pointer;
         font-weight: 700; color: var(--text-medium); border-bottom: 3px solid transparent;
         transition: all 0.2s;
-        &.active { color: var(--pink-600); border-bottom-color: var(--pink-500); background: white; }
+        &.active { color: var(--pink-600); border-bottom-color: var(--pink-500); background: var(--bg-card); }
         &:hover:not(.active) { color: var(--pink-400); }
       }
     }
@@ -220,7 +220,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
     .data-table {
       width: 100%; border-collapse: collapse;
       th, td { padding: 1rem 1.5rem; text-align: left; }
-      th { background: #f8f9fa; font-weight: 700; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; }
+      th { background: var(--bg-main); font-weight: 700; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; }
       td { border-bottom: 1px solid #f0f0f0; color: var(--text-dark); font-size: 0.95rem; }
       tr:last-child td { border-bottom: none; }
       .text-right { text-align: right; }
@@ -240,64 +240,37 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
   `]
 })
 export class FinancialsComponent implements OnInit {
-    startDate: string = '';
-    endDate: string = '';
-    loading = signal(false);
-    report = signal<FinancialReport | null>(null);
-    activeTab = signal<'investments' | 'expenses'>('investments');
+  startDate: string = '';
+  endDate: string = '';
+  loading = signal(false);
+  report = signal<FinancialReport | null>(null);
+  activeTab = signal<'investments' | 'expenses'>('investments');
 
-    constructor(private api: ApiService) {
-        // Default to current fortnight (simple logic for now: start of month to today, or similar)
-        const now = new Date();
-        this.endDate = now.toISOString().split('T')[0];
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        this.startDate = start.toISOString().split('T')[0];
-    }
+  constructor(private api: ApiService) {
+    // Default to current fortnight (simple logic for now: start of month to today, or similar)
+    const now = new Date();
+    this.endDate = now.toISOString().split('T')[0];
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    this.startDate = start.toISOString().split('T')[0];
+  }
 
-    ngOnInit(): void {
-        this.loadData();
-    }
+  ngOnInit(): void {
+    this.loadData();
+  }
 
-    loadData(): void {
-        if (!this.startDate || !this.endDate) return;
+  loadData(): void {
+    if (!this.startDate || !this.endDate) return;
 
-        this.loading.set(true);
-        this.api.getFinancialReport(this.startDate, this.endDate).subscribe({
-            next: (data) => {
-                this.report.set(data);
-                this.loading.set(false);
-            },
-            error: (err) => {
-                console.error('Error loading financials', err);
-                // MOCK DATA ON ERROR (Until backend is ready)
-                this.mockData();
-                this.loading.set(false);
-            }
-        });
-    }
-
-    private mockData() {
-        // Provisional mock to show UI behaviors
-        this.report.set({
-            period: 'Simulado',
-            startDate: this.startDate,
-            endDate: this.endDate,
-            totalIncome: 15400.50,
-            totalInvestment: 8200.00,
-            totalExpenses: 1350.00,
-            netProfit: 5850.50,
-            details: {
-                investments: [
-                    { id: 1, supplierId: 101, amount: 5000, date: this.startDate, notes: 'Mercancía nueva', createdAt: '' },
-                    { id: 2, supplierId: 102, amount: 3200, date: this.endDate, notes: 'Restock accesorios', createdAt: '' }
-                ],
-                incomes: [],
-                expenses: [
-                    { id: 1, driverId: 1, driverName: 'Juan Repartidor', amount: 500, expenseType: 'Gasolina', date: this.startDate, notes: 'Tanque lleno', createdAt: '' },
-                    { id: 2, driverId: 2, driverName: 'Pedro Driver', amount: 200, expenseType: 'Comida', date: this.endDate, notes: 'Almuerzo ruta larga', createdAt: '' },
-                    { id: 3, driverId: 1, driverName: 'Juan Repartidor', amount: 650, expenseType: 'Mantenimiento', date: this.endDate, notes: 'Aceite', createdAt: '' }
-                ]
-            }
-        });
-    }
+    this.loading.set(true);
+    this.api.getFinancialReport(this.startDate, this.endDate).subscribe({
+      next: (data) => {
+        this.report.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        console.error('Error loading financials', err);
+        this.loading.set(false);
+      }
+    });
+  }
 }

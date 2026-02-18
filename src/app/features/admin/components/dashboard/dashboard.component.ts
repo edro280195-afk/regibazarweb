@@ -115,35 +115,7 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
              </div>
            </div>
 
-          <div class="section-title">
-            <h3>Acciones Rápidas ⚡</h3>
-          </div>
-          
-          <div class="actions-grid">
-            <a routerLink="/admin/upload" class="action-btn upload">
-              <div class="icon-circle">📄</div>
-              <span>Subir Excel</span>
-            </a>
-            
-            <a routerLink="/admin/orders" class="action-btn orders">
-              <div class="icon-circle">🛒</div>
-              <span>Ver Pedidos</span>
-            </a>
-            
-            <a routerLink="/admin/routes" class="action-btn routes">
-              <div class="icon-circle">🗺️</div>
-              <span>Mis Rutas</span>
-            </a>
-            
-            <a routerLink="/admin/clients" class="action-btn clients">
-              <div class="icon-circle">👯‍♀️</div>
-              <span>Clientas</span>
-            </a>
-             <a routerLink="/admin/suppliers" class="action-btn suppliers">
-              <div class="icon-circle">📦</div>
-              <span>Proveedores</span>
-            </a>
-          </div>
+                  <!-- Quick Actions removed as per user request -->
         }
       }
     </div>
@@ -237,9 +209,9 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
     }
 
     .stat-card {
-      background: rgba(255, 255, 255, 0.8);
+      background: var(--bg-card);
       backdrop-filter: blur(12px);
-      border: 1px solid white;
+      border: 1px solid var(--border-soft);
       border-radius: 1.8rem;
       padding: 1.2rem;
       display: flex; flex-direction: column; justify-content: space-between;
@@ -249,33 +221,35 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
       cursor: default;
       animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     }
-
+    
     .stat-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: var(--shadow-md); }
 
     /* Estilos específicos de tarjetas */
+    /* Estilos específicos de tarjetas */
     .revenue-card {
       grid-column: 1 / -1;
-      background: linear-gradient(135deg, #fff0f6 0%, #e6f7ff 100%);
-      height: auto; padding: 1.5rem 2rem; position: relative; overflow: hidden; border: none;
+      background: linear-gradient(135deg, var(--bg-main) 0%, var(--bg-card) 100%);
+      border: 1px solid var(--border-soft);
+      height: auto; padding: 1.5rem 2rem; position: relative; overflow: hidden;
     }
     
     @media (min-width: 600px) { .revenue-card { grid-column: span 2; } }
 
     .revenue-card .card-content { display: flex; align-items: center; gap: 1.5rem; position: relative; z-index: 2; }
-    .revenue-card .card-icon { font-size: 2.5rem; background: rgba(255,255,255,0.6); padding: 12px; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .revenue-card .card-icon { font-size: 2.5rem; background: var(--bg-glass); padding: 12px; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
     .revenue-card .label { display: block; font-size: 0.9rem; color: var(--text-medium); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
     .revenue-card .value { font-size: 2.5rem; font-weight: 800; color: var(--pink-600); font-family: var(--font-body); }
     .revenue-card .sparkles { position: absolute; right: 10px; top: -10px; font-size: 5rem; opacity: 0.3; transform: rotate(20deg); animation: shimmer 3s infinite linear; }
 
-    /* Colores pastel */
-    .pink-glass { background: linear-gradient(145deg, #FFF0F6, rgba(255,255,255,0.8)); border-color: #FFC2D9; }
-    .purple-glass { background: linear-gradient(145deg, #F9F0FF, rgba(255,255,255,0.8)); border-color: #E8D5F5; }
-    .peach-glass { background: linear-gradient(145deg, #FFF7E6, rgba(255,255,255,0.8)); border-color: #FFE5D4; }
-    .mint-glass { background: linear-gradient(145deg, #F6FFED, rgba(255,255,255,0.8)); border-color: #D4F5E9; }
-    .blue-glass { background: linear-gradient(145deg, #E6F7FF, rgba(255,255,255,0.8)); border-color: #BAE7FF; }
+    /* Colores pastel adaptados a tema */
+    .pink-glass { background: var(--bg-card); border-color: var(--pink-200); }
+    .purple-glass { background: var(--bg-card); border-color: var(--pink-200); }
+    .peach-glass { background: var(--bg-card); border-color: var(--pink-200); }
+    .mint-glass { background: var(--bg-card); border-color: var(--color-success-bg); }
+    .blue-glass { background: var(--bg-card); border-color: var(--pink-200); }
 
     .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .stat-header .emoji { font-size: 1.5rem; background: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .stat-header .emoji { font-size: 1.5rem; background: var(--bg-main); border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     .stat-header .trend { font-size: 0.85rem; font-weight: 700; color: var(--text-light); }
     
     .stat-number { font-size: 2rem; font-weight: 800; color: var(--text-dark); }
@@ -549,9 +523,9 @@ export class DashboardComponent implements OnInit {
       color: colors,
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderColor: '#FFC2D9',
-        textStyle: { color: '#855C75' }
+        backgroundColor: 'var(--bg-overlay)',
+        borderColor: 'var(--pink-200)',
+        textStyle: { color: 'var(--text-medium)' }
       },
       legend: { bottom: 0 },
       grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },

@@ -440,37 +440,38 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
        DESIGN TOKENS
     ═══════════════════════════════════════════ */
     :host {
-      --pink-50:  #fdf2f8;
-      --pink-100: #fce7f3;
-      --pink-200: #fbcfe8;
-      --pink-300: #f9a8d4;
-      --pink-400: #f472b6;
-      --pink-500: #ec4899;
-      --pink-600: #db2777;
-      --rose-gold: #b76e79;
-      --purple-50:  #faf5ff;
-      --purple-100: #f3e8ff;
-      --purple-200: #e9d5ff;
-      --purple-500: #a855f7;
-      --green-50:  #f0fdf4;
-      --green-500: #22c55e;
-      --amber-50:  #fffbeb;
-      --amber-600: #d97706;
       --radius-xl: 24px;
       --radius-lg: 16px;
       --radius-md: 12px;
       --shadow-soft: 0 8px 25px rgba(255, 107, 157, 0.08);
-      --shadow-lift: 0 15px 35px rgba(255, 107, 157, 0.14);
       --gradient-pink: linear-gradient(135deg, #ff6b9d, #c084fc);
       --gradient-danger: linear-gradient(135deg, #ff6b9d, #e0395c);
       --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    /* ═════════ MISSING STYLES ═════════ */
+    .btn-nuke {
+      background: var(--color-danger); color: white; border: none; padding: 0.6rem 1rem;
+      border-radius: 20px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; gap: 6px; font-size: 0.85rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      &:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(220, 38, 38, 0.25); }
+    }
+    
+    .filter-select {
+      appearance: none; background: var(--bg-card); border: 2px solid var(--pink-200);
+      border-radius: 20px; padding: 0.6rem 2rem 0.6rem 1rem; color: var(--text-dark);
+      font-weight: 600; cursor: pointer; outline: none; transition: all 0.2s;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23db2777' d='M6 8.825L1.175 4L2.238 2.938L6 6.7L9.763 2.938L10.825 4z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+      &:focus { border-color: var(--pink-500); box-shadow: 0 0 0 3px var(--pink-100); }
     }
 
     /* ═════════ SELECTION TOGGLE ═════════ */
     .btn-toggle-select {
       padding: 0.6rem 1.2rem; border-radius: 20px; border: 2px solid var(--pink-200);
-      background: white; color: var(--pink-600); font-weight: 700; cursor: pointer;
-      transition: all 0.2s; box-shadow: 0 4px 10px rgba(255,107,157,0.1);
+      background: var(--bg-card); color: var(--pink-600); font-weight: 700; cursor: pointer;
+       transition: all 0.2s; box-shadow: 0 4px 10px rgba(255,107,157,0.1);
       &:hover { transform: translateY(-2px); border-color: var(--pink-400); }
       &.active { background: var(--pink-100); border-color: var(--pink-400); color: var(--pink-700); }
     }
@@ -484,7 +485,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     }
     .route-dock {
       pointer-events: auto;
-      background: rgba(255, 255, 255, 0.9);
+      background: var(--bg-glass);
       backdrop-filter: blur(16px) saturate(180%);
       border: 1px solid rgba(255, 255, 255, 0.6);
       box-shadow: 0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,107,157,0.1);
@@ -578,7 +579,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
       padding: 1rem 1.25rem 6rem;
       max-width: 1360px;
       margin: 0 auto;
-      background: #fdfafb;
+      background: var(--bg-main);
       min-height: 100vh;
     }
 
@@ -587,12 +588,12 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     ═══════════════════════════════════════════ */
     .toast-notification {
       position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-      background: rgba(255, 255, 255, 0.95);
+      background: var(--bg-overlay);
       backdrop-filter: blur(12px);
       border: 1.5px solid var(--pink-200);
       padding: 12px 24px; border-radius: 50px;
       display: flex; align-items: center; gap: 8px;
-      z-index: 600; font-weight: 700; font-size: 0.9rem; color: #555;
+      z-index: 600; font-weight: 700; font-size: 0.9rem; color: var(--text-dark);
       box-shadow: 0 10px 30px rgba(255, 107, 157, 0.15);
       animation: toastSlide 0.4s var(--ease-bounce);
       &.error { border-color: #fca5a5; }
@@ -607,19 +608,113 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(8px);
-      z-index: 500;
+      z-index: 2000;
       display: flex; align-items: center; justify-content: center;
       animation: fadeIn 0.3s forwards;
     }
 
     .modal-card {
-      background: white; border-radius: var(--radius-xl);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      background: var(--bg-card); border-radius: var(--radius-xl);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25); border: 1px solid var(--border-soft);
       padding: 0; width: 90%; max-width: 400px;
       position: relative;
       animation: scaleUp 0.3s var(--ease-bounce);
     }
     @keyframes scaleUp { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ═══════════════════════════════════════════
+       EDIT MODAL STYLES (GESTIONAR PEDIDO)
+    ═══════════════════════════════════════════ */
+    .edit-modal {
+      width: 95%; max-width: 500px; overflow: hidden; display: flex; flex-direction: column;
+    }
+    .edit-modal-header {
+      position: relative; padding: 1.5rem 1.5rem 0.5rem; text-align: center;
+    }
+    .edit-modal-bg-blur {
+      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(circle, var(--pink-200) 0%, transparent 60%);
+      opacity: 0.3; pointer-events: none; z-index: 0;
+    }
+    .sparkle-row { font-size: 1.5rem; margin-bottom: 0.5rem; animation: float 3s ease-in-out infinite; }
+    .edit-modal-header h3 {
+      font-family: var(--font-display); font-size: 1.8rem; color: var(--pink-600);
+      margin: 0; position: relative; z-index: 1;
+    }
+    .client-title {
+      font-size: 1.1rem; color: var(--text-dark); margin: 0.2rem 0 0; font-weight: 700;
+      position: relative; z-index: 1;
+    }
+    .btn-close-modal {
+      position: absolute; top: 1rem; right: 1rem; background: transparent; border: none;
+      font-size: 1.5rem; color: #ccc; cursor: pointer; z-index: 2; transition: 0.2s;
+      &:hover { transform: rotate(90deg); color: var(--pink-500); }
+    }
+
+    .edit-modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+    .edit-section { display: flex; flex-direction: column; gap: 0.8rem; }
+    .field-label {
+      font-size: 0.8rem; font-weight: 800; color: var(--pink-500);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* Type Switch */
+    .type-switch {
+      display: flex; background: var(--pink-50); padding: 4px; border-radius: 16px;
+      border: 1px solid var(--pink-100);
+    }
+    .type-switch button {
+      flex: 1; border: none; background: transparent; padding: 10px; border-radius: 12px;
+      font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.3s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .type-switch button.active {
+      background: var(--bg-card); color: var(--pink-600); box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      border: 1px solid var(--border-soft);
+    }
+    .switch-icon { font-size: 1.2rem; }
+
+    /* Status Pills */
+    .status-pills-selector {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .status-pill-btn {
+      border: 1px solid var(--border-soft); background: var(--bg-main);
+      color: var(--text-medium); padding: 8px 14px; border-radius: 20px;
+      font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+    }
+    .status-pill-btn:hover { background: var(--pink-100); border-color: var(--pink-200); }
+    .status-pill-btn.active {
+      background: var(--pink-600); color: white; border-color: var(--pink-600);
+      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+    }
+
+    /* Postponed Box */
+    .postponed-box {
+      background: var(--color-warning-bg); border: 1px dashed var(--color-warning); border-radius: 16px; padding: 1rem;
+      display: flex; flex-direction: column; gap: 1rem; animation: slideDown 0.3s ease-out;
+    }
+    .fancy-input {
+      width: 100%; border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px;
+      font-family: inherit; font-size: 0.95rem; outline: none; transition: 0.2s;
+      background: var(--bg-main); color: var(--text-dark);
+    }
+    .fancy-input:focus { border-color: var(--pink-400); background: var(--bg-card); box-shadow: 0 0 0 3px rgba(236,72,153,0.1); }
+
+    .edit-modal-footer {
+      padding: 1rem 1.5rem 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;
+      border-top: 1px solid var(--border-soft);
+    }
+    .btn-modal-cancel {
+      background: transparent; border: none; color: var(--text-muted); font-weight: 700; cursor: pointer;
+      &:hover { color: var(--text-medium); text-decoration: underline; }
+    }
+    .btn-modal-pink {
+      background: var(--pink-500); color: white; border: none; padding: 10px 20px;
+      border-radius: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(236,72,153,0.3);
+      transition: 0.2s;
+      &:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(236,72,153,0.4); }
+    }
 
     /* ═══════════════════════════════════════════
        HEADER
@@ -640,7 +735,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
 
     .search-box {
       position: relative;
-      background: white; border-radius: 25px;
+      background: var(--bg-card); border-radius: 25px;
       box-shadow: 0 4px 15px rgba(236, 72, 153, 0.08); /* Pink shadow */
       transition: all 0.3s;
     }
@@ -651,7 +746,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     .search-input {
       border: none; background: transparent; padding: 10px 20px 10px 40px;
       font-size: 0.95rem; border-radius: 25px; width: 220px;
-      font-weight: 600; color: #444; outline: none; transition: width 0.3s;
+      font-weight: 600; color: var(--text-dark); outline: none; transition: width 0.3s;
     }
     .search-input:focus { width: 280px; }
     .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.5; font-size: 1rem; }
@@ -663,7 +758,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
 
     .btn-icon-circle {
       width: 44px; height: 44px; border-radius: 50%;
-      background: white; border: 1px solid #fce7f3;
+      background: var(--bg-card); border: 1px solid #fce7f3;
       display: flex; align-items: center; justify-content: center;
       font-size: 1.2rem; cursor: pointer; transition: all 0.2s;
       box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -682,13 +777,13 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
       display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;
     }
     .qs-chip {
-      background: white; border-radius: 16px; padding: 10px 20px;
+      background: var(--bg-card); border-radius: 16px; padding: 10px 20px;
       display: flex; flex-direction: column; min-width: 100px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid white;
       transition: all 0.3s;
     }
     .qs-chip:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.06); }
-    .qs-num { font-size: 1.4rem; font-weight: 800; color: #444; font-family: var(--font-body); }
+    .qs-num { font-size: 1.4rem; font-weight: 800; color: var(--text-dark); font-family: var(--font-body); }
     .qs-label { font-size: 0.75rem; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
 
     .qs-chip.pending { background: #fffbeb; border-color: #fef3c7; .qs-num { color: #d97706; } }
@@ -726,7 +821,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     }
 
     .order-card {
-      background: rgba(255, 255, 255, 0.85);
+      background: var(--bg-card);
       backdrop-filter: blur(10px);
       border-radius: 24px;
       border: 1px solid white;
@@ -736,8 +831,8 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
       display: flex; flex-direction: column; gap: 1rem;
       transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
-    .order-card[data-status="Delivered"] { background: rgba(240, 253, 244, 0.7); }
-    .order-card[data-status="Canceled"] { background: rgba(254, 242, 242, 0.7); opacity: 0.85; }
+    .order-card[data-status="Delivered"] { background: var(--color-success-bg); border-color: var(--color-success); }
+    .order-card[data-status="Canceled"] { background: var(--color-danger-bg); opacity: 0.85; border-color: var(--color-danger); }
 
     .order-card:hover {
       transform: translateY(-8px) scale(1.02);
@@ -765,7 +860,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     /* Card Body */
     .card-body { display: flex; flex-direction: column; gap: 1rem; flex: 1; }
     .client-info .name-check { display: flex; align-items: center; gap: 8px; }
-    .client-name { font-size: 1.2rem; font-weight: 700; color: #333; margin: 0; line-height: 1.2; }
+    .client-name { font-size: 1.2rem; font-weight: 700; color: var(--text-dark); margin: 0; line-height: 1.2; }
     .badge-vip {
       font-size: 0.65rem; background: linear-gradient(135deg, #FFD700, #ffb347);
       color: white; padding: 2px 8px; border-radius: 8px; font-weight: 800;
@@ -785,13 +880,13 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     .items-scroll-row { overflow-x: auto; padding-bottom: 5px; margin: 0 -5px; padding: 5px; }
     .items-track { display: flex; gap: 8px; }
     .item-chip {
-      background: white; border-radius: 12px; padding: 6px 10px;
+      background: var(--bg-main); border-radius: 12px; padding: 6px 10px;
       display: flex; align-items: center; gap: 6px;
       border: 1px solid #f0f0f0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
       flex-shrink: 0; font-size: 0.85rem;
     }
     .qty { font-weight: 800; color: var(--pink-500); background: var(--pink-50); padding: 2px 6px; border-radius: 6px; font-size: 0.75rem; }
-    .name { max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #555; }
+    .name { max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-medium); }
     .price { font-weight: 600; color: #999; font-size: 0.75rem; }
     .btn-del-item {
       width: 20px; height: 20px; border-radius: 50%; border: none; background: #fee2e2;
@@ -892,16 +987,9 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     }
 
     /* 🌸 MODAL & DRAWER BASE STYLES REUSED 🌸 */
-    .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px);
-      z-index: 2000; display: flex; align-items: center; justify-content: center;
-      animation: fadeIn 0.3s;
-    }
-    .modal-card {
-      background: white; border-radius: 30px; padding: 2rem;
-      max-width: 90vw; width: 400px;
-      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
-    }
+    /* NOTE: .modal-overlay and .modal-card are already defined above.
+       These were duplicates causing dark mode issues (background: white override).
+       Removed to let the themed definitions at the top of the file take effect. */
   `]
 })
 export class OrdersComponent implements OnInit {

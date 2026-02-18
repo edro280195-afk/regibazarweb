@@ -59,6 +59,10 @@ export class ApiService {
     return this.http.delete(`${this.url}/clients/wipe`);
   }
 
+  deleteClient(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.url}/clients/${id}`);
+  }
+
 
   // ── Routes (admin) ──
   createRoute(orderIds: number[]): Observable<DeliveryRoute> {

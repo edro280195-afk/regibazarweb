@@ -243,7 +243,7 @@ import { Supplier, Investment } from '../../../../shared/models/models';
     }
 
     .supplier-card {
-      background: white; border-radius: 1.25rem; overflow: hidden;
+      background: var(--bg-card); border-radius: 1.25rem; overflow: hidden;
       border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm);
       transition: all 0.2s;
       &:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--pink-200); }
@@ -278,8 +278,8 @@ import { Supplier, Investment } from '../../../../shared/models/models';
     }
 
     .btn-edit, .btn-delete {
-      width: 34px; height: 34px; border-radius: 8px; border: 1px solid #eee;
-      background: white; cursor: pointer; font-size: 0.85rem;
+      width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border-soft);
+      background: var(--bg-card); cursor: pointer; font-size: 0.85rem;
       display: flex; align-items: center; justify-content: center; transition: all 0.2s;
     }
     .btn-edit:hover { background: #f0f7ff; border-color: #a0c4ff; }
@@ -298,13 +298,13 @@ import { Supplier, Investment } from '../../../../shared/models/models';
 
     /* MODAL */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
       display: flex; align-items: center; justify-content: center; z-index: 1000;
       &.top-z { z-index: 1100; }
     }
 
     .modal-card {
-      background: white; width: 90%; max-width: 450px; padding: 2rem;
+      background: var(--bg-card); width: 90%; max-width: 450px; padding: 2rem;
       border-radius: 1.5rem; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
       animation: modalIn 0.25s ease-out;
       h3 { margin-top: 0; color: var(--pink-600); font-family: var(--font-display); }
@@ -321,9 +321,9 @@ import { Supplier, Investment } from '../../../../shared/models/models';
       label { display: block; font-size: 0.8rem; font-weight: 700; color: var(--pink-600); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px; }
       input, textarea {
         width: 100%; padding: 0.8rem; border: 1.5px solid rgba(255, 157, 191, 0.2);
-        border-radius: 0.85rem; font-family: var(--font-body); background: var(--pink-50);
+        border-radius: 0.85rem; font-family: var(--font-body); background: var(--bg-main);
         color: var(--text-dark); font-size: 0.95rem; box-sizing: border-box; transition: all 0.2s;
-        &:focus { outline: none; border-color: var(--pink-400); background: white; box-shadow: 0 0 0 3px rgba(255,107,157,0.1); }
+        &:focus { outline: none; border-color: var(--pink-400); background: var(--bg-card); box-shadow: 0 0 0 3px rgba(255,107,157,0.1); }
       }
     }
 
@@ -334,7 +334,7 @@ import { Supplier, Investment } from '../../../../shared/models/models';
         font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;
         transition: all 0.2s;
       }
-      .btn-cancel { background: #f5f5f5; color: #666; &:hover { background: #eee; } }
+      .btn-cancel { background: var(--bg-main); color: var(--text-medium); &:hover { background: var(--pink-50); } }
       .btn-confirm {
         background: linear-gradient(135deg, var(--pink-400), var(--pink-500)); color: white;
         box-shadow: 0 3px 10px rgba(255,107,157,0.25);
@@ -351,12 +351,12 @@ import { Supplier, Investment } from '../../../../shared/models/models';
 
     /* DRAWER */
     .drawer-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.2); z-index: 900;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(8px); z-index: 900;
       display: flex; justify-content: flex-end;
     }
 
     .drawer-panel {
-      width: 520px; max-width: 92vw; background: white; height: 100%;
+      width: 520px; max-width: 92vw; background: var(--bg-card); height: 100%;
       box-shadow: -10px 0 30px rgba(0,0,0,0.1);
       display: flex; flex-direction: column;
       animation: slideIn 0.3s ease-out;
@@ -401,15 +401,16 @@ import { Supplier, Investment } from '../../../../shared/models/models';
     }
 
     .add-investment-box {
-      background: linear-gradient(135deg, #fffbfd, #fef4ff); padding: 1.25rem;
-      border-radius: 1rem; margin-bottom: 1.5rem; border: 1.5px solid rgba(255,157,191,0.15);
+      background: var(--bg-main); padding: 1.25rem;
+      border-radius: 1rem; margin-bottom: 1.5rem; border: 1.5px solid var(--border-soft);
       h4 { margin: 0 0 0.8rem; font-size: 0.95rem; color: var(--pink-600); font-family: var(--font-display); }
       .inv-form-row { display: flex; gap: 0.8rem; margin-bottom: 0.6rem; }
       .field { flex: 1; }
       label { display: block; font-size: 0.7rem; font-weight: 700; margin-bottom: 0.3rem; color: var(--pink-600); text-transform: uppercase; letter-spacing: 0.3px; }
       input {
         width: 100%; padding: 0.65rem 0.8rem; border: 1.5px solid rgba(255,157,191,0.2);
-        border-radius: 0.7rem; font-family: var(--font-body); background: white; box-sizing: border-box;
+        border-radius: 0.7rem; font-family: var(--font-body); background: var(--bg-main); box-sizing: border-box;
+        color: var(--text-dark);
         &:focus { outline: none; border-color: var(--pink-400); box-shadow: 0 0 0 3px rgba(255,107,157,0.08); }
       }
       .btn-add-inv {
@@ -428,8 +429,8 @@ import { Supplier, Investment } from '../../../../shared/models/models';
     .investments-list { display: flex; flex-direction: column; gap: 0.6rem; }
 
     .inv-card {
-      display: flex; gap: 0.8rem; align-items: center; background: white; padding: 0.75rem 0.9rem;
-      border-radius: 0.85rem; border: 1px solid #f0f0f0; transition: all 0.15s;
+      display: flex; gap: 0.8rem; align-items: center; background: var(--bg-card); padding: 0.75rem 0.9rem;
+      border-radius: 0.85rem; border: 1px solid var(--border-soft); transition: all 0.15s;
       &:hover { border-color: var(--pink-200); box-shadow: 0 2px 8px rgba(255,107,157,0.06); }
     }
 
@@ -447,8 +448,8 @@ import { Supplier, Investment } from '../../../../shared/models/models';
     }
 
     .btn-remove-inv {
-      width: 28px; height: 28px; border-radius: 50%; border: 1px solid #f0f0f0;
-      background: white; color: #ccc; font-size: 1.1rem; cursor: pointer;
+      width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-soft);
+      background: var(--bg-card); color: #ccc; font-size: 1.1rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       transition: all 0.2s;
       &:hover { background: #ff6b6b; color: white; border-color: #ff6b6b; }

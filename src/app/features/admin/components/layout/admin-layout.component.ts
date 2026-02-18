@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../../../core/services/auth.service';
@@ -16,8 +16,8 @@ import { AuthService } from '../../../../core/services/auth.service';
               <img src="assets/LogoRegi.png" alt="PMM Logo" class="logo-image" />
             </span>
             <div>
-              <span class="brand-name">Entregas</span>
-              <span class="brand-tag">panel bonito ✨</span>
+              <span class="brand-name">Gestion de Pedidos</span>
+              <span class="brand-tag">Panel de control ✨</span>
             </div>
           </div>
           <button class="close-btn" (click)="sidebarOpen = false">✕</button>
@@ -55,11 +55,19 @@ import { AuthService } from '../../../../core/services/auth.service';
         </nav>
 
         <div class="sidebar-footer">
-          <div class="user-info">
-            <div class="user-avatar">{{ auth.userName()?.charAt(0)?.toUpperCase() }}</div>
-            <span class="user-name">{{ auth.userName() }}</span>
+          <div class="theme-selector">
+            <button class="theme-btn" [class.active]="theme() === 'default'" (click)="setTheme('default')" title="Coquette 🌸">🌸</button>
+            <button class="theme-btn" [class.active]="theme() === 'dark'" (click)="setTheme('dark')" title="Midnight 🌙">🌙</button>
+            <button class="theme-btn" [class.active]="theme() === 'bold'" (click)="setTheme('bold')" title="Bold 💃">💃</button>
+            <button class="theme-btn" [class.active]="theme() === 'minimal'" (click)="setTheme('minimal')" title="Minimal ☁️">☁️</button>
           </div>
-          <button class="logout-btn" (click)="auth.logout()">👋 Salir</button>
+          <div class="footer-row">
+            <div class="user-info">
+              <div class="user-avatar">{{ auth.userName()?.charAt(0)?.toUpperCase() }}</div>
+              <span class="user-name">{{ auth.userName() }}</span>
+            </div>
+            <button class="logout-btn" (click)="auth.logout()">👋</button>
+          </div>
         </div>
       </aside>
 
@@ -87,9 +95,7 @@ import { AuthService } from '../../../../core/services/auth.service';
 
     .sidebar {
       width: 260px;
-      background: linear-gradient(180deg,
-        rgba(255,255,255,0.92) 0%,
-        rgba(255,240,246,0.92) 100%);
+      background: var(--bg-glass);
       backdrop-filter: blur(20px);
       border-right: 1px solid var(--border-soft);
       display: flex; flex-direction: column;
@@ -168,7 +174,14 @@ import { AuthService } from '../../../../core/services/auth.service';
     .sidebar-footer {
       padding: 1rem 1.1rem;
       border-top: 1px solid var(--border-soft);
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; flex-direction: column; gap: 0.75rem;
+    }
+    .footer-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .theme-selector { display: flex; justify-content: center; gap: 0.5rem; background: rgba(255,255,255,0.5); padding: 0.4rem; border-radius: 1rem; }
+    .theme-btn {
+      background: none; border: none; font-size: 1.1rem; padding: 0.3rem; border-radius: 50%; cursor: pointer; transition: transform 0.2s; opacity: 0.6;
+      &:hover { transform: scale(1.2); opacity: 0.8; }
+      &.active { opacity: 1; transform: scale(1.2); background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     }
 
     .user-info { display: flex; align-items: center; gap: 0.5rem; }
@@ -211,7 +224,7 @@ import { AuthService } from '../../../../core/services/auth.service';
     .top-bar {
       padding: 1rem 1.5rem;
       border-bottom: 1px solid var(--border-soft);
-      background: rgba(255, 255, 255, 0.7);
+      background: var(--bg-glass);
       backdrop-filter: blur(12px);
       display: flex; align-items: center; gap: 1rem;
     }
@@ -256,5 +269,16 @@ import { AuthService } from '../../../../core/services/auth.service';
 })
 export class AdminLayoutComponent {
   sidebarOpen = false;
-  constructor(public auth: AuthService) { }
+  theme = signal<string>('default');
+
+  constructor(public auth: AuthService) {
+    const saved = localStorage.getItem('theme') || 'default';
+    this.setTheme(saved);
+  }
+
+  setTheme(t: string) {
+    this.theme.set(t);
+    localStorage.setItem('theme', t);
+    document.documentElement.setAttribute('data-theme', t);
+  }
 }

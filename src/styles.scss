@@ -3,71 +3,153 @@
    ═══════════════════════════════════════════════════════ */
 
 @import 'leaflet/dist/leaflet.css';
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400..700&family=Pacifico&family=Quicksand:wght@300..700&display=swap');
 
 :root {
-  /* 🌸 PALETA COQUETTE */
-  --pink-50:  #FFF0F5; /* Lavender Blush */
+  /* 🌸 DEFAULT THEME (Coquette Soft Glam) */
+  --pink-50: #FFF0F5;
   --pink-100: #FFE1EA;
   --pink-200: #FFC5D9;
   --pink-300: #FFA6C9;
   --pink-400: #FF85B3;
-  --pink-500: #FF5C96; /* Hot Pink suave */
+  --pink-500: #FF5C96;
   --pink-600: #E63E7B;
   --pink-700: #C21C55;
 
-  --cream:    #FFFAF0; /* Floral White */
-  --peach:    #FFF0E1;
-  --lavender: #F3E5F5;
-  --mint:     #E0F2F1;
-  --sky:      #E1F5FE;
-
-  /* 🖋️ TEXTOS */
-  --text-dark:   #4A2C40; /* Dark Purple/Brown instead of Black */
+  --text-dark: #4A2C40;
   --text-medium: #855C75;
-  --text-light:  #BFA3B5;
-  --text-muted:  #D4C4D4;
+  --text-light: #BFA3B5;
+  --text-muted: #D4C4D4;
 
-  /* 🖼️ FONDOS */
-  --bg-main:  #FFFAFC; /* Snow */
-  --bg-card:  rgba(255, 255, 255, 0.85);
+  --bg-main: #FFFAFC;
+  --bg-card: rgba(255, 255, 255, 0.85);
   --bg-glass: rgba(255, 255, 255, 0.65);
+  --bg-overlay: rgba(255, 255, 255, 0.9);
 
-  /* 🎀 BORDES & SOMBRAS */
   --border-soft: rgba(255, 182, 193, 0.4);
-  --border-pink: rgba(255, 105, 180, 0.5);
-  --radius-xl:   24px;
-  --radius-lg:   18px;
-  --radius-md:   12px;
-  --radius-sm:   8px;
-
-  --shadow-sm:   0 4px 12px rgba(255, 182, 193, 0.15);
-  --shadow-md:   0 8px 24px rgba(255, 105, 180, 0.2);
-  --shadow-lg:   0 15px 40px rgba(255, 92, 150, 0.25);
-  --shadow-glow: 0 0 25px rgba(255, 105, 180, 0.3);
-
-  /* 🔤 TYPOGRAPHY */
-  --font-display: 'Pacifico', cursive;       /* Títulos divertidos */
-  --font-body:    'Quicksand', sans-serif;   /* Lectura limpia y redonda */
-  --font-script:  'Dancing Script', cursive; /* Detalles elegantes */
-
-  /* ⚡ ANIMACIONES */
+  --shadow-sm: 0 4px 12px rgba(255, 182, 193, 0.15);
+  --shadow-md: 0 8px 24px rgba(255, 105, 180, 0.2);
+  --font-display: 'Pacifico', cursive;
+  --font-body: 'Quicksand', sans-serif;
+  --radius-xl: 24px;
+  --radius-lg: 18px;
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --color-success: #22c55e;
+  --color-success-bg: #dcfce7;
+  --color-danger: #ef4444;
+  --color-danger-bg: #fee2e2;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fef3c7;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* 🌙 DARK MODE (Midnight Coquette) */
+[data-theme="dark"] {
+  --pink-50: #2D1F2A;
+  /* Dark background base */
+  --pink-100: #3E2C38;
+  --pink-200: #5D3A4A;
+  --pink-300: #7F4A63;
+  --pink-400: #D63384;
+  /* Neon pink */
+  --pink-500: #FF66A3;
+  /* Lighter neon */
+  --pink-600: #FF99C2;
+  /* Lightest pink for text/icons */
+  --pink-700: #FFCce0;
 
-html { 
-  font-size: 16px; 
-  -webkit-font-smoothing: antialiased; 
+  --text-dark: #FFE1EA;
+  /* Light text */
+  --text-medium: #E0C0D0;
+  --text-light: #9A7A8A;
+  --text-muted: #6D5A64;
+
+  --bg-main: #1a1016;
+  /* Very dark charcoal/purple */
+  --bg-card: rgba(45, 31, 42, 0.85);
+  --bg-glass: rgba(45, 31, 42, 0.65);
+  --bg-overlay: rgba(26, 16, 22, 0.95);
+
+  --border-soft: rgba(255, 105, 180, 0.2);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  --color-success: #4ade80;
+  --color-success-bg: #14532d;
+  --color-danger: #f87171;
+  --color-danger-bg: #450a0a;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #451a03;
+}
+
+/* 💃 BOLD COQUETTE (Vibrant & Contrast) */
+[data-theme="bold"] {
+  --pink-50: #FFFFFF;
+  --pink-100: #FFCCE0;
+  --pink-200: #FF99C2;
+  --pink-500: #D60058;
+  /* Strong Magenta */
+  --pink-600: #A80045;
+  /* Deep Crimson */
+  --text-dark: #000000;
+  --text-medium: #444444;
+  --bg-main: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --border-soft: #FF1493;
+  /* Deep Pink solid border */
+  --shadow-sm: 4px 4px 0px rgba(255, 20, 147, 0.2);
+  /* Pop art shadows */
+  --shadow-md: 8px 8px 0px rgba(255, 20, 147, 0.3);
+  --font-display: 'Shrikhand', cursive;
+  /* Chunky font */
+}
+
+/* ☁️ MINIMALIST (Clean & Soft) */
+[data-theme="minimal"] {
+  --pink-50: #F8F9FA;
+  --pink-100: #F1F3F5;
+  --pink-200: #E9ECEF;
+  --pink-400: #ADB5BD;
+  --pink-500: #495057;
+  /* Dark Gray accents, not pink */
+  --pink-600: #212529;
+
+  --text-dark: #212529;
+  --text-medium: #495057;
+  --bg-main: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-glass: rgba(255, 255, 255, 0.9);
+
+  --border-soft: #E9ECEF;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
+  --font-display: 'Inter', sans-serif;
+  /* Clean sans */
+  --font-body: 'Inter', sans-serif;
+  --radius-xl: 12px;
+  --radius-lg: 8px;
+  /* Tighter radius */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  scroll-behavior: smooth; 
+  scroll-behavior: smooth;
 }
 
 body {
   font-family: var(--font-body);
   background: var(--bg-main);
-  background-image: 
+  background-image:
     radial-gradient(circle at 10% 20%, rgba(255, 225, 235, 0.4) 0%, transparent 20%),
     radial-gradient(circle at 90% 80%, rgba(240, 230, 255, 0.4) 0%, transparent 20%);
   background-attachment: fixed;
@@ -77,14 +159,26 @@ body {
 }
 
 /* 🎀 SCROLLBAR CUQUI */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--pink-50); border-radius: 4px; }
-::-webkit-scrollbar-thumb { 
-  background: linear-gradient(180deg, var(--pink-200), var(--pink-400)); 
-  border-radius: 6px; 
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pink-50);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--pink-200), var(--pink-400));
+  border-radius: 6px;
   border: 2px solid var(--pink-50);
 }
-::selection { background: var(--pink-200); color: var(--pink-700); }
+
+::selection {
+  background: var(--pink-200);
+  color: var(--pink-700);
+}
 
 /* 🌟 UTILITIES */
 .coquette-card {
@@ -102,21 +196,72 @@ body {
   border-radius: var(--radius-lg);
   transition: all 0.3s var(--ease-bounce);
   cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;gap: 8px;
-  
-  &:active { transform: scale(0.95); }
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:active {
+    transform: scale(0.95);
+  }
 }
 
 /* 💃 ANIMACIONES */
-@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-@keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}
 
 /* 📱 MOBILE TWEAKS */
 @media (max-width: 480px) {
-  html { font-size: 15px; }
-  .coquette-card { padding: 1rem; border-radius: var(--radius-lg); }
+  html {
+    font-size: 15px;
+  }
+
+  .coquette-card {
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+  }
 }
 
-a { color: var(--pink-500); text-decoration: none; font-weight: 600; transition: color 0.2s; }
-a:hover { color: var(--pink-700); text-decoration: underline; text-decoration-color: var(--pink-300); }
+a {
+  color: var(--pink-500);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: var(--pink-700);
+  text-decoration: underline;
+  text-decoration-color: var(--pink-300);
+}

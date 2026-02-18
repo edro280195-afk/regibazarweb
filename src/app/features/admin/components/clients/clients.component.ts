@@ -45,6 +45,10 @@ interface Client {
         @for (client of filteredClients(); track client.id) {
           <div class="client-card" [attr.data-tag]="client.tag" (click)="openEdit(client)">
             
+            <button class="btn-delete-card" (click)="$event.stopPropagation(); deleteClient(client)" title="Eliminar clienta">
+              🗑️
+            </button>
+
             <div class="card-top">
               <div class="avatar">
                 {{ client.name.charAt(0).toUpperCase() }}
@@ -120,7 +124,7 @@ interface Client {
       }
     </div>
   `,
-styles: [`
+  styles: [`
     /* ═══════════════════════════════════════════
        DESIGN TOKENS
     ═══════════════════════════════════════════ */
@@ -158,9 +162,9 @@ styles: [`
       position: relative; width: 100%; max-width: 320px;
       input {
         width: 100%; padding: 12px 20px 12px 45px; border-radius: 25px;
-        border: 2px solid transparent; background: white;
+        border: 2px solid transparent; background: var(--bg-card);
         box-shadow: 0 4px 15px rgba(255,107,157,0.08);
-        font-family: var(--font-body); font-weight: 600; color: #555;
+        font-family: var(--font-body); font-weight: 600; color: var(--text-medium);
         transition: all 0.3s; margin-left: auto;
         &:focus { outline: none; border-color: var(--pink-300); box-shadow: 0 6px 20px rgba(255,107,157,0.2); }
       }
@@ -171,10 +175,10 @@ styles: [`
     }
 
     .btn-nuke {
-      background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3;
+      background: var(--bg-card); color: var(--color-danger); border: 1px solid var(--pink-200);
       padding: 8px 16px; border-radius: 20px; font-weight: 700;
       cursor: pointer; transition: 0.2s; font-size: 0.8rem;
-      &:hover { background: #ffe4e6; transform: translateY(-2px); }
+      &:hover { background: var(--pink-50); transform: translateY(-2px); }
     }
 
     /* GRID */
@@ -184,18 +188,18 @@ styles: [`
     }
 
     .client-card {
-      background: var(--glass-bg); backdrop-filter: blur(12px);
-      border-radius: 24px; padding: 1.5rem;
-      border: 1px solid white; box-shadow: var(--shadow-soft);
+      background: var(--bg-card);
+      border-radius: 1.25rem; padding: 1.5rem;
+      border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm);
       position: relative; overflow: hidden; cursor: pointer;
       transition: all 0.3s var(--ease-bounce);
       
-      &:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(255, 107, 157, 0.2); z-index: 5; }
+      &:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); z-index: 5; border-color: var(--pink-200); }
       
       /* Status Lines */
       &::before {
         content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 6px;
-        background: #eee; transition: 0.3s;
+        background: var(--pink-100); transition: 0.3s;
       }
       &[data-tag="Vip"]::before { background: linear-gradient(to bottom, #FFD700, #FDB931); }
       &[data-tag="RisingStar"]::before { background: linear-gradient(to bottom, #d8b4fe, #a855f7); }
@@ -203,27 +207,37 @@ styles: [`
       &[data-tag="None"]::before { background: var(--pink-200); }
     }
 
+    .btn-delete-card {
+      position: absolute; top: 10px; right: 10px; z-index: 10;
+      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-soft);
+      background: var(--bg-card); cursor: pointer; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .client-card:hover .btn-delete-card { opacity: 1; }
+    .btn-delete-card:hover { background: #fff0f0; border-color: #ffaaaa; transform: scale(1.1); }
+
     .card-top { display: flex; gap: 15px; align-items: center; margin-bottom: 1rem; padding-left: 10px; }
     .avatar {
-      width: 50px; height: 50px; background: white; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; font-weight: 800; color: var(--pink-500);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 2px solid var(--pink-50);
-    }
-    .info { flex: 1; overflow: hidden; }
-    .info h3 { margin: 0; font-size: 1.1rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        width: 50px; height: 50px; background: var(--bg-main); border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; font-weight: 800; color: var(--pink-500);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 2px solid var(--pink-50);
+      }
+      .info { flex: 1; overflow: hidden; }
+      .info h3 { margin: 0; font-size: 1.1rem; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
     .tag-badge {
       font-size: 0.7rem; padding: 3px 10px; border-radius: 12px; font-weight: 800;
       text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; display: inline-block;
     }
-    [data-tag="Vip"] { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
-    [data-tag="RisingStar"] { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
-    [data-tag="Blacklist"] { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    [data-tag="None"] { background: #fdf2f8; color: var(--pink-600); border: 1px solid var(--pink-200); }
+    .tag-badge[data-tag="Vip"] { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+    .tag-badge[data-tag="RisingStar"] { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
+    .tag-badge[data-tag="Blacklist"] { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .tag-badge[data-tag="None"] { background: #fdf2f8; color: var(--pink-600); border: 1px solid var(--pink-200); }
 
     .stats-row {
-      background: rgba(255,255,255,0.6); border-radius: 16px; padding: 10px 15px;
+      background: var(--bg-main); border-radius: 16px; padding: 10px 15px;
       display: flex; justify-content: space-between; margin-bottom: 1rem; margin-left: 6px;
     }
     .stat { display: flex; flex-direction: column; text-align: center; }
@@ -241,8 +255,8 @@ styles: [`
       padding: 1rem; animation: fadeIn 0.3s;
     }
     .modal-card {
-      background: white; width: 100%; max-width: 450px; border-radius: 30px; padding: 2rem;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.25); border: 4px solid white;
+      background: var(--bg-card); width: 100%; max-width: 450px; border-radius: 30px; padding: 2rem;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.25); border: 4px solid var(--bg-card);
       animation: popIn 0.4s var(--ease-bounce);
     }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
@@ -255,9 +269,10 @@ styles: [`
     label { display: block; font-weight: 700; font-size: 0.85rem; color: #888; margin-bottom: 6px; }
     
     input, textarea, select {
-      width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #f0f0f0;
-      font-size: 0.95rem; font-family: inherit; transition: 0.3s; background: #fafafa;
-      &:focus { border-color: var(--pink-300); background: white; outline: none; box-shadow: 0 4px 12px rgba(255,107,157,0.1); }
+      width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--border-soft);
+      font-size: 0.95rem; font-family: inherit; transition: 0.3s; background: var(--bg-main);
+      color: var(--text-dark);
+      &:focus { border-color: var(--pink-300); background: var(--bg-card); outline: none; box-shadow: 0 4px 12px rgba(255,107,157,0.1); }
     }
     
     .tag-select { font-weight: 700; color: var(--pink-600); }
@@ -274,7 +289,7 @@ styles: [`
     /* TOAST */
     .toast-notification {
       position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-      background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); color: #333;
+      background: var(--bg-overlay); backdrop-filter: blur(10px); color: var(--text-dark);
       padding: 12px 24px; border-radius: 50px; font-weight: 700; z-index: 2000;
       box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid var(--pink-100);
       animation: slideDown 0.4s var(--ease-bounce);
@@ -389,6 +404,26 @@ export class ClientsComponent implements OnInit {
       'Blacklist': '🚫 Lista Negra'
     };
     return labels[tag] || tag;
+  }
+
+  async deleteClient(client: Client) {
+    const confirmed = await this.confirm.confirm({
+      title: '¿Eliminar clienta?',
+      message: `Se eliminará a "${client.name}" y todo su historial de pedidos.`,
+      confirmText: 'Sí, eliminar',
+      type: 'danger',
+      icon: '🗑️'
+    });
+
+    if (confirmed) {
+      this.api.deleteClient(client.id).subscribe({
+        next: () => {
+          this.allClients.update(clients => clients.filter(c => c.id !== client.id));
+          this.showToast(`${client.name} eliminada 🗑️`);
+        },
+        error: () => this.showToast('Error al eliminar 😓')
+      });
+    }
   }
 
   showToast(msg: string) {

@@ -113,7 +113,6 @@ import * as L from 'leaflet';
         }
       </div>
 
-          ═══════════════════════════════════════════
       @if (showMapModal() && selectedRouteForMap()) {
         <div class="modal-overlay" (click)="closeMap()">
           <div class="modal-card map-card" (click)="$event.stopPropagation()">
@@ -416,13 +415,13 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
       message: `La ruta #${route.id} se eliminará y los pedidos volverán a estar pendientes. ✍`,
       confirmText: 'Sí, cancelar',
       type: 'danger',
-            icon: '🗑️'
+      icon: '🗑️'
     });
 
     if (confirmed) {
       this.api.deleteRoute(route.id).subscribe({
         next: () => {
-                    this.showToast('Ruta cancelada 🗑️');
+          this.showToast('Ruta cancelada 🗑️');
           this.loadRoutes();
         },
         error: () => this.showToast('Error al cancelar ruta 😔')

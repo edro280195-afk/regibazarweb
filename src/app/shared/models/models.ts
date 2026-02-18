@@ -54,6 +54,7 @@ export interface ExcelUploadResult {
 
 export interface ManualOrderRequest {
   clientName: string;
+  clientType?: string;
   clientPhone?: string;
   clientAddress?: string;
   orderType: string;
