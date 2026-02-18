@@ -39,6 +39,16 @@ export const routes: Routes = [
           .then(m => m.ClientsComponent)
       },
       {
+        path: 'calendar',
+        loadComponent: () => import('./features/admin/components/delivery-calendar/delivery-calendar.component')
+          .then(m => m.DeliveryCalendarComponent)
+      },
+      {
+        path: 'clients/:id',
+        loadComponent: () => import('./features/admin/components/clients/client-profile/client-profile.component')
+          .then(m => m.ClientProfileComponent)
+      },
+      {
         path: 'suppliers',
         loadComponent: () => import('./features/admin/components/suppliers/suppliers.component')
           .then(m => m.SuppliersComponent)
@@ -47,6 +57,11 @@ export const routes: Routes = [
         path: 'financials',
         loadComponent: () => import('./features/admin/components/financials/financials.component')
           .then(m => m.FinancialsComponent)
+      },
+      {
+        path: 'payments',
+        loadComponent: () => import('./features/admin/components/payment-manager/payment-manager.component')
+          .then(m => m.PaymentManagerComponent)
       }
     ]
   },

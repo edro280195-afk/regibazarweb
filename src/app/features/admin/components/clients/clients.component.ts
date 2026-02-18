@@ -1,24 +1,15 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
-
-// Definimos la interfaz aquí mismo para rápido, o muévela a models.ts
-interface Client {
-  id: number;
-  name: string;
-  phone?: string;
-  address?: string;
-  tag: string; // 'None', 'RisingStar', 'Vip', 'Blacklist'
-  ordersCount: number;
-  totalSpent: number;
-}
+import { Client } from '../../../../shared/models/models';
 
 @Component({
   selector: 'app-clients',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="clients-page">
       
@@ -36,14 +27,14 @@ interface Client {
 
         <div class="actions-header">
           <button class="btn-nuke" (click)="onWipeClients()">
-            💀 Borrar TODAS las clientas
+            💀 Borrar TODAS
           </button>
         </div>
       </div>
 
       <div class="clients-grid">
         @for (client of filteredClients(); track client.id) {
-          <div class="client-card" [attr.data-tag]="client.tag" (click)="openEdit(client)">
+          <div class="client-card" [attr.data-tag]="client.tag" [routerLink]="['/admin/clients', client.id]">
             
             <button class="btn-delete-card" (click)="$event.stopPropagation(); deleteClient(client)" title="Eliminar clienta">
               🗑️
@@ -54,74 +45,38 @@ interface Client {
                 {{ client.name.charAt(0).toUpperCase() }}
               </div>
               <div class="info">
-                <h3>{{ client.name }}</h3>
+                <div class="name-row">
+                    <h3>{{ client.name }}</h3>
+                    <!-- TIPO DE CLIENTA BADGE -->
+                    <span class="client-type-badge" 
+                          [class.frecuente]="isFrecuente(client)" 
+                          [class.nueva]="!isFrecuente(client)">
+                        {{ isFrecuente(client) ? '💎 Frecuente' : '🌱 Nueva' }}
+                    </span>
+                </div>
+                
                 <span class="tag-badge" [attr.data-tag]="client.tag">
-                  {{ getTagLabel(client.tag) }}
+                  {{ getTagLabel(client.tag || 'None') }}
                 </span>
               </div>
             </div>
 
+
+
             <div class="stats-row">
               <div class="stat">
                 <small>Pedidos</small>
-                <strong>{{ client.ordersCount }}</strong>
+                <strong>{{ client.orderCount || 0 }}</strong>
               </div>
               <div class="stat">
-                <small>Total Gastado</small>
-                <strong>$ {{ client.totalSpent | number:'1.0-0' }}</strong>
+                <small>Gastado</small>
+                <strong>$ {{ (client.totalSpent || 0) | number:'1.0-0' }}</strong>
               </div>
             </div>
 
-            @if (client.phone || client.address) {
-              <div class="contact-mini">
-                @if (client.phone) { <span>📞 {{ client.phone }}</span> }
-                @if (client.address) { <span>📍 {{ client.address }}</span> }
-              </div>
-            }
           </div>
         }
       </div>
-
-      @if (clientToEdit()) {
-        <div class="modal-overlay">
-          <div class="modal-card">
-            <div class="modal-header">
-              <h3>Editar Clienta ✨</h3>
-              <button class="close-btn" (click)="clientToEdit.set(null)">✕</button>
-            </div>
-
-            <div class="form-group">
-              <label>Nombre</label>
-              <input type="text" [(ngModel)]="editData.name">
-            </div>
-
-            <div class="row">
-              <div class="form-group">
-                <label>Teléfono</label>
-                <input type="text" [(ngModel)]="editData.phone" placeholder="Sin teléfono">
-              </div>
-              <div class="form-group">
-                <label>Etiqueta 🏷️</label>
-                <select [(ngModel)]="editData.tag" class="tag-select">
-                  <option value="None">Normal 🌸</option>
-                  <option value="RisingStar">En Ascenso 🚀</option>
-                  <option value="Vip">Consentida 👑</option>
-                  <option value="Blacklist">Lista Negra 🚫</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Dirección</label>
-              <textarea [(ngModel)]="editData.address" rows="2" placeholder="Dirección de entrega"></textarea>
-            </div>
-
-            <div class="modal-footer">
-              <button class="btn-save" (click)="saveClient()">Guardar Cambios 💾</button>
-            </div>
-          </div>
-        </div>
-      }
     </div>
   `,
   styles: [`
@@ -183,7 +138,7 @@ interface Client {
 
     /* GRID */
     .clients-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 1.5rem;
     }
 
@@ -191,7 +146,7 @@ interface Client {
       background: var(--bg-card);
       border-radius: 1.25rem; padding: 1.5rem;
       border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm);
-      position: relative; overflow: hidden; cursor: pointer;
+      position: relative; overflow: hidden;
       transition: all 0.3s var(--ease-bounce);
       
       &:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); z-index: 5; border-color: var(--pink-200); }
@@ -213,78 +168,65 @@ interface Client {
       background: var(--bg-card); cursor: pointer; font-size: 0.85rem;
       display: flex; align-items: center; justify-content: center;
       opacity: 0; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      color: #e11d48;
     }
     .client-card:hover .btn-delete-card { opacity: 1; }
     .btn-delete-card:hover { background: #fff0f0; border-color: #ffaaaa; transform: scale(1.1); }
 
-    .card-top { display: flex; gap: 15px; align-items: center; margin-bottom: 1rem; padding-left: 10px; }
+    .card-top { display: flex; gap: 15px; align-items: flex-start; margin-bottom: 1rem; padding-left: 10px; }
     .avatar {
-        width: 50px; height: 50px; background: var(--bg-main); border-radius: 50%;
+        width: 45px; height: 45px; background: var(--bg-main); border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-size: 1.5rem; font-weight: 800; color: var(--pink-500);
+        font-size: 1.3rem; font-weight: 800; color: var(--pink-500);
         box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 2px solid var(--pink-50);
+        flex-shrink: 0;
       }
       .info { flex: 1; overflow: hidden; }
-      .info h3 { margin: 0; font-size: 1.1rem; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+      .info h3 { margin: 0; font-size: 1.1rem; color: var(--text-dark); }
     
+    .client-type-badge {
+        font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 800; text-transform: uppercase;
+        &.nueva { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        &.frecuente { background: #fce7f3; color: #be185d; border: 1px solid #fbcfe8; }
+    }
+
     .tag-badge {
-      font-size: 0.7rem; padding: 3px 10px; border-radius: 12px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; display: inline-block;
+      font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 700;
+      text-transform: uppercase; display: inline-block;
     }
     .tag-badge[data-tag="Vip"] { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
     .tag-badge[data-tag="RisingStar"] { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
     .tag-badge[data-tag="Blacklist"] { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .tag-badge[data-tag="None"] { background: #fdf2f8; color: var(--pink-600); border: 1px solid var(--pink-200); }
+    .tag-badge[data-tag="None"] { display: none; }
+
+    /* INLINE EDIT */
+    .inline-edit-section {
+        background: rgba(255,255,255,0.5); border-radius: 12px; padding: 8px;
+        margin-bottom: 1rem; display: flex; flex-direction: column; gap: 6px;
+    }
+    .edit-row { display: flex; align-items: center; gap: 8px; }
+    .icon { width: 20px; text-align: center; font-size: 0.9rem; opacity: 0.6; }
+    .edit-row input {
+        flex: 1; border: none; background: transparent; border-bottom: 1px solid transparent;
+        font-size: 0.9rem; padding: 4px; color: #555; font-family: inherit;
+        transition: 0.2s; border-radius: 4px;
+        &:focus { background: white; border-bottom-color: var(--pink-400); outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        &::placeholder { color: #ccc; }
+    }
+    .mini-select {
+        flex: 1; border: none; background: transparent; font-size: 0.85rem; color: #555; 
+        font-weight: 600; padding: 4px; border-radius: 4px; cursor: pointer;
+        &:hover { background: rgba(255,255,255,0.8); }
+    }
 
     .stats-row {
       background: var(--bg-main); border-radius: 16px; padding: 10px 15px;
-      display: flex; justify-content: space-between; margin-bottom: 1rem; margin-left: 6px;
+      display: flex; justify-content: space-between; margin-left: 6px;
     }
     .stat { display: flex; flex-direction: column; text-align: center; }
     .stat small { font-size: 0.7rem; color: #999; font-weight: 700; text-transform: uppercase; }
     .stat strong { color: var(--pink-600); font-size: 1rem; }
-
-    .contact-mini {
-      margin-left: 6px; font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px;
-    }
-
-    /* MODAL */
-    .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
-      z-index: 1000; display: flex; align-items: center; justify-content: center;
-      padding: 1rem; animation: fadeIn 0.3s;
-    }
-    .modal-card {
-      background: var(--bg-card); width: 100%; max-width: 450px; border-radius: 30px; padding: 2rem;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.25); border: 4px solid var(--bg-card);
-      animation: popIn 0.4s var(--ease-bounce);
-    }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    .modal-header h3 { margin: 0; font-family: var(--font-display); font-size: 1.8rem; color: var(--pink-600); }
-    .close-btn { background: none; border: none; font-size: 1.5rem; color: #ccc; cursor: pointer; transition: 0.2s; }
-    .close-btn:hover { color: var(--pink-500); transform: rotate(90deg); }
-
-    .form-group { margin-bottom: 1.2rem; }
-    .row { display: flex; gap: 1rem; }
-    label { display: block; font-weight: 700; font-size: 0.85rem; color: #888; margin-bottom: 6px; }
-    
-    input, textarea, select {
-      width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--border-soft);
-      font-size: 0.95rem; font-family: inherit; transition: 0.3s; background: var(--bg-main);
-      color: var(--text-dark);
-      &:focus { border-color: var(--pink-300); background: var(--bg-card); outline: none; box-shadow: 0 4px 12px rgba(255,107,157,0.1); }
-    }
-    
-    .tag-select { font-weight: 700; color: var(--pink-600); }
-    
-    .modal-footer { margin-top: 2rem; }
-    .btn-save {
-      width: 100%; padding: 14px; border-radius: 16px; border: none;
-      background: linear-gradient(135deg, var(--pink-500), #db2777);
-      color: white; font-weight: 800; font-size: 1.1rem; cursor: pointer;
-      box-shadow: 0 8px 20px rgba(236,72,153,0.3); transition: 0.2s;
-      &:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(236,72,153,0.4); }
-    }
 
     /* TOAST */
     .toast-notification {
@@ -296,7 +238,6 @@ interface Client {
     }
     @keyframes slideDown { from { transform: translate(-50%, -50px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
-    /* MEDIA QUERIES */
     @media (max-width: 768px) {
       .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
       .search-box { max-width: 100%; }
@@ -308,10 +249,6 @@ interface Client {
 export class ClientsComponent implements OnInit {
   allClients = signal<Client[]>([]);
   searchTerm = '';
-  clientToEdit = signal<Client | null>(null);
-
-  // Datos del formulario
-  editData = { name: '', phone: '', address: '', tag: 'None' };
   toastMessage = signal('');
 
   constructor(
@@ -336,32 +273,13 @@ export class ClientsComponent implements OnInit {
     );
   });
 
-  openEdit(client: Client) {
-    this.clientToEdit.set(client);
-    this.editData = {
-      name: client.name,
-      phone: client.phone || '',
-      address: client.address || '',
-      tag: client.tag
-    };
+  isFrecuente(client: Client): boolean {
+    // Logic: Frecuente if orders > 1 OR explicitly tagged
+    // If orderCount is not populated, fall back to simple check
+    return (client.orderCount > 1) || (client.ordersCount || 0) > 1 || client.clientType === 'Frecuente';
   }
 
-  saveClient() {
-    const client = this.clientToEdit();
-    if (!client) return;
 
-    this.api.updateClient(client.id, this.editData).subscribe({
-      next: () => {
-        // Actualizar localmente para no recargar
-        this.allClients.update(clients => clients.map(c =>
-          c.id === client.id ? { ...c, ...this.editData } : c
-        ));
-        this.clientToEdit.set(null);
-        this.showToast('¡Clienta actualizada! ✨');
-      },
-      error: () => this.showToast('Error al guardar 😓')
-    });
-  }
 
   async onWipeClients() {
     const confirm1 = await this.confirm.confirm({

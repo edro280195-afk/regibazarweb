@@ -10,6 +10,13 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor])),
     provideEcharts(),
+    { provide: LOCALE_ID, useValue: 'es-MX' }
   ]
 };
+
+import { registerLocaleData } from '@angular/common';
+import localeEsMx from '@angular/common/locales/es-MX';
+import { LOCALE_ID } from '@angular/core';
+registerLocaleData(localeEsMx, 'es-MX');

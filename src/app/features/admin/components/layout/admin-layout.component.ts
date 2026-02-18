@@ -3,10 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../../../core/services/auth.service';
 
+import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
+
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, AiAssistantComponent],
   template: `
     <div class="admin-shell">
       <aside class="sidebar" [class.open]="sidebarOpen">
@@ -35,6 +37,10 @@ import { AuthService } from '../../../../core/services/auth.service';
           <a routerLink="/admin/orders" routerLinkActive="active"
              (click)="sidebarOpen = false">
             <span class="nav-icon">🛒</span> Pedidos
+          </a>
+          <a routerLink="/admin/calendar" routerLinkActive="active"
+             (click)="sidebarOpen = false">
+            <span class="nav-icon">📅</span> Calendario
           </a>
           <a routerLink="/admin/routes" routerLinkActive="active"
              (click)="sidebarOpen = false">
@@ -83,6 +89,8 @@ import { AuthService } from '../../../../core/services/auth.service';
         <div class="content-area">
           <router-outlet></router-outlet>
         </div>
+        
+        <app-ai-assistant></app-ai-assistant>
       </main>
     </div>
   `,
@@ -218,7 +226,8 @@ import { AuthService } from '../../../../core/services/auth.service';
     .main-content {
       flex: 1; margin-left: 260px;
       display: flex; flex-direction: column;
-      position: relative; z-index: 1;
+      position: relative; 
+      /* z-index: 1;  <-- REMOVED to allow fixed children (modals) to escape this stacking context and be above sidebar */
     }
 
     .top-bar {

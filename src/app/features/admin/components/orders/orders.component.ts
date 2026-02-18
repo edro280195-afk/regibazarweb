@@ -3,12 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
+import { WhatsAppService } from '../../../../core/services/whatsapp.service';
 import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/models/models';
+import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouteOptimizerComponent],
   template: `
     <div class="orders-page">
       
@@ -34,7 +36,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                 <span>✨</span><span>💖</span><span>✨</span>
               </div>
               <h3>Gestionar Pedido</h3>
-              <p class="client-title">{{ orderToEdit()?.clientName }}</p>
+              <p class="client-title">{{ orderToEdit()!.clientName }}</p>
               <button class="btn-close-modal" (click)="orderToEdit.set(null)">✕</button>
             </div>
 
@@ -56,6 +58,19 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                     <span class="switch-icon">🛍️</span><span>Local</span>
                   </button>
                 </div>
+                
+                @if (editData.orderType === 'Delivery') {
+                    <div class="field-row" style="margin-top: 10px;">
+                        <label class="mini-label">Hora estipulada</label>
+                        <input type="time" [(ngModel)]="editData.deliveryTime" class="fancy-input">
+                    </div>
+                } @else {
+                     <div class="field-row" style="margin-top: 10px;">
+                        <label class="mini-label">Fecha de Recolección</label>
+                        <input type="date" [(ngModel)]="editData.pickupDate" class="fancy-input">
+                        <input type="time" [(ngModel)]="editData.deliveryTime" class="fancy-input" style="margin-top:5px">
+                    </div>
+                }
               </div>
 
               <div class="edit-section">
@@ -65,6 +80,19 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                   <button class="status-pill-btn" [class.active]="editData.status === 'Delivered'" (click)="editData.status = 'Delivered'">💝 Entregado</button>
                   <button class="status-pill-btn" [class.active]="editData.status === 'Canceled'"  (click)="editData.status = 'Canceled'">🚫 Cancelado</button>
                   <button class="status-pill-btn" [class.active]="editData.status === 'Postponed'" (click)="editData.status = 'Postponed'">📅 Posponer</button>
+                </div>
+              </div>
+
+              <div class="edit-section">
+                <label class="field-label">🏷️ Etiquetas</label>
+                <div class="tags-selector">
+                  @for (tag of availableTags; track tag) {
+                    <button class="tag-btn" 
+                            [class.active]="editData.tags.includes(tag)"
+                            (click)="toggleTag(tag)">
+                      {{ tag }}
+                    </button>
+                  }
                 </div>
               </div>
 
@@ -80,6 +108,15 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                   </div>
                 </div>
               }
+
+              <div class="edit-section">
+                <label class="field-label">📱 Notificaciones WhatsApp</label>
+                <div class="whatsapp-actions">
+                  <button class="btn-wa" (click)="sendWaConfirmation()">✅ Confirmación</button>
+                  <button class="btn-wa" (click)="sendWaOnWay()">🚗 En Camino</button>
+                  <button class="btn-wa" (click)="sendWaPayment()">💸 Cobro</button>
+                </div>
+              </div>
             </div>
 
             <div class="edit-modal-footer">
@@ -196,7 +233,7 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                 <span class="stat-txt">Clientes nuevos</span>
               </div>
             </div>
-            @if (uploadResult()!.warnings?.length) {
+            @if (uploadResult()!.warnings.length) {
               <div class="upload-warnings">
                 <label>⚠️ Notas:</label>
                 @for (w of uploadResult()!.warnings; track w) {
@@ -209,6 +246,14 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
             </div>
           </div>
         </div>
+      }
+
+      @if (showOptimizer()) {
+        <app-route-optimizer 
+          [orders]="selectedOrdersList()"
+          (cancel)="showOptimizer.set(false)"
+          (confirmRoute)="handleRouteConfirmed($event)">
+        </app-route-optimizer>
       }
 
       <!-- ═══════════════ PÁGINA PRINCIPAL ═══════════════ -->
@@ -241,6 +286,12 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
             <option value="Delivered">💝 Entregados</option>
             <option value="Postponed">📅 Pospuestos</option>
             <option value="Canceled">🚫 Cancelados</option>
+          </select>
+
+          <select [(ngModel)]="clientTypeFilter" (change)="applyFilter()" class="filter-select">
+            <option value="">👤 Tipo Clienta</option>
+            <option value="Nueva">🌱 Nueva</option>
+            <option value="Frecuente">💎 Frecuente</option>
           </select>
 
           
@@ -354,6 +405,9 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                 <span class="order-type-tag" [class.pickup]="order.orderType === 'PickUp'">
                   {{ order.orderType === 'PickUp' ? '🛍️ LOCAL' : '🛵 ENVÍO' }}
                 </span>
+                @for (tag of order.tags; track tag) {
+                  <span class="tag-pill">{{ tag }}</span>
+                }
               </div>
               <span class="status-pill" [attr.data-status]="order.status">
                 {{ statusLabel(order.status) }}
@@ -371,9 +425,15 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
                   }
                   <h3 class="client-name">{{ order.clientName }}</h3>
                 </div>
-                @if (order.clientType === 'Frecuente') {
-                  <span class="badge-vip">👑 CLIENTA VIP</span>
-                }
+                
+                <!-- CLIENT TYPE BADGE -->
+                <div class="client-badges">
+                    @if (order.clientType === 'Frecuente') {
+                      <span class="badge-vip">💎 FRECUENTE</span>
+                    } @else {
+                      <span class="badge-new">🌱 NUEVA</span>
+                    }
+                </div>
               </div>
 
               @if (order.status === 'Postponed' && order.postponedAt) {
@@ -621,116 +681,151 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     /* ═══════════════════════════════════════════
        MODAL OVERLAY
     ═══════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════
+       MODAL OVERLAY & CARD
+    ═══════════════════════════════════════════ */
     .modal-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.4);
+      position: fixed; inset: 0; 
+      background: rgba(0,0,0,0.6); /* Darker dim for better contrast */
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center; 
       backdrop-filter: blur(8px);
-      z-index: 2000;
-      display: flex; align-items: center; justify-content: center;
-      animation: fadeIn 0.3s forwards;
+      animation: fadeIn 0.3s ease-out;
+      padding: 20px;
     }
 
     .modal-card {
-      background: var(--bg-card); border-radius: var(--radius-xl);
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25); border: 1px solid var(--border-soft);
-      padding: 0; width: 90%; max-width: 400px;
+      background: var(--bg-card); /* Theme aware */
+      color: var(--text-dark);
+      border-radius: 24px;
       position: relative;
-      animation: scaleUp 0.3s var(--ease-bounce);
+      display: flex; flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-soft);
+
+      /* Desktop Defaults */
+      width: 100%; max-width: 700px; /* Wider to allow side-by-side */
+      max-height: 85vh;
+      animation: modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
     }
-    @keyframes scaleUp { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    @keyframes modalPop { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     /* ═══════════════════════════════════════════
-       EDIT MODAL STYLES (GESTIONAR PEDIDO)
+       EDIT MODAL BODY (GRID LAYOUT)
     ═══════════════════════════════════════════ */
-    .edit-modal {
-      width: 95%; max-width: 500px; overflow: hidden; display: flex; flex-direction: column;
-    }
     .edit-modal-header {
-      position: relative; padding: 1.5rem 1.5rem 0.5rem; text-align: center;
+      position: relative; padding: 1.2rem 1.5rem; text-align: center;
+      border-bottom: 1px solid var(--border-soft);
+      background: var(--bg-main); /* Slight contrast header */
     }
-    .edit-modal-bg-blur {
-      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-      background: radial-gradient(circle, var(--pink-200) 0%, transparent 60%);
-      opacity: 0.3; pointer-events: none; z-index: 0;
-    }
-    .sparkle-row { font-size: 1.5rem; margin-bottom: 0.5rem; animation: float 3s ease-in-out infinite; }
     .edit-modal-header h3 {
-      font-family: var(--font-display); font-size: 1.8rem; color: var(--pink-600);
-      margin: 0; position: relative; z-index: 1;
+      font-family: var(--font-display); font-size: 1.5rem; color: var(--pink-600); margin: 0;
     }
     .client-title {
-      font-size: 1.1rem; color: var(--text-dark); margin: 0.2rem 0 0; font-weight: 700;
-      position: relative; z-index: 1;
+      font-size: 1rem; color: var(--text-medium); margin: 0.2rem 0 0; font-weight: 700;
     }
     .btn-close-modal {
       position: absolute; top: 1rem; right: 1rem; background: transparent; border: none;
-      font-size: 1.5rem; color: #ccc; cursor: pointer; z-index: 2; transition: 0.2s;
-      &:hover { transform: rotate(90deg); color: var(--pink-500); }
+      font-size: 1.2rem; color: var(--text-muted); cursor: pointer; transition: 0.2s;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      &:hover { background: var(--bg-hover); color: var(--text-dark); }
     }
 
-    .edit-modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
-    .edit-section { display: flex; flex-direction: column; gap: 0.8rem; }
+    .edit-modal-body { 
+      padding: 1.5rem; 
+      overflow-y: auto;
+      
+      /* 🖥️ DESKTOP GRID SYSTEM */
+      display: grid; 
+      grid-template-columns: 1fr 1fr; /* Two columns */
+      gap: 1.5rem;
+    }
+
+    /* Full width sections */
+    .edit-section:first-child, /* Client */
+    .edit-section:nth-child(4), /* Tags */
+    .postponed-box,
+    .edit-section:last-child { /* WhatsApp */
+      grid-column: 1 / -1; 
+    }
+
+    .edit-section { display: flex; flex-direction: column; gap: 0.6rem; }
+    
     .field-label {
-      font-size: 0.8rem; font-weight: 800; color: var(--pink-500);
-      text-transform: uppercase; letter-spacing: 0.5px;
+      font-size: 0.75rem; font-weight: 800; color: var(--pink-500);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-left: 4px;
+    }
+
+    /* Inputs & Controls */
+    .fancy-input {
+      width: 100%; border: 1px solid var(--border-soft); border-radius: 12px; padding: 10px 14px;
+      font-family: inherit; font-size: 0.9rem; outline: none; transition: 0.2s;
+      background: var(--bg-main); color: var(--text-dark);
+    }
+    .fancy-input:focus { 
+      border-color: var(--pink-400); 
+      box-shadow: 0 0 0 3px rgba(236,72,153,0.1); 
+      background: var(--bg-card);
     }
 
     /* Type Switch */
     .type-switch {
-      display: flex; background: var(--pink-50); padding: 4px; border-radius: 16px;
-      border: 1px solid var(--pink-100);
-    }
-    .type-switch button {
-      flex: 1; border: none; background: transparent; padding: 10px; border-radius: 12px;
-      font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.3s;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .type-switch button.active {
-      background: var(--bg-card); color: var(--pink-600); box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: flex; background: var(--bg-main); padding: 4px; border-radius: 14px;
       border: 1px solid var(--border-soft);
     }
-    .switch-icon { font-size: 1.2rem; }
+    .type-switch button {
+      flex: 1; border: none; background: transparent; padding: 8px; border-radius: 10px;
+      font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem;
+    }
+    .type-switch button.active {
+      background: var(--bg-card); color: var(--pink-600); 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid var(--border-soft);
+    }
 
     /* Status Pills */
-    .status-pills-selector {
-      display: flex; flex-wrap: wrap; gap: 8px;
-    }
+    .status-pills-selector { display: flex; flex-wrap: wrap; gap: 6px; }
     .status-pill-btn {
+      flex: 1; white-space: nowrap; 
       border: 1px solid var(--border-soft); background: var(--bg-main);
-      color: var(--text-medium); padding: 8px 14px; border-radius: 20px;
-      font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+      color: var(--text-medium); padding: 8px 10px; border-radius: 12px;
+      font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
     }
-    .status-pill-btn:hover { background: var(--pink-100); border-color: var(--pink-200); }
+    .status-pill-btn:hover { background: var(--hover-color, #f5f5f5); }
     .status-pill-btn.active {
       background: var(--pink-600); color: white; border-color: var(--pink-600);
-      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+      box-shadow: 0 4px 10px rgba(236, 72, 153, 0.25);
     }
 
-    /* Postponed Box */
-    .postponed-box {
-      background: var(--color-warning-bg); border: 1px dashed var(--color-warning); border-radius: 16px; padding: 1rem;
-      display: flex; flex-direction: column; gap: 1rem; animation: slideDown 0.3s ease-out;
+    /* Tags */
+    .tags-selector { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag-btn {
+      background: var(--bg-main); border: 1px solid var(--border-soft); border-radius: 20px;
+      padding: 6px 12px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; color: var(--text-medium);
     }
-    .fancy-input {
-      width: 100%; border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px;
-      font-family: inherit; font-size: 0.95rem; outline: none; transition: 0.2s;
-      background: var(--bg-main); color: var(--text-dark);
-    }
-    .fancy-input:focus { border-color: var(--pink-400); background: var(--bg-card); box-shadow: 0 0 0 3px rgba(236,72,153,0.1); }
+    .tag-btn.active { background: var(--pink-100); color: var(--pink-600); border-color: var(--pink-400); font-weight: 700; }
 
+    /* Footer */
     .edit-modal-footer {
-      padding: 1rem 1.5rem 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;
+      padding: 1rem 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;
       border-top: 1px solid var(--border-soft);
+      background: var(--bg-main);
+      border-radius: 0 0 24px 24px;
     }
     .btn-modal-cancel {
       background: transparent; border: none; color: var(--text-muted); font-weight: 700; cursor: pointer;
-      &:hover { color: var(--text-medium); text-decoration: underline; }
+      &:hover { color: var(--text-dark); }
     }
     .btn-modal-pink {
-      background: var(--pink-500); color: white; border: none; padding: 10px 20px;
-      border-radius: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(236,72,153,0.3);
-      transition: 0.2s;
-      &:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(236,72,153,0.4); }
+      background: var(--pink-500); color: white; border: none; padding: 10px 24px;
+      border-radius: 14px; font-weight: 700; cursor: pointer; 
+      box-shadow: 0 4px 15px rgba(236,72,153,0.3);
+      &:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(236,72,153,0.4); }
     }
 
     /* ═══════════════════════════════════════════
@@ -744,6 +839,18 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
       font-family: var(--font-display); font-size: 2.2rem; margin: 0; color: var(--pink-600);
       text-shadow: 2px 2px 0px white;
     }
+    
+    .client-badges { display: flex; gap: 5px; margin-top: 2px; }
+    .badge-vip {
+        background: #fce7f3; color: #be185d; border: 1px solid #fbcfe8;
+        font-size: 0.6rem; font-weight: 800; padding: 2px 6px; border-radius: 8px;
+    }
+    .badge-new {
+        background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;
+        font-size: 0.6rem; font-weight: 800; padding: 2px 6px; border-radius: 8px;
+    }
+    
+    .mini-label { font-size: 0.75rem; font-weight: 700; color: #888; display: block; margin-bottom: 4px; }
     .page-sub { margin: 5px 0 0; color: #777; font-weight: 600; font-size: 0.95rem; font-family: var(--font-body); }
 
     .header-controls {
@@ -998,9 +1105,21 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
       .card-buttons { justify-content: space-between; width: 100%; gap: 10px; }
       .action-btn { flex: 1; justify-content: center; height: 40px; }
 
-      .edit-modal { max-width: 100%; border-radius: 20px 20px 0 0; }
-      .status-pills-selector { gap: 6px; }
-      .status-pill-btn { font-size: 0.72rem; padding: 6px 10px; }
+      /* Mobile Modal: Centered Compact Card */
+      .modal-card {
+         width: 90%; 
+         max-width: 380px; /* Limit width */
+         height: auto; max-height: 85vh; /* Limit height */
+         margin: auto; /* Center vertically and horizontally */
+         border-radius: 20px;
+         position: relative; top: auto; bottom: auto;
+      }
+      .edit-modal-body {
+        grid-template-columns: 1fr; /* Stack columns on mobile */
+        gap: 1.2rem; padding: 1.2rem;
+      }
+      .edit-modal-header { padding: 1rem; }
+      .edit-modal-footer { padding: 1rem; }
     }
 
     /* 🌸 MODAL & DRAWER BASE STYLES REUSED 🌸 */
@@ -1013,6 +1132,11 @@ import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/m
     .btn-icon-mini:hover { transform: scale(1.1); }
     .btn-icon-mini.edit { background: #e0f2fe; color: #0284c7; }
     .btn-icon-mini.delete { background: #fee2e2; color: #ef4444; }
+    .btn-icon-mini.delete { background: #fee2e2; color: #ef4444; }
+    
+    .whatsapp-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .btn-wa { flex: 1; padding: 0.5rem; border: 1px solid #25D366; background: #dcfce7; color: #15803d; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.8rem; }
+    .btn-wa:hover { background: #25D366; color: white; transform: translateY(-2px); }
   `]
 })
 export class OrdersComponent implements OnInit {
@@ -1033,6 +1157,14 @@ export class OrdersComponent implements OnInit {
   uploading = signal(false);
   uploadResult = signal<ExcelUploadResult | null>(null);
 
+  // Tags System
+  availableTags = ['VIP', 'Nuevo', 'Urgente', 'Regalo', 'Problema', 'Frecuente'];
+  filterTag = signal<string>('');
+
+  // Route Optimizer
+  showOptimizer = signal(false);
+
+
   // ── Modals ──
   orderToEdit = signal<OrderSummary | null>(null);
   editData = {
@@ -1042,8 +1174,25 @@ export class OrdersComponent implements OnInit {
     postponedNote: '',
     clientName: '',
     clientAddress: '',
-    clientPhone: ''
+    clientPhone: '',
+    tags: [] as string[],
+    deliveryTime: '',
+    pickupDate: ''
   };
+
+  /* WHATSAPP STYLES */
+  // We'll add them to global styles or inline here since we can't easily append to styles array without seeing it all
+  // But wait, the component imports styles from... wait, styles are not visible here.
+  // Actually the component has `styles: [...]` which I can't easily see end of.
+  // I'll put styles in a <style> block in template? No, Angular doesn't like that.
+  // I'll assume I can append them if I find the styles array end.
+  // But I don't want to risk breaking it.
+  // I'll use inline styles or existing classes + new ones if I can find where styles end.
+  // The styles end was not in the range I viewed.
+  // I will add the CSS to the template using <style> tag if possible? No.
+  // I will skip adding CSS for now and rely on global or existing. 
+  // Actually, I can use `btn-wa` and define it if I can find the styles end.
+  // I'll assume `btn-wa` needs styling.
 
   // ── Drawer ──
   drawerOrder = signal<OrderSummary | null>(null);
@@ -1052,6 +1201,7 @@ export class OrdersComponent implements OnInit {
 
   // ── Filters ──
   statusFilter = '';
+  clientTypeFilter = ''; // [NEW] Filter by client type
   searchTerm = '';
 
   // ── Computed stats ──
@@ -1077,7 +1227,8 @@ export class OrdersComponent implements OnInit {
 
   constructor(
     private api: ApiService,
-    private confirm: ConfirmationService
+    private confirm: ConfirmationService,
+    private whatsapp: WhatsAppService
   ) { }
 
   ngOnInit(): void {
@@ -1108,9 +1259,17 @@ export class OrdersComponent implements OnInit {
       list = list.filter(o => o.status === this.statusFilter);
     }
 
+    if (this.filterTag()) {
+      list = list.filter(o => o.tags?.includes(this.filterTag()));
+    }
+
     if (this.searchTerm.trim()) {
       const term = this.searchTerm.toLowerCase().trim();
       list = list.filter(o => o.clientName.toLowerCase().includes(term));
+    }
+
+    if (this.clientTypeFilter) {
+      list = list.filter(o => o.clientType === this.clientTypeFilter);
     }
 
     list.sort((a, b) => b.id - a.id);
@@ -1137,13 +1296,21 @@ export class OrdersComponent implements OnInit {
 
   createRoute(): void {
     if (this.selectedIds().size === 0) return;
+    this.showOptimizer.set(true);
+  }
+
+  handleRouteConfirmed(sortedOrders: OrderSummary[]) {
+    this.showOptimizer.set(false);
     this.loading.set(true);
-    this.api.createRoute(Array.from(this.selectedIds())).subscribe({
+
+    const ids = sortedOrders.map(o => o.id);
+    this.api.createRoute(ids).subscribe({
       next: (route) => {
         this.routeCreated.set(route);
         this.selectedIds.set(new Set());
         this.loadOrders();
-        this.showToast('¡Ruta lista! 🚗💨');
+        this.showToast('¡Ruta creada con éxito! 🚗💨');
+        this.loading.set(false);
       },
       error: () => {
         this.loading.set(false);
@@ -1163,8 +1330,21 @@ export class OrdersComponent implements OnInit {
       postponedNote: order.postponedNote || '',
       clientName: order.clientName,
       clientAddress: order.clientAddress || '',
-      clientPhone: order.clientPhone || ''
+      clientPhone: order.clientPhone || '',
+      tags: order.tags || [],
+      deliveryTime: order.deliveryTime || '',
+      pickupDate: order.pickupDate || ''
     };
+  }
+
+  toggleTag(tag: string) {
+    if (!this.editData.tags) this.editData.tags = [];
+    const idx = this.editData.tags.indexOf(tag);
+    if (idx > -1) {
+      this.editData.tags.splice(idx, 1);
+    } else {
+      this.editData.tags.push(tag);
+    }
   }
 
   saveEdit(): void {
@@ -1179,7 +1359,10 @@ export class OrdersComponent implements OnInit {
       postponedNote: this.editData.postponedNote || null,
       clientName: this.editData.clientName,
       clientAddress: this.editData.clientAddress,
-      clientPhone: this.editData.clientPhone
+      clientPhone: this.editData.clientPhone,
+      tags: this.editData.tags,
+      deliveryTime: this.editData.deliveryTime,
+      pickupDate: this.editData.pickupDate
     };
 
     // Use updateOrder for top-level updates (status, type, client info)
@@ -1197,6 +1380,22 @@ export class OrdersComponent implements OnInit {
       },
       error: () => this.showToast('Error al guardar 😿', true)
     });
+  }
+
+  // ═══════════════ WHATSAPP ACTIONS ═══════════════
+  sendWaConfirmation() {
+    const order = this.orderToEdit();
+    if (order) this.whatsapp.sendOrderConfirmation(order);
+  }
+
+  sendWaOnWay() {
+    const order = this.orderToEdit();
+    if (order) this.whatsapp.sendOnTheWay(order);
+  }
+
+  sendWaPayment() {
+    const order = this.orderToEdit();
+    if (order) this.whatsapp.sendPaymentReminder(order);
   }
 
   // ═══════════════ DRAWER: EDIT ITEM ═══════════════

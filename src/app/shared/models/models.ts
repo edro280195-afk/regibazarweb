@@ -20,10 +20,12 @@ export interface RegisterRequest {
 export interface OrderSummary {
   id: number;
   clientName: string;
-  clientType?: string; // 'Nueva' | 'Frecuente'
+  clientType?: 'Nueva' | 'Frecuente'; // 'Nueva' | 'Frecuente'
   clientPhone?: string;
   clientAddress?: string;
   orderType: string;      // 'Delivery' | 'PickUp'
+  deliveryTime?: string;  // [NEW] Hora de entrega estipulada (HH:mm)
+  pickupDate?: string;    // [NEW] Fecha específica para PickUp
   postponedAt?: string;   // Fecha ISO
   postponedNote?: string; // Motivo
   subtotal: number;
@@ -35,6 +37,26 @@ export interface OrderSummary {
   expiresAt: string;
   items: OrderItem[];
   createdAt: string; // ISO Date
+
+  // Payments
+  paymentStatus?: 'Unpaid' | 'Partial' | 'Paid';
+  payments?: Payment[];
+  amountPaid?: number;
+  amountDue?: number;
+
+  // Tags
+  tags?: string[];
+}
+
+export interface Payment {
+  id: number;
+  orderId: number;
+  amount: number;
+  method: 'Efectivo' | 'Transferencia' | 'OXXO' | 'Tarjeta';
+  reference?: string;
+  date: string; // ISO
+  notes?: string;
+  createdAt: string;
 }
 
 export interface OrderItem {
@@ -54,10 +76,12 @@ export interface ExcelUploadResult {
 
 export interface ManualOrderRequest {
   clientName: string;
-  clientType?: string;
+  clientType?: 'Nueva' | 'Frecuente';
   clientPhone?: string;
   clientAddress?: string;
   orderType: string;
+  deliveryTime?: string; // [NEW]
+  pickupDate?: string;   // [NEW]
   items: { productName: string; quantity: number; unitPrice: number }[];
 }
 
@@ -97,6 +121,7 @@ export interface RouteDelivery {
 
 // ── Client View ──
 export interface ClientOrderView {
+  clientId?: number; // [NEW] Needed for loyalty
   clientName: string;
   items: OrderItem[];
   subtotal: number;
@@ -111,6 +136,8 @@ export interface ClientOrderView {
   deliveriesAhead?: number;
   clientLatitude?: number;
   clientLongitude?: number;
+  createdAt: string;       // [NEW] Para calcular fecha de entrega
+  clientType?: 'Nueva' | 'Frecuente';     // [NEW] 'Nueva' | 'Frecuente'
 }
 
 export interface DriverLocation {
@@ -140,6 +167,9 @@ export interface Client {
   longitude?: number;
   orderCount: number;
   tag?: string;
+  clientType?: 'Nueva' | 'Frecuente'; // [NEW]
+  totalSpent?: number;
+  ordersCount?: number; // Some endpoints might return this aliases
 }
 
 // ── Suppliers ──
@@ -190,4 +220,32 @@ export interface FinancialReport {
     incomes: OrderSummary[]; // Or a simplified version
     expenses: DriverExpense[];
   };
+}
+// ── Chat ──
+export interface ChatMessage {
+  id: number;
+  routeId: number;
+  sender: 'Admin' | 'Driver';
+  senderName?: string;
+  text: string;
+  timestamp: string; // ISO
+  read: boolean;
+}
+
+// ── Loyalty (RegiPuntos) ──
+export interface LoyaltyAccount {
+  clientId: number;
+  currentPoints: number;
+  tier: 'Pink' | 'Gold' | 'Diamond'; // Niveles Coquette
+  lifetimePoints: number;
+  lastAccrual: string;
+}
+
+export interface PointTransaction {
+  id: number;
+  clientId: number;
+  orderId?: number;
+  amount: number; // Positivo (ganancia) o negativo (uso)
+  reason: string;
+  date: string;
 }

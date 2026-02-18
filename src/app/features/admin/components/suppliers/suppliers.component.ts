@@ -87,7 +87,7 @@ import { Supplier, Investment } from '../../../../shared/models/models';
             <div class="modal-actions">
               <button class="btn-cancel" (click)="closeSupplierModal()">Cancelar</button>
               <button class="btn-confirm" (click)="saveSupplier()" 
-                      [disabled]="!supplierForm.name?.trim() || savingSupplier()">
+                      [disabled]="!supplierForm.name.trim() || savingSupplier()">
                 @if (savingSupplier()) { <span class="spinner"></span> }
                 {{ editingSupplier() ? 'Actualizar' : 'Guardar' }}
               </button>

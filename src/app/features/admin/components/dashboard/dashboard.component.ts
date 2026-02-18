@@ -33,6 +33,30 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
       } @else {
         @if (data(); as d) {
           
+          <!-- NEW BUSINESS KPIs -->
+          <div class="kpi-row fade-in">
+             <div class="kpi-card">
+               <span class="kpi-label">Ventas Hoy</span>
+               <span class="kpi-value">{{ metrics().salesToday | currency:'MXN' }}</span>
+             </div>
+             <div class="kpi-card">
+               <span class="kpi-label">Esta Semana</span>
+               <span class="kpi-value">{{ metrics().salesWeek | currency:'MXN' }}</span>
+             </div>
+             <div class="kpi-card">
+               <span class="kpi-label">Este Mes</span>
+               <span class="kpi-value">{{ metrics().salesMonth | currency:'MXN' }}</span>
+             </div>
+             <div class="kpi-card">
+                <span class="kpi-label">Ticket Promedio</span>
+                <span class="kpi-value">{{ metrics().avgTicket | currency:'MXN' }}</span>
+             </div>
+             <div class="kpi-card highlight">
+                <span class="kpi-label">Por Cobrar</span>
+                <span class="kpi-value text-red">{{ metrics().pendingCollection | currency:'MXN' }}</span>
+             </div>
+          </div>
+
           <div class="stats-grid">
             
             <div class="stat-card revenue-card">
@@ -75,7 +99,10 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
                 <span class="emoji">💝</span>
                 <span class="trend">Entregados</span>
               </div>
-              <span class="stat-number">{{ d.deliveredOrders }}</span>
+              <div>
+                <span class="stat-number">{{ d.deliveredOrders }}</span>
+                <span class="sub-stat">({{ metrics().successRate }}% éxito)</span>
+              </div>
             </div>
 
             <div class="stat-card blue-glass">
@@ -96,19 +123,25 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
                <div echarts [options]="salesVsInvOptions" class="chart-container"></div>
              </div>
              
-             <!-- Chart 2: Top Clients -->
+             <!-- Chart 2: Top Products (NEW) -->
+             <div class="chart-card">
+               <h3>💄 Top Productos</h3>
+               <div echarts [options]="topProductsOptions" class="chart-container"></div>
+             </div>
+
+             <!-- Chart 3: Top Clients -->
              <div class="chart-card">
                <h3>👑 Top Clientas</h3>
                <div echarts [options]="topClientsOptions" class="chart-container"></div>
              </div>
 
-             <!-- Chart 3: Client Types (Pie) -->
+             <!-- Chart 4: Client Types (Pie) -->
              <div class="chart-card">
                <h3>🎀 Tipos de Clientas</h3>
                <div echarts [options]="clientTypeOptions" class="chart-container"></div>
              </div>
 
-             <!-- Chart 4: Delivery Methods (Pie) -->
+             <!-- Chart 5: Delivery Methods (Pie) -->
              <div class="chart-card">
                <h3>🚚 Envíos vs PickUp</h3>
                <div echarts [options]="deliveryMethodOptions" class="chart-container"></div>
@@ -142,6 +175,24 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
       gap: 1.5rem;
       margin-bottom: 3rem;
     }
+
+    /* KPI ROW */
+    .kpi-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem; margin-bottom: 2rem;
+    }
+    .kpi-card {
+      background: white; border-radius: 1rem; padding: 1rem;
+      border: 1px solid var(--pink-100); box-shadow: var(--shadow-sm);
+      display: flex; flex-direction: column; align-items: flex-start;
+      transition: transform 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-3px); }
+    .kpi-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+    .kpi-value { font-size: 1.3rem; font-weight: 800; color: var(--pink-600); }
+    .kpi-card.highlight { background: #fff1f2; border-color: #fecdd3; }
+    .text-red { color: #e11d48; }
+    .sub-stat { font-size: 0.75rem; color: #15803d; font-weight: 700; margin-left: 5px; }
     
     .chart-card {
       background: var(--glass-bg);
@@ -353,11 +404,21 @@ export class DashboardComponent implements OnInit {
   loading = signal(true);
   today = new Date();
 
+  metrics = signal({
+    salesToday: 0,
+    salesWeek: 0,
+    salesMonth: 0,
+    avgTicket: 0,
+    pendingCollection: 0,
+    successRate: 0
+  });
+
   // Chart Options
   salesVsInvOptions: any;
   topClientsOptions: any;
   clientTypeOptions: any;
   deliveryMethodOptions: any;
+  topProductsOptions: any;
 
   constructor(private api: ApiService) { }
 
@@ -407,6 +468,59 @@ export class DashboardComponent implements OnInit {
   }
 
   processCharts(orders: OrderSummary[], investments: Investment[], clients: Client[]) {
+    // ── CALCULAR KPIs DE NEGOCIO ──
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay())); // Sunday
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    let salesToday = 0;
+    let salesWeek = 0;
+    let salesMonth = 0;
+    let totalSales = 0;
+    let pendingCol = 0;
+    let deliveredCount = 0;
+
+    // Use a flattened list of items for product popularity
+    const productCounts: Record<string, number> = {};
+
+    orders.forEach(o => {
+      if (o.status === 'Canceled') return;
+
+      const orderDate = new Date(o.createdAt);
+      if (isNaN(orderDate.getTime())) return;
+
+      if (orderDate >= startOfToday) salesToday += o.total;
+      if (orderDate >= startOfWeek) salesWeek += o.total;
+      if (orderDate >= startOfMonth) salesMonth += o.total;
+
+      totalSales += o.total;
+      pendingCol += (o.amountDue ?? o.total); // From payment features
+
+      if (o.status === 'Delivered') deliveredCount++;
+
+      // Count products
+      if (o.items) {
+        o.items.forEach(item => {
+          const name = item.productName.trim();
+          productCounts[name] = (productCounts[name] || 0) + item.quantity;
+        });
+      }
+    });
+
+    const activeOrders = orders.filter(o => o.status !== 'Canceled').length;
+    const avgTicket = activeOrders > 0 ? totalSales / activeOrders : 0;
+    const successRate = activeOrders > 0 ? Math.round((deliveredCount / activeOrders) * 100) : 0;
+
+    this.metrics.set({
+      salesToday,
+      salesWeek,
+      salesMonth,
+      avgTicket,
+      pendingCollection: pendingCol,
+      successRate
+    });
+
     // ── 1. Sales vs Investment (Last 12 months) ──
     const salesByMonth = new Map<string, number>();
     const invByMonth = new Map<string, number>();
@@ -513,6 +627,22 @@ export class DashboardComponent implements OnInit {
       ...this.deliveryMethodOptions,
       series: [{ ...this.deliveryMethodOptions.series[0], data: methodData }]
     };
+
+    // ── 5. Top Products (NEW) ──
+    const sortedProducts = Object.entries(productCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    this.topProductsOptions = {
+      ...this.topClientsOptions, // Reuse style from top clients
+      yAxis: { ...this.topClientsOptions.yAxis, data: sortedProducts.map(p => p[0]) },
+      series: [{
+        ...this.topClientsOptions.series[0],
+        name: 'Unidades',
+        itemStyle: { color: '#FF85B3', borderRadius: [0, 20, 20, 0] },
+        data: sortedProducts.map(p => p[1])
+      }]
+    };
   }
 
   initCharts() {
@@ -563,6 +693,7 @@ export class DashboardComponent implements OnInit {
       ]
     };
 
+    // (Code continues for other charts...)
     this.clientTypeOptions = {
       color: ['#FF9DBF', '#FFC5D9', '#E8A0BF', '#D4C4D4'],
       tooltip: { trigger: 'item' },

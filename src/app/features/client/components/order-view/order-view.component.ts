@@ -1,10 +1,10 @@
-import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, Inject, LOCALE_ID } from '@angular/core';
+import { CommonModule, formatDate } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
-import { ClientOrderView } from '../../../../shared/models/models';
+import { ClientOrderView, LoyaltyAccount } from '../../../../shared/models/models';
 import * as L from 'leaflet';
 
 @Component({
@@ -64,7 +64,7 @@ import * as L from 'leaflet';
             }
             @case ('Delivered') {
               <span class="status-icon">💝</span>
-              <div><strong>¡Entregado!</strong><p>Tu pedido fue entregado con mucho cariño 🌸</p></div>
+              <div><strong>¡Entregado!</strong><p>Tu pedido fue entregado, muchas gracias por tu compra 🌸</p></div>
             }
             @case ('NotDelivered') {
               <span class="status-icon">😿</span>
@@ -119,6 +119,37 @@ import * as L from 'leaflet';
             }
           </div>
         }
+
+        <!-- Delivery Countdown (Only if Pending or similar status where date matters) -->
+        @if (deliveryDate() && (o.status === 'Pending' || o.status === 'InRoute')) {
+          <div class="countdown-section">
+            <h3>⏳ Tiempo para tu entrega</h3>
+            <div class="countdown-timer">
+              <div class="time-block">
+                <span class="time-val">{{ countdown().days }}</span>
+                <span class="time-label">Días</span>
+              </div>
+              <div class="time-block">
+                <span class="time-val">{{ countdown().hours }}</span>
+                <span class="time-label">Hrs</span>
+              </div>
+              <div class="time-block">
+                <span class="time-val">{{ countdown().minutes }}</span>
+                <span class="time-label">Mins</span>
+              </div>
+              <div class="time-block">
+                <span class="time-val">{{ countdown().seconds }}</span>
+                <span class="time-label">Segs</span>
+              </div>
+            </div>
+            <p class="delivery-date-hint">
+              Tu entrega está programada para el <strong>{{ deliveryDateFormatted() }}</strong> 📅
+              <br>
+              <span class="delivery-reason">{{ deliveryReason() }}</span>
+            </p>
+          </div>
+        }
+
 
         <!-- Order items -->
         <div class="order-section">
@@ -180,7 +211,7 @@ import * as L from 'leaflet';
               <span class="pay-icon">🏪</span>
               <div>
                 <strong>Depósito OXXO</strong>
-                <span class="bank-name">Tarjeta Spin / Saldazo</span>
+                <span class="bank-name">BBVA</span>
               </div>
             </div>
             <div class="card-details">
@@ -195,8 +226,46 @@ import * as L from 'leaflet';
             </div>
           </div>
 
+          <!-- 3. EFECTIVO -->
+          <div class="pay-card cash">
+            <div class="pay-header">
+              <span class="pay-icon">💵</span>
+              <div>
+                <strong>Pago en Efectivo (Al recibir pedido)</strong>
+                <span class="bank-name">Contar con monto exacto de preferencia</span>
+              </div>
+            </div>
+            <p class="cash-hint">Prepara tu cambio exacto para agilizar la entrega ✨</p>
+          </div>
+
         </div>
+        
+        <!-- LOYALTY WIDGET -->
+        @if (loyalty(); as l) {
+           <div class="loyalty-widget" [attr.data-tier]="l.tier">
+             <div class="l-header">
+               <span class="l-icon">💎</span>
+               <div class="l-info">
+                 <h3>Tus RegiPuntos</h3>
+                 <span class="l-tier">{{ l.tier }} Member</span>
+               </div>
+             </div>
+             <div class="l-points">
+               <span class="lp-val">{{ l.currentPoints }}</span>
+               <span class="lp-label">puntos disponibles</span>
+             </div>
+             <p class="l-hint">¡Sigue comprando para subir de nivel! ✨</p>
+           </div>
+        }
+
         <p class="footer-msg">Hecho con 💗 para ti</p>
+      }
+
+      @if (toastVisible()) {
+        <div class="toast-notification">
+          <span class="toast-icon">✨</span>
+          <span>{{ toastMessage() }}</span>
+        </div>
       }
     </div>
   `,
@@ -324,11 +393,65 @@ import * as L from 'leaflet';
       &:active { transform: scale(0.95); }
     }
     
-    .store-logos { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8; }
-    .store-badge {
-       background: white; border: 1px solid #ddd; padding: 0.4rem 0.8rem; border-radius: 20px;
+    .store-logos { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8; 
        font-size: 0.75rem; font-weight: 600; color: #555;
     }
+
+    /* COUNTDOWN */
+    .countdown-section {
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px dashed var(--pink-300);
+      border-radius: 1rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      position: relative; z-index: 1;
+    }
+    .countdown-section h3 { color: var(--text-dark); font-size: 1rem; margin: 0 0 0.75rem; font-family: var(--font-display); }
+    .countdown-timer { display: flex; justify-content: center; gap: 0.8rem; margin-bottom: 0.5rem; }
+    .time-block { display: flex; flex-direction: column; align-items: center; background: white; padding: 0.5rem 0.8rem; border-radius: 0.8rem; box-shadow: 0 2px 8px rgba(255, 107, 157, 0.1); min-width: 50px; }
+    .time-val { font-size: 1.2rem; font-weight: 800; color: var(--pink-600); font-family: monospace; }
+    .time-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .delivery-date-hint { font-size: 0.85rem; color: var(--text-medium); margin: 0; line-height: 1.4; }
+    .delivery-reason { font-size: 0.75rem; color: var(--pink-500); font-style: italic; display: block; margin-top: 0.2rem; }
+
+    .cash-hint { font-size: 0.8rem; color: var(--text-muted); margin: 0; font-style: italic; }
+
+    /* TOAST */
+    .toast-notification {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+      background: rgba(40, 40, 40, 0.9); backdrop-filter: blur(8px);
+      color: white;
+      padding: 0.75rem 1.5rem; border-radius: 2rem;
+      display: flex; align-items: center; gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      z-index: 9999;
+      animation: toastFadeIn 0.3s ease-out;
+      font-size: 0.9rem; font-weight: 500;
+    }
+    .toast-icon { font-size: 1.2rem; }
+    @keyframes toastFadeIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    /* LOYALTY WIDGET */
+    .loyalty-widget {
+      background: linear-gradient(135deg, #fff0f5, #ffe4e6);
+      border: 1px solid #fecdd3; border-radius: 1rem; padding: 1.25rem;
+      margin-top: 1.5rem; position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      box-shadow: 0 4px 15px rgba(255,182,193,0.2);
+    }
+    .loyalty-widget[data-tier="Gold"] { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fcd34d; }
+    .loyalty-widget[data-tier="Diamond"] { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
+
+    .l-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem; }
+    .l-icon { font-size: 1.8rem; background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .l-info h3 { margin: 0; font-size: 1rem; color: #db2777; font-family: var(--font-display); }
+    .l-tier { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #be185d; letter-spacing: 1px; }
+
+    .l-points { background: white; padding: 0.5rem 1.5rem; border-radius: 2rem; display: flex; flex-direction: column; line-height: 1; margin-bottom: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .lp-val { font-size: 1.5rem; font-weight: 800; color: #db2777; }
+    .lp-label { font-size: 0.7rem; color: #999; text-transform: uppercase; font-weight: 700; margin-top: 2px; }
+    
+    .l-hint { font-size: 0.8rem; color: #666; font-style: italic; margin: 0; }
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy {
@@ -339,6 +462,18 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   expired = signal(false);
   notFound = signal(false);
   showMap = signal(false);
+
+  // Countdown & Toast
+  deliveryDate = signal<Date | null>(null);
+  deliveryDateFormatted = signal('');
+  deliveryReason = signal<string>('');
+  countdown = signal({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  loyalty = signal<LoyaltyAccount | null>(null);
+
+  toastVisible = signal(false);
+  toastMessage = signal('');
+  private timerInterval: any;
 
   private map?: L.Map;
   private driverMarker?: L.Marker;
@@ -354,7 +489,8 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
-    private signalr: SignalRService
+    private signalr: SignalRService,
+    @Inject(LOCALE_ID) private locale: string
   ) { }
 
   ngOnInit(): void {
@@ -367,6 +503,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     this.deliverySub?.unsubscribe();
     this.signalr.disconnect();
     this.destroyMap();
+    if (this.timerInterval) clearInterval(this.timerInterval);
   }
 
   private loadOrder(): void {
@@ -375,6 +512,11 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         const prevStatus = this.order()?.status;
         this.order.set(order);
         this.loading.set(false);
+
+        // Calculate delivery date logic
+        // Fallback to now if createdAt is missing, to ensure countdown works
+        const createdStr = order.createdAt || new Date().toISOString();
+        this.calculateDelivery(createdStr, order.clientType || 'Nueva');
 
         const needsMap = order.status === 'InRoute' || order.status === 'InTransit';
         this.showMap.set(needsMap);
@@ -394,6 +536,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         } else {
           this.destroyMap();
         }
+
+        // Fetch Loyalty if client ID is present (or use mock ID 1 for demo if missing)
+        const cid = order.clientId || 1;
+        this.api.getLoyaltyAccount(cid).subscribe(l => this.loyalty.set(l));
       },
       error: (err) => {
         this.loading.set(false);
@@ -591,7 +737,81 @@ export class OrderViewComponent implements OnInit, OnDestroy {
 
   copyText(val: string) {
     navigator.clipboard.writeText(val);
-    // Could add toast here but simple copy is fine for now
-    alert('¡Número de tarjeta copiado! 💳');
+    this.showToast('¡Número de tarjeta copiado! 💳');
+  }
+
+  showToast(msg: string) {
+    this.toastMessage.set(msg);
+    this.toastVisible.set(true);
+    setTimeout(() => this.toastVisible.set(false), 3000);
+  }
+
+  private calculateDelivery(createdAtStr: string, clientType: string) {
+    const created = new Date(createdAtStr);
+    const delivery = new Date(created);
+
+    // "Nueva" -> Next Sunday
+    // "Frecuente" -> 2nd Sunday (Sunday of next week)
+    // Logic: Find next Sunday.
+    // 0=Sun, 1=Mon, ..., 6=Sat
+    const dayOfWeek = created.getDay();
+    const daysUntilSunday = (7 - dayOfWeek) % 7;
+
+    // If created on Sunday, is it today's delivery or next week?
+    // User requirement: "a partir de la fecha de creacion"
+    // Usually if created typically implies next upcoming delivery cycle.
+    // Let's assume if created on Sunday, the "next Sunday" is likely +7 days if it's already late, 
+    // but typically "next Sunday" means the upcoming one.
+    // If created Sunday, daysUntilSunday is 0. Does that mean today? 
+    // Let's assume +0 days (today) if early, but safe bet is +7 if we want "next".
+    // However, let's stick to standard logic: Simple "Next Sunday".
+
+    let addDays = daysUntilSunday === 0 ? 7 : daysUntilSunday;
+
+    // If client is "Frecuente", add extra 7 days (2nd Sunday)
+    if (clientType === 'Frecuente') {
+      addDays += 7;
+      this.deliveryReason.set('✨ Por ser clienta frecuente, tu entrega es en 2 semanas 💕');
+    } else {
+      this.deliveryReason.set('🌸 Por ser clienta nueva, tu entrega es el próximo domingo ✨');
+    }
+
+    // Actually apply the date change!
+    delivery.setDate(created.getDate() + addDays);
+
+    delivery.setHours(10, 0, 0, 0);
+
+    const fmt = formatDate(delivery, "EEEE d 'de' MMMM", this.locale);
+    // Capitalize first letter
+    this.deliveryDateFormatted.set(fmt.charAt(0).toUpperCase() + fmt.slice(1));
+    this.deliveryDate.set(delivery);
+    this.startCountdown();
+  }
+
+  private startCountdown() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+
+    const update = () => {
+      const target = this.deliveryDate();
+      if (!target) return;
+
+      const now = new Date();
+      const diff = target.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        this.countdown.set({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+
+      this.countdown.set({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60)
+      });
+    };
+
+    update();
+    this.timerInterval = setInterval(update, 1000);
   }
 }

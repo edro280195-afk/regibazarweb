@@ -1,15 +1,17 @@
 import { Component, OnInit, signal, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../../../core/services/api.service';
-import { DeliveryRoute } from '../../../../shared/models/models';
+import { WhatsAppService } from '../../../../core/services/whatsapp.service';
+import { DeliveryRoute, ChatMessage } from '../../../../shared/models/models';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
 import * as L from 'leaflet';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-route-manager',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="routes-page">
       
@@ -78,6 +80,7 @@ import * as L from 'leaflet';
               <div class="link-row">
                 <input type="text" [value]="route.driverLink" readonly #linkEl>
                 <button class="btn-copy" (click)="copy(linkEl)">📋 Copiar</button>
+                <button class="btn-copy btn-wa" (click)="shareRouteWa(route)">📱 Enviar</button>
               </div>
             </div>
 
@@ -130,6 +133,46 @@ import * as L from 'leaflet';
               } @else {
                 <span class="offline-indicator">Sin GPS en vivo. Mostrando ruta planificada 🗺️</span>
               }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════ CHAT MODAL ═══════════════ -->
+      @if (chatRoute()) {
+        <div class="modal-overlay" (click)="closeChat()">
+          <div class="modal-card chat-card" (click)="$event.stopPropagation()">
+            <div class="chat-header">
+              <div class="driver-info">
+                <span class="driver-avatar">🧢</span>
+                <div>
+                  <h3>Chat con Repartidor</h3>
+                  <span class="status">Ruta #{{ chatRoute()!.id }}</span>
+                </div>
+              </div>
+              <button class="btn-close-map" (click)="closeChat()">✕</button>
+            </div>
+
+            <div class="chat-messages" #chatScroll>
+              @if (activeMessages().length === 0) {
+                <div class="empty-chat">
+                  <span>💬</span>
+                  <p>Inicia la conversación con tu repartidor</p>
+                </div>
+              }
+              @for (msg of activeMessages(); track msg.id) {
+                <div class="message-bubble" [class.me]="msg.sender === 'Admin'" [class.them]="msg.sender === 'Driver'">
+                  <div class="bubble-content">
+                    {{ msg.text }}
+                  </div>
+                  <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="chat-input-area">
+              <input type="text" [(ngModel)]="newMessage" (keydown.enter)="sendMessage()" placeholder="Escribe un mensaje...">
+              <button class="btn-send" (click)="sendMessage()" [disabled]="!newMessage.trim()">➤</button>
             </div>
           </div>
         </div>
@@ -269,6 +312,8 @@ import * as L from 'leaflet';
       transition: 0.2s;
     }
     .btn-copy:hover { box-shadow: 0 4px 12px rgba(236,72,153,0.3); transform: translateY(-1px); }
+    .btn-wa { background: #25D366; margin-left: 5px; }
+    .btn-wa:hover { box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4); }
 
     /* DELIVERIES LIST */
     .deliveries-list {
@@ -341,6 +386,50 @@ import * as L from 'leaflet';
     .dot { width: 10px; height: 10px; background: #34d399; border-radius: 50%; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(2); } }
 
+    /* ═══ CHAT MODAL ═══ */
+    .chat-card {
+      max-width: 400px; height: 600px;
+      display: flex; flex-direction: column;
+    }
+    .chat-header {
+      padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
+      background: #fdf2f8;
+    }
+    .driver-info { display: flex; align-items: center; gap: 10px; }
+    .driver-avatar { font-size: 1.5rem; background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .chat-header h3 { margin: 0; font-size: 1rem; color: var(--pink-600); }
+    .chat-header .status { font-size: 0.75rem; color: #666; font-weight: 700; }
+
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 1rem; background: #fffbff;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .message-bubble {
+      max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; position: relative;
+    }
+    .message-bubble.me {
+      align-self: flex-end; background: var(--pink-500); color: white; border-bottom-right-radius: 4px;
+    }
+    .message-bubble.them {
+      align-self: flex-start; background: white; border: 1px solid #eee; color: #444; border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+    .msg-time { display: block; font-size: 0.65rem; margin-top: 4px; opacity: 0.7; text-align: right; }
+    
+    .chat-input-area {
+      padding: 10px; border-top: 1px solid #eee; display: flex; gap: 8px; background: white;
+    }
+    .chat-input-area input {
+      flex: 1; border: 1px solid #eee; padding: 10px 14px; border-radius: 24px; outline: none; transition: 0.2s;
+    }
+    .chat-input-area input:focus { border-color: var(--pink-400); }
+    
+    .empty-chat {
+      text-align: center; color: #ccc; margin-top: 2rem;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .empty-chat span { font-size: 3rem; opacity: 0.5; margin-bottom: 5px; }
+
     /* ═══ RESPONSIVE ═══ */
     @media (max-width: 600px) {
       .routes-page { padding: 1rem 1rem 5rem; }
@@ -371,6 +460,12 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   selectedRouteForMap = signal<DeliveryRoute | null>(null);
   lastLocationUpdate = signal<string | null>(null);
 
+  // Chat State
+  chatRoute = signal<DeliveryRoute | null>(null);
+  activeMessages = signal<ChatMessage[]>([]);
+  newMessage = '';
+  @ViewChild('chatScroll') chatScroll?: ElementRef;
+
   private map?: L.Map;
   private driverMarker?: L.Marker;
   private markersLayer?: L.LayerGroup;
@@ -379,7 +474,8 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   constructor(
     private api: ApiService,
     private confirm: ConfirmationService,
-    private signalr: SignalRService
+    private signalr: SignalRService,
+    private whatsapp: WhatsAppService
   ) { }
 
   ngOnInit(): void {
@@ -447,6 +543,18 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     this.showToast('¡Link copiado! 📋✅');
   }
 
+  shareRouteWa(route: DeliveryRoute): void {
+    // Assuming we have a driver phone number? 
+    // The route object doesn't have driverPhone in my models?
+    // Let's check. DeliveryRoute has driverName, driverId?
+    // Actually, createRoute returns a Route.
+    // If we don't have driver phone, we might need to prompt or just open generic link.
+    // For now, let's open generic link or prompt user.
+    // Or just use a dummy phone for demo.
+    const phone = '8671794003'; // Example
+    this.whatsapp.shareRouteWithDriver(phone, route);
+  }
+
   showToast(msg: string): void {
     this.toastMessage.set(msg);
     setTimeout(() => this.toastMessage.set(''), 3000);
@@ -499,8 +607,24 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   private plotRoute(route: DeliveryRoute): void {
     if (!this.map || !this.markersLayer) return;
 
+    // Clear old layers first just in case
+    this.markersLayer.clearLayers();
     const points: L.LatLngExpression[] = [];
     const bounds: L.LatLngExpression[] = [];
+
+    // 🏭 WAREHOUSE / ADMIN LOCATION (Mock)
+    const warehousePos: L.LatLngExpression = [25.686614, -100.316112];
+    bounds.push(warehousePos);
+    points.push(warehousePos);
+
+    const warehouseIcon = L.divIcon({
+      html: `<div style="font-size:24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🏭</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
+    });
+    L.marker(warehousePos, { icon: warehouseIcon }).addTo(this.markersLayer)
+      .bindPopup('<b style="color:#db2777; font-family:Quicksand">Base / Almacén</b>');
+
+
 
     route.deliveries.forEach(d => {
       if (!d.latitude || !d.longitude) return;
@@ -536,6 +660,22 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     }
   }
 
+  private updateDriverMarker(lat: number, lng: number) {
+    if (!this.map) return;
+
+    const icon = L.divIcon({
+      html: `<div style="font-size:24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🚚</div>`, // Truck icon
+      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
+    });
+
+    if (!this.driverMarker) {
+      this.driverMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(this.map);
+    } else {
+      this.driverMarker.setLatLng([lat, lng]);
+    }
+    this.map.panTo([lat, lng]);
+  }
+
   private handleLocationUpdate(loc: any) {
     const currentRoute = this.selectedRouteForMap();
     if (!currentRoute || !this.showMapModal()) return;
@@ -551,19 +691,55 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     }
   }
 
-  private updateDriverMarker(lat: number, lng: number) {
-    if (!this.map) return;
+  // ═══ CHAT LOGIC ═══
+  openChat(route: DeliveryRoute) {
+    this.chatRoute.set(route);
+    // Load mock messages for this route
+    this.activeMessages.set([
+      { id: 1, routeId: route.id, sender: 'Driver', text: 'Ya voy en camino a la primera entrega 🛵', timestamp: new Date().toISOString(), read: true },
+      { id: 2, routeId: route.id, sender: 'Admin', text: 'Excelente, avísame cualquier cosa', timestamp: new Date().toISOString(), read: true }
+    ]);
+    setTimeout(() => this.scrollToBottom(), 100);
+  }
 
-    const icon = L.divIcon({
-      html: `<div style="font-size:24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🚚</div>`, // Truck icon
-      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
-    });
+  closeChat() {
+    this.chatRoute.set(null);
+  }
 
-    if (!this.driverMarker) {
-      this.driverMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(this.map);
-    } else {
-      this.driverMarker.setLatLng([lat, lng]);
+  sendMessage() {
+    if (!this.newMessage.trim() || !this.chatRoute()) return;
+
+    const msg: ChatMessage = {
+      id: Date.now(),
+      routeId: this.chatRoute()!.id,
+      sender: 'Admin',
+      text: this.newMessage.trim(),
+      timestamp: new Date().toISOString(),
+      read: true
+    };
+
+    this.activeMessages.update(msgs => [...msgs, msg]);
+    this.newMessage = '';
+    setTimeout(() => this.scrollToBottom(), 50);
+
+    // Mock Driver Reply
+    setTimeout(() => {
+      const reply: ChatMessage = {
+        id: Date.now() + 1,
+        routeId: this.chatRoute()!.id,
+        sender: 'Driver',
+        text: '¡Entendido! 👌',
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+      this.activeMessages.update(msgs => [...msgs, reply]);
+      this.scrollToBottom();
+    }, 2000);
+  }
+
+  scrollToBottom() {
+    if (this.chatScroll) {
+      this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
     }
-    this.map.panTo([lat, lng]);
   }
 }

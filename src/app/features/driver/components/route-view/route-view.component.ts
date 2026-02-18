@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
-import { DeliveryRoute, RouteDelivery } from '../../../../shared/models/models';
+import { DeliveryRoute, RouteDelivery, ChatMessage } from '../../../../shared/models/models';
 import * as L from 'leaflet';
 
 @Component({
@@ -213,6 +213,57 @@ import * as L from 'leaflet';
             🎉 ¡Ruta completada! Buen trabajo 💪
           </div>
         }
+      }
+
+      <!-- Floating Chat Button -->
+      <!-- Floating Chat Button -->
+      @if (route(); as r) {
+        <button class="btn-chat-fab" (click)="toggleChat()">
+          💬
+          @if (unreadCount() > 0) {
+            <span class="unread-badge">{{ unreadCount() }}</span>
+          }
+        </button>
+      }
+
+      <!-- Chat Modal -->
+      @if (showChat()) {
+        <div class="modal-overlay" (click)="toggleChat()">
+          <div class="modal-card chat-card" (click)="$event.stopPropagation()">
+            <div class="chat-header">
+              <div class="admin-info">
+                <span class="admin-avatar">👩‍💼</span>
+                <div>
+                  <h3>Chat con Admin</h3>
+                  <span class="status">En línea</span>
+                </div>
+              </div>
+              <button class="btn-close-chat" (click)="toggleChat()">✕</button>
+            </div>
+
+            <div class="chat-messages" #chatScroll>
+              @if (activeMessages().length === 0) {
+                <div class="empty-chat">
+                  <span>👋</span>
+                  <p>Envía un mensaje a la base</p>
+                </div>
+              }
+              @for (msg of activeMessages(); track msg.id) {
+                <div class="message-bubble" [class.me]="msg.sender === 'Driver'" [class.them]="msg.sender === 'Admin'">
+                  <div class="bubble-content">
+                    {{ msg.text }}
+                  </div>
+                  <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="chat-input-area">
+              <input type="text" [(ngModel)]="newMessage" (keydown.enter)="sendMessage()" placeholder="Escribe un mensaje..." #chatInput>
+              <button class="btn-send" (click)="sendMessage()" [disabled]="!newMessage.trim()">➤</button>
+            </div>
+          </div>
+        </div>
       }
 
       <!-- Fail modal -->
@@ -668,6 +719,83 @@ import * as L from 'leaflet';
       color: white; border: none; border-radius: 0.8rem; font-weight: 700; cursor: pointer;
       &:disabled { opacity: 0.5; }
     }
+
+    /* CHAT FAB */
+    .btn-chat-fab {
+      position: fixed; bottom: 20px; right: 20px;
+      width: 60px; height: 60px; border-radius: 50%;
+      background: linear-gradient(135deg, #ec4899, #db2777);
+      color: white; border: none; font-size: 1.8rem;
+      box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
+      cursor: pointer; z-index: 1001;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .btn-chat-fab:active { transform: scale(0.9); }
+    .unread-badge {
+      position: absolute; top: 0; right: 0;
+      background: #ef4444; color: white;
+      width: 20px; height: 20px; border-radius: 50%;
+      font-size: 0.75rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid white;
+    }
+
+    /* CHAT MODAL OVERRIDES */
+    .chat-card {
+      height: 80vh; max-height: 600px; display: flex; flex-direction: column; padding: 0 !important;
+      overflow: hidden;
+    }
+    .chat-header {
+      padding: 1rem; background: #fdf2f8; border-bottom: 1px solid #fce7f3;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .admin-info { display: flex; align-items: center; gap: 10px; }
+    .admin-avatar { font-size: 1.5rem; background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .chat-header h3 { margin: 0; font-size: 1rem; color: #db2777; }
+    .chat-header .status { font-size: 0.75rem; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+    .chat-header .status::before { content: ''; width: 8px; height: 8px; background: #10b981; border-radius: 50%; }
+    
+    .btn-close-chat { background: none; border: none; font-size: 1.2rem; color: #999; cursor: pointer; padding: 5px; }
+
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 1rem; background: #fffbff;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .message-bubble {
+      max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; position: relative; word-wrap: break-word;
+    }
+    .message-bubble.me {
+      align-self: flex-end; background: #ec4899; color: white; border-bottom-right-radius: 4px;
+      box-shadow: 0 2px 5px rgba(236, 72, 153, 0.2);
+    }
+    .message-bubble.them {
+      align-self: flex-start; background: white; border: 1px solid #f3f4f6; color: #374151; border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+    .msg-time { display: block; font-size: 0.65rem; margin-top: 4px; opacity: 0.7; text-align: right; }
+
+    .chat-input-area {
+      padding: 10px; background: white; border-top: 1px solid #f3f4f6;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .chat-input-area input {
+      flex: 1; border: 1px solid #e5e7eb; padding: 10px 15px; border-radius: 24px; outline: none; transition: 0.2s;
+      font-family: inherit;
+    }
+    .chat-input-area input:focus { border-color: #ec4899; }
+    .btn-send {
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: #ec4899; color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: 0.2s;
+    }
+    .btn-send:disabled { background: #f3f4f6; color: #9ca3af; }
+
+    .empty-chat {
+      text-align: center; color: #9ca3af; margin-top: auto; margin-bottom: auto; padding: 2rem;
+    }
+    .empty-chat span { font-size: 3rem; margin-bottom: 0.5rem; display: block; opacity: 0.5; }
   `]
 })
 export class RouteViewComponent implements OnInit, OnDestroy {
@@ -680,6 +808,14 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   failModalId = signal(0);
   selectedReason = signal('');
   toastMsg = signal('');
+
+  // Chat State
+  showChat = signal(false);
+  activeMessages = signal<ChatMessage[]>([]);
+  newMessage = '';
+  unreadCount = signal(0);
+  @ViewChild('chatScroll') chatScroll?: ElementRef;
+  @ViewChild('chatInput') chatInput?: ElementRef;
 
   // Expenses
   showExpenseModal = signal(false);
@@ -798,6 +934,68 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ═══ CHAT LOGIC ═══
+  toggleChat() {
+    this.showChat.set(!this.showChat());
+    if (this.showChat()) {
+      this.unreadCount.set(0);
+      setTimeout(() => {
+        this.scrollToBottom();
+        this.chatInput?.nativeElement.focus();
+      }, 100);
+
+      // Load mock messages if empty
+      if (this.activeMessages().length === 0) {
+        this.activeMessages.set([
+          { id: 1, routeId: this.route()!.id, sender: 'Admin', text: '¡Hola! ¿Todo bien con la ruta? 💕', timestamp: new Date(Date.now() - 3600000).toISOString(), read: true }
+        ]);
+        this.unreadCount.set(1);
+      }
+    }
+  }
+
+  sendMessage() {
+    if (!this.newMessage.trim() || !this.route()) return;
+
+    const msg: ChatMessage = {
+      id: Date.now(),
+      routeId: this.route()!.id,
+      sender: 'Driver',
+      text: this.newMessage.trim(),
+      timestamp: new Date().toISOString(),
+      read: true
+    };
+
+    this.activeMessages.update(msgs => [...msgs, msg]);
+    this.newMessage = '';
+    setTimeout(() => this.scrollToBottom(), 50);
+
+    // Mock Admin Reply
+    setTimeout(() => {
+      const reply: ChatMessage = {
+        id: Date.now() + 1,
+        routeId: this.route()!.id,
+        sender: 'Admin',
+        text: '¡Enterado! Gracias por avisar 👍',
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+      this.activeMessages.update(msgs => [...msgs, reply]);
+      if (this.showChat()) {
+        this.scrollToBottom();
+      } else {
+        this.unreadCount.update(c => c + 1);
+        this.showToast('💬 Nuevo mensaje del Admin');
+      }
+    }, 1500);
+  }
+
+  scrollToBottom() {
+    if (this.chatScroll) {
+      this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
+    }
+  }
+
   submitExpense() {
     if (!this.expenseForm.amount || this.expenseForm.amount <= 0) return;
 
@@ -830,6 +1028,11 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
     if (this.map) {
       this.map.remove();
+      this.map = undefined;
+      // CRITICAL FIX: Reset markers so they are recreated on the new map instance
+      this.driverMarker = undefined;
+      this.markersLayer = undefined;
+      this.routeLine = undefined;
     }
 
     this.map = L.map(this.mapEl.nativeElement).setView([25.75, -100.3], 12);
