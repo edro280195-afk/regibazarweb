@@ -165,97 +165,109 @@ import * as L from 'leaflet';
         }
 
 
-        <!-- Order items -->
+        <!-- Order items (Collapsible) -->
         <div class="order-section">
-          <h3>Tu pedido 🛍️</h3>
-          <div class="items-list">
-            @for (item of o.items; track item.id) {
-              <div class="item-row">
-                <div class="item-info">
-                  <span class="item-name">{{ item.productName }}</span>
-                  <span class="item-qty">×{{ item.quantity }}</span>
-                </div>
-                @if (item.unitPrice > 0) {
-                  <span class="item-price">\${{ item.lineTotal | number:'1.2-2' }}</span>
-                }
-              </div>
-            }
+          <div class="order-header-row" (click)="toggleOrderDetails()">
+            <h3>Tu pedido 🛍️</h3>
+            <span class="toggle-icon">{{ showOrderDetails() ? '▲' : '▼' }}</span>
           </div>
+          
+          @if (showOrderDetails()) {
+            <div class="items-list fade-in">
+              @for (item of o.items; track item.id) {
+                <div class="item-row">
+                  <div class="item-info">
+                    <span class="item-name">{{ item.productName }}</span>
+                    <span class="item-qty">×{{ item.quantity }}</span>
+                  </div>
+                  @if (item.unitPrice > 0) {
+                    <span class="item-price">\${{ item.lineTotal | number:'1.2-2' }}</span>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="order-summary-text">{{ o.items.length }} artículos en tu bolsita ✨</p>
+          }
+
           <div class="order-totals">
-            @if (o.subtotal > 0) {
-              <div class="total-row"><span>Subtotal</span><span>\${{ o.subtotal | number:'1.2-2' }}</span></div>
+            @if (showOrderDetails() && o.subtotal > 0) {
+               <div class="total-row"><span>Subtotal</span><span>\${{ o.subtotal | number:'1.2-2' }}</span></div>
             }
-            @if (o.shippingCost > 0) {
-              <div class="total-row"><span>Envío 🚗</span><span>\${{ o.shippingCost | number:'1.2-2' }}</span></div>
+            @if (showOrderDetails() && o.shippingCost > 0) {
+               <div class="total-row"><span>Envío 🚗</span><span>\${{ o.shippingCost | number:'1.2-2' }}</span></div>
             }
             <div class="total-row grand"><span>Total a pagar</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
           </div>
         </div>
         
-        <!-- Payment Info -->
+        <!-- Payment Info (Tabbed) -->
         <div class="payment-section">
           <h3>Formas de Pago 💸</h3>
-          <p class="pay-hint">Elige la opción que prefieras para tu pago ✨</p>
-          <!-- 1. EFECTIVO -->
-          <div class="pay-card cash">
-            <div class="pay-header">
-              <span class="pay-icon">💵</span>
-              <div>
-                <strong>Pago en Efectivo (Al recibir pedido)</strong>
-                <span class="bank-name">Contar con monto exacto de preferencia</span>
-              </div>
-            </div>
-            <p class="cash-hint">Prepara tu cambio exacto para agilizar la entrega ✨</p>
-          </div>
-          <!-- 2. TRANSFERENCIAS (BANAMEX) -->
-          <div class="pay-card banamex">
-            <div class="pay-header">
-              <span class="pay-icon">🏦</span>
-              <div>
-                <strong>Transferencia (Preferido)</strong>
-                <span class="bank-name">Citibanamex</span>
-              </div>
-            </div>
-            <div class="card-details">
-              <div class="card-row">
-                <span class="card-label">Tarjeta:</span>
-                <span class="card-num">5256 7861 3758 3898</span>
-                <button class="btn-copy-card" (click)="copyText('5256786137583898')">Copiar</button>
-              </div>
-              <div class="card-row">
-                <span class="card-label">Nombre:</span>
-                <span class="card-name">Sandra Y Vara Portilla</span>
-              </div>
-            </div>
-          </div>
-
+          <p class="pay-hint">Elige cómo quieres pagar hoy ✨</p>
           
+          <div class="payment-tabs">
+            <button class="pay-tab" [class.active]="paymentTab() === 'transfer'" (click)="paymentTab.set('transfer')">
+              🏦 Transf.
+            </button>
+            <button class="pay-tab" [class.active]="paymentTab() === 'cash'" (click)="paymentTab.set('cash')">
+              💵 Efectivo
+            </button>
+            <button class="pay-tab" [class.active]="paymentTab() === 'oxxo'" (click)="paymentTab.set('oxxo')">
+              🏪 OXXO
+            </button>
+          </div>
 
-          <!-- 2. DEPÓSITOS (OXXO) -->
-          <div class="pay-card oxxo">
-            <div class="pay-header">
-              <span class="pay-icon">🏪</span>
-              <div>
-                <strong>Depósito OXXO</strong>
-                <span class="bank-name">BBVA</span>
-              </div>
-            </div>
-            <div class="card-details">
-              <div class="card-row">
-                <span class="card-label">Tarjeta:</span>
-                <span class="card-num">4152 3144 9667 1333</span>
-                <button class="btn-copy-card" (click)="copyText('4152314496671333')">Copiar</button>
-              </div>
-            </div>
-            <div class="store-logos">
-              <div class="store-badge">🏪 OXXO</div>
-            </div>
-          </div>          
-
+          <div class="payment-content">
+            @switch (paymentTab()) {
+              @case ('cash') {
+                <div class="pay-card cash fade-in">
+                  <div class="pay-header">
+                     <span class="pay-icon">💵</span>
+                     <div><strong>Pago Contra Entrega</strong><span class="bank-name">Efectivo</span></div>
+                  </div>
+                  <p class="cash-hint">Por favor ten el monto exacto listo para agilizar tu entrega 💕</p>
+                </div>
+              }
+              @case ('transfer') {
+                <div class="pay-card banamex fade-in">
+                  <div class="pay-header">
+                    <span class="pay-icon">🏦</span>
+                    <div><strong>Transferencia</strong><span class="bank-name">Citibanamex</span></div>
+                  </div>
+                  <div class="card-details">
+                    <div class="card-row">
+                      <span class="card-label">Tarjeta:</span>
+                      <span class="card-num">5256 7861 3758 3898</span>
+                      <button class="btn-copy-card" (click)="copyText('5256786137583898')">Copiar</button>
+                    </div>
+                    <div class="card-row">
+                      <span class="card-label">Nombre:</span>
+                      <span class="card-name">Sandra Y Vara Portilla</span>
+                    </div>
+                  </div>
+                  <p class="cash-hint">Envía tu comprobante a la vendedora ✨</p>
+                </div>
+              }
+              @case ('oxxo') {
+                <div class="pay-card oxxo fade-in">
+                  <div class="pay-header">
+                    <span class="pay-icon">🏪</span>
+                    <div><strong>Depósito</strong><span class="bank-name">OXXO (BBVA)</span></div>
+                  </div>
+                  <div class="card-details">
+                    <div class="card-row">
+                      <span class="card-label">Tarjeta:</span>
+                      <span class="card-num">4152 3144 9667 1333</span>
+                      <button class="btn-copy-card" (click)="copyText('4152314496671333')">Copiar</button>
+                    </div>
+                  </div>
+                </div>
+              }
+            }
+          </div>
         </div>
         
-
-
         <p class="footer-msg">Hecho con 💗 para ti</p>
       }
 
@@ -270,9 +282,9 @@ import * as L from 'leaflet';
   styles: [`
     .client-page {
       min-height: 100vh;
-      background: linear-gradient(180deg, #FFF5F9 0%, #FFE0EB 40%, #E8D5F5 100%);
-      padding: 1.25rem; max-width: 500px; margin: 0 auto;
-      position: relative; overflow: hidden;
+      background: linear-gradient(180deg, #FFF0F5 0%, #FFF5F9 50%, #F3E5F5 100%);
+      padding: 1.25rem; max-width: 480px; margin: 0 auto;
+      position: relative; overflow-x: hidden;
     }
     .deco { position: absolute; font-size: 1.8rem; animation: float 5s ease-in-out infinite; opacity: 0.35; pointer-events: none; }
     .deco-1 { top: 5%; right: 8%; } .deco-2 { top: 40%; left: 5%; animation-delay: 1.5s; font-size: 1.3rem; } .deco-3 { bottom: 10%; right: 12%; animation-delay: 3s; }
@@ -287,164 +299,146 @@ import * as L from 'leaflet';
     .client-header { text-align: center; margin-bottom: 1.5rem; position: relative; z-index: 1;
       .header-ribbon { font-size: 2rem; display: block; margin-bottom: 0.25rem; animation: bow-sway 3s ease-in-out infinite; }
       @keyframes bow-sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
-      h1 { font-family: var(--font-display); color: var(--pink-600); font-size: 1.5rem; margin: 0; }
-      .subtitle { font-family: var(--font-script); color: var(--rose-gold); font-size: 1.05rem; margin: 0.15rem 0 0; }
+      h1 { font-family: var(--font-display); color: var(--pink-600); font-size: 1.6rem; margin: 0; text-shadow: 0 2px 4px rgba(236,72,153,0.1); }
+      .subtitle { font-family: var(--font-script); color: var(--rose-gold); font-size: 1.1rem; margin: 0.15rem 0 0; }
     }
 
     .status-banner {
-      display: flex; align-items: center; gap: 1rem; padding: 1.15rem; border-radius: 1.25rem;
-      margin-bottom: 1.25rem; backdrop-filter: blur(10px); animation: fadeInUp 0.5s ease; position: relative; z-index: 1;
+      display: flex; align-items: center; gap: 1rem; padding: 1rem; border-radius: 1.25rem;
+      margin-bottom: 1rem; backdrop-filter: blur(12px); animation: fadeInUp 0.5s ease; position: relative; z-index: 1;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,255,255,0.4);
       .status-icon { font-size: 2rem; &.pulse { animation: heartbeat 1.2s infinite; } }
       @keyframes heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.2); } }
-      strong { color: var(--text-dark); display: block; font-family: var(--font-display); }
-      p { margin: 0.1rem 0 0; font-size: 0.85rem; }
-      &[data-status="Pending"] { background: rgba(255,248,220,0.7); border: 1px solid rgba(251,191,36,0.25); p { color: #92400E; } }
-      &[data-status="InRoute"] { background: rgba(219,234,254,0.7); border: 1px solid rgba(96,165,250,0.25); p { color: #1E40AF; } }
-      &[data-status="InTransit"] { background: linear-gradient(135deg, rgba(219,234,254,0.8), rgba(191,219,254,0.8)); border: 2px solid rgba(59,130,246,0.4); box-shadow: 0 0 0 4px rgba(59,130,246,0.08); p { color: #1D4ED8; } }
-      &[data-status="Delivered"] { background: rgba(209,250,229,0.7); border: 1px solid rgba(52,211,153,0.25); p { color: #065F46; } }
-      &[data-status="NotDelivered"] { background: rgba(255,228,230,0.7); border: 1px solid rgba(255,107,157,0.25); p { color: #9F1239; } }
+      strong { color: var(--text-dark); display: block; font-family: var(--font-display); font-size: 0.95rem; }
+      p { margin: 0.1rem 0 0; font-size: 0.8rem; line-height: 1.3; }
+      &[data-status="Pending"] { background: rgba(255,253,240,0.6); p { color: #92400E; } }
+      &[data-status="InRoute"] { background: rgba(239,246,255,0.6); p { color: #1E40AF; } }
+      &[data-status="InTransit"] { background: linear-gradient(135deg, rgba(219,234,254,0.8), rgba(191,219,254,0.8)); border: 2px solid rgba(59,130,246,0.4); p { color: #1D4ED8; } }
+      &[data-status="Delivered"] { background: rgba(236,253,245,0.6); p { color: #065F46; } }
     }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
     .loyalty-banner {
-      background: linear-gradient(135deg, #fff0f7 0%, #ffffff 100%);
-      border: 1px solid #fce7f3;
-      border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, rgba(255,240,247,0.8) 0%, rgba(255,255,255,0.8) 100%);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(252, 231, 243, 0.6);
+      border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem;
       display: flex; align-items: center; gap: 1rem;
       position: relative; z-index: 1;
-      box-shadow: 0 4px 15px rgba(236, 72, 153, 0.1);
+      box-shadow: 0 8px 20px rgba(236, 72, 153, 0.08);
     }
-    .lb-icon { font-size: 2rem; background: #fdf2f8; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid #fbcfe8; }
+    .lb-icon { font-size: 2rem; background: rgba(255,255,255,0.8); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid #fce7f3; }
     .lb-info { flex: 1; }
-    .lb-tier { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pink-600); font-weight: 800; background: var(--pink-100); padding: 2px 8px; border-radius: 10px; }
-    .lb-points { font-size: 1.1rem; color: var(--text-dark); margin: 2px 0; }
-    .lb-points strong { color: var(--pink-600); font-weight: 800; font-size: 1.3rem; }
-    .lb-promo { font-size: 0.75rem; color: #888; font-style: italic; margin: 0; line-height: 1.3; }
+    .lb-tier { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pink-600); font-weight: 800; background: rgba(252, 231, 243, 0.5); padding: 2px 8px; border-radius: 10px; }
+    .lb-points { font-size: 1rem; color: var(--text-dark); margin: 2px 0; }
+    .lb-points strong { color: var(--pink-600); font-weight: 800; font-size: 1.2rem; }
+    .lb-promo { font-size: 0.7rem; color: #888; font-style: italic; margin: 0; line-height: 1.2; }
 
-    .queue-info { background: rgba(255,255,255,0.75); backdrop-filter: blur(10px); border: 1px solid rgba(96,165,250,0.2); border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 1.25rem; text-align: center; position: relative; z-index: 1; }
-    .queue-position { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.75rem; }
-    .queue-number { font-size: 2.5rem; font-weight: 800; color: #3B82F6; font-family: var(--font-display); line-height: 1; }
-    .queue-label { font-size: 0.85rem; color: var(--text-medium); font-weight: 600; }
-    .queue-bar { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-    .queue-dot { width: 24px; height: 24px; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 800; color: white; transition: all 0.3s;
+    .queue-info { background: rgba(255,255,255,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(96,165,250,0.2); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem; text-align: center; position: relative; z-index: 1; }
+    .queue-number { font-size: 2rem; font-weight: 800; color: #3B82F6; font-family: var(--font-display); line-height: 1; }
+    .queue-label { font-size: 0.8rem; color: var(--text-medium); font-weight: 600; }
+    .queue-bar { display: flex; justify-content: center; gap: 0.4rem; margin-bottom: 0.5rem; }
+    .queue-dot { width: 18px; height: 18px; border-radius: 50%; background: #E5E7EB; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; font-weight: 800; color: white;
       &.done { background: #34D399; } &.current { background: #3B82F6; animation: pulse-dot 1.5s infinite; }
-      &.you { background: var(--pink-500); width: 30px; height: 30px; border: 2px solid white; box-shadow: 0 2px 8px rgba(255,61,127,0.3); }
+      &.you { background: var(--pink-500); width: 24px; height: 24px; border: 2px solid white; box-shadow: 0 2px 8px rgba(255,61,127,0.3); }
     }
     @keyframes pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 0 6px rgba(59,130,246,0); } }
-    .queue-hint { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
 
-    .transit-alert { display: flex; align-items: center; gap: 1rem; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(96,165,250,0.08)); border: 1.5px solid rgba(59,130,246,0.2); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem; position: relative; z-index: 1;
+    .transit-alert { display: flex; align-items: center; gap: 1rem; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(96,165,250,0.08)); border: 1.5px solid rgba(59,130,246,0.2); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem; position: relative; z-index: 1;
       p { color: #1D4ED8; font-weight: 600; font-size: 0.9rem; margin: 0; }
     }
-    .transit-icon-wrap { position: relative; }
-    .transit-icon { font-size: 2rem; position: relative; z-index: 1; }
+    .transit-icon { font-size: 2rem; }
     .transit-pulse { position: absolute; inset: -4px; border-radius: 50%; background: rgba(59,130,246,0.2); animation: transit-ring 1.5s infinite; }
-    @keyframes transit-ring { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 
     .map-section { margin-bottom: 1.5rem; position: relative; z-index: 1;
-      h3 { color: var(--text-dark); font-size: 1rem; margin: 0 0 0.75rem; font-family: var(--font-display); }
+      h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.5rem; font-family: var(--font-display); }
     }
-    .map-container { width: 100%; height: 280px; border-radius: 1.25rem; overflow: hidden; border: 2px solid rgba(255,157,191,0.2); box-shadow: var(--shadow-md); }
+    .map-container { width: 100%; height: 240px; border-radius: 1.25rem; overflow: hidden; border: 2px solid rgba(255,157,191,0.2); box-shadow: var(--shadow-md); }
     .map-hint { color: var(--text-muted); font-size: 0.8rem; margin: 0.5rem 0 0; text-align: center; font-style: italic; }
 
-    .map-legend {
-      display: flex; align-items: center; justify-content: center; gap: 0.75rem;
-      margin-top: 0.5rem; font-size: 0.78rem; color: var(--text-medium); font-weight: 600;
-    }
-    .legend-item { display: flex; align-items: center; gap: 0.3rem; }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block;
-      &.driver { background: #FF3D7F; box-shadow: 0 0 6px rgba(255,61,127,0.4); }
-      &.you { background: #3B82F6; box-shadow: 0 0 6px rgba(59,130,246,0.4); }
-    }
-    .legend-line { width: 30px; height: 2px; background: repeating-linear-gradient(90deg, #3B82F6, #3B82F6 4px, transparent 4px, transparent 8px); }
-
-    .order-section { position: relative; z-index: 1;
-      h3 { color: var(--text-dark); font-size: 1rem; margin: 0 0 0.75rem; font-family: var(--font-display); }
-    }
-    .items-list { background: rgba(255,255,255,0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255,157,191,0.2); border-radius: 1rem; overflow: hidden; box-shadow: var(--shadow-sm); }
-    .item-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,107,157,0.06); &:last-child { border-bottom: none; } }
-    .item-info { display: flex; gap: 0.5rem; align-items: center; }
-    .item-name { color: var(--text-dark); font-size: 0.95rem; font-weight: 600; }
-    .item-qty { color: var(--text-muted); font-size: 0.85rem; }
-    .item-price { color: var(--pink-500); font-weight: 700; }
-    .order-totals { margin-top: 0.75rem; padding: 0.5rem 0; }
-    .total-row { display: flex; justify-content: space-between; padding: 0.3rem 0; color: var(--text-medium); font-size: 0.9rem;
-      &.grand { border-top: 2px solid var(--border-pink); margin-top: 0.5rem; padding-top: 0.75rem; color: var(--pink-600); font-weight: 800; font-size: 1.2rem; font-family: var(--font-display); }
-    }
-    .footer-msg { text-align: center; margin-top: 2rem; font-family: var(--font-script); color: var(--rose-gold); font-size: 1rem; position: relative; z-index: 1; }
-
-    /* PAYMENT SECTION */
-    .payment-section { margin-top: 1.5rem; position: relative; z-index: 1; }
-    .payment-section h3 { color: var(--text-dark); font-size: 1rem; margin: 0 0 0.5rem; font-family: var(--font-display); }
-    .pay-hint { font-size: 0.85rem; color: var(--text-medium); margin-bottom: 1rem; }
+    .order-section { position: relative; z-index: 1; background: rgba(255,255,255,0.65); backdrop-filter: blur(12px); border-radius: 1.25rem; padding: 1rem; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 1.25rem; transition: all 0.3s ease; }
+    .order-header-row { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+    .toggle-icon { font-size: 0.8rem; color: var(--pink-400); font-weight: bold; }
+    .order-summary-text { font-size: 0.85rem; color: var(--text-medium); margin: 0.25rem 0 0.5rem; font-style: italic; }
     
+    .items-list { margin-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.5rem; }
+    .item-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px dashed rgba(0,0,0,0.05); &:last-child { border-bottom: none; } }
+    .item-name { color: var(--text-dark); font-size: 0.9rem; font-weight: 600; }
+    .item-qty { color: var(--text-muted); font-size: 0.8rem; }
+    .item-price { color: var(--pink-500); font-weight: 700; font-size: 0.9rem; }
+    
+    .order-totals { margin-top: 0.5rem; }
+    .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--text-medium); font-size: 0.85rem;
+      &.grand { margin-top: 0.3rem; color: var(--pink-600); font-weight: 800; font-size: 1.1rem; font-family: var(--font-display); border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.5rem; }
+    }
+    
+    .payment-section { margin-top: 1rem; position: relative; z-index: 1; }
+    .payment-section h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.2rem; font-family: var(--font-display); }
+    .pay-hint { font-size: 0.8rem; color: var(--text-medium); margin-bottom: 0.8rem; }
+    
+    .payment-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; background: rgba(255,255,255,0.4); padding: 4px; border-radius: 12px; }
+    .pay-tab { flex: 1; border: none; background: none; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-medium); cursor: pointer; transition: all 0.2s;
+       &:hover { background: rgba(255,255,255,0.5); }
+       &.active { background: white; color: var(--pink-600); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    }
+
+    .payment-content { min-height: 120px; }
     .pay-card {
-      background: linear-gradient(135deg, white, #FFF0F5);
-      border: 1px solid var(--pink-200); border-radius: 1rem; padding: 1.25rem;
-      box-shadow: 0 4px 15px rgba(255,107,157,0.15); margin-bottom: 1rem;
+      background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,245,248,0.9));
+      border: 1px solid white; border-radius: 1rem; padding: 1.25rem;
+      box-shadow: 0 10px 30px rgba(255,107,157,0.1);
       position: relative; overflow: hidden;
+      animation: scaleIn 0.3s ease-out;
     }
-    .pay-card::before {
-       content: '🎀'; position: absolute; top: -10px; right: -10px; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);
-    }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .pay-card::before { content: '🎀'; position: absolute; top: -10px; right: -10px; font-size: 4rem; opacity: 0.05; transform: rotate(15deg); }
     
-    .pay-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem; }
-    .pay-icon { font-size: 1.8rem; background: var(--pink-100); padding: 0.5rem; border-radius: 50%; }
-    .pay-header strong { display: block; color: var(--text-dark); font-size: 0.95rem; }
-    .bank-name { color: var(--pink-600); font-weight: 700; font-size: 0.85rem; }
+    .pay-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem; }
+    .pay-icon { font-size: 1.6rem; background: var(--pink-100); padding: 0.4rem; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .pay-header strong { display: block; color: var(--text-dark); font-size: 0.9rem; }
+    .bank-name { color: var(--pink-600); font-weight: 700; font-size: 0.8rem; }
 
-    .card-details { background: rgba(255,255,255,0.6); border-radius: 0.75rem; padding: 0.8rem; border: 1px dashed var(--pink-300); }
-    .card-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; &:last-child { margin-bottom: 0; } }
+    .card-details { background: rgba(255,255,255,0.5); border-radius: 0.75rem; padding: 0.8rem; border: 1px dashed var(--pink-200); }
+    .card-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; font-size: 0.8rem; &:last-child { margin-bottom: 0; } }
     .card-label { color: var(--text-muted); }
-    .card-num { font-family: monospace; font-size: 1rem; font-weight: 700; color: var(--text-dark); letter-spacing: 1px; }
+    .card-num { font-family: monospace; font-size: 0.95rem; font-weight: 700; color: var(--text-dark); letter-spacing: 0.5px; }
     .card-name { font-weight: 600; color: var(--text-dark); }
     
     .btn-copy-card {
       background: var(--pink-500); color: white; border: none; border-radius: 0.5rem;
-      padding: 0.2rem 0.6rem; font-size: 0.75rem; font-weight: 700; cursor: pointer;
-      transition: all 0.2s;
-      &:active { transform: scale(0.95); }
+      padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 2px 5px rgba(236,72,153,0.3);
+      transition: all 0.2s; &:active { transform: scale(0.95); }
     }
     
-    .store-logos { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8; 
-       font-size: 0.75rem; font-weight: 600; color: #555;
-    }
+    .store-logos { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8; font-size: 0.75rem; font-weight: 600; color: #555; }
+    .footer-msg { text-align: center; margin-top: 2rem; font-family: var(--font-script); color: var(--rose-gold); font-size: 0.9rem; position: relative; z-index: 1; opacity: 0.8; }
+    
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     /* COUNTDOWN */
     .countdown-section {
-      background: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(8px);
       border: 1px dashed var(--pink-300);
-      border-radius: 1rem;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      text-align: center;
-      position: relative; z-index: 1;
+      border-radius: 1rem; padding: 0.8rem; margin-bottom: 1.25rem;
+      text-align: center; position: relative; z-index: 1;
     }
-    .countdown-section h3 { color: var(--text-dark); font-size: 1rem; margin: 0 0 0.75rem; font-family: var(--font-display); }
-    .countdown-timer { display: flex; justify-content: center; gap: 0.8rem; margin-bottom: 0.5rem; }
-    .time-block { display: flex; flex-direction: column; align-items: center; background: white; padding: 0.5rem 0.8rem; border-radius: 0.8rem; box-shadow: 0 2px 8px rgba(255, 107, 157, 0.1); min-width: 50px; }
-    .time-val { font-size: 1.2rem; font-weight: 800; color: var(--pink-600); font-family: monospace; }
-    .time-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .delivery-date-hint { font-size: 0.85rem; color: var(--text-medium); margin: 0; line-height: 1.4; }
-    .delivery-reason { font-size: 0.75rem; color: var(--pink-500); font-style: italic; display: block; margin-top: 0.2rem; }
-
-    .cash-hint { font-size: 0.8rem; color: var(--text-muted); margin: 0; font-style: italic; }
+    .countdown-section h3 { color: var(--text-dark); font-size: 0.9rem; margin: 0 0 0.5rem; font-family: var(--font-display); }
+    .countdown-timer { display: flex; justify-content: center; gap: 0.6rem; margin-bottom: 0.4rem; }
+    .time-block { display: flex; flex-direction: column; align-items: center; background: white; padding: 0.3rem 0.6rem; border-radius: 0.6rem; box-shadow: 0 2px 8px rgba(255, 107, 157, 0.1); min-width: 44px; }
+    .time-val { font-size: 1.1rem; font-weight: 800; color: var(--pink-600); font-family: monospace; }
+    .time-label { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
     /* TOAST */
     .toast-notification {
       position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
-      background: rgba(40, 40, 40, 0.9); backdrop-filter: blur(8px);
-      color: white;
-      padding: 0.75rem 1.5rem; border-radius: 2rem;
+      background: rgba(40, 40, 40, 0.85); backdrop-filter: blur(12px);
+      color: white; padding: 0.75rem 1.5rem; border-radius: 2rem;
       display: flex; align-items: center; gap: 0.5rem;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      z-index: 9999;
-      animation: toastFadeIn 0.3s ease-out;
-      font-size: 0.9rem; font-weight: 500;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1);
+      z-index: 9999; animation: toastFadeIn 0.3s ease-out; font-size: 0.9rem; font-weight: 500;
     }
-    .toast-icon { font-size: 1.2rem; }
-    @keyframes toastFadeIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy {
@@ -457,6 +451,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   showMap = signal(false);
 
   loyalty = signal<LoyaltySummary | null>(null);
+
+  // UI States
+  showOrderDetails = signal(false); // Collapsed by default
+  paymentTab = signal<'transfer' | 'cash' | 'oxxo'>('transfer');
 
   // Countdown & Toast
   deliveryDate = signal<Date | null>(null);
@@ -768,6 +766,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   copyText(val: string) {
     navigator.clipboard.writeText(val);
     this.showToast('¡Número de tarjeta copiado! 💳');
+  }
+
+  toggleOrderDetails() {
+    this.showOrderDetails.update(v => !v);
   }
 
   showToast(msg: string) {
