@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
-import { ClientOrderView } from '../../../../shared/models/models';
+import { ClientOrderView, LoyaltySummary } from '../../../../shared/models/models';
 import * as L from 'leaflet';
 
 @Component({
@@ -72,6 +72,20 @@ import * as L from 'leaflet';
             }
           }
         </div>
+
+        <!-- LOYALTY BANNER -->
+        @if (loyalty(); as l) {
+          <div class="loyalty-banner">
+            <div class="lb-icon">💎</div>
+            <div class="lb-info">
+              <span class="lb-tier">{{ l.tier }}</span>
+              <div class="lb-points">
+                <strong>{{ l.currentPoints }}</strong> RegiPuntos
+              </div>
+              <p class="lb-promo">¡Por cada $100 m.n. acumulas 10 RegiPuntos! 🌸 Acumula y obtén beneficios.</p>
+            </div>
+          </div>
+        }
 
         <!-- Queue position -->
         @if (o.status === 'InRoute' && o.queuePosition && o.totalDeliveries) {
@@ -292,6 +306,21 @@ import * as L from 'leaflet';
     }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
+    .loyalty-banner {
+      background: linear-gradient(135deg, #fff0f7 0%, #ffffff 100%);
+      border: 1px solid #fce7f3;
+      border-radius: 1.25rem; padding: 1rem; margin-bottom: 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+      position: relative; z-index: 1;
+      box-shadow: 0 4px 15px rgba(236, 72, 153, 0.1);
+    }
+    .lb-icon { font-size: 2rem; background: #fdf2f8; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid #fbcfe8; }
+    .lb-info { flex: 1; }
+    .lb-tier { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pink-600); font-weight: 800; background: var(--pink-100); padding: 2px 8px; border-radius: 10px; }
+    .lb-points { font-size: 1.1rem; color: var(--text-dark); margin: 2px 0; }
+    .lb-points strong { color: var(--pink-600); font-weight: 800; font-size: 1.3rem; }
+    .lb-promo { font-size: 0.75rem; color: #888; font-style: italic; margin: 0; line-height: 1.3; }
+
     .queue-info { background: rgba(255,255,255,0.75); backdrop-filter: blur(10px); border: 1px solid rgba(96,165,250,0.2); border-radius: 1.25rem; padding: 1.25rem; margin-bottom: 1.25rem; text-align: center; position: relative; z-index: 1; }
     .queue-position { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.75rem; }
     .queue-number { font-size: 2.5rem; font-weight: 800; color: #3B82F6; font-family: var(--font-display); line-height: 1; }
@@ -427,6 +456,8 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   notFound = signal(false);
   showMap = signal(false);
 
+  loyalty = signal<LoyaltySummary | null>(null);
+
   // Countdown & Toast
   deliveryDate = signal<Date | null>(null);
   deliveryDateFormatted = signal('');
@@ -477,23 +508,24 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         this.order.set(order);
         this.loading.set(false);
 
-        // Calculate delivery date logic
-        // Fallback to now if createdAt is missing, to ensure countdown works
+        // 1. Initial Delivery Calculation
+        // Determine frequency from order object first (defaulting to false)
+        // Check loosely for 'Frecuente' case-insensitive or boolean
+        let isFrecuente = (order.clientType || '').toLowerCase() === 'frecuente';
         const createdStr = order.createdAt || new Date().toISOString();
-        this.calculateDelivery(createdStr, order.clientType || 'Nueva');
 
+        // Run calculation immediately with available data
+        this.calculateDelivery(createdStr, isFrecuente);
+
+        // 2. Map Setup
         const needsMap = order.status === 'InRoute' || order.status === 'InTransit';
         this.showMap.set(needsMap);
 
         if (needsMap) {
-          // Destroy old map if status changed (template recreated the div)
           if (prevStatus && prevStatus !== order.status) {
             this.destroyMap();
           }
-          // Wait for Angular to render the map container
           setTimeout(() => this.ensureMap(order), 200);
-
-          // Connect SignalR only once
           if (!this.signalrConnected) {
             this.connectRealtime();
           }
@@ -501,7 +533,43 @@ export class OrderViewComponent implements OnInit, OnDestroy {
           this.destroyMap();
         }
 
+        // 3. Robust Loyalty & Client Info Fetch
+        // Always set a default loyalty state first so the banner shows
+        const defaultLoyalty: LoyaltySummary = {
+          clientId: order.clientId || 0,
+          clientName: order.clientName,
+          currentPoints: 0,
+          lifetimePoints: 0,
+          tier: 'Bronce'
+        };
+        // Initialize with default
+        this.loyalty.set(defaultLoyalty);
 
+        if (order.clientId) {
+          // Try to get real loyalty
+          this.api.getLoyaltySummary(order.clientId).subscribe({
+            next: (res) => this.loyalty.set(res),
+            error: (err) => console.warn('Could not fetch loyalty, keeping default', err)
+          });
+
+          // Try to verify Frequent status via Clients list (if accessible)
+          this.api.getClients().subscribe({
+            next: (clients) => {
+              const c = clients.find(x => x.id === order.clientId);
+              if (c) {
+                // Update frequency if found
+                if (c.orderCount > 1 || (c.clientType || '').toLowerCase() === 'frecuente') {
+                  isFrecuente = true;
+                  // Recalculate delivery with confirmed status
+                  this.calculateDelivery(createdStr, true);
+                }
+              }
+            },
+            error: () => {
+              // Ignore error (e.g. 401/403), relying on initial isFrecuente value
+            }
+          });
+        }
       },
       error: (err) => {
         this.loading.set(false);
@@ -708,40 +776,40 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     setTimeout(() => this.toastVisible.set(false), 3000);
   }
 
-  private calculateDelivery(createdAtStr: string, clientType: string) {
+  private calculateDelivery(createdAtStr: string, isFrecuente: boolean) {
     const created = new Date(createdAtStr);
     const delivery = new Date(created);
 
-    // "Nueva" -> Next Sunday
-    // "Frecuente" -> 2nd Sunday (Sunday of next week)
-    // Logic: Find next Sunday.
+    // Logic:
+    // If order is created Mon-Sat -> Delivery is *This coming Sunday*
+    // If order is created Sun -> Delivery is *Next Sunday* (7 days later) or *Today*?
+    // Assumption: "Cierre de pedidos" is usually mid-week. If I order Sunday, it's for next Sunday.
+    // Standard rule: Delivery is always on Sunday.
+    // Calculate days until next Sunday.
+
     // 0=Sun, 1=Mon, ..., 6=Sat
     const dayOfWeek = created.getDay();
-    const daysUntilSunday = (7 - dayOfWeek) % 7;
+    // Days to add to reach next Sunday
+    // If Today is Sun(0), target is next Sun(0) => +7 days
+    // If Today is Mon(1), target is Sun(0) => +6 days
+    // If Today is Sat(6), target is Sun(0) => +1 days
+    let daysUntilSunday = (7 - dayOfWeek) % 7;
+    if (daysUntilSunday === 0) daysUntilSunday = 7; // If today is Sunday, move to next Sunday
 
-    // If created on Sunday, is it today's delivery or next week?
-    // User requirement: "a partir de la fecha de creacion"
-    // Usually if created typically implies next upcoming delivery cycle.
-    // Let's assume if created on Sunday, the "next Sunday" is likely +7 days if it's already late, 
-    // but typically "next Sunday" means the upcoming one.
-    // If created Sunday, daysUntilSunday is 0. Does that mean today? 
-    // Let's assume +0 days (today) if early, but safe bet is +7 if we want "next".
-    // However, let's stick to standard logic: Simple "Next Sunday".
+    let addDays = daysUntilSunday;
 
-    let addDays = daysUntilSunday === 0 ? 7 : daysUntilSunday;
-
-    // If client is "Frecuente", add extra 7 days (2nd Sunday)
-    if (clientType === 'Frecuente') {
+    // If client is "Frecuente":
+    // "Second Sunday" means +7 days on top of the next Sunday.
+    if (isFrecuente) {
       addDays += 7;
-      this.deliveryReason.set('✨ Por ser clienta frecuente, tu entrega es en 2 semanas 💕');
+      this.deliveryReason.set('✨ Por ser clienta frecuente, tu entrega es el segundo domingo (para que juntes más pedidos) 💕');
     } else {
-      this.deliveryReason.set('🌸 Por ser clienta nueva, tu entrega es el próximo domingo ✨');
+      this.deliveryReason.set('🌸 Por ser clienta nueva, tu entrega es este próximo domingo ✨');
     }
 
-    // Actually apply the date change!
+    // Apply date change
     delivery.setDate(created.getDate() + addDays);
-
-    delivery.setHours(10, 0, 0, 0);
+    delivery.setHours(12, 0, 0, 0); // Noon
 
     const fmt = formatDate(delivery, "EEEE d 'de' MMMM", this.locale);
     // Capitalize first letter

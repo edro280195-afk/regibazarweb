@@ -233,4 +233,27 @@ export interface ChatMessage {
   read: boolean;
 }
 
+// ── Loyalty ──
+export interface LoyaltySummary {
+  clientId: number;
+  clientName: string;
+  currentPoints: number;
+  lifetimePoints: number;
+  tier: string;
+  lastAccrual?: string; // ISO Date
+}
+
+export interface LoyaltyTransaction {
+  id: number;
+  points: number;
+  reason: string;
+  date: string; // ISO Date
+}
+
+export interface AdjustPointsRequest {
+  clientId: number;
+  points: number; // Can be negative
+  reason: string;
+}
+
 

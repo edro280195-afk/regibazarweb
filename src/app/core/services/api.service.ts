@@ -241,4 +241,18 @@ export class ApiService {
 
 
 
+  // ═══════════════════════════════════════════
+  //  LOYALTY (REGIPUNTOS)
+  // ═══════════════════════════════════════════
+  getLoyaltySummary(clientId: number): Observable<import('../../shared/models/models').LoyaltySummary> {
+    return this.http.get<import('../../shared/models/models').LoyaltySummary>(`${this.url}/loyalty/${clientId}`);
+  }
+
+  getLoyaltyHistory(clientId: number): Observable<import('../../shared/models/models').LoyaltyTransaction[]> {
+    return this.http.get<import('../../shared/models/models').LoyaltyTransaction[]>(`${this.url}/loyalty/${clientId}/history`);
+  }
+
+  adjustLoyaltyPoints(req: import('../../shared/models/models').AdjustPointsRequest): Observable<any> {
+    return this.http.post<any>(`${this.url}/loyalty/adjust`, req);
+  }
 }

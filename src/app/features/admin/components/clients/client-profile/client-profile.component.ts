@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../../core/services/confirmation.service';
-import { Client, OrderSummary } from '../../../../../shared/models/models';
+import { Client, OrderSummary, LoyaltySummary, LoyaltyTransaction } from '../../../../../shared/models/models';
 import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
 
 @Component({
@@ -78,10 +78,10 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
             <span class="stat-label">Pedidos Totales</span>
             <span class="stat-value">{{ stats().totalOrders }}</span>
           </div>
-          <div class="stat-card blue">
+          <!-- <div class="stat-card blue">
              <span class="stat-label">Ticket Promedio</span>
              <span class="stat-value">$ {{ stats().avgTicket | number:'1.0-0' }}</span>
-          </div>
+          </div> -->
           <div class="stat-card orange">
              <span class="stat-label">Último Pedido</span>
              <span class="stat-value text-sm">{{ stats().lastOrderDate | date:'mediumDate' }}</span>
@@ -135,6 +135,60 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
                <h3>🏆 Productos Favoritos</h3>
                <div echarts [options]="topProductsOption" class="echart-container"></div>
              </div> -->
+
+             <!-- ═══════════════ LOYALTY CARD ═══════════════ -->
+             <div class="info-card loyalty-card">
+               <div class="loyalty-header">
+                  <h3>💎 RegiPuntos</h3>
+                  @if (loyalty()) {
+                    <span class="tier-badge">{{ loyalty()?.tier }}</span>
+                  }
+               </div>
+
+               @if (loyalty()) {
+                 <div class="points-circle">
+                   <span class="points-val">{{ loyalty()?.currentPoints }}</span>
+                   <span class="points-lbl">Puntos Disponibles</span>
+                 </div>
+                 
+                 <div class="loyalty-stats">
+                   <div class="l-stat">
+                     <label>De por vida</label>
+                     <span>{{ loyalty()?.lifetimePoints }}</span>
+                   </div>
+                   <div class="l-stat">
+                     <label>Último mov.</label>
+                     <span>{{ loyalty()?.lastAccrual | date:'shortDate' }}</span>
+                   </div>
+                 </div>
+
+                 <div class="loyalty-actions">
+                   <button class="btn-points add" (click)="openPointsModal('add')">🎁 Regalar</button>
+                   <button class="btn-points sub" (click)="openPointsModal('subtract')">🛍️ Canjear</button>
+                 </div>
+
+                 <div class="loyalty-history">
+                   <h4>Historial reciente</h4>
+                   @for (t of loyaltyHistory().slice(0, 5); track t.id) {
+                     <div class="l-row">
+                       <span class="l-date">{{ t.date | date:'shortDate' }}</span>
+                       <span class="l-reason">{{ t.reason }}</span>
+                       <span class="l-points" [class.pos]="t.points > 0" [class.neg]="t.points < 0">
+                         {{ t.points > 0 ? '+' : '' }}{{ t.points }}
+                       </span>
+                     </div>
+                   }
+                   @if (loyaltyHistory().length === 0) {
+                     <p class="no-history">Sin movimientos aún</p>
+                   }
+                 </div>
+
+               } @else {
+                 <div class="loyalty-loading">
+                   <p>Cargando puntos...</p>
+                 </div>
+               }
+             </div>
           </div>
 
           <!-- ═══════════════ RIGHT: ORDER HISTORY ═══════════════ -->
@@ -163,6 +217,34 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
                    </div>
                  }
                </div>
+            </div>
+          </div>
+        </div>
+      }
+
+
+      <!-- ═══════════════ MODAL: AJUSTAR PUNTOS ═══════════════ -->
+      @if (showPointsModal()) {
+        <div class="modal-overlay" (click)="showPointsModal.set(false)">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <h3>{{ pointsMode === 'add' ? '🎁 Regalar Puntos' : '🛍️ Canjear Puntos' }}</h3>
+            
+            <div class="form-group">
+              <label>Puntos</label>
+              <input type="number" [(ngModel)]="pointsForm.amount" min="1" class="input-field" placeholder="0">
+            </div>
+
+            <div class="form-group">
+              <label>Motivo</label>
+              <input type="text" [(ngModel)]="pointsForm.reason" class="input-field" 
+                     [placeholder]="pointsMode === 'add' ? 'Ej. Cumpleaños, Promoción...' : 'Ej. Descuento $50, Gorra de regalo...'">
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-cancel" (click)="showPointsModal.set(false)">Cancelar</button>
+              <button class="btn-save" (click)="submitPoints()" [disabled]="!pointsForm.amount || !pointsForm.reason">
+                {{ pointsMode === 'add' ? '✨ Enviar Regalo' : '✅ Aplicar Canje' }}
+              </button>
             </div>
           </div>
         </div>
@@ -280,10 +362,51 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
     
     .delete-section { margin-top: 2rem; border-top: 1px dashed #fee2e2; padding-top: 1rem; text-align: center; }
     .btn-delete { background: #fee2e2; color: #b91c1c; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; &:hover { background: #fecaca; } }
+    
+    /* LOYALTY CARD STYLES */
+    .loyalty-card { background: linear-gradient(135deg, #fff0f7 0%, #fff 100%); border: 1px solid #fce7f3; }
+    .loyalty-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .tier-badge { background: var(--pink-100); color: var(--pink-600); font-weight: 800; font-size: 0.75rem; padding: 4px 8px; border-radius: 12px; border: 1px solid var(--pink-200); }
+    
+    .points-circle { text-align: center; padding: 1.5rem; background: white; border-radius: 50%; width: 140px; height: 140px; margin: 0 auto 1.5rem; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 8px 20px rgba(236,72,153,0.1); border: 4px solid var(--pink-50); }
+    .points-val { font-size: 2.5rem; font-weight: 800; color: var(--pink-500); line-height: 1; display: block; }
+    .points-lbl { font-size: 0.7rem; text-transform: uppercase; color: #999; font-weight: 700; margin-top: 5px; }
+
+    .loyalty-stats { display: flex; justify-content: space-around; margin-bottom: 1.5rem; text-align: center; }
+    .l-stat label { font-size: 0.7rem; color: #aaa; font-weight: 700; display: block; margin-bottom: 2px; text-transform: uppercase; }
+    .l-stat span { font-weight: 700; color: #555; font-size: 0.95rem; }
+
+    .loyalty-actions { display: flex; gap: 10px; margin-bottom: 1.5rem; }
+    .btn-points { flex: 1; border: none; padding: 8px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: transform 0.2s; }
+    .btn-points:hover { transform: translateY(-2px); }
+    .btn-points.add { background: #dcfce7; color: #166534; }
+    .btn-points.sub { background: #fff7ed; color: #c2410c; }
+
+    .loyalty-history h4 { font-size: 0.9rem; margin: 0 0 10px; color: #888; border-bottom: 1px solid #fce7f3; padding-bottom: 5px; }
+    .l-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 6px 0; border-bottom: 1px dashed #fce7f3; }
+    .l-date { color: #999; font-size: 0.75rem; width: 60px; }
+    .l-reason { flex: 1; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
+    .l-points { font-weight: 700; }
+    .l-points.pos { color: #16a34a; }
+    .l-points.neg { color: #ef4444; }
+    .no-history { text-align: center; color: #ccc; font-style: italic; font-size: 0.8rem; margin: 10px 0; }
+
+    /* Modal Styles */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: fadeIn 0.2s; }
+    .modal-card { background: white; padding: 2rem; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); animation: slideUp 0.3s; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   `]
 })
 export class ClientProfileComponent implements OnInit {
   client = signal<Client | null>(null);
+
+  // Loyalty
+  loyalty = signal<LoyaltySummary | null>(null);
+  loyaltyHistory = signal<LoyaltyTransaction[]>([]);
+  showPointsModal = signal(false);
+  pointsMode: 'add' | 'subtract' = 'add';
+  pointsForm = { amount: 0, reason: '' };
 
 
   orders = signal<OrderSummary[]>([]);
@@ -340,6 +463,16 @@ export class ClientProfileComponent implements OnInit {
       this.client.set(c || null);
 
 
+    });
+
+    // Load Loyalty
+    this.api.getLoyaltySummary(clientId).subscribe({
+      next: (res) => this.loyalty.set(res),
+      error: () => console.log('Sin datos de loyalty o error')
+    });
+    this.api.getLoyaltyHistory(clientId).subscribe({
+      next: (hist) => this.loyaltyHistory.set(hist),
+      error: () => { }
     });
 
     this.api.getOrders().subscribe(allOrders => {
@@ -456,5 +589,37 @@ export class ClientProfileComponent implements OnInit {
         error: () => alert('Error al eliminar')
       });
     }
+  }
+
+  // ═══════════════ LOYALTY ACTIONS ═══════════════
+  openPointsModal(mode: 'add' | 'subtract') {
+    this.pointsMode = mode;
+    this.pointsForm = { amount: 0, reason: '' };
+    this.showPointsModal.set(true);
+  }
+
+  submitPoints() {
+    const c = this.client();
+    if (!c || !this.pointsForm.amount) return;
+
+    const points = this.pointsMode === 'add' ? this.pointsForm.amount : -this.pointsForm.amount;
+
+    this.api.adjustLoyaltyPoints({
+      clientId: c.id,
+      points: points,
+      reason: this.pointsForm.reason
+    }).subscribe({
+      next: (res) => {
+        // Refresh loyalty data
+        this.api.getLoyaltySummary(c.id).subscribe(l => this.loyalty.set(l));
+        this.api.getLoyaltyHistory(c.id).subscribe(h => this.loyaltyHistory.set(h));
+
+        this.showPointsModal.set(false);
+        alert(res.message || 'Puntos actualizados ✨');
+      },
+      error: (err) => {
+        alert(err.error || 'Error al ajustar puntos');
+      }
+    });
   }
 }
