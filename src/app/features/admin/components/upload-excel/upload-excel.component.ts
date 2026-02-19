@@ -440,7 +440,7 @@ function normalizeForMatch(text: string): string {
                   }
                 </div>
                 <div class="order-link">
-                  <input type="text" [value]="order.trackingUrl" readonly #linkInput>
+                  <input type="text" [value]="order.link" readonly #linkInput>
                   <button class="btn-copy" (click)="copyLink(linkInput)">📋 Copiar</button>
                 </div>
               </div>

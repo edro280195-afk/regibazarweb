@@ -32,7 +32,7 @@ export interface OrderSummary {
   shippingCost: number;
   total: number;
   status: string; // 'Pending', 'InRoute', 'Delivered', 'NotDelivered', 'Canceled', 'Postponed'
-  trackingUrl: string;
+  link: string;
   accessToken: string;
   expiresAt: string;
   items: OrderItem[];

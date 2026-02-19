@@ -69,7 +69,7 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
               </span>
             </div>
           </div>
-          <button class="btn-icon-action copy" (click)="copyLink(order()!.trackingUrl)" title="Copiar link">📋</button>
+          <button class="btn-icon-action copy" (click)="copyLink(order()!.link)" title="Copiar link">📋</button>
         </div>
 
         <!-- ═══════════════ MAIN CONTENT GRID ═══════════════ -->

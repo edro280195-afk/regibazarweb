@@ -28,12 +28,12 @@ export class WhatsAppService {
      */
 
     sendOrderConfirmation(order: OrderSummary) {
-        const msg = `¡Hola ${order.clientName}! 🌸\n\nTu pedido #${order.id} ha sido confirmado y está en proceso. 🛍️\n\nTotal: $${order.total}\n\nPuedes ver el estado de tu pedido aquí:\n${order.trackingUrl}\n\n¡Gracias por tu compra! ✨`;
+        const msg = `¡Hola ${order.clientName}! 🌸\n\nTu pedido #${order.id} ha sido confirmado y está en proceso. 🛍️\n\nTotal: $${order.total}\n\nPuedes ver el estado de tu pedido aquí:\n${order.link}\n\n¡Gracias por tu compra! ✨`;
         this.sendOrderMessage(order.clientPhone, msg);
     }
 
     sendOnTheWay(order: OrderSummary) {
-        const msg = `¡Buenas noticias, ${order.clientName}! 🚗\n\nTu pedido va en camino. Nuestro repartidor llegará pronto.\n\nSigue tu entrega aquí:\n${order.trackingUrl}\n\n¡Nos vemos! 👋`;
+        const msg = `¡Buenas noticias, ${order.clientName}! 🚗\n\nTu pedido va en camino. Nuestro repartidor llegará pronto.\n\nSigue tu entrega aquí:\n${order.link}\n\n¡Nos vemos! 👋`;
         this.sendOrderMessage(order.clientPhone, msg);
     }
 

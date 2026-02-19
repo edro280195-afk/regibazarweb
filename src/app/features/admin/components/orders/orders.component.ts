@@ -481,7 +481,7 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
                 <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
               </div>
               <div class="card-buttons">
-                <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.trackingUrl)" title="Copiar Link">📋</button>
+                <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.link)" title="Copiar Link">📋</button>
                 <button class="action-btn delete" (click)="$event.stopPropagation(); askDeleteOrder(order)" title="Eliminar">🗑️</button>
                 <span class="action-arrow" title="Ver detalle">→</span>
               </div>
