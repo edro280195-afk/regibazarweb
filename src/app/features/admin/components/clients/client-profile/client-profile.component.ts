@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../../core/services/confirmation.service';
-import { Client, OrderSummary, LoyaltyAccount, PointTransaction } from '../../../../../shared/models/models';
+import { Client, OrderSummary } from '../../../../../shared/models/models';
 import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
 
 @Component({
@@ -129,44 +129,12 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
               }
             </div>
 
-            <!-- LOYALTY CARD -->
-            @if (loyaltyAccount(); as l) {
-               <div class="loyalty-card" [attr.data-tier]="l.tier">
-                 <div class="loyalty-header">
-                   <h3>💎 RegiPuntos</h3>
-                   <span class="tier-badge">{{ l.tier }} Member</span>
-                 </div>
-                 
-                 <div class="points-display">
-                   <div class="points-circle">
-                     <span class="p-val">{{ l.currentPoints }}</span>
-                     <span class="p-lbl">Puntos</span>
-                   </div>
-                   <div class="points-meta">
-                     <p>Acumulados: {{ l.lifetimePoints }}</p>
-                     <p>Vence: {{ l.lastAccrual | date:'MMM yyyy' }}</p>
-                   </div>
-                 </div>
-
-                 <div class="transactions-mini">
-                   <h4>Últimos movimientos</h4>
-                   @for (t of loyaltyTransactions().slice(0, 3); track t.id) {
-                     <div class="trans-row">
-                       <span class="t-desc">{{ t.reason }}</span>
-                       <span class="t-amt" [class.pos]="t.amount > 0" [class.neg]="t.amount < 0">
-                         {{ t.amount > 0 ? '+' : '' }}{{ t.amount }}
-                       </span>
-                     </div>
-                   }
-                  </div>
-               </div>
-            }
 
             <!-- TOP PRODUCTS CHART -->
-             <div class="chart-card">
+             <!-- <div class="chart-card">
                <h3>🏆 Productos Favoritos</h3>
                <div echarts [options]="topProductsOption" class="echart-container"></div>
-             </div>
+             </div> -->
           </div>
 
           <!-- ═══════════════ RIGHT: ORDER HISTORY ═══════════════ -->
@@ -175,7 +143,7 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
                <h3>🛍️ Historial de Pedidos</h3>
                <div class="orders-list">
                  @for (order of orders(); track order.id) {
-                   <div class="order-item" [routerLink]="['/admin/orders']" [state]="{ highlightId: order.id }">
+                   <div class="order-item" [routerLink]="['/admin/orders', order.id]">
                      <div class="order-left">
                        <span class="order-id">#{{ order.id }}</span>
                        <span class="order-date">{{ order.createdAt | date:'shortDate' }}</span>
@@ -269,7 +237,7 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
     .echart-container { height: 250px; width: 100%; }
 
     /* Orders List */
-    .orders-list { display: flex; flex-direction: column; gap: 1rem; }
+    .orders-list { display: flex; flex-direction: column; gap: 1rem; max-height: 500px; overflow-y: auto; padding-right: 4px; }
     .order-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 1rem; border-radius: 16px; border: 1px solid var(--border-soft); background: var(--bg-list-item);
@@ -293,41 +261,7 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
     .loading-state { text-align: center; padding: 4rem; color: #999; }
     .spinner-cute { width: 40px; height: 40px; border: 4px solid var(--pink-200); border-top-color: var(--pink-500); border-radius: 50%; animation: spin 1s infinite; margin: 0 auto 1rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    /* LOYALTY CARD */
-    .loyalty-card {
-      background: linear-gradient(135deg, #fff0f5, #ffe4e6); 
-      border-radius: 24px; padding: 1.5rem; margin-bottom: 2rem;
-      border: 1px solid #fecdd3; position: relative; overflow: hidden;
-      box-shadow: 0 4px 15px rgba(255,182,193,0.3);
-    }
-    .loyalty-card[data-tier="Gold"] { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fcd34d; }
-    .loyalty-card[data-tier="Diamond"] { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
 
-    .loyalty-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .loyalty-header h3 { margin: 0; font-size: 1.2rem; color: #db2777; }
-    .tier-badge { 
-      background: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; 
-      font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #be185d;
-    }
-
-    .points-display { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem; }
-    .points-circle {
-      width: 70px; height: 70px; border-radius: 50%; background: white;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 2px solid rgba(255,255,255,0.5);
-    }
-    .p-val { font-size: 1.4rem; font-weight: 800; color: #db2777; line-height: 1; }
-    .p-lbl { font-size: 0.65rem; color: #999; text-transform: uppercase; font-weight: 700; }
-    
-    .points-meta p { margin: 0; font-size: 0.8rem; color: #666; font-weight: 600; }
-
-    .transactions-mini h4 { margin: 0 0 0.5rem; font-size: 0.8rem; color: #999; text-transform: uppercase; }
-    .trans-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px dashed rgba(0,0,0,0.05); }
-    .t-desc { color: #444; }
-    .t-amt { font-weight: 700; }
-    .t-amt.pos { color: #10b981; }
-    .t-amt.neg { color: #ef4444; }
 
     /* EDIT STYLES */
     .header-actions { margin-left: auto; display: flex; gap: 10px; }
@@ -351,8 +285,7 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
 export class ClientProfileComponent implements OnInit {
   client = signal<Client | null>(null);
 
-  loyaltyAccount = signal<LoyaltyAccount | null>(null);
-  loyaltyTransactions = signal<PointTransaction[]>([]);
+
   orders = signal<OrderSummary[]>([]);
   loading = signal(true);
   stats = computed(() => {
@@ -406,11 +339,7 @@ export class ClientProfileComponent implements OnInit {
       const c = clients.find(x => x.id === clientId);
       this.client.set(c || null);
 
-      if (c) {
-        // Fetch Loyalty
-        this.api.getLoyaltyAccount(c.id).subscribe(l => this.loyaltyAccount.set(l));
-        this.api.getPointTransactions(c.id).subscribe(t => this.loyaltyTransactions.set(t));
-      }
+
     });
 
     this.api.getOrders().subscribe(allOrders => {

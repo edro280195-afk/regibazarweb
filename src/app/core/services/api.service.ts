@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   LoginRequest, LoginResponse, RegisterRequest,
@@ -239,26 +239,6 @@ export class ApiService {
     );
   }
 
-  // ═══════════════════════════════════════════
-  //  LOYALTY (REGIPUNTOS)
-  // ═══════════════════════════════════════════
-  getLoyaltyAccount(clientId: number): Observable<any> {
-    // Mock temporal, luego conectaremos al backend real
-    return of({
-      clientId,
-      currentPoints: 1250,
-      tier: 'Gold',
-      lifetimePoints: 3400,
-      lastAccrual: new Date().toISOString()
-    });
-  }
 
-  getPointTransactions(clientId: number): Observable<any[]> {
-    // Mock temporal
-    return of([
-      { id: 1, clientId, amount: 150, reason: 'Compra #1023', date: new Date().toISOString(), orderId: 1023 },
-      { id: 2, clientId, amount: 50, reason: 'Bono Cumpleaños', date: new Date(Date.now() - 86400000).toISOString() },
-      { id: 3, clientId, amount: -200, reason: 'Canje Cupón $200', date: new Date(Date.now() - 172800000).toISOString() }
-    ]);
-  }
+
 }

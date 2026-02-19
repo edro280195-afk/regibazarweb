@@ -66,7 +66,7 @@ import { Client } from '../../../../shared/models/models';
             <div class="stats-row">
               <div class="stat">
                 <small>Pedidos</small>
-                <strong>{{ client.orderCount || 0 }}</strong>
+                <strong>{{ client.orderCount || client.ordersCount || 0 }}</strong>
               </div>
               <div class="stat">
                 <small>Gastado</small>

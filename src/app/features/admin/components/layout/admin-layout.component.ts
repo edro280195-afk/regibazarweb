@@ -4,11 +4,12 @@ import { RouterModule } from '@angular/router';
 import { AuthService } from '../../../../core/services/auth.service';
 
 import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
+import { GlobalSearchComponent } from './global-search.component';
 
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, AiAssistantComponent],
+  imports: [CommonModule, RouterModule, AiAssistantComponent, GlobalSearchComponent],
   template: `
     <div class="admin-shell">
       <aside class="sidebar" [class.open]="sidebarOpen">
@@ -88,6 +89,7 @@ import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
       <main class="main-content">
         <header class="top-bar">
           <button class="menu-btn" (click)="sidebarOpen = true">☰</button>
+          <app-global-search></app-global-search>
           <span class="page-greeting">¡Hola, {{ auth.userName() }}! 💖</span>
         </header>
         <div class="content-area">

@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
-import { ClientOrderView, LoyaltyAccount } from '../../../../shared/models/models';
+import { ClientOrderView } from '../../../../shared/models/models';
 import * as L from 'leaflet';
 
 @Component({
@@ -240,23 +240,7 @@ import * as L from 'leaflet';
 
         </div>
         
-        <!-- LOYALTY WIDGET -->
-        <!-- @if (loyalty(); as l) {
-           <div class="loyalty-widget" [attr.data-tier]="l.tier">
-             <div class="l-header">
-               <span class="l-icon">💎</span>
-               <div class="l-info">
-                 <h3>Tus RegiPuntos</h3>
-                 <span class="l-tier">{{ l.tier }} Member</span>
-               </div>
-             </div>
-             <div class="l-points">
-               <span class="lp-val">{{ l.currentPoints }}</span>
-               <span class="lp-label">puntos disponibles</span>
-             </div>
-             <p class="l-hint">¡Sigue comprando para subir de nivel! ✨</p>
-           </div>
-        } -->
+
 
         <p class="footer-msg">Hecho con 💗 para ti</p>
       }
@@ -431,27 +415,7 @@ import * as L from 'leaflet';
     }
     .toast-icon { font-size: 1.2rem; }
     @keyframes toastFadeIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-    /* LOYALTY WIDGET */
-    .loyalty-widget {
-      background: linear-gradient(135deg, #fff0f5, #ffe4e6);
-      border: 1px solid #fecdd3; border-radius: 1rem; padding: 1.25rem;
-      margin-top: 1.5rem; position: relative; z-index: 1;
-      display: flex; flex-direction: column; align-items: center; text-align: center;
-      box-shadow: 0 4px 15px rgba(255,182,193,0.2);
-    }
-    .loyalty-widget[data-tier="Gold"] { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fcd34d; }
-    .loyalty-widget[data-tier="Diamond"] { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
 
-    .l-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem; }
-    .l-icon { font-size: 1.8rem; background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .l-info h3 { margin: 0; font-size: 1rem; color: #db2777; font-family: var(--font-display); }
-    .l-tier { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #be185d; letter-spacing: 1px; }
-
-    .l-points { background: white; padding: 0.5rem 1.5rem; border-radius: 2rem; display: flex; flex-direction: column; line-height: 1; margin-bottom: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    .lp-val { font-size: 1.5rem; font-weight: 800; color: #db2777; }
-    .lp-label { font-size: 0.7rem; color: #999; text-transform: uppercase; font-weight: 700; margin-top: 2px; }
-    
-    .l-hint { font-size: 0.8rem; color: #666; font-style: italic; margin: 0; }
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy {
@@ -469,7 +433,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   deliveryReason = signal<string>('');
   countdown = signal({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-  loyalty = signal<LoyaltyAccount | null>(null);
+
 
   toastVisible = signal(false);
   toastMessage = signal('');
@@ -537,9 +501,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
           this.destroyMap();
         }
 
-        // Fetch Loyalty if client ID is present (or use mock ID 1 for demo if missing)
-        const cid = order.clientId || 1;
-        this.api.getLoyaltyAccount(cid).subscribe(l => this.loyalty.set(l));
+
       },
       error: (err) => {
         this.loading.set(false);

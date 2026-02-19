@@ -233,20 +233,4 @@ export interface ChatMessage {
   read: boolean;
 }
 
-// ── Loyalty (RegiPuntos) ──
-export interface LoyaltyAccount {
-  clientId: number;
-  currentPoints: number;
-  tier: 'Pink' | 'Gold' | 'Diamond'; // Niveles Coquette
-  lifetimePoints: number;
-  lastAccrual: string;
-}
 
-export interface PointTransaction {
-  id: number;
-  clientId: number;
-  orderId?: number;
-  amount: number; // Positivo (ganancia) o negativo (uso)
-  reason: string;
-  date: string;
-}
