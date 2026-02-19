@@ -59,10 +59,7 @@ import { GlobalSearchComponent } from './global-search.component';
              (click)="sidebarOpen = false">
             <span class="nav-icon">📈</span> Finanzas
           </a>
-          <a routerLink="/admin/payments" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">💸</span> Pagos
-          </a>
+
         </nav>
 
         <div class="sidebar-footer">
@@ -123,6 +120,7 @@ import { GlobalSearchComponent } from './global-search.component';
       display: flex; justify-content: space-between; align-items: center;
       padding: 1.25rem 1.25rem;
       border-bottom: 1px solid var(--border-soft);
+      z-index: 1050;
     }
 
     .brand { display: flex; align-items: center; gap: 0.65rem; }
@@ -233,7 +231,6 @@ import { GlobalSearchComponent } from './global-search.component';
       flex: 1; margin-left: 260px;
       display: flex; flex-direction: column;
       position: relative; 
-      /* z-index: 1;  <-- REMOVED to allow fixed children (modals) to escape this stacking context and be above sidebar */
     }
 
     .top-bar {
@@ -242,6 +239,8 @@ import { GlobalSearchComponent } from './global-search.component';
       background: var(--bg-glass);
       backdrop-filter: blur(12px);
       display: flex; align-items: center; gap: 1rem;
+      position: relative;
+      z-index: 1000;
     }
 
     .menu-btn {

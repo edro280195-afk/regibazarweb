@@ -91,7 +91,7 @@ interface SearchResult {
     </div>
   `,
   styles: [`
-    .search-wrapper { position: relative; flex: 1; max-width: 400px; }
+    .search-wrapper { position: relative; flex: 1; max-width: 400px; z-index: 1050; }
 
     .search-input-container {
       display: flex; align-items: center; gap: 8px;
@@ -127,6 +127,7 @@ interface SearchResult {
       box-shadow: var(--shadow-md, 0 8px 30px rgba(0,0,0,0.12));
       max-height: 400px; overflow-y: auto; z-index: 200;
       animation: dropIn 0.2s ease;
+      z-index: 9999;
     }
     @keyframes dropIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -141,8 +142,8 @@ interface SearchResult {
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .result-group { padding: 8px 0; z-index: 99999; }
-    .result-group + .result-group { border-top: 1px solid var(--border-soft, #f3e8ee); z-index: 99999;}
+    .result-group { padding: 8px 0; }
+    .result-group + .result-group { border-top: 1px solid var(--border-soft, #f3e8ee); }
 
     .group-label {
       display: block; padding: 4px 16px 6px;

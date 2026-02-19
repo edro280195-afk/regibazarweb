@@ -128,6 +128,43 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
         </div>
       }
 
+      <!-- ═══════════════ MODAL: CONFIRMAR COBRO ═══════════════ -->
+      @if (selectedOrderForPayment()) {
+        <div class="modal-overlay" (click)="selectedOrderForPayment.set(null)">
+          <div class="modal-card" style="max-width: 400px;" (click)="$event.stopPropagation()">
+            <div class="edit-modal-header">
+              <h3>Confirmar Cobro 💸</h3>
+              <p class="client-title">{{ selectedOrderForPayment()!.clientName }}</p>
+              <button class="btn-close-modal" (click)="selectedOrderForPayment.set(null)">✕</button>
+            </div>
+            <div class="edit-modal-body" style="display: block;">
+               <div style="text-align: center; margin-bottom: 1.5rem;">
+                 <p style="font-size: 1.5rem; font-weight: 800; color: var(--pink-600); margin: 0;">
+                   $ {{ selectedOrderForPayment()!.total | number:'1.2-2' }}
+                 </p>
+                 <p style="color: #888; margin: 5px 0 0;">Total a cobrar</p>
+               </div>
+               
+               <div class="edit-section">
+                  <label class="field-label">Método de Pago</label>
+                  <div class="type-switch">
+                    <button [class.active]="paymentMethod() === 'Efectivo'" (click)="paymentMethod.set('Efectivo')">💵 Efectivo</button>
+                    <button [class.active]="paymentMethod() === 'Transferencia'" (click)="paymentMethod.set('Transferencia')">🏦 Transferencia</button>
+                    <button [class.active]="paymentMethod() === 'Tarjeta'" (click)="paymentMethod.set('Tarjeta')">💳 Tarjeta</button>
+                  </div>
+               </div>
+
+               <div class="edit-modal-footer" style="margin-top: 2rem; justify-content: center;">
+                 <button class="btn-modal-cancel" (click)="selectedOrderForPayment.set(null)">Cancelar</button>
+                 <button class="btn-modal-pink" [disabled]="confirmingPayment()" (click)="confirmPayment()">
+                    {{ confirmingPayment() ? 'Procesando...' : '✅ Confirmar Cobro' }}
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- ═══════════════ DRAWER: AGREGAR ARTÍCULO ═══════════════ -->
       @if (drawerOrder()) {
         <div class="drawer-overlay" (click)="closeDrawer()">
@@ -286,6 +323,7 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
             <option value="InRoute">🚗 En ruta</option>
             <option value="Delivered">💝 Entregados</option>
             <option value="Postponed">📅 Pospuestos</option>
+            <option value="PaymentPending" style="font-weight: 800; color: #db2777;">💸 Por Cobrar</option>
             <option value="Canceled">🚫 Cancelados</option>
           </select>
 
@@ -318,13 +356,13 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
           <span class="qs-num">{{ orderStats().pending }}</span>
           <span class="qs-label">Pendientes</span>
         </div>
-        <div class="qs-chip delivered">
-          <span class="qs-num">{{ orderStats().delivered }}</span>
-          <span class="qs-label">Entregados</span>
-        </div>
         <div class="qs-chip revenue">
-          <span class="qs-num">$ {{ orderStats().revenue | number:'1.0-0' }}</span>
-          <span class="qs-label">Venta total</span>
+          <span class="qs-num">$ {{ orderStats().pendingAmount | number:'1.0-0' }}</span>
+          <span class="qs-label">Por Cobrar</span>
+        </div>
+        <div class="qs-chip delivered">
+          <span class="qs-num">$ {{ orderStats().collectedToday | number:'1.0-0' }}</span>
+          <span class="qs-label">Cobrado Hoy</span>
         </div>
       </div>
 
@@ -481,6 +519,9 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
                 <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
               </div>
               <div class="card-buttons">
+                @if (order.status === 'Pending' || order.status === 'InRoute') {
+                    <button class="action-btn pay" (click)="$event.stopPropagation(); openConfirmPayment(order)" title="Confirmar Cobro">💰</button>
+                }
                 <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.link)" title="Copiar Link">📋</button>
                 <button class="action-btn delete" (click)="$event.stopPropagation(); askDeleteOrder(order)" title="Eliminar">🗑️</button>
                 <span class="action-arrow" title="Ver detalle">→</span>
@@ -1041,6 +1082,8 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
     }
     .action-btn:hover { transform: translateY(-3px); }
     .action-btn.edit:hover { background: #f0fdf4; color: #16a34a; }
+    .action-btn.pay { background: #fdf2f8; color: #db2777; border: 1px solid #fce7f3; }
+    .action-btn.pay:hover { background: #db2777; color: white; border-color: #db2777; }
     .action-btn.link:hover { background: #fff7ed; color: #ea580c; }
     .action-btn.delete:hover { background: #fef2f2; color: #ef4444; }
 
@@ -1218,9 +1261,20 @@ export class OrdersComponent implements OnInit {
       total: all.length,
       pending: all.filter(o => o.status === 'Pending').length,
       delivered: all.filter(o => o.status === 'Delivered').length,
-      revenue: all.reduce((sum, o) => sum + o.total, 0)
+      revenue: all.reduce((sum, o) => sum + o.total, 0),
+      // Financials
+      pendingAmount: all.filter(o => o.status === 'Pending' || o.status === 'InRoute').reduce((sum, o) => sum + o.total, 0),
+      collectedToday: this.calculateCollectedToday(all)
     };
   });
+
+  calculateCollectedToday(orders: OrderSummary[]) {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return orders
+      .filter(o => o.status === 'Delivered' && new Date(o.createdAt) >= start)
+      .reduce((sum, o) => sum + o.total, 0);
+  }
 
   // Lista de objetos orden completos seleccionados (para el Dock)
   selectedOrdersList = computed(() => {
@@ -1264,7 +1318,11 @@ export class OrdersComponent implements OnInit {
     let list = this.orders();
 
     if (this.statusFilter) {
-      list = list.filter(o => o.status === this.statusFilter);
+      if (this.statusFilter === 'PaymentPending') {
+        list = list.filter(o => o.status === 'Pending' || o.status === 'InRoute');
+      } else {
+        list = list.filter(o => o.status === this.statusFilter);
+      }
     }
 
     if (this.filterTag()) {
@@ -1387,6 +1445,43 @@ export class OrdersComponent implements OnInit {
         this.showToast('¡Pedido actualizado! ✨💅');
       },
       error: () => this.showToast('Error al guardar 😿', true)
+    });
+  }
+
+  // ═══════════════ PAYMENT ACTIONS ═══════════════
+  selectedOrderForPayment = signal<OrderSummary | null>(null);
+  paymentMethod = signal('Efectivo');
+  confirmingPayment = signal(false);
+
+  openConfirmPayment(order: OrderSummary): void {
+    this.selectedOrderForPayment.set(order);
+    this.paymentMethod.set('Efectivo');
+  }
+
+  confirmPayment(): void {
+    const order = this.selectedOrderForPayment();
+    if (!order) return;
+    this.confirmingPayment.set(true);
+
+    // Mark as delivered (and paid)
+    this.api.updateOrderStatus(order.id, { status: 'Delivered' }).subscribe({
+      next: (updated) => {
+        this.showToast(`¡Cobro de $${order.total} registrado! 💸`);
+        // Update local state
+        const current = this.orders();
+        const idx = current.findIndex(o => o.id === order.id);
+        if (idx !== -1) {
+          current[idx] = updated;
+          this.orders.set([...current]);
+          this.applyFilter();
+        }
+        this.selectedOrderForPayment.set(null);
+        this.confirmingPayment.set(false);
+      },
+      error: () => {
+        this.showToast('Error al registrar cobro 😿', true);
+        this.confirmingPayment.set(false);
+      }
     });
   }
 

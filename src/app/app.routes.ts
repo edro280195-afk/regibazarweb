@@ -63,11 +63,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/components/financials/financials.component')
           .then(m => m.FinancialsComponent)
       },
-      {
-        path: 'payments',
-        loadComponent: () => import('./features/admin/components/payment-manager/payment-manager.component')
-          .then(m => m.PaymentManagerComponent)
-      }
+
     ]
   },
   {
