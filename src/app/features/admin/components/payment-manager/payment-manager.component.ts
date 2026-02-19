@@ -2,22 +2,22 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/services/api.service';
-import { OrderSummary, Payment } from '../../../../shared/models/models';
+import { OrderSummary } from '../../../../shared/models/models';
 
 @Component({
-    selector: 'app-payment-manager',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-payment-manager',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="payments-container fade-in">
       <div class="header">
         <div>
           <h2>💸 Gestión de Cobranza</h2>
-          <p class="subtitle">Administra los pagos pendientes y confirma ingresos.</p>
+          <p class="subtitle">Confirma entregas y controla tus cobros ✨</p>
         </div>
         <div class="stats-bar">
           <div class="stat-card">
-            <span class="label">Total Pendiente</span>
+            <span class="label">Por Cobrar</span>
             <span class="value text-red">{{ totalPending() | currency:'MXN' }}</span>
           </div>
           <div class="stat-card">
@@ -33,151 +33,154 @@ import { OrderSummary, Payment } from '../../../../shared/models/models';
 
       <div class="toolbar">
         <div class="search-box">
-          <i class="fas fa-search"></i>
+          <span>🔍</span>
           <input type="text" placeholder="Buscar clienta o pedido..." [(ngModel)]="searchTerm">
         </div>
         <div class="filters">
           <button (click)="filter.set('all')" [class.active]="filter() === 'all'">Todos</button>
-          <button (click)="filter.set('Unpaid')" [class.active]="filter() === 'Unpaid'">Pendientes</button>
-          <button (click)="filter.set('Partial')" [class.active]="filter() === 'Partial'">Parciales</button>
-          <button (click)="filter.set('Paid')" [class.active]="filter() === 'Paid'">Pagados</button>
+          <button (click)="filter.set('pending')" [class.active]="filter() === 'pending'">Por Cobrar</button>
+          <button (click)="filter.set('delivered')" [class.active]="filter() === 'delivered'">Cobrados</button>
         </div>
       </div>
 
-      <div class="orders-grid">
-        <div class="order-card" *ngFor="let order of filteredOrders()" [class.paid]="order.paymentStatus === 'Paid'">
-          <div class="card-header">
-            <span class="order-id">#{{ order.id }}</span>
-            <span class="status-badge" [ngClass]="order.paymentStatus || 'Unpaid'">
-              {{ getStatusLabel(order.paymentStatus || 'Unpaid') }}
-            </span>
-          </div>
-          
-          <div class="card-body">
-            <h3>{{ order.clientName }}</h3>
-            <p class="date">{{ order.createdAt | date:'mediumDate' }}</p>
-            
-            <div class="financials">
-              <div class="row">
-                <span>Total:</span>
-                <strong>{{ order.total | currency:'MXN' }}</strong>
-              </div>
-              <div class="row paid text-green" *ngIf="order.amountPaid && order.amountPaid > 0">
-                <span>Pagado:</span>
-                <strong>{{ order.amountPaid | currency:'MXN' }}</strong>
-              </div>
-              <div class="row pending text-red" *ngIf="(order.amountDue ?? order.total) > 0">
-                <span>Resta:</span>
-                <strong>{{ (order.amountDue ?? order.total) | currency:'MXN' }}</strong>
-              </div>
-            </div>
-
-            <div class="progress-bar" *ngIf="order.amountPaid && order.amountPaid > 0">
-              <div class="fill" [style.width.%]="(order.amountPaid / order.total) * 100"></div>
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <button class="btn-history" (click)="viewHistory(order)" title="Ver historial">
-              📜
-            </button>
-            <button class="btn-pay" *ngIf="order.paymentStatus !== 'Paid'" (click)="openPaymentModal(order)">
-              💰 Registrar Pago
-            </button>
-            <button class="btn-receipt" *ngIf="order.paymentStatus === 'Paid'" (click)="generateReceipt(order)">
-              🧾 Recibo
-            </button>
-          </div>
+      @if (loading()) {
+        <div class="loading-state">
+          <div class="spinner">🎀</div>
+          <p>Cargando pedidos...</p>
         </div>
-      </div>
-
-      <!-- PAYMENT MODAL -->
-      <div class="modal-backdrop" *ngIf="selectedOrder" (click)="closeModal()">
-        <div class="modal-content" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h3>Registrar Pago #{{ selectedOrder.id }}</h3>
-            <button class="btn-close" (click)="closeModal()">✕</button>
-          </div>
-          <div class="modal-body">
-            <div class="amount-info">
-              <p>Total del pedido: <strong>{{ selectedOrder.total | currency:'MXN' }}</strong></p>
-              <p>Monto restante: <strong class="text-red">{{ (selectedOrder.amountDue ?? selectedOrder.total) | currency:'MXN' }}</strong></p>
-            </div>
-
-            <div class="form-group">
-              <label>Monto a pagar</label>
-              <div class="input-prefix">
-                <span>$</span>
-                <input type="number" [(ngModel)]="paymentForm.amount" (input)="validateAmount()">
+      } @else {
+        <div class="orders-grid">
+          @for (order of filteredOrders(); track order.id) {
+            <div class="order-card" [class.paid]="order.status === 'Delivered'" [class.canceled]="order.status === 'Canceled'">
+              <div class="card-header">
+                <span class="order-id">#{{ order.id }}</span>
+                <span class="status-badge" [attr.data-status]="order.status">
+                  {{ orderStatusLabel(order) }}
+                </span>
               </div>
-              <div class="quick-amounts">
-                <button (click)="setAmount('total')">Total Restante</button>
-                <button (click)="setAmount('half')">50%</button>
-              </div>
-            </div>
+              
+              <div class="card-body">
+                <h3>{{ order.clientName }}</h3>
+                <p class="date">{{ order.createdAt | date:'mediumDate' }}</p>
 
-            <div class="form-group">
-              <label>Método de Pago</label>
-              <div class="method-grid">
-                <button [class.selected]="paymentForm.method === 'Efectivo'" (click)="paymentForm.method = 'Efectivo'">💵 Efectivo</button>
-                <button [class.selected]="paymentForm.method === 'Transferencia'" (click)="paymentForm.method = 'Transferencia'">🏦 Transfer</button>
-                <button [class.selected]="paymentForm.method === 'OXXO'" (click)="paymentForm.method = 'OXXO'">🏪 OXXO</button>
-                <button [class.selected]="paymentForm.method === 'Tarjeta'" (click)="paymentForm.method = 'Tarjeta'">💳 Tarjeta</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Referencia / Notas (Opcional)</label>
-              <input type="text" [(ngModel)]="paymentForm.notes" placeholder="#12345 o Comentarios...">
-            </div>
-
-            <div class="modal-actions">
-              <button class="btn-cancel" (click)="closeModal()">Cancelar</button>
-              <button class="btn-confirm" [disabled]="!isValidPayment()" (click)="confirmPayment()">
-                Confirmar Pago
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-       <!-- HISTORY MODAL -->
-      <div class="modal-backdrop" *ngIf="showHistory && historyOrder" (click)="closeHistory()">
-        <div class="modal-content" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h3>Historial de Pagos #{{ historyOrder.id }}</h3>
-            <button class="btn-close" (click)="closeHistory()">✕</button>
-          </div>
-          <div class="modal-body">
-            <div class="history-list" *ngIf="historyOrder.payments?.length; else noPayments">
-              <div class="history-item" *ngFor="let p of historyOrder.payments">
-                <div class="h-left">
-                  <span class="h-method">{{ p.method }}</span>
-                  <span class="h-date">{{ p.date | date:'short' }}</span>
+                <div class="order-type">
+                  <span class="type-tag" [class.pickup]="order.orderType === 'PickUp'">
+                    {{ order.orderType === 'PickUp' ? '🛍️ Recoge en local' : '🛵 Envío a domicilio' }}
+                  </span>
                 </div>
-                <div class="h-right">
-                  <strong class="h-amount">+{{ p.amount | currency:'MXN' }}</strong>
+
+                <div class="items-preview">
+                  @for (item of order.items.slice(0, 3); track item.id) {
+                    <span class="item-mini">{{ item.quantity }}× {{ item.productName }}</span>
+                  }
+                  @if (order.items.length > 3) {
+                    <span class="item-mini more">+{{ order.items.length - 3 }} más</span>
+                  }
+                </div>
+                
+                <div class="financials">
+                  <div class="row">
+                    <span>Total:</span>
+                    <strong>{{ order.total | currency:'MXN' }}</strong>
+                  </div>
                 </div>
               </div>
+
+              <div class="card-actions">
+                @if (isPendingPayment(order)) {
+                  <button class="btn-pay" (click)="openConfirmModal(order)">
+                    💰 Confirmar Cobro
+                  </button>
+                } @else if (order.status === 'Delivered') {
+                  <div class="paid-badge">✅ Entregado y Cobrado</div>
+                } @else if (order.status === 'Canceled') {
+                  <div class="canceled-badge">🚫 Cancelado</div>
+                }
+              </div>
             </div>
-            <ng-template #noPayments>
-              <p class="empty-state">No hay pagos registrados aún.</p>
-            </ng-template>
+          } @empty {
+            <div class="empty-state">
+              <div class="empty-icon">💸</div>
+              <h3>No hay pedidos</h3>
+              <p>No se encontraron pedidos con los filtros actuales</p>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- CONFIRM PAYMENT MODAL -->
+      @if (selectedOrder) {
+        <div class="modal-backdrop" (click)="closeModal()">
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h3>Confirmar Cobro #{{ selectedOrder.id }}</h3>
+              <button class="btn-close" (click)="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="confirm-summary">
+                <p class="client-name">{{ selectedOrder.clientName }}</p>
+                <p class="order-type-label">
+                  {{ selectedOrder.orderType === 'PickUp' ? '🛍️ Recoge en local' : '🛵 Envío a domicilio' }}
+                </p>
+                <div class="items-list">
+                  @for (item of selectedOrder.items; track item.id) {
+                    <div class="item-row">
+                      <span>{{ item.quantity }}× {{ item.productName }}</span>
+                      <span>{{ item.lineTotal | currency:'MXN' }}</span>
+                    </div>
+                  }
+                </div>
+                <div class="total-row">
+                  <strong>Total a Cobrar:</strong>
+                  <strong class="total-value">{{ selectedOrder.total | currency:'MXN' }}</strong>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Método de Pago</label>
+                <div class="method-grid">
+                  <button [class.selected]="paymentMethod === 'Efectivo'" (click)="paymentMethod = 'Efectivo'">💵 Efectivo</button>
+                  <button [class.selected]="paymentMethod === 'Transferencia'" (click)="paymentMethod = 'Transferencia'">🏦 Transfer</button>
+                  <button [class.selected]="paymentMethod === 'OXXO'" (click)="paymentMethod = 'OXXO'">🏪 OXXO</button>
+                  <button [class.selected]="paymentMethod === 'Tarjeta'" (click)="paymentMethod = 'Tarjeta'">💳 Tarjeta</button>
+                </div>
+              </div>
+
+              <div class="modal-actions">
+                <button class="btn-cancel" (click)="closeModal()">Cancelar</button>
+                <button class="btn-confirm" [disabled]="confirming()" (click)="confirmPayment()">
+                  @if (confirming()) {
+                    Procesando...
+                  } @else {
+                    ✅ Confirmar Entrega y Cobro
+                  }
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      }
+
+      <!-- TOAST -->
+      @if (toastMessage()) {
+        <div class="toast" [class.error]="toastIsError()">{{ toastMessage() }}</div>
+      }
     </div>
   `,
-    styles: [`
+  styles: [`
     .payments-container { padding: 1.5rem; max-width: 1200px; margin: 0 auto; color: var(--text-dark); }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
     .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
     h2 { font-family: var(--font-display); font-size: 2rem; margin: 0; color: var(--pink-600); }
     .subtitle { color: var(--text-muted); margin: 0.5rem 0 0; }
 
-    .stats-bar { display: flex; gap: 1rem; }
+    .stats-bar { display: flex; gap: 1rem; flex-wrap: wrap; }
     .stat-card {
-      background: white; padding: 0.8rem 1.2rem; border-radius: 1rem;
+      background: var(--bg-card, white); padding: 0.8rem 1.2rem; border-radius: 1rem;
       box-shadow: var(--shadow-sm); border: 1px solid var(--border-soft);
-      display: flex; flex-direction: column; min-width: 140px;
+      display: flex; flex-direction: column; min-width: 130px;
     }
     .stat-card .label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
     .stat-card .value { font-size: 1.4rem; font-weight: 800; }
@@ -185,15 +188,14 @@ import { OrderSummary, Payment } from '../../../../shared/models/models';
 
     .toolbar {
       display: flex; justify-content: space-between; margin-bottom: 1.5rem;
-      background: white; padding: 0.8rem; border-radius: 1rem; box-shadow: var(--shadow-sm);
+      background: var(--bg-card, white); padding: 0.8rem; border-radius: 1rem; box-shadow: var(--shadow-sm);
       flex-wrap: wrap; gap: 1rem;
     }
     .search-box {
       flex: 1; min-width: 250px; display: flex; align-items: center; gap: 0.5rem;
       background: var(--bg-main); padding: 0.5rem 1rem; border-radius: 2rem;
-      i { color: var(--text-muted); }
-      input { border: none; background: transparent; flex: 1; outline: none; font-size: 0.95rem; }
     }
+    .search-box input { border: none; background: transparent; flex: 1; outline: none; font-size: 0.95rem; color: var(--text-dark); }
     .filters { display: flex; gap: 0.5rem; overflow-x: auto; }
     .filters button {
       border: none; background: transparent; padding: 0.5rem 1rem;
@@ -207,38 +209,61 @@ import { OrderSummary, Payment } from '../../../../shared/models/models';
       display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;
     }
     .order-card {
-      background: white; border-radius: 1.2rem; padding: 1.2rem;
+      background: var(--bg-card, white); border-radius: 1.2rem; padding: 1.2rem;
       box-shadow: var(--shadow-sm); border: 1px solid var(--border-soft);
       display: flex; flex-direction: column; gap: 1rem; transition: transform 0.2s;
     }
     .order-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
     .order-card.paid { border-left: 5px solid #22c55e; }
+    .order-card.canceled { border-left: 5px solid #ef4444; opacity: 0.6; }
 
     .card-header { display: flex; justify-content: space-between; align-items: center; }
     .order-id { font-weight: 800; color: var(--text-muted); font-size: 0.9rem; }
     .status-badge {
       padding: 0.3rem 0.8rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 700;
     }
-    .status-badge.Unpaid { background: #fee2e2; color: #ef4444; }
-    .status-badge.Partial { background: #fef3c7; color: #d97706; }
-    .status-badge.Paid { background: #dcfce7; color: #16a34a; }
+    .status-badge[data-status="Pending"] { background: #fee2e2; color: #ef4444; }
+    .status-badge[data-status="InRoute"] { background: #dbeafe; color: #2563eb; }
+    .status-badge[data-status="Delivered"] { background: #dcfce7; color: #16a34a; }
+    .status-badge[data-status="Canceled"] { background: #f3f4f6; color: #6b7280; }
+    .status-badge[data-status="Postponed"] { background: #f3e8ff; color: #7c3aed; }
 
     .card-body h3 { margin: 0; font-size: 1.1rem; color: var(--text-dark); }
     .date { margin: 0; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
-    .financials .row { display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.9rem; }
-    .progress-bar { height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; margin-top: 0.5rem; }
-    .progress-bar .fill { height: 100%; background: #22c55e; transition: width 0.3s ease; }
 
-    .card-actions { display: flex; gap: 0.5rem; margin-top: auto; }
-    .btn-pay, .btn-receipt {
-      flex: 1; border: none; padding: 0.6rem; border-radius: 0.6rem;
-      font-weight: 700; cursor: pointer; transition: all 0.2s;
+    .order-type { margin-bottom: 0.5rem; }
+    .type-tag {
+      font-size: 0.8rem; padding: 4px 10px; border-radius: 10px;
+      background: #e0f2fe; color: #0284c7; font-weight: 700;
     }
-    .btn-pay { background: var(--pink-100); color: var(--pink-600); }
-    .btn-pay:hover { background: var(--pink-200); }
-    .btn-receipt { background: #f3f4f6; color: var(--text-dark); }
-    .btn-receipt:hover { background: #e5e7eb; }
-    .btn-history { background: none; border: 1px solid var(--border-soft); border-radius: 0.6rem; padding: 0.6rem; cursor: pointer; }
+    .type-tag.pickup { background: #f3e8ff; color: #9333ea; }
+
+    .items-preview { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 0.5rem; }
+    .item-mini {
+      font-size: 0.75rem; background: var(--bg-main, #f9fafb); padding: 3px 8px;
+      border-radius: 6px; color: var(--text-medium); font-weight: 600;
+    }
+    .item-mini.more { background: var(--pink-50); color: var(--pink-500); }
+
+    .financials .row { display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 1rem; }
+    .financials .row strong { color: var(--pink-600); font-size: 1.1rem; }
+
+    .card-actions { margin-top: auto; }
+    .btn-pay {
+      width: 100%; border: none; padding: 0.7rem; border-radius: 0.8rem;
+      font-weight: 700; cursor: pointer; transition: all 0.2s;
+      background: var(--pink-100); color: var(--pink-600); font-size: 0.95rem;
+    }
+    .btn-pay:hover { background: var(--pink-200); transform: translateY(-2px); }
+
+    .paid-badge {
+      text-align: center; padding: 0.6rem; border-radius: 0.8rem;
+      background: #dcfce7; color: #16a34a; font-weight: 700; font-size: 0.9rem;
+    }
+    .canceled-badge {
+      text-align: center; padding: 0.6rem; border-radius: 0.8rem;
+      background: #f3f4f6; color: #6b7280; font-weight: 700; font-size: 0.9rem;
+    }
 
     /* Modal */
     .modal-backdrop {
@@ -247,196 +272,220 @@ import { OrderSummary, Payment } from '../../../../shared/models/models';
       backdrop-filter: blur(4px); animation: fadeIn 0.2s;
     }
     .modal-content {
-      background: white; width: 90%; max-width: 450px; border-radius: 1.5rem;
-      padding: 1.5rem; box-shadow: var(--shadow-lg); animation: slideUp 0.3s;
+      background: var(--bg-card, white); width: 90%; max-width: 480px; border-radius: 1.5rem;
+      padding: 1.5rem; box-shadow: var(--shadow-lg, 0 20px 50px rgba(0,0,0,0.3)); animation: slideUp 0.3s;
     }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    .modal-header h3 { margin: 0; }
-    .btn-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+    .modal-header h3 { margin: 0; font-family: var(--font-display); color: var(--text-dark); }
+    .btn-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
 
-    .input-prefix {
-      display: flex; align-items: center; background: var(--bg-main);
-      border-radius: 0.8rem; padding: 0 1rem; border: 1px solid var(--border-soft);
-      span { font-weight: bold; color: var(--text-muted); }
-      input { flex: 1; border: none; background: transparent; padding: 0.8rem; font-size: 1.2rem; font-weight: 700; outline: none; }
+    .confirm-summary { margin-bottom: 1.5rem; }
+    .client-name { font-size: 1.2rem; font-weight: 800; margin: 0 0 0.3rem; color: var(--text-dark); }
+    .order-type-label { margin: 0 0 1rem; color: var(--text-muted); font-weight: 600; }
+    .items-list { border-top: 1px solid var(--border-soft); padding-top: 0.8rem; margin-bottom: 0.8rem; }
+    .item-row {
+      display: flex; justify-content: space-between; padding: 0.3rem 0;
+      font-size: 0.9rem; color: var(--text-medium);
     }
-    .quick-amounts { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-    .quick-amounts button {
-      flex: 1; border: 1px solid var(--pink-200); background: var(--pink-50);
-      color: var(--pink-600); padding: 0.4rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.8rem;
+    .total-row {
+      display: flex; justify-content: space-between; padding-top: 0.8rem;
+      border-top: 2px solid var(--pink-200); font-size: 1.1rem;
     }
+    .total-value { color: var(--pink-600); }
 
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-dark); }
     .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
     .method-grid button {
-      padding: 0.8rem; border: 1px solid var(--border-soft); background: white;
+      padding: 0.8rem; border: 1px solid var(--border-soft); background: var(--bg-card, white);
       border-radius: 0.8rem; cursor: pointer; font-weight: 600; transition: all 0.2s;
+      color: var(--text-dark);
     }
     .method-grid button:hover { background: var(--bg-main); }
     .method-grid button.selected { border-color: var(--pink-500); background: var(--pink-50); color: var(--pink-600); }
 
-    .modal-actions { display: flex; gap: 1rem; margin-top: 2rem; }
-    .modal-actions button { flex: 1; padding: 0.8rem; border-radius: 0.8rem; border: none; font-weight: 700; cursor: pointer; }
+    .modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+    .modal-actions button { flex: 1; padding: 0.8rem; border-radius: 0.8rem; border: none; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
     .btn-cancel { background: #f3f4f6; color: var(--text-dark); }
     .btn-confirm { background: #22c55e; color: white; }
     .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .history-item { display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid var(--border-soft); }
-    .h-method { display: block; font-weight: 700; font-size: 0.9rem; }
-    .h-date { font-size: 0.75rem; color: var(--text-muted); }
-    .h-amount { color: #22c55e; }
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: white; padding: 0.8rem 1.5rem; border-radius: 1rem;
+      font-weight: 700; z-index: 1100; animation: slideUp 0.3s;
+    }
+    .toast.error { background: #ef4444; }
 
+    /* Loading */
+    .loading-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 300px; color: var(--pink-400); font-family: var(--font-display);
+    }
+    .spinner { font-size: 3rem; animation: spin 1s infinite linear; margin-bottom: 1rem; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .empty-state {
+      grid-column: 1 / -1; text-align: center; padding: 4rem 2rem; color: var(--text-muted);
+    }
+    .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
+    .empty-state h3 { margin: 0 0 0.5rem; color: var(--text-dark); }
+
+    @media (max-width: 768px) {
+      .header { flex-direction: column; align-items: flex-start; }
+      .stats-bar { width: 100%; }
+      .stat-card { flex: 1; min-width: 0; }
+      .orders-grid { grid-template-columns: 1fr; }
+    }
   `]
 })
 export class PaymentManagerComponent implements OnInit {
-    orders = signal<OrderSummary[]>([]);
-    searchTerm = '';
-    filter = signal<'all' | 'Unpaid' | 'Partial' | 'Paid'>('all');
+  orders = signal<OrderSummary[]>([]);
+  loading = signal(true);
+  searchTerm = '';
+  filter = signal<'all' | 'pending' | 'delivered'>('all');
 
-    selectedOrder: OrderSummary | null = null;
-    historyOrder: OrderSummary | null = null;
-    showHistory = false;
+  selectedOrder: OrderSummary | null = null;
+  paymentMethod: string = 'Efectivo';
+  confirming = signal(false);
 
-    paymentForm = {
-        amount: 0,
-        method: 'Efectivo' as Payment['method'],
-        notes: ''
-    };
+  toastMessage = signal('');
+  toastIsError = signal(false);
 
-    constructor(private api: ApiService) { }
+  constructor(private api: ApiService) { }
 
-    ngOnInit() {
-        this.api.getOrders().subscribe(data => {
-            // Mock Data Enriched for demo if info missing
-            const enriched = data.map(o => ({
-                ...o,
-                paymentStatus: o.paymentStatus || 'Unpaid',
-                amountPaid: o.amountPaid || 0,
-                amountDue: o.amountDue ?? o.total,
-                payments: o.payments || []
-            }));
-            this.orders.set(enriched);
-        });
+  ngOnInit() {
+    this.loadOrders();
+  }
+
+  loadOrders() {
+    this.loading.set(true);
+    this.api.getOrders().subscribe({
+      next: (data) => {
+        // Solo pedidos activos (excluir cancelados del cálculo, pero mostrar en lista)
+        this.orders.set(data);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.showToast('Error al cargar pedidos 😿', true);
+        this.loading.set(false);
+      }
+    });
+  }
+
+  filteredOrders = computed(() => {
+    let list = this.orders();
+    const term = this.searchTerm.toLowerCase();
+    const f = this.filter();
+
+    // Excluir cancelados y pospuestos de la vista de cobranza
+    list = list.filter(o => o.status !== 'Canceled' && o.status !== 'Postponed');
+
+    if (f === 'pending') {
+      list = list.filter(o => this.isPendingPayment(o));
+    } else if (f === 'delivered') {
+      list = list.filter(o => o.status === 'Delivered');
     }
 
-    filteredOrders = computed(() => {
-        let list = this.orders();
-        const term = this.searchTerm.toLowerCase();
-        const f = this.filter();
+    if (term) {
+      list = list.filter(o =>
+        o.clientName.toLowerCase().includes(term) ||
+        o.id.toString().includes(term)
+      );
+    }
 
-        if (f !== 'all') {
-            list = list.filter(o => o.paymentStatus === f);
-        }
+    return list;
+  });
 
-        if (term) {
-            list = list.filter(o =>
-                o.clientName.toLowerCase().includes(term) ||
-                o.id.toString().includes(term)
-            );
-        }
-        return list;
-    });
+  // ═══════════════ KPIs REALES ═══════════════
 
-    totalPending = computed(() =>
-        this.orders().reduce((acc, o) => acc + (o.amountDue ?? o.total), 0)
+  totalPending = computed(() => {
+    return this.orders()
+      .filter(o => this.isPendingPayment(o))
+      .reduce((acc, o) => acc + o.total, 0);
+  });
+
+  totalCollectedToday = computed(() => {
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return this.orders()
+      .filter(o => {
+        if (o.status !== 'Delivered') return false;
+        const created = new Date(o.createdAt);
+        return created >= startOfDay;
+      })
+      .reduce((acc, o) => acc + o.total, 0);
+  });
+
+  percentCollected = computed(() => {
+    const activeOrders = this.orders().filter(o =>
+      o.status !== 'Canceled' && o.status !== 'Postponed'
     );
+    const total = activeOrders.length;
+    const delivered = activeOrders.filter(o => o.status === 'Delivered').length;
+    return total > 0 ? Math.round((delivered / total) * 100) : 0;
+  });
 
-    totalCollectedToday = computed(() => {
-        // Mock logic: Sum of payments with today's date
-        // For now showing total gathered in the mock data
-        return this.orders().reduce((acc, o) => acc + (o.amountPaid || 0), 0);
-    });
+  // ═══════════════ HELPERS ═══════════════
 
-    percentCollected = computed(() => {
-        const total = this.orders().reduce((acc, o) => acc + o.total, 0);
-        const paid = this.orders().reduce((acc, o) => acc + (o.amountPaid || 0), 0);
-        return total > 0 ? Math.round((paid / total) * 100) : 0;
-    });
+  isPendingPayment(order: OrderSummary): boolean {
+    return order.status === 'Pending' || order.status === 'InRoute';
+  }
 
-    getStatusLabel(status: string) {
-        const map: any = { 'Unpaid': 'Pendiente', 'Partial': 'Parcial', 'Paid': 'Pagado' };
-        return map[status] || status;
-    }
+  orderStatusLabel(order: OrderSummary): string {
+    const labels: Record<string, string> = {
+      'Pending': '⏳ Pendiente',
+      'InRoute': '🚗 En Ruta',
+      'Delivered': '💝 Entregado',
+      'Canceled': '🚫 Cancelado',
+      'Postponed': '📅 Pospuesto'
+    };
+    return labels[order.status] || order.status;
+  }
 
-    openPaymentModal(order: OrderSummary) {
-        this.selectedOrder = order;
-        this.paymentForm = {
-            amount: order.amountDue ?? order.total,
-            method: 'Efectivo',
-            notes: ''
-        };
-    }
+  // ═══════════════ CONFIRM COBRO ═══════════════
 
-    closeModal() {
-        this.selectedOrder = null;
-    }
+  openConfirmModal(order: OrderSummary) {
+    this.selectedOrder = order;
+    this.paymentMethod = 'Efectivo';
+  }
 
-    setAmount(type: 'total' | 'half') {
-        if (!this.selectedOrder) return;
-        const due = this.selectedOrder.amountDue ?? this.selectedOrder.total;
-        if (type === 'total') this.paymentForm.amount = due;
-        if (type === 'half') this.paymentForm.amount = Math.floor(due / 2);
-    }
+  closeModal() {
+    this.selectedOrder = null;
+  }
 
-    validateAmount() {
-        if (!this.selectedOrder) return;
-        const due = this.selectedOrder.amountDue ?? this.selectedOrder.total;
-        if (this.paymentForm.amount > due) this.paymentForm.amount = due;
-        if (this.paymentForm.amount < 0) this.paymentForm.amount = 0;
-    }
+  confirmPayment() {
+    if (!this.selectedOrder) return;
+    this.confirming.set(true);
 
-    isValidPayment() {
-        return this.paymentForm.amount > 0;
-    }
+    const orderId = this.selectedOrder.id;
 
-    confirmPayment() {
-        if (!this.selectedOrder) return;
-
-        // Simulate API call
-        const payment: Payment = {
-            id: Math.floor(Math.random() * 10000),
-            orderId: this.selectedOrder.id,
-            amount: this.paymentForm.amount,
-            method: this.paymentForm.method,
-            date: new Date().toISOString(),
-            notes: this.paymentForm.notes,
-            createdAt: new Date().toISOString()
-        };
-
-        // Update Local State (Optimistic UI)
-        this.orders.update(prev => prev.map(o => {
-            if (o.id === this.selectedOrder!.id) {
-                const newPaid = (o.amountPaid || 0) + payment.amount;
-                const newDue = o.total - newPaid;
-                const newStatus = newDue <= 0.5 ? 'Paid' : 'Partial'; // 0.5 tolerance for float math
-
-                return {
-                    ...o,
-                    amountPaid: newPaid,
-                    amountDue: newDue,
-                    paymentStatus: newStatus,
-                    payments: [...(o.payments || []), payment]
-                };
-            }
-            return o;
-        }));
-
+    // Llamar al API real: marcar como Entregado
+    this.api.updateOrderStatus(orderId, { status: 'Delivered' }).subscribe({
+      next: (updatedOrder) => {
+        // Actualizar estado local
+        this.orders.update(prev => prev.map(o =>
+          o.id === orderId ? { ...o, status: 'Delivered' } : o
+        ));
+        this.confirming.set(false);
         this.closeModal();
-        // Here we would call this.api.addPayment(payment)
-    }
+        this.showToast(`Pedido #${orderId} marcado como entregado y cobrado ✅`);
+      },
+      error: (err) => {
+        this.confirming.set(false);
+        const msg = err.error?.message || 'Error al confirmar el pago';
+        this.showToast(msg + ' 😿', true);
+      }
+    });
+  }
 
-    viewHistory(order: OrderSummary) {
-        this.historyOrder = order;
-        this.showHistory = true;
-    }
+  // ═══════════════ TOAST ═══════════════
 
-    closeHistory() {
-        this.showHistory = false;
-        this.historyOrder = null;
-    }
-
-    generateReceipt(order: OrderSummary) {
-        alert(`Generando recibo para Orden #${order.id}...\n(Próximamente descarga PDF)`);
-    }
+  showToast(msg: string, isError = false) {
+    this.toastMessage.set(msg);
+    this.toastIsError.set(isError);
+    setTimeout(() => this.toastMessage.set(''), 3000);
+  }
 }

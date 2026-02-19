@@ -92,7 +92,7 @@ import { FinancialReport, DriverExpense, Investment, OrderSummary } from '../../
                 @for (inv of report()?.details?.investments; track inv.id) {
                   <tr>
                     <td>{{ inv.date | date:'dd/MM/yyyy' }}</td>
-                    <td>Proveedor #{{ inv.supplierId }}</td>
+                    <td>{{ inv.supplierName }}</td>
                     <td>{{ inv.notes || '-' }}</td>
                     <td class="text-right font-bold">$ {{ inv.amount | number:'1.2-2' }}</td>
                   </tr>

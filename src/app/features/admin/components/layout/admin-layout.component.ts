@@ -58,6 +58,10 @@ import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
              (click)="sidebarOpen = false">
             <span class="nav-icon">📈</span> Finanzas
           </a>
+          <a routerLink="/admin/payments" routerLinkActive="active"
+             (click)="sidebarOpen = false">
+            <span class="nav-icon">💸</span> Pagos
+          </a>
         </nav>
 
         <div class="sidebar-footer">

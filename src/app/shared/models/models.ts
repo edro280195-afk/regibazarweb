@@ -185,6 +185,7 @@ export interface Supplier {
 export interface Investment {
   id: number;
   supplierId: number;
+  supplierName?: string;
   amount: number;
   date: string; // ISO
   notes?: string;

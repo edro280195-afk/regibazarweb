@@ -47,10 +47,6 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
                <span class="kpi-label">Este Mes</span>
                <span class="kpi-value">{{ metrics().salesMonth | currency:'MXN' }}</span>
              </div>
-             <div class="kpi-card">
-                <span class="kpi-label">Ticket Promedio</span>
-                <span class="kpi-value">{{ metrics().avgTicket | currency:'MXN' }}</span>
-             </div>
              <div class="kpi-card highlight">
                 <span class="kpi-label">Por Cobrar</span>
                 <span class="kpi-value text-red">{{ metrics().pendingCollection | currency:'MXN' }}</span>
