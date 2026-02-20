@@ -745,13 +745,18 @@ export class OrderViewComponent implements OnInit, OnDestroy {
 
       this.locationSub = this.signalr.locationUpdate$.subscribe(loc => {
         this.updateDriverPosition(loc.latitude, loc.longitude);
-
-        // Optional: pan map to keep driver in view? 
-        // this.map?.panTo({ lat: loc.latitude, lng: loc.longitude });
       });
 
       this.deliverySub = this.signalr.deliveryUpdate$.subscribe(() => {
         this.reloadOrder();
+      });
+      this.signalr.clientChatUpdate$.subscribe(msg => {
+        if (this.showChat()) {
+          this.chatMessages.update(msgs => [...msgs, msg]);
+          this.scrollChat();
+        } else {
+          this.showToast('💬 Nuevo mensaje del repartidor');
+        }
       });
     } catch (err) {
       console.error('SignalR connection failed:', err);

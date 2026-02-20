@@ -943,6 +943,11 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         r.deliveries.sort((a: RouteDelivery, b: RouteDelivery) => a.sortOrder - b.sortOrder);
         this.route.set(r);
         this.loading.set(false);
+
+        this.signalr.connect().then(() => {
+          this.signalr.joinRoute(this.token);
+        });
+
         setTimeout(() => {
           this.initMap(r);
           this.autoExpandNext(r);
