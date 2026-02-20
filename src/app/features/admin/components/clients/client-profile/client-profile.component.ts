@@ -435,7 +435,7 @@ export class ClientProfileComponent implements OnInit {
   isFrecuente = computed(() => {
     const c = this.client();
     if (!c) return false;
-    return (c.orderCount > 1) || c.clientType === 'Frecuente';
+    return (c.orderCount > 1) || c.type === 'Frecuente';
   });
 
   topProductsOption: any;
@@ -468,15 +468,7 @@ export class ClientProfileComponent implements OnInit {
 
   loadData(clientId: number) {
     this.loading.set(true);
-    // Fetch client details and their orders
-    // In a real app we might have a specific endpoint. 
-    // Here we might need to fetch all orders and filter (mock style)
 
-    // ForkJoin isn't optimal if we don't have endpoints, but let's assume we use what we have.
-    // We'll get all clients to find this one, and all orders to filter by this client.
-    // Optimally: api.getClient(id) and api.getClientOrders(id)
-
-    // Using existing generic methods for now:
     this.api.getClients().subscribe(clients => {
       const c = clients.find(x => x.id === clientId);
       this.client.set(c || null);
@@ -567,7 +559,7 @@ export class ClientProfileComponent implements OnInit {
         phone: c.phone || '',
         address: c.address || '',
         tag: c.tag || 'None',
-        clientType: c.clientType || 'Nueva',
+        clientType: c.type || 'Nueva',
         totalSpent: c.totalSpent || 0,
         latitude: c.latitude || 0,
         longitude: c.longitude || 0

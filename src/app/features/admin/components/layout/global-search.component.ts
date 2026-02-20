@@ -256,7 +256,7 @@ export class GlobalSearchComponent implements OnInit {
         id: c.id,
         title: c.name,
         subtitle: `${c.phone || 'Sin tel.'} · ${c.orderCount} pedidos`,
-        icon: c.Type === 'Frecuente' ? '💎' : '🌱'
+        icon: c.type === 'Frecuente' ? '💎' : '🌱'
       }));
 
     this.orderResults.set(matchedOrders);

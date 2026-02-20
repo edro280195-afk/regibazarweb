@@ -332,7 +332,7 @@ export class ClientsComponent implements OnInit {
   isFrecuente(client: Client): boolean {
     // Logic: Frecuente if orders > 1 OR explicitly tagged
     // If orderCount is not populated, fall back to simple check
-    return (client.orderCount > 1) || (client.ordersCount || 0) > 1 || client.Type === 'Frecuente';
+    return (client.orderCount > 1) || (client.ordersCount || 0) > 1 || client.type === 'Frecuente';
   }
 
 
