@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, Inject, LOCALE_ID } from '@angular/core';
 import { CommonModule, formatDate } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
@@ -13,7 +14,7 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
 @Component({
   selector: 'app-order-view',
   standalone: true,
-  imports: [CommonModule, GoogleMapsModule, MapDirectionsRenderer, MapMarker],
+  imports: [CommonModule, GoogleMapsModule, MapDirectionsRenderer, MapMarker, FormsModule],
   template: `
     <div class="client-page">
       <div class="deco deco-1">🌸</div>
@@ -306,6 +307,40 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
         </div>
       }
     </div>
+    @if (order()?.status === 'InRoute' || order()?.status === 'InTransit') {
+        <button class="floating-chat-btn" (click)="toggleChat()" [class.unread]="false">
+          💬
+        </button>
+      }
+
+      @if (showChat()) {
+        <div class="chat-modal">
+          <div class="chat-header">
+            <div>
+              <strong>Repartidor de Regi Bazar</strong>
+              <span class="status-text">En camino 🚗</span>
+            </div>
+            <button class="btn-close" (click)="toggleChat()">✕</button>
+          </div>
+          
+          <div class="chat-body" #clientChatScroll>
+            @if (chatMessages().length === 0) {
+              <p class="chat-empty">Escríbele a tu repartidor si necesitas darle indicaciones ✨</p>
+            }
+            @for (msg of chatMessages(); track msg.id) {
+              <div class="msg-bubble" [class.me]="msg.sender === 'Client'" [class.them]="msg.sender === 'Driver'">
+                {{ msg.text }}
+                <span class="time">{{ msg.timestamp | date:'shortTime' }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="chat-input">
+            <input type="text" [(ngModel)]="newChatMessage" (keydown.enter)="sendChat()" placeholder="Mensaje...">
+            <button (click)="sendChat()" [disabled]="!newChatMessage.trim()">➤</button>
+          </div>
+        </div>
+      }
   `,
   styles: [`
     .client-page {
@@ -480,6 +515,30 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
       box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1);
       z-index: 9999; animation: toastFadeIn 0.3s ease-out; font-size: 0.9rem; font-weight: 500;
     }
+
+    /* CHAT FLOTANTE */
+    .floating-chat-btn { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: var(--pink-500); color: white; border: none; font-size: 1.8rem; box-shadow: 0 4px 15px rgba(236,72,153,0.4); cursor: pointer; z-index: 1000; transition: 0.2s; }
+    .floating-chat-btn:hover { transform: scale(1.1); }
+    
+    .chat-modal { position: fixed; bottom: 90px; right: 20px; width: calc(100% - 40px); max-width: 350px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); z-index: 1000; display: flex; flex-direction: column; height: 400px; overflow: hidden; border: 1px solid var(--pink-100); animation: slideUp 0.3s ease; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .chat-modal .chat-header { background: var(--pink-50); padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pink-100); }
+    .chat-modal .chat-header strong { display: block; color: var(--pink-600); font-size: 0.95rem; }
+    .chat-modal .chat-header .status-text { font-size: 0.75rem; color: #888; }
+    .chat-modal .btn-close { background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; }
+    
+    .chat-modal .chat-body { flex: 1; padding: 15px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
+    .chat-empty { text-align: center; color: #aaa; font-size: 0.85rem; font-style: italic; margin: auto; }
+    .msg-bubble { max-width: 80%; padding: 8px 12px; border-radius: 15px; font-size: 0.9rem; position: relative; }
+    .msg-bubble.me { background: var(--pink-500); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-bubble.them { background: white; color: #444; align-self: flex-start; border: 1px solid #eee; border-bottom-left-radius: 4px; }
+    .msg-bubble .time { display: block; font-size: 0.65rem; text-align: right; opacity: 0.7; margin-top: 4px; }
+    
+    .chat-modal .chat-input { padding: 10px; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
+    .chat-modal .chat-input input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; outline: none; }
+    .chat-modal .chat-input input:focus { border-color: var(--pink-400); }
+    .chat-modal .chat-input button { background: var(--pink-500); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy {
@@ -503,7 +562,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   deliveryReason = signal<string>('');
   countdown = signal({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-
+  showChat = signal(false);
+  chatMessages = signal<any[]>([]);
+  newChatMessage = '';
+  @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
   toastVisible = signal(false);
   toastMessage = signal('');
@@ -823,5 +885,36 @@ export class OrderViewComponent implements OnInit, OnDestroy {
 
     update();
     this.timerInterval = setInterval(update, 1000);
+  }
+
+  toggleChat() {
+    this.showChat.update(v => !v);
+    if (this.showChat()) {
+      this.loadChat();
+    }
+  }
+
+  loadChat() {
+    this.api.getClientChat(this.accessToken).subscribe(msgs => {
+      this.chatMessages.set(msgs);
+      setTimeout(() => this.scrollChat(), 50);
+    });
+  }
+
+  sendChat() {
+    if (!this.newChatMessage.trim()) return;
+    const text = this.newChatMessage.trim();
+    this.newChatMessage = '';
+
+    this.api.sendClientMessage(this.accessToken, text).subscribe(msg => {
+      this.chatMessages.update(msgs => [...msgs, msg]);
+      this.scrollChat();
+    });
+  }
+
+  scrollChat() {
+    if (this.clientChatScroll) {
+      this.clientChatScroll.nativeElement.scrollTop = this.clientChatScroll.nativeElement.scrollHeight;
+    }
   }
 }

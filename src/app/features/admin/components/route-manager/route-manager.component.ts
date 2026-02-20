@@ -578,10 +578,22 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     this.signalr.connect().then(() => {
       this.signalr.joinAdmin();
     });
+
     this.signalr.locationUpdate$.subscribe(loc => {
       this.handleLocationUpdate(loc);
     });
+
+    this.signalr.adminChatUpdate$.subscribe(msg => {
+      if (this.chatRoute()?.id === msg.deliveryRouteId) {
+        this.activeMessages.update(msgs => [...msgs, msg]);
+        this.scrollToBottom();
+      } else {
+        this.showToast(`💬 Mensaje del chofer (Ruta #${msg.deliveryRouteId})`);
+      }
+    });
   }
+
+
 
   ngOnDestroy(): void {
     this.signalr.disconnect();
@@ -813,11 +825,11 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   // ═══ CHAT LOGIC ═══
   openChat(route: DeliveryRoute) {
     this.chatRoute.set(route);
-    this.activeMessages.set([
-      { id: 1, routeId: route.id, sender: 'Driver', text: 'Ya voy en camino a la primera entrega 🛵', timestamp: new Date().toISOString(), read: true },
-      { id: 2, routeId: route.id, sender: 'Admin', text: 'Excelente, avísame cualquier cosa', timestamp: new Date().toISOString(), read: true }
-    ]);
-    setTimeout(() => this.scrollToBottom(), 100);
+    this.activeMessages.set([]);
+    this.api.getRouteChat(route.id).subscribe(msgs => {
+      this.activeMessages.set(msgs);
+      setTimeout(() => this.scrollToBottom(), 100);
+    });
   }
 
   closeChat() {
@@ -827,31 +839,13 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   sendMessage() {
     if (!this.newMessage.trim() || !this.chatRoute()) return;
 
-    const msg: ChatMessage = {
-      id: Date.now(),
-      routeId: this.chatRoute()!.id,
-      sender: 'Admin',
-      text: this.newMessage.trim(),
-      timestamp: new Date().toISOString(),
-      read: true
-    };
-
-    this.activeMessages.update(msgs => [...msgs, msg]);
+    const text = this.newMessage.trim();
     this.newMessage = '';
-    setTimeout(() => this.scrollToBottom(), 50);
 
-    setTimeout(() => {
-      const reply: ChatMessage = {
-        id: Date.now() + 1,
-        routeId: this.chatRoute()!.id,
-        sender: 'Driver',
-        text: '¡Entendido! 👌',
-        timestamp: new Date().toISOString(),
-        read: false
-      };
-      this.activeMessages.update(msgs => [...msgs, reply]);
-      this.scrollToBottom();
-    }, 2000);
+    this.api.sendAdminMessage(this.chatRoute()!.id, text).subscribe(msg => {
+      this.activeMessages.update(msgs => [...msgs, msg]);
+      setTimeout(() => this.scrollToBottom(), 50);
+    });
   }
 
   scrollToBottom() {

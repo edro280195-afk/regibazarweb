@@ -113,6 +113,11 @@ declare var google: any;
                  [class.is-current]="d.status === 'InTransit'"
                  (click)="toggleExpand(d.id)">
 
+                  @if (d.status === 'Pending' || d.status === 'InTransit') {
+                    <button class="btn-chat" (click)="openClientChat(d)">
+                      💬 Chat Clienta
+                    </button>
+                  }
               <!-- Current delivery badge -->
               @if (d.status === 'InTransit') {
                 <div class="current-badge">🏃 EN CAMINO</div>
@@ -331,6 +336,37 @@ declare var google: any;
         </div>
       }
     </div>
+
+    @if (activeChatDelivery(); as delivery) {
+        <div class="modal-overlay" (click)="closeClientChat()">
+          <div class="chat-modal" (click)="$event.stopPropagation()">
+            <div class="chat-header">
+              <div>
+                <strong>Chat con {{ delivery.clientName }}</strong>
+                <span class="status-text">Entrega #{{ delivery.sortOrder }}</span>
+              </div>
+              <button class="btn-close" (click)="closeClientChat()">✕</button>
+            </div>
+            
+            <div class="chat-body" #driverClientChatScroll>
+              @if (clientChatMessages().length === 0) {
+                <p class="chat-empty">Avísale a la clienta que ya estás afuera 🚚</p>
+              }
+              @for (msg of clientChatMessages(); track msg.id) {
+                <div class="msg-bubble" [class.me]="msg.sender === 'Driver'" [class.them]="msg.sender === 'Client'">
+                  {{ msg.text }}
+                  <span class="time">{{ msg.timestamp | date:'shortTime' }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="chat-input">
+              <input type="text" [(ngModel)]="newClientMessage" (keydown.enter)="sendClientChat()" placeholder="Mensaje para la clienta...">
+              <button (click)="sendClientChat()" [disabled]="!newClientMessage.trim()">➤</button>
+            </div>
+          </div>
+        </div>
+      }
   `,
   styles: [`
     .driver-page {
@@ -797,6 +833,30 @@ declare var google: any;
       text-align: center; color: #9ca3af; margin-top: auto; margin-bottom: auto; padding: 2rem;
     }
     .empty-chat span { font-size: 3rem; margin-bottom: 0.5rem; display: block; opacity: 0.5; }
+
+    /* CHAT FLOTANTE */
+    .floating-chat-btn { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: var(--pink-500); color: white; border: none; font-size: 1.8rem; box-shadow: 0 4px 15px rgba(236,72,153,0.4); cursor: pointer; z-index: 1000; transition: 0.2s; }
+    .floating-chat-btn:hover { transform: scale(1.1); }
+    
+    .chat-modal { position: fixed; bottom: 90px; right: 20px; width: calc(100% - 40px); max-width: 350px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); z-index: 1000; display: flex; flex-direction: column; height: 400px; overflow: hidden; border: 1px solid var(--pink-100); animation: slideUp 0.3s ease; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .chat-modal .chat-header { background: var(--pink-50); padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pink-100); }
+    .chat-modal .chat-header strong { display: block; color: var(--pink-600); font-size: 0.95rem; }
+    .chat-modal .chat-header .status-text { font-size: 0.75rem; color: #888; }
+    .chat-modal .btn-close { background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; }
+    
+    .chat-modal .chat-body { flex: 1; padding: 15px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
+    .chat-empty { text-align: center; color: #aaa; font-size: 0.85rem; font-style: italic; margin: auto; }
+    .msg-bubble { max-width: 80%; padding: 8px 12px; border-radius: 15px; font-size: 0.9rem; position: relative; }
+    .msg-bubble.me { background: var(--pink-500); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-bubble.them { background: white; color: #444; align-self: flex-start; border: 1px solid #eee; border-bottom-left-radius: 4px; }
+    .msg-bubble .time { display: block; font-size: 0.65rem; text-align: right; opacity: 0.7; margin-top: 4px; }
+    
+    .chat-modal .chat-input { padding: 10px; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
+    .chat-modal .chat-input input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; outline: none; }
+    .chat-modal .chat-input input:focus { border-color: var(--pink-400); }
+    .chat-modal .chat-input button { background: var(--pink-500); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   `]
 })
 export class RouteViewComponent implements OnInit, OnDestroy {
@@ -809,7 +869,11 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   failModalId = signal(0);
   selectedReason = signal('');
   toastMsg = signal('');
-
+  // Chat Client State
+  activeChatDelivery = signal<any | null>(null); // Guarda la entrega seleccionada
+  clientChatMessages = signal<any[]>([]);
+  newClientMessage = '';
+  @ViewChild('driverClientChatScroll') driverClientChatScroll?: ElementRef;
   // Chat State
   showChat = signal(false);
   activeMessages = signal<ChatMessage[]>([]);
@@ -855,6 +919,15 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.token = this.routeParam.snapshot.paramMap.get('token') || '';
     this.loadRoute();
+
+    this.signalr.clientChatUpdate$.subscribe(msg => {
+      if (this.activeChatDelivery()?.id === msg.deliveryId) {
+        this.clientChatMessages.update(msgs => [...msgs, msg]);
+        this.scrollClientChat();
+      } else {
+        this.showToast('💬 Nuevo mensaje de una clienta'); // Aviso si tiene el chat cerrado
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -1394,5 +1467,34 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   private showToast(msg: string): void {
     this.toastMsg.set(msg);
     setTimeout(() => this.toastMsg.set(''), 3000);
+  }
+
+  openClientChat(delivery: any) {
+    this.activeChatDelivery.set(delivery);
+    this.api.getDriverClientChat(this.token, delivery.id).subscribe(msgs => {
+      this.clientChatMessages.set(msgs);
+      setTimeout(() => this.scrollClientChat(), 50);
+    });
+  }
+
+  closeClientChat() {
+    this.activeChatDelivery.set(null);
+  }
+
+  sendClientChat() {
+    if (!this.newClientMessage.trim() || !this.activeChatDelivery()) return;
+    const text = this.newClientMessage.trim();
+    this.newClientMessage = '';
+
+    this.api.sendDriverClientMessage(this.token, this.activeChatDelivery().id, text).subscribe(msg => {
+      this.clientChatMessages.update(msgs => [...msgs, msg]);
+      this.scrollClientChat();
+    });
+  }
+
+  scrollClientChat() {
+    if (this.driverClientChatScroll) {
+      this.driverClientChatScroll.nativeElement.scrollTop = this.driverClientChatScroll.nativeElement.scrollHeight;
+    }
   }
 }

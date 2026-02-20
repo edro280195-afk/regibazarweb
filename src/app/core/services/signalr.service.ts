@@ -18,6 +18,8 @@ export class SignalRService {
   deliveryUpdate$ = new Subject<any>();
   routeCompleted$ = new Subject<any>();
   orderConfirmed$ = new Subject<{ orderId: number, clientName: string, newStatus: string }>();
+  clientChatUpdate$ = new Subject<any>();
+  adminChatUpdate$ = new Subject<any>();
 
   constructor(private auth: AuthService) { }
 
@@ -41,6 +43,10 @@ export class SignalRService {
       };
 
       this.locationUpdate$.next(locationData);
+    });
+
+    this.connection.on('ReceiveChatMessage', (msg: any) => {
+      this.adminChatUpdate$.next(msg);
     });
 
     this.connection.on('LocationUpdate', (data: LocationUpdate) => {
@@ -69,6 +75,10 @@ export class SignalRService {
 
     this.connection.on('OrderConfirmed', (data: any) => {
       this.orderConfirmed$.next(data);
+    });
+
+    this.connection.on('ReceiveClientChatMessage', (msg: any) => {
+      this.clientChatUpdate$.next(msg);
     });
 
     await this.connection.start();

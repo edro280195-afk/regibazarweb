@@ -260,4 +260,23 @@ export class ApiService {
   adjustLoyaltyPoints(req: import('../../shared/models/models').AdjustPointsRequest): Observable<any> {
     return this.http.post<any>(`${this.url}/loyalty/adjust`, req);
   }
+
+  // Chat con clientes
+  getClientChat(accessToken: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.url}/pedido/${accessToken}/chat`);
+  }
+
+  sendClientMessage(accessToken: string, text: string): Observable<any> {
+    return this.http.post<any>(`${this.url}/pedido/${accessToken}/chat`, { text });
+  }
+
+  getDriverClientChat(driverToken: string, deliveryId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.url}/driver/${driverToken}/deliver/${deliveryId}/chat`);
+  }
+
+  sendDriverClientMessage(driverToken: string, deliveryId: number, text: string): Observable<any> {
+    return this.http.post<any>(`${this.url}/driver/${driverToken}/deliver/${deliveryId}/chat`, { text });
+  }
 }
+
+
