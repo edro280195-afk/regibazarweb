@@ -561,7 +561,7 @@ export class DashboardComponent implements OnInit {
 
     clients.forEach(c => {
       // Logic: Frecuente if orders > 1 OR explicitly tagged
-      const isFrecuente = (c.orderCount > 1) || ((c as any).ordersCount || 0) > 1 || c.clientType === 'Frecuente';
+      const isFrecuente = (c.orderCount > 1) || ((c as any).ordersCount || 0) > 1 || c.Type === 'Frecuente';
       if (isFrecuente) countFrecuente++;
       else countNueva++;
     });

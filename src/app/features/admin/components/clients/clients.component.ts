@@ -2,9 +2,10 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
-import { Client } from '../../../../shared/models/models';
+import { Client, OrderSummary } from '../../../../shared/models/models';
 
 @Component({
   selector: 'app-clients',
@@ -270,7 +271,51 @@ export class ClientsComponent implements OnInit {
   }
 
   loadClients() {
-    this.api.getClientsWithStats().subscribe(data => this.allClients.set(data));
+    forkJoin({
+      clients: this.api.getClients(),
+      orders: this.api.getOrders()
+    }).subscribe({
+      next: ({ clients, orders }) => {
+        // Calculate counts map
+        const counts = new Map<number, number>(); // ClientID -> Count
+        const nameCounts = new Map<string, number>(); // Name -> Count
+
+        orders.forEach(o => {
+          // Count by ID if available
+          if (o.clientId) {
+            counts.set(o.clientId, (counts.get(o.clientId) || 0) + 1);
+          }
+          // Also count by name as fallback/auxiliary
+          const normName = o.clientName.trim().toLowerCase();
+          nameCounts.set(normName, (nameCounts.get(normName) || 0) + 1);
+        });
+
+        // Merge logic
+        const enrichedClients = clients.map(c => {
+          let count = 0;
+          if (counts.has(c.id)) {
+            count = counts.get(c.id)!;
+          } else {
+            // Fallback to name match
+            const normName = c.name.trim().toLowerCase();
+            count = nameCounts.get(normName) || 0;
+          }
+
+          return {
+            ...c,
+            orderCount: count,
+            // Also update totalSpent if we want to be fancy, but orderCount is the priority
+            clientType: count > 1 ? 'Frecuente' : 'Nueva'
+          } as Client;
+        });
+
+        this.allClients.set(enrichedClients);
+      },
+      error: (e) => {
+        console.error('Error loading clients/orders', e);
+        this.showToast('Error al cargar datos 😿');
+      }
+    });
   }
 
   // Filtrado computado
@@ -287,7 +332,7 @@ export class ClientsComponent implements OnInit {
   isFrecuente(client: Client): boolean {
     // Logic: Frecuente if orders > 1 OR explicitly tagged
     // If orderCount is not populated, fall back to simple check
-    return (client.orderCount > 1) || (client.ordersCount || 0) > 1 || client.clientType === 'Frecuente';
+    return (client.orderCount > 1) || (client.ordersCount || 0) > 1 || client.Type === 'Frecuente';
   }
 
 

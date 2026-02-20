@@ -8,10 +8,12 @@ import { ClientOrderView, LoyaltySummary } from '../../../../shared/models/model
 
 declare var google: any;
 
+import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/google-maps';
+
 @Component({
   selector: 'app-order-view',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, GoogleMapsModule, MapDirectionsRenderer, MapMarker],
   template: `
     <div class="client-page">
       <div class="deco deco-1">🌸</div>
@@ -53,6 +55,10 @@ declare var google: any;
           @switch (o.status) {
             @case ('Pending') {
               <span class="status-icon">📦</span>
+              <div><strong>Pedido confirmado</strong><p>Tu pedido está listo, pronto saldrá a entrega ✨</p></div>
+            }
+            @case ('Shipped') {
+              <span class="status-icon">🚚</span>
               <div><strong>Pedido confirmado</strong><p>Tu pedido está listo, pronto saldrá a entrega ✨</p></div>
             }
             @case ('InRoute') {
@@ -118,19 +124,45 @@ declare var google: any;
         }
 
         <!-- MAP — always visible when InRoute or InTransit -->
+        <!-- MAP — always visible when InRoute or InTransit -->
         @if (showMap()) {
           <div class="map-section">
             <h3>📍 ¿Dónde va tu pedido?</h3>
-            <div class="map-container" #mapContainer></div>
-            @if (!o.driverLocation) {
+            
+            <google-map 
+              height="300px" 
+              width="100%" 
+              [options]="mapOptions"
+              [center]="centerSignal()"
+              [zoom]="zoomSignal()">
+              
+              <!-- Driver Marker -->
+              @if (driverPos()) {
+                <map-marker 
+                  [position]="driverPos()!" 
+                  [options]="driverMarkerOptions">
+                </map-marker>
+              }
+
+              <!-- Client Marker -->
+              @if (clientPos()) {
+                <map-marker 
+                  [position]="clientPos()!" 
+                  [options]="clientMarkerOptions">
+                </map-marker>
+              }
+
+              <!-- Directions (Only InTransit) -->
+              @if (o.status === 'InTransit' && directionsResult()) {
+                <map-directions-renderer 
+                  [directions]="directionsResult()!"
+                  [options]="rendererOptions">
+                </map-directions-renderer>
+              }
+            </google-map>
+
+            @if (!driverPos()) {
               <p class="map-hint">El repartidor aún no ha compartido su ubicación, espera un poquito ✨</p>
-            }
-            @if (o.status === 'InTransit' && o.driverLocation) {
-              <div class="map-legend">
-                <span class="legend-item"><span class="legend-dot driver"></span> Repartidor</span>
-                <span class="legend-line"></span>
-                <span class="legend-item"><span class="legend-dot you"></span> Tu entrega</span>
-              </div>
             }
           </div>
         }
@@ -203,14 +235,14 @@ declare var google: any;
           <p class="pay-hint">Elige cómo quieres pagar hoy ✨</p>
           
           <div class="payment-tabs">
-            <button class="pay-tab" [class.active]="paymentTab() === 'transfer'" (click)="paymentTab.set('transfer')">
-              🏦 Transf.
-            </button>
             <button class="pay-tab" [class.active]="paymentTab() === 'cash'" (click)="paymentTab.set('cash')">
               💵 Efectivo
             </button>
+            <button class="pay-tab" [class.active]="paymentTab() === 'transfer'" (click)="paymentTab.set('transfer')">
+              🏦 Transferencia
+            </button>
             <button class="pay-tab" [class.active]="paymentTab() === 'oxxo'" (click)="paymentTab.set('oxxo')">
-              🏪 OXXO
+              🏪 Deposito
             </button>
           </div>
 
@@ -220,7 +252,7 @@ declare var google: any;
                 <div class="pay-card cash fade-in">
                   <div class="pay-header">
                      <span class="pay-icon">💵</span>
-                     <div><strong>Pago Contra Entrega</strong><span class="bank-name">Efectivo</span></div>
+                     <div><strong>Pago al recibir tu pedido</strong><span class="bank-name">Efectivo</span></div>
                   </div>
                   <p class="cash-hint">Por favor ten el monto exacto listo para agilizar tu entrega 💕</p>
                 </div>
@@ -308,9 +340,22 @@ declare var google: any;
       strong { color: var(--text-dark); display: block; font-family: var(--font-display); font-size: 0.95rem; }
       p { margin: 0.1rem 0 0; font-size: 0.8rem; line-height: 1.3; }
       &[data-status="Pending"] { background: rgba(255,253,240,0.6); p { color: #92400E; } }
+      &[data-status="Shipped"] { background: rgba(243, 232, 255, 0.6); border: 1px solid #e9d5ff; p { color: #6b21a8; } }
       &[data-status="InRoute"] { background: rgba(239,246,255,0.6); p { color: #1E40AF; } }
       &[data-status="InTransit"] { background: linear-gradient(135deg, rgba(219,234,254,0.8), rgba(191,219,254,0.8)); border: 2px solid rgba(59,130,246,0.4); p { color: #1D4ED8; } }
       &[data-status="Delivered"] { background: rgba(236,253,245,0.6); p { color: #065F46; } }
+    }
+    .btn-confirm-order {
+      margin-top: 1rem; width: 100%;
+      background: linear-gradient(135deg, #10b981, #059669); 
+      color: white; border: none; padding: 12px 20px; 
+      border-radius: 12px; font-weight: 800; cursor: pointer; 
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+      font-size: 1rem; letter-spacing: 0.5px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.2s; 
+      &:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5); }
+      &:active { transform: scale(0.98); }
     }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -464,16 +509,44 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   toastMessage = signal('');
   private timerInterval: any;
 
-  private map?: google.maps.Map;
-  private driverMarker?: google.maps.Marker;
-  private destinationMarker?: google.maps.Marker;
-  private directionsRenderer?: google.maps.DirectionsRenderer;
+  // Maps State
+  centerSignal = signal<google.maps.LatLngLiteral>({ lat: 25.6866, lng: -100.3161 }); // MTY
+  zoomSignal = signal(12);
+  driverPos = signal<google.maps.LatLngLiteral | null>(null);
+  clientPos = signal<google.maps.LatLngLiteral | null>(null);
+  directionsResult = signal<google.maps.DirectionsResult | undefined>(undefined);
+
+  mapOptions: google.maps.MapOptions = {
+    disableDefaultUI: true,
+    zoomControl: true,
+    styles: [
+      { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e9e9e9" }, { "lightness": 17 }] },
+      { "featureType": "landscape", "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }, { "lightness": 20 }] },
+      { "featureType": "road.highway", "elementType": "geometry.fill", "stylers": [{ "color": "#ffffff" }, { "lightness": 17 }] },
+      { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }, { "lightness": 16 }] }
+    ]
+  };
+
+  driverMarkerOptions: google.maps.MarkerOptions = {
+    icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' },
+    title: 'Repartidor 🚗'
+  };
+
+  clientMarkerOptions: google.maps.MarkerOptions = {
+    icon: { url: 'http://maps.google.com/mapfiles/ms/icons/pink-dot.png' },
+    title: 'Tú 💖'
+  };
+
+  rendererOptions: google.maps.DirectionsRendererOptions = {
+    suppressMarkers: true,
+    polylineOptions: { strokeColor: '#3B82F6', strokeOpacity: 0.7, strokeWeight: 5 }
+  };
+
   private accessToken = '';
   private locationSub?: Subscription;
   private deliverySub?: Subscription;
   private signalrConnected = false;
-  private lastDriverLat = 0;
-  private lastDriverLng = 0;
+  private directionsService = new google.maps.DirectionsService();
 
   constructor(
     private route: ActivatedRoute,
@@ -491,7 +564,6 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     this.locationSub?.unsubscribe();
     this.deliverySub?.unsubscribe();
     this.signalr.disconnect();
-    this.destroyMap();
     if (this.timerInterval) clearInterval(this.timerInterval);
   }
 
@@ -512,15 +584,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         this.showMap.set(needsMap);
 
         if (needsMap) {
-          if (prevStatus && prevStatus !== order.status) {
-            this.destroyMap();
-          }
-          setTimeout(() => this.ensureMap(order), 200);
+          this.updateMapState(order);
           if (!this.signalrConnected) {
             this.connectRealtime();
           }
-        } else {
-          this.destroyMap();
         }
 
         // 3. Loyalty & Client Info
@@ -548,153 +615,64 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ═══ MAP MANAGEMENT ═══
+  // ═══ REAL-TIME UPDATES & MAP LOGIC ═══
 
-  private destroyMap(): void {
-    if (this.map) {
-      this.driverMarker?.setMap(null);
-      this.destinationMarker?.setMap(null);
-      this.directionsRenderer?.setMap(null);
-      this.map = undefined;
+  private updateMapState(order: ClientOrderView): void {
+    // 1. Client Position
+    const lat = (order as any).latitude || (order as any).clientLat || order.clientLatitude;
+    const lng = (order as any).longitude || (order as any).clientLng || order.clientLongitude;
+
+    if (lat && lng) {
+      this.clientPos.set({ lat: Number(lat), lng: Number(lng) });
+      this.centerSignal.set({ lat: Number(lat), lng: Number(lng) });
+      this.zoomSignal.set(14);
+    }
+
+    // 2. Driver Position (Init)
+    if (order.driverLocation && order.driverLocation.latitude) {
+      this.updateDriverPosition(order.driverLocation.latitude, order.driverLocation.longitude);
     }
   }
-
-  private ensureMap(order: ClientOrderView): void {
-    if (!this.mapEl) return;
-
-    if (!this.map) {
-      const center = { lat: 25.75, lng: -100.3 };
-      this.map = new google.maps.Map(this.mapEl.nativeElement, {
-        center,
-        zoom: 12,
-        disableDefaultUI: true,
-        zoomControl: true,
-        styles: [
-          { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e9e9e9" }, { "lightness": 17 }] },
-          { "featureType": "landscape", "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }, { "lightness": 20 }] },
-          { "featureType": "road.highway", "elementType": "geometry.fill", "stylers": [{ "color": "#ffffff" }, { "lightness": 17 }] },
-          { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{ "color": "#ffffff" }, { "lightness": 29 }, { "weight": 0.2 }] },
-          { "featureType": "road.arterial", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }, { "lightness": 18 }] },
-          { "featureType": "road.local", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }, { "lightness": 16 }] },
-          { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }, { "lightness": 21 }] },
-          { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#dedede" }, { "lightness": 21 }] },
-          { "elementType": "labels.text.stroke", "stylers": [{ "visibility": "on" }, { "color": "#ffffff" }, { "lightness": 16 }] },
-          { "elementType": "labels.text.fill", "stylers": [{ "saturation": 36 }, { "color": "#333333" }, { "lightness": 40 }] },
-          { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] }
-        ]
-      });
-    }
-
-    this.updateMapContent(order);
-  }
-
-  private updateMapContent(order: ClientOrderView): void {
-    if (!this.map) return;
-    const map = this.map;
-
-    const bounds = new google.maps.LatLngBounds();
-    let hasPoints = false;
-
-    // 1. Destination
-    const destLat = (order as any).latitude || (order as any).clientLat || order.clientLatitude;
-    const destLng = (order as any).longitude || (order as any).clientLng || order.clientLongitude;
-
-    if (destLat && destLng) {
-      const destPos = { lat: Number(destLat), lng: Number(destLng) };
-      if (!this.destinationMarker) {
-        this.destinationMarker = new google.maps.Marker({
-          position: destPos,
-          map: map,
-          title: 'Tu ubicación 💖',
-          icon: 'http://maps.google.com/mapfiles/ms/icons/pink-dot.png'
-        });
-      } else {
-        this.destinationMarker.setPosition(destPos);
-      }
-      bounds.extend(destPos);
-      hasPoints = true;
-    }
-
-    // 2. Driver Marker
-    if (order.driverLocation) {
-      // It is strongly typed as DriverLocation object, no split needed
-      const loc = order.driverLocation;
-      if (loc.latitude && loc.longitude) {
-        const driverPos = { lat: loc.latitude, lng: loc.longitude };
-        this.lastDriverLat = loc.latitude;
-        this.lastDriverLng = loc.longitude;
-
-        if (!this.driverMarker) {
-          this.driverMarker = new google.maps.Marker({
-            position: driverPos,
-            map: map,
-            title: 'Repartidor 🚗',
-            icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-          });
-        } else {
-          this.driverMarker.setPosition(driverPos);
-        }
-        bounds.extend(driverPos);
-        hasPoints = true;
-      }
-    }
-
-    if (hasPoints) {
-      map.fitBounds(bounds);
-      const listener = google.maps.event.addListener(map, "idle", () => {
-        const zoom = map.getZoom();
-        if (zoom != null && zoom > 15) map.setZoom(15);
-        google.maps.event.removeListener(listener);
-      });
-    }
-  }
-
-  // ═══ REAL-TIME UPDATES ═══
 
   private updateDriverPosition(lat: number, lng: number): void {
-    if (!this.map || !lat || !lng) return;
+    if (!lat || !lng) return;
+    const driver = { lat, lng };
+    this.driverPos.set(driver);
+    // If not client pos, center on driver
+    if (!this.clientPos()) {
+      this.centerSignal.set(driver);
+    }
 
-    const pos = { lat, lng };
-    if (!this.driverMarker) {
-      this.driverMarker = new google.maps.Marker({
-        position: pos,
-        map: this.map,
-        title: 'Repartidor 🚗',
-        icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-      });
+    // 3. Routing (Only if InTransit)
+    if (this.order()?.status === 'InTransit' && this.clientPos()) {
+      this.calculateRoute(driver, this.clientPos()!);
     } else {
-      this.driverMarker.setPosition(pos);
+      this.directionsResult.set(undefined);
     }
   }
 
-  private drawRouteLine(driverLat: number, driverLng: number, destLat: number, destLng: number): void {
-    if (!this.map) return;
+  private calculateRoute(origin: google.maps.LatLngLiteral, dest: google.maps.LatLngLiteral) {
+    this.directionsService.route({
+      origin,
+      destination: dest,
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (result: any, status: any) => {
+      // @ts-ignore
+      if (status === 'OK' && result) {
+        this.directionsResult.set(result);
+      }
+    });
+  }
 
-    // Use DirectionsService for real roads if possible, or Polyline for straight line
-    // For now, simple straight dashed line to match previous behavior (but better: use Directions if we had it set up)
-    // The previous code was just a straight line. Let's stick to straight line for simplicity in this phase, 
-    // or use a dashed Polyline.
-
-    const path = [
-      { lat: driverLat, lng: driverLng },
-      { lat: destLat, lng: destLng }
-    ];
-
-    if (this.directionsRenderer) {
-      this.directionsRenderer.setMap(null); // Clear old
-    }
-
-    // We reused 'routeLine' previously. Let's use a Polyline.
-    // I need to define 'routeLine' property as google.maps.Polyline if I want to track it.
-    // In strict mode, I didn't verify if I added `routeLine` to the class properties in the previous edit.
-    // I added `directionsRenderer` but removed `routeLine`.
-    // Let's use `directionsRenderer` behavior if we want real routing, but here we just have points.
-    // Let's re-add a `routeLine` property or just draw a new one? 
-    // To avoid property errors, I will simply NOT draw lines for now or assume I can add a property.
-    // Actually, I can use directionsRenderer if I want.
-    // But let's just use `updateDriverPosition` updates. The line is nice but not critical if causing type issues.
-    // Use `any` cast if needed or just skip the line drawing for this iteration to ensure stability.
-    // "Simple is better".
+  confirmOrder() {
+    if (!confirm('¿Confirmas que has recibido tu pedido? ✨')) return;
+    this.api.confirmClientOrder(this.accessToken).subscribe({
+      next: () => {
+        this.showToast('¡Pedido confirmado! Gracias 💕');
+        this.loadOrder();
+      },
+      error: () => this.showToast('Error al confirmar, intenta de nuevo 😿')
+    });
   }
 
   private async connectRealtime(): Promise<void> {
@@ -704,8 +682,6 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       this.signalrConnected = true;
 
       this.locationSub = this.signalr.locationUpdate$.subscribe(loc => {
-        this.lastDriverLat = loc.latitude;
-        this.lastDriverLng = loc.longitude;
         this.updateDriverPosition(loc.latitude, loc.longitude);
 
         // Optional: pan map to keep driver in view? 
@@ -738,12 +714,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         this.showMap.set(needsMap);
 
         if (needsMap) {
-          if (prevStatus && prevStatus !== order.status) {
-            this.destroyMap();
+          this.updateMapState(order);
+          if (!this.signalrConnected) {
+            this.connectRealtime();
           }
-          setTimeout(() => this.ensureMap(order), 200);
-        } else {
-          this.destroyMap();
         }
       }
     });

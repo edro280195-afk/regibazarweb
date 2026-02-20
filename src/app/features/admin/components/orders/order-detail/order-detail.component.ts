@@ -135,6 +135,7 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
               <h3 class="section-title">🎀 Estatus</h3>
               <div class="status-pills">
                 <button class="status-btn" [class.active]="editData.status === 'Pending'"   (click)="editData.status = 'Pending'; markDirty()">⏳ Pendiente</button>
+                <button class="status-btn" [class.active]="editData.status === 'Shipped'"   (click)="editData.status = 'Shipped'; markDirty()">📦 Enviado</button>
                 <button class="status-btn" [class.active]="editData.status === 'Delivered'" (click)="editData.status = 'Delivered'; markDirty()">💝 Entregado</button>
                 <button class="status-btn" [class.active]="editData.status === 'Canceled'"  (click)="editData.status = 'Canceled'; markDirty()">🚫 Cancelado</button>
                 <button class="status-btn" [class.active]="editData.status === 'Postponed'" (click)="editData.status = 'Postponed'; markDirty()">📅 Posponer</button>
@@ -382,7 +383,10 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
     }
     .status-pill[data-status="Pending"]   { background: #fffbeb; color: #d97706; }
     .status-pill[data-status="InRoute"]   { background: #eff6ff; color: #2563eb; }
+    .status-pill[data-status="Shipped"]   { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
     .status-pill[data-status="Delivered"] { background: #f0fdf4; color: #16a34a; }
+    .status-pill[data-status="Canceled"]  { background: #fef2f2; color: #dc2626; }
+    .status-pill[data-status="Postponed"] { background: #faf5ff; color: #9333ea; }
     .status-pill[data-status="Canceled"]  { background: #fef2f2; color: #dc2626; }
     .status-pill[data-status="Postponed"] { background: #faf5ff; color: #9333ea; }
 

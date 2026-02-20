@@ -17,8 +17,9 @@ export class SignalRService {
   locationUpdate$ = new Subject<LocationUpdate>();
   deliveryUpdate$ = new Subject<any>();
   routeCompleted$ = new Subject<any>();
+  orderConfirmed$ = new Subject<{ orderId: number, clientName: string, newStatus: string }>();
 
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService) { }
 
   async connect(): Promise<void> {
     if (this.connection?.state === signalR.HubConnectionState.Connected) return;
@@ -56,7 +57,12 @@ export class SignalRService {
       this.routeCompleted$.next(data);
     });
 
+    this.connection.on('OrderConfirmed', (data: any) => {
+      this.orderConfirmed$.next(data);
+    });
+
     await this.connection.start();
+    this.joinAdminGroup();
   }
 
   async connectPublic(): Promise<void> {
@@ -86,6 +92,11 @@ export class SignalRService {
     await this.connection?.invoke('JoinAdmin');
   }
 
+  async joinAdminGroup(): Promise<void> {
+    console.log('Joining Admin Group...');
+    await this.connection?.invoke('JoinAdminGroup');
+  }
+
   async joinRoute(driverToken: string): Promise<void> {
     await this.connection?.invoke('JoinRoute', driverToken);
   }
@@ -95,3 +106,4 @@ export class SignalRService {
     this.connection = null;
   }
 }
+

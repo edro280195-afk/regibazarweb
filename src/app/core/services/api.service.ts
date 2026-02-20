@@ -200,6 +200,10 @@ export class ApiService {
     return this.http.get<ClientOrderView>(`${this.url}/pedido/${accessToken}`);
   }
 
+  confirmClientOrder(accessToken: string): Observable<any> {
+    return this.http.post(`${this.url}/pedido/${accessToken}/confirm`, {});
+  }
+
   // ═══════════════════════════════════════════
   //  SUPPLIERS & INVESTMENTS
   // ═══════════════════════════════════════════

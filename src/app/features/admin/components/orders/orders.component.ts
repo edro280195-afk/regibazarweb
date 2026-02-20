@@ -8,6 +8,8 @@ import { WhatsAppService } from '../../../../core/services/whatsapp.service';
 import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/models/models';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
 import { GoogleAutocompleteDirective } from '../../../../shared/directives/google-autocomplete.directive';
+import { SignalRService } from '../../../../core/services/signalr.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-orders',
@@ -86,6 +88,7 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
                 <label class="field-label">🎀 Estatus del Pedido</label>
                 <div class="status-pills-selector">
                   <button class="status-pill-btn" [class.active]="editData.status === 'Pending'"   (click)="editData.status = 'Pending'">⏳ Pendiente</button>
+                  <button class="status-pill-btn" [class.active]="editData.status === 'Shipped'"   (click)="editData.status = 'Shipped'">📦 Enviado</button>
                   <button class="status-pill-btn" [class.active]="editData.status === 'Delivered'" (click)="editData.status = 'Delivered'">💝 Entregado</button>
                   <button class="status-pill-btn" [class.active]="editData.status === 'Canceled'"  (click)="editData.status = 'Canceled'">🚫 Cancelado</button>
                   <button class="status-pill-btn" [class.active]="editData.status === 'Postponed'" (click)="editData.status = 'Postponed'">📅 Posponer</button>
@@ -329,6 +332,7 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
             <option value="">Todos</option>
             <option value="Pending">⏳ Pendientes</option>
             <option value="InRoute">🚗 En ruta</option>
+            <option value="Shipped">📦 Enviado</option>
             <option value="Delivered">💝 Entregados</option>
             <option value="Postponed">📅 Pospuestos</option>
             <option value="PaymentPending" style="font-weight: 800; color: #db2777;">💸 Por Cobrar</option>
@@ -340,8 +344,6 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
             <option value="Nueva">🌱 Nueva</option>
             <option value="Frecuente">💎 Frecuente</option>
           </select>
-
-          
 
           <div class="search-box">
             <span class="search-icon">🔍</span>
@@ -531,6 +533,7 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
                     <button class="action-btn pay" (click)="$event.stopPropagation(); openConfirmPayment(order)" title="Confirmar Cobro">💰</button>
                 }
                 <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.link)" title="Copiar Link">📋</button>
+                <button class="action-btn edit" (click)="$event.stopPropagation(); openEditModal(order)" title="Editar">✏️</button>
                 <button class="action-btn delete" (click)="$event.stopPropagation(); askDeleteOrder(order)" title="Eliminar">🗑️</button>
                 <span class="action-arrow" title="Ver detalle">→</span>
               </div>
@@ -1188,9 +1191,11 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
       transition: transform 0.2s;
     }
     .btn-icon-mini:hover { transform: scale(1.1); }
-    .btn-icon-mini.edit { background: #e0f2fe; color: #0284c7; }
-    .btn-icon-mini.delete { background: #fee2e2; color: #ef4444; }
-    .btn-icon-mini.delete { background: #fee2e2; color: #ef4444; }
+    /* Status Pills */
+    .status-pill[data-status="Pending"]   { background: #fffbeb; color: #d97706; }
+    .status-pill[data-status="InRoute"]   { background: #eff6ff; color: #2563eb; }
+    .status-pill[data-status="Shipped"]   { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
+    .status-pill[data-status="Delivered"] { background: #f0fdf4; color: #16a34a; }
     
     .whatsapp-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
     .btn-wa { flex: 1; padding: 0.5rem; border: 1px solid #25D366; background: #dcfce7; color: #15803d; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.8rem; }
@@ -1294,15 +1299,31 @@ export class OrdersComponent implements OnInit {
     return this.selectedOrdersList().reduce((sum, o) => sum + o.total, 0);
   });
 
+  private orderSub?: Subscription;
+
   constructor(
     private api: ApiService,
     private confirm: ConfirmationService,
     private whatsapp: WhatsAppService,
-    private router: Router
+    private router: Router,
+    private signalr: SignalRService
   ) { }
 
   ngOnInit(): void {
     this.loadOrders();
+
+    // SignalR Notification
+    this.orderSub = this.signalr.orderConfirmed$.subscribe(data => {
+      this.showToast(`¡${data.clientName} acaba de confirmar su pedido! ✨`);
+      // Update local state
+      this.orders.update(current =>
+        current.map(o => o.id === data.orderId ? { ...o, status: data.newStatus } : o)
+      );
+    });
+  }
+
+  ngOnDestroy() {
+    this.orderSub?.unsubscribe();
   }
 
   // ═══════════════ DATA ═══════════════
@@ -1404,7 +1425,7 @@ export class OrdersComponent implements OnInit {
 
   // ═══════════════ EDIT MODAL ═══════════════
 
-  openEdit(order: OrderSummary): void {
+  openEditModal(order: OrderSummary): void {
     this.orderToEdit.set(order);
     this.editData = {
       status: order.status,

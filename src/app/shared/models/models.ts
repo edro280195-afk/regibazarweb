@@ -168,7 +168,7 @@ export interface Client {
   longitude?: number;
   orderCount: number;
   tag?: string;
-  clientType?: 'Nueva' | 'Frecuente'; // [NEW]
+  Type?: 'Nueva' | 'Frecuente'; // [NEW]
   totalSpent?: number;
   ordersCount?: number; // Some endpoints might return this aliases
 }

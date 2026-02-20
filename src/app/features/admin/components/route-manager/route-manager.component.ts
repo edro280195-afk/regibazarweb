@@ -2,16 +2,28 @@ import { Component, OnInit, signal, OnDestroy, ViewChild, ElementRef } from '@an
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../../../core/services/api.service';
 import { WhatsAppService } from '../../../../core/services/whatsapp.service';
-import { DeliveryRoute, ChatMessage } from '../../../../shared/models/models';
+import { DeliveryRoute, ChatMessage, RouteDelivery } from '../../../../shared/models/models';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
-import * as L from 'leaflet';
+import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
+import { environment } from '../../../../../environments/environment';
+
+// ─── CONFIG ────────────────────────────────────────────────────
+const GEOCODE_CONFIG = {
+  googleApiKey: environment.googleMapsApiKey || '',
+  city: 'Nuevo Laredo',
+  state: 'Tamaulipas',
+  country: 'Mexico',
+  defaultLat: 27.4861,
+  defaultLng: -99.5069,
+};
+// ────────────────────────────────────────────────────────────────
 
 @Component({
   selector: 'app-route-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, GoogleMapsModule],
   template: `
     <div class="routes-page">
       
@@ -19,19 +31,17 @@ import { FormsModule } from '@angular/forms';
         <div class="toast-notification">{{ toastMessage() }}</div>
       }
 
-
-
       <div class="page-header">
         <div>
-                    <h2>Mis Rutas 🚗</h2>
+          <h2>Mis Rutas 🚗</h2>
           <p class="page-sub">Monitorea tus entregas en tiempo real, bonita</p>
         </div>
-                <button class="btn-refresh" (click)="loadRoutes()" title="Actualizar">🔄</button>
+        <button class="btn-refresh" (click)="loadRoutes()" title="Actualizar">🔄</button>
       </div>
 
       @if (loading() && routes().length === 0) {
         <div class="loading-state">
-                    <div class="spinner">🎀</div>
+          <div class="spinner">🎀</div>
           <p>Cargando rutas...</p>
         </div>
       }
@@ -61,14 +71,14 @@ import { FormsModule } from '@angular/forms';
                   {{ route.status === 'Pending' ? '⏳ Pendiente' : route.status === 'Active' ? '🚀 En camino' : '✅ Finalizada' }}
                 </span>
                 <button class="btn-icon" (click)="openMap(route)" title="Ver Mapa en Vivo">🗺️</button>
-                                <button class="btn-delete" (click)="askDelete(route)" title="Cancelar ruta">🗑️</button>
+                <button class="btn-delete" (click)="askDelete(route)" title="Cancelar ruta">🗑️</button>
               </div>
             </div>
 
             <div class="route-progress">
               <div class="progress-labels">
                 <span>Progreso</span>
-                                <span>{{ getDelivered(route) }}/{{ route.deliveries.length }} entregas 🎁</span>
+                <span>{{ getDelivered(route) }}/{{ route.deliveries.length }} entregas 🎁</span>
               </div>
               <div class="progress-track">
                 <div class="progress-fill" [style.width.%]="getProgress(route)"></div>
@@ -76,7 +86,7 @@ import { FormsModule } from '@angular/forms';
             </div>
 
             <div class="driver-link-section">
-                            <span class="label">🔗 Link para el chofer:</span>
+              <span class="label">🔗 Link para el chofer:</span>
               <div class="link-row">
                 <input type="text" [value]="route.driverLink" readonly #linkEl>
                 <button class="btn-copy" (click)="copy(linkEl)">📋 Copiar</button>
@@ -116,6 +126,7 @@ import { FormsModule } from '@angular/forms';
         }
       </div>
 
+      <!-- ═══════════════ MAP MODAL ═══════════════ -->
       @if (showMapModal() && selectedRouteForMap()) {
         <div class="modal-overlay" (click)="closeMap()">
           <div class="modal-card map-card" (click)="$event.stopPropagation()">
@@ -124,7 +135,49 @@ import { FormsModule } from '@angular/forms';
               <p>Ruta #{{ selectedRouteForMap()!.id }}</p>
               <button class="btn-close-map" (click)="closeMap()">✗</button>
             </div>
-            <div class="map-container" #adminMap></div>
+            
+            <div class="map-container">
+               <google-map 
+                height="100%" 
+                width="100%" 
+                [center]="center" 
+                [zoom]="zoom"
+                [options]="mapOptions">
+                
+                <!-- Base / Warehouse Marker -->
+                <map-marker 
+                  [position]="warehousePos" 
+                  [options]="warehouseOptions">
+                </map-marker>
+
+                <!-- Driver Marker -->
+                @if (driverPos) {
+                  <map-marker 
+                    [position]="driverPos" 
+                    [options]="driverOptions">
+                  </map-marker>
+                }
+
+                <!-- Delivery Markers -->
+                @for (d of routeDeliveries; track d.id) {
+                  @if (d.latitude && d.longitude) {
+                    <map-marker 
+                      [position]="{ lat: d.latitude, lng: d.longitude }" 
+                      [options]="getDeliveryMarkerOptions(d)">
+                    </map-marker>
+                  }
+                }
+
+                <!-- Route Polyline (Directions) -->
+                 @if (directionsResult(); as result) {
+                  <map-directions-renderer 
+                    [directions]="result" 
+                    [options]="directionsOptions">
+                  </map-directions-renderer>
+                }
+              </google-map>
+            </div>
+
             <div class="map-footer">
               @if (lastLocationUpdate()) {
                 <span class="live-indicator">
@@ -376,7 +429,7 @@ import { FormsModule } from '@angular/forms';
       font-size: 1.2rem; cursor: pointer; color: #888;
     }
     
-    .map-container { flex: 1; background: #eee; }
+    .map-container { flex: 1; background: #eee; position: relative; }
     
     .map-footer {
       padding: 10px 15px; background: #222; color: white; font-size: 0.85rem;
@@ -449,7 +502,7 @@ import { FormsModule } from '@angular/forms';
   `]
 })
 export class RouteManagerComponent implements OnInit, OnDestroy {
-  @ViewChild('adminMap') mapEl?: ElementRef;
+  @ViewChild(GoogleMap) map!: GoogleMap;
 
   routes = signal<DeliveryRoute[]>([]);
   loading = signal(false);
@@ -466,10 +519,44 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   newMessage = '';
   @ViewChild('chatScroll') chatScroll?: ElementRef;
 
-  private map?: L.Map;
-  private driverMarker?: L.Marker;
-  private markersLayer?: L.LayerGroup;
-  private routeLine?: L.Polyline;
+  // Google Maps Config
+  center: google.maps.LatLngLiteral = { lat: GEOCODE_CONFIG.defaultLat, lng: GEOCODE_CONFIG.defaultLng };
+  zoom = 13;
+  mapOptions: google.maps.MapOptions = {
+    disableDefaultUI: false,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false
+  };
+
+  // Markers
+  warehousePos: google.maps.LatLngLiteral = { lat: 27.4861, lng: -99.5069 }; // Mock warehouse
+  driverPos?: google.maps.LatLngLiteral;
+  routeDeliveries: RouteDelivery[] = [];
+  directionsResult = signal<google.maps.DirectionsResult | undefined>(undefined);
+
+  warehouseOptions: google.maps.MarkerOptions = {
+    label: { text: '🏭', fontSize: '24px' },
+    title: 'Base / Almacén'
+  };
+
+  driverOptions: google.maps.MarkerOptions = {
+    label: { text: '🚚', fontSize: '30px' },
+    title: 'Repartidor',
+    zIndex: 1000
+  };
+
+  directionsOptions: google.maps.DirectionsRendererOptions = {
+    suppressMarkers: true,
+    polylineOptions: {
+      strokeColor: '#ec4899',
+      strokeWeight: 6,
+      strokeOpacity: 0.7
+    }
+  };
+
+  // Helper for geocoding
+  private geocodeCache = new Map<string, { lat: number; lng: number } | null>();
 
   constructor(
     private api: ApiService,
@@ -496,7 +583,6 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.api.getRoutes().subscribe({
       next: (r) => {
-        // Ordenar: Más recientes primero
         r.sort((a, b) => b.id - a.id);
         this.routes.set(r);
         this.loading.set(false);
@@ -535,7 +621,7 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   }
 
   getFailedDeliveries(r: DeliveryRoute): any[] {
-    return r.deliveries.filter(d => d.status === 'NotDelivered'); // Ajustado a tu Enum del API (NotDelivered)
+    return r.deliveries.filter(d => d.status === 'NotDelivered');
   }
 
   copy(el: HTMLInputElement): void {
@@ -544,13 +630,6 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   }
 
   shareRouteWa(route: DeliveryRoute): void {
-    // Assuming we have a driver phone number? 
-    // The route object doesn't have driverPhone in my models?
-    // Let's check. DeliveryRoute has driverName, driverId?
-    // Actually, createRoute returns a Route.
-    // If we don't have driver phone, we might need to prompt or just open generic link.
-    // For now, let's open generic link or prompt user.
-    // Or just use a dummy phone for demo.
     const phone = '8671794003'; // Example
     this.whatsapp.shareRouteWithDriver(phone, route);
   }
@@ -564,137 +643,165 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   openMap(route: DeliveryRoute) {
     this.selectedRouteForMap.set(route);
     this.showMapModal.set(true);
+    this.routeDeliveries = route.deliveries;
+    this.directionsResult.set(undefined);
+    this.driverPos = undefined;
 
-    // Check if we have initial location
-    if (route.driverLocation) {
+    // Initial driver location
+    if (route.driverLocation && route.driverLocation.latitude) {
+      this.driverPos = { lat: route.driverLocation.latitude, lng: route.driverLocation.longitude };
       this.lastLocationUpdate.set(route.driverLocation.lastUpdate);
     }
 
+    // Center map logic
+    if (this.driverPos) {
+      this.center = this.driverPos;
+    } else {
+      this.center = this.warehousePos;
+    }
+
+    // Trigger plotting with slight delay for modal to open
     setTimeout(() => {
-      this.initMap(route);
-    }, 100);
+      this.plotRoute(route);
+    }, 200);
   }
 
   closeMap() {
     this.showMapModal.set(false);
     this.selectedRouteForMap.set(null);
-    if (this.map) {
-      this.map.remove();
-      this.map = undefined;
-    }
   }
 
-  private initMap(route: DeliveryRoute): void {
-    if (!this.mapEl) return;
+  getDeliveryMarkerOptions(d: RouteDelivery): google.maps.MarkerOptions {
+    let color = '#f472b6'; // Default
+    if (d.status === 'InTransit') color = '#3b82f6';
+    else if (d.status === 'Delivered') color = '#22c55e';
+    else if (d.status === 'NotDelivered') color = '#ef4444';
 
-    this.map = L.map(this.mapEl.nativeElement).setView([25.75, -100.3], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OSM'
-    }).addTo(this.map);
-
-    // Fix map render issues in modal
-    setTimeout(() => this.map?.invalidateSize(), 50);
-
-    this.markersLayer = L.layerGroup().addTo(this.map);
-    this.plotRoute(route);
-
-    // Initial driver marker if available
-    if (route.driverLocation) {
-      this.updateDriverMarker(route.driverLocation.latitude, route.driverLocation.longitude);
-    }
+    return {
+      label: {
+        text: d.sortOrder.toString(),
+        color: 'white',
+        fontWeight: 'bold'
+      },
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: 'white',
+        strokeWeight: 2,
+        scale: 10
+      },
+      title: `${d.sortOrder}. ${d.clientName} (${d.status})`
+    };
   }
 
-  private plotRoute(route: DeliveryRoute): void {
-    if (!this.map || !this.markersLayer) return;
+  private async plotRoute(route: DeliveryRoute) {
+    // 1. Prepare Waypoints
+    // Needs Coordinates. If missing, we warn? Or just skip?
+    // We assume route optimizer did its job, but lets be safe.
 
-    // Clear old layers first just in case
-    this.markersLayer.clearLayers();
-    const points: L.LatLngExpression[] = [];
-    const bounds: L.LatLngExpression[] = [];
+    // Sort logic from API should be correct (sortOrder), but lets verify
+    const sortedDeliveries = [...route.deliveries].sort((a, b) => a.sortOrder - b.sortOrder);
 
-    // 🏭 WAREHOUSE / ADMIN LOCATION (Mock)
-    const warehousePos: L.LatLngExpression = [25.686614, -100.316112];
-    bounds.push(warehousePos);
-    points.push(warehousePos);
+    const waypoints: google.maps.DirectionsWaypoint[] = [];
+    const path: google.maps.LatLngLiteral[] = [this.warehousePos];
 
-    const warehouseIcon = L.divIcon({
-      html: `<div style="font-size:24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🏭</div>`,
-      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
+    // Filter valid ones
+    for (const d of sortedDeliveries) {
+      let lat = d.latitude;
+      let lng = d.longitude;
+
+      // Fallback geocoding if needed (optional)
+      if (!lat || !lng) {
+        const coords = await this.geocodeAddress(d.address || d.clientAddress || '');
+        if (coords) {
+          lat = coords.lat;
+          lng = coords.lng;
+        }
+      }
+
+      if (lat && lng) {
+        waypoints.push({ location: { lat, lng }, stopover: true });
+        path.push({ lat, lng });
+        // Update internal model for marker rendering
+        d.latitude = lat;
+        d.longitude = lng;
+      }
+    }
+
+    if (path.length > 1) {
+      this.calculateDirections(this.warehousePos, path[path.length - 1], waypoints.slice(0, -1)); // last is destination
+    }
+
+    // Auto fit bounds
+    setTimeout(() => {
+      if (this.map) {
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(this.warehousePos);
+        path.forEach(p => bounds.extend(p));
+        if (this.driverPos) bounds.extend(this.driverPos);
+        this.map.fitBounds(bounds, 50);
+      }
+    }, 500);
+  }
+
+  private calculateDirections(start: google.maps.LatLngLiteral, end: google.maps.LatLngLiteral, waypoints: google.maps.DirectionsWaypoint[]) {
+    const directionsService = new google.maps.DirectionsService();
+    directionsService.route({
+      origin: start,
+      destination: end,
+      waypoints: waypoints,
+      optimizeWaypoints: false, // Maintain order strictly
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK && result) {
+        this.directionsResult.set(result);
+      } else {
+        console.warn('Google Maps Directions failed', status);
+      }
     });
-    L.marker(warehousePos, { icon: warehouseIcon }).addTo(this.markersLayer)
-      .bindPopup('<b style="color:#db2777; font-family:Quicksand">Base / Almacén</b>');
+  }
 
+  private async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    if (!address) return null;
+    const cacheKey = address.toLowerCase().trim();
+    if (this.geocodeCache.has(cacheKey)) return this.geocodeCache.get(cacheKey) ?? null;
 
+    return new Promise((resolve) => {
+      const geocoder = new google.maps.Geocoder();
+      const fullAddress = `${address}, ${GEOCODE_CONFIG.city}, ${GEOCODE_CONFIG.state}, México`;
 
-    route.deliveries.forEach(d => {
-      if (!d.latitude || !d.longitude) return;
-      const pos: L.LatLngExpression = [d.latitude, d.longitude];
-      bounds.push(pos);
-      if (d.status !== 'Delivered' && d.status !== 'NotDelivered') points.push(pos);
-
-      // Marker logic — Coquette Colors 🌸
-      let bgColor = '#f472b6'; // Default Pink-400
-      if (d.status === 'InTransit') bgColor = '#3b82f6'; // Keep Blue
-      else if (d.status === 'Delivered') bgColor = '#22c55e'; // Green-500
-      else if (d.status === 'NotDelivered') bgColor = '#ef4444'; // Red-500
-
-      const icon = L.divIcon({
-        html: `<div style="background:${bgColor};width:28px;height:28px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:white;box-shadow:0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s;">${d.sortOrder}</div>`,
-        iconSize: [28, 28], iconAnchor: [14, 14]
+      geocoder.geocode({ address: fullAddress }, (results, status) => {
+        if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+          const res = {
+            lat: results[0].geometry.location.lat(),
+            lng: results[0].geometry.location.lng()
+          };
+          this.geocodeCache.set(cacheKey, res);
+          resolve(res);
+        } else {
+          resolve(null);
+        }
       });
-
-      L.marker(pos, { icon }).addTo(this.markersLayer!).bindPopup(
-        `<div style="font-family:'Quicksand',sans-serif; text-align:center;">
-           <b style="color:#db2777; font-size:1.1em;">${d.clientName}</b><br>
-           <span style="color:#666; font-size:0.9em;">${d.address || 'Sin dirección'}</span>
-         </div>`
-      );
     });
-
-    if (points.length >= 2) {
-      this.routeLine = L.polyline(points, { color: '#ec4899', weight: 5, opacity: 0.7, dashArray: '12, 12', lineCap: 'round' }).addTo(this.map);
-    }
-
-    if (bounds.length > 0) {
-      this.map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
-    }
-  }
-
-  private updateDriverMarker(lat: number, lng: number) {
-    if (!this.map) return;
-
-    const icon = L.divIcon({
-      html: `<div style="font-size:24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🚚</div>`, // Truck icon
-      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
-    });
-
-    if (!this.driverMarker) {
-      this.driverMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(this.map);
-    } else {
-      this.driverMarker.setLatLng([lat, lng]);
-    }
-    this.map.panTo([lat, lng]);
   }
 
   private handleLocationUpdate(loc: any) {
     const currentRoute = this.selectedRouteForMap();
     if (!currentRoute || !this.showMapModal()) return;
 
-    // Assuming backend sends routeId or we match by active driver?
-    // User said "Update map marker position".
-    // For now we assume if a location comes in, it's for the currently viewed map if relevant.
-    // Ideally check loc.routeId === currentRoute.id
-
     if (loc.latitude && loc.longitude) {
-      this.updateDriverMarker(loc.latitude, loc.longitude);
+      this.driverPos = { lat: loc.latitude, lng: loc.longitude };
       this.lastLocationUpdate.set(new Date().toISOString());
+
+      // Optional: Pan map to driver if tracking?
+      // this.map.panTo(this.driverPos);
     }
   }
 
   // ═══ CHAT LOGIC ═══
   openChat(route: DeliveryRoute) {
     this.chatRoute.set(route);
-    // Load mock messages for this route
     this.activeMessages.set([
       { id: 1, routeId: route.id, sender: 'Driver', text: 'Ya voy en camino a la primera entrega 🛵', timestamp: new Date().toISOString(), read: true },
       { id: 2, routeId: route.id, sender: 'Admin', text: 'Excelente, avísame cualquier cosa', timestamp: new Date().toISOString(), read: true }
@@ -722,7 +829,6 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     this.newMessage = '';
     setTimeout(() => this.scrollToBottom(), 50);
 
-    // Mock Driver Reply
     setTimeout(() => {
       const reply: ChatMessage = {
         id: Date.now() + 1,
