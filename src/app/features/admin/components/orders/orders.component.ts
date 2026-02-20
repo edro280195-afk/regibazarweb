@@ -1387,7 +1387,6 @@ export class OrdersComponent implements OnInit {
       // Opcional: this.selectedIds.set(new Set());
       // Dejémoslo activo por si se arrepiente, pero el dock se ocultará si condicionamos al modo
     }
-    this.showOptimizer.set(true);
   }
 
   createRoute(): void {
