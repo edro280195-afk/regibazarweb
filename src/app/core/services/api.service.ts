@@ -102,8 +102,9 @@ export class ApiService {
   // ═══════════════════════════════════════════
   //  ROUTES (ADMIN)
   // ═══════════════════════════════════════════
-  createRoute(orderIds: number[]): Observable<DeliveryRoute> {
-    return this.http.post<DeliveryRoute>(`${this.url}/routes`, { orderIds });
+  createRoute(data: any): Observable<DeliveryRoute> {
+    // data can be number[] (old) or { orders: [...] } (new)
+    return this.http.post<DeliveryRoute>(`${this.url}/routes`, data);
   }
 
   getRoutes(): Observable<DeliveryRoute[]> {

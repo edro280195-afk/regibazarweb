@@ -19,6 +19,7 @@ export interface RegisterRequest {
 // ── Orders ──
 export interface OrderSummary {
   id: number;
+  clientId?: number;
   clientName: string;
   clientType?: 'Nueva' | 'Frecuente'; // 'Nueva' | 'Frecuente'
   clientPhone?: string;

@@ -22,7 +22,7 @@ import { Client } from '../../../../shared/models/models';
         </div>
         <div class="search-box">
           <span class="search-icon">🔍</span>
-          <input type="text" [(ngModel)]="searchTerm" placeholder="Buscar por nombre...">
+          <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Buscar por nombre...">
         </div>
 
         <div class="actions-header">
@@ -58,6 +58,11 @@ import { Client } from '../../../../shared/models/models';
                 <span class="tag-badge" [attr.data-tag]="client.tag">
                   {{ getTagLabel(client.tag || 'None') }}
                 </span>
+
+                <div class="contact-info">
+                   <p class="u-phone">📞 {{ client.phone || 'Sin teléfono' }}</p>
+                   <p class="u-addr">📍 {{ client.address || 'Sin dirección' }}</p>
+                </div>
               </div>
             </div>
 
@@ -184,6 +189,10 @@ import { Client } from '../../../../shared/models/models';
       .info { flex: 1; overflow: hidden; }
       .name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
       .info h3 { margin: 0; font-size: 1.1rem; color: var(--text-dark); }
+
+      .contact-info { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+      .u-phone, .u-addr { margin: 0; font-size: 0.75rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .u-phone { color: var(--pink-500); font-weight: 600; }
     
     .client-type-badge {
         font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 800; text-transform: uppercase;
@@ -248,7 +257,7 @@ import { Client } from '../../../../shared/models/models';
 })
 export class ClientsComponent implements OnInit {
   allClients = signal<Client[]>([]);
-  searchTerm = '';
+  searchTerm = signal('');
   toastMessage = signal('');
 
   constructor(
@@ -266,11 +275,13 @@ export class ClientsComponent implements OnInit {
 
   // Filtrado computado
   filteredClients = computed(() => {
-    const term = this.searchTerm.toLowerCase();
-    return this.allClients().filter(c =>
+    const term = this.searchTerm().toLowerCase();
+    const list = this.allClients().filter(c =>
       c.name.toLowerCase().includes(term) ||
       (c.phone && c.phone.includes(term))
     );
+    // Alfa Sort
+    return list.sort((a, b) => a.name.localeCompare(b.name));
   });
 
   isFrecuente(client: Client): boolean {

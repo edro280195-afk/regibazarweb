@@ -118,18 +118,6 @@ import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/
                <h3>📈 Ventas vs Inversión</h3>
                <div echarts [options]="salesVsInvOptions" class="chart-container"></div>
              </div>
-             
-             <!-- Chart 2: Top Products (NEW) -->
-             <div class="chart-card">
-               <h3>💄 Top Productos</h3>
-               <div echarts [options]="topProductsOptions" class="chart-container"></div>
-             </div>
-
-             <!-- Chart 3: Top Clients -->
-             <div class="chart-card">
-               <h3>👑 Top Clientas</h3>
-               <div echarts [options]="topClientsOptions" class="chart-container"></div>
-             </div>
 
              <!-- Chart 4: Client Types (Pie) -->
              <div class="chart-card">
@@ -410,11 +398,10 @@ export class DashboardComponent implements OnInit {
   });
 
   // Chart Options
+  // Chart Options
   salesVsInvOptions: any;
-  topClientsOptions: any;
   clientTypeOptions: any;
   deliveryMethodOptions: any;
-  topProductsOptions: any;
 
   constructor(private api: ApiService) { }
 
@@ -568,37 +555,21 @@ export class DashboardComponent implements OnInit {
       ]
     };
 
-    // ── 2. Top Clients (by Order Count) ──
-    const sortedClients = [...clients]
-      .sort((a, b) => b.orderCount - a.orderCount)
-      .slice(0, 5);
+    // ── 3. Client Types (by Tag -> Nueva vs Frecuente) ──
+    let countNueva = 0;
+    let countFrecuente = 0;
 
-    this.topClientsOptions = {
-      ...this.topClientsOptions,
-      yAxis: { ...this.topClientsOptions.yAxis, data: sortedClients.map(c => c.name) },
-      series: [{
-        ...this.topClientsOptions.series[0],
-        data: sortedClients.map(c => c.orderCount)
-      }]
-    };
+    clients.forEach(c => {
+      // Logic: Frecuente if orders > 1 OR explicitly tagged
+      const isFrecuente = (c.orderCount > 1) || ((c as any).ordersCount || 0) > 1 || c.clientType === 'Frecuente';
+      if (isFrecuente) countFrecuente++;
+      else countNueva++;
+    });
 
-    // ── 3. Client Types (by Tag) ──
-    const clientTypes = clients.reduce((acc, c) => {
-      // Assuming 'tag' exists or infer it. If 'tag' is missing, fallback to 'None'
-      const tag = (c as any).tag || 'None';
-      acc[tag] = (acc[tag] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Map tags to user-friendly names
-    const typeMap: Record<string, string> = {
-      'None': '✨ Normal', 'Frequent': '🔥 Frecuente', 'New': '🌱 Nueva', 'Problematic': '⚠️ Cuidado'
-    };
-
-    const typeData = Object.keys(clientTypes).map(key => ({
-      name: typeMap[key] || key,
-      value: clientTypes[key]
-    }));
+    const typeData = [
+      { name: '🌱 Nueva', value: countNueva },
+      { name: '🔥 Frecuente', value: countFrecuente }
+    ];
 
     this.clientTypeOptions = {
       ...this.clientTypeOptions,
@@ -624,21 +595,6 @@ export class DashboardComponent implements OnInit {
       series: [{ ...this.deliveryMethodOptions.series[0], data: methodData }]
     };
 
-    // ── 5. Top Products (NEW) ──
-    const sortedProducts = Object.entries(productCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
-    this.topProductsOptions = {
-      ...this.topClientsOptions, // Reuse style from top clients
-      yAxis: { ...this.topClientsOptions.yAxis, data: sortedProducts.map(p => p[0]) },
-      series: [{
-        ...this.topClientsOptions.series[0],
-        name: 'Unidades',
-        itemStyle: { color: '#FF85B3', borderRadius: [0, 20, 20, 0] },
-        data: sortedProducts.map(p => p[1])
-      }]
-    };
   }
 
   initCharts() {
@@ -674,20 +630,6 @@ export class DashboardComponent implements OnInit {
       ]
     };
 
-    this.topClientsOptions = {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: { type: 'value', splitLine: { show: false } },
-      yAxis: { type: 'category', data: [], axisTick: { show: false }, axisLine: { show: false } },
-      series: [
-        {
-          name: 'Compras', type: 'bar',
-          data: [],
-          itemStyle: { color: '#B37FEB', borderRadius: [0, 20, 20, 0] },
-          barWidth: '50%'
-        }
-      ]
-    };
 
     // (Code continues for other charts...)
     this.clientTypeOptions = {

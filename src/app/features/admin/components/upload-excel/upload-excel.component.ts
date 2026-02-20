@@ -210,7 +210,8 @@ function normalizeForMatch(text: string): string {
                 </div>
               }
               <button class="btn-pink wide" (click)="createManual()" [disabled]="uploading() || manualItems.length === 0">
-                💖 Crear pedido ({{ manualOrderType === 'PickUp' ? 'Pick Up' : 'Domicilio' }})
+                @if (uploading()) { <span class="spinner"></span> Guardando... 🌸 }
+                @else { 💖 Crear pedido ({{ manualOrderType === 'PickUp' ? 'Pick Up' : 'Domicilio' }}) }
               </button>
             </div>
           </div>

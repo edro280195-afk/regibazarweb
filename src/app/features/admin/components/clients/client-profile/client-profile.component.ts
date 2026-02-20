@@ -6,11 +6,12 @@ import { ApiService } from '../../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../../core/services/confirmation.service';
 import { Client, OrderSummary, LoyaltySummary, LoyaltyTransaction } from '../../../../../shared/models/models';
 import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
+import { GoogleAutocompleteDirective } from '../../../../../shared/directives/google-autocomplete.directive';
 
 @Component({
   selector: 'app-client-profile',
   standalone: true,
-  imports: [CommonModule, RouterModule, NgxEchartsDirective, FormsModule],
+  imports: [CommonModule, RouterModule, NgxEchartsDirective, FormsModule, GoogleAutocompleteDirective],
   providers: [
     provideEcharts(),
     ConfirmationService
@@ -40,6 +41,11 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
                     <option value="VIP">VIP 👑</option>
                     <option value="Blacklist">Blacklist 🚫</option>
                  </select>
+                 <select [(ngModel)]="editForm.clientType" class="select-tag">
+                    <option value="Nueva">Nueva 🌱</option>
+                    <option value="Frecuente">Frecuente 💎</option>
+                 </select>
+                 <input type="number" [(ngModel)]="editForm.totalSpent" class="input-money" placeholder="$">
                } @else {
                  <span class="badge-tag" [attr.data-tag]="client()?.tag">{{ client()?.tag || 'Nuevo' }}</span>
                }
@@ -101,7 +107,13 @@ import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
                 </div>
                 <div class="form-group">
                   <label>Dirección</label>
-                  <textarea [(ngModel)]="editForm.address" placeholder="Ej. Calle 123..." class="input-field" rows="3"></textarea>
+                  <textarea 
+                    appGoogleAutocomplete
+                    (onAddressChange)="handleAddressChange($event)"
+                    [(ngModel)]="editForm.address" 
+                    placeholder="Ej. Calle 123..." 
+                    class="input-field" 
+                    rows="3"></textarea>
                 </div>
                 
                 <div class="delete-section">
@@ -431,7 +443,14 @@ export class ClientProfileComponent implements OnInit {
 
   // EDIT STATE
   isEditing = signal(false);
-  editForm = { name: '', phone: '', address: '', tag: '' };
+  editForm = { name: '', phone: '', address: '', tag: '', clientType: '', totalSpent: 0, latitude: 0, longitude: 0 };
+
+  handleAddressChange(place: any) {
+    this.editForm.address = place.address;
+    this.editForm.latitude = place.lat;
+    this.editForm.longitude = place.lng;
+  }
+
 
   constructor(
     private route: ActivatedRoute,
@@ -547,7 +566,11 @@ export class ClientProfileComponent implements OnInit {
         name: c.name,
         phone: c.phone || '',
         address: c.address || '',
-        tag: c.tag || 'None'
+        tag: c.tag || 'None',
+        clientType: c.clientType || 'Nueva',
+        totalSpent: c.totalSpent || 0,
+        latitude: c.latitude || 0,
+        longitude: c.longitude || 0
       };
     }
     this.isEditing.update(v => !v);

@@ -7,11 +7,12 @@ import { ConfirmationService } from '../../../../core/services/confirmation.serv
 import { WhatsAppService } from '../../../../core/services/whatsapp.service';
 import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/models/models';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
+import { GoogleAutocompleteDirective } from '../../../../shared/directives/google-autocomplete.directive';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouteOptimizerComponent],
+  imports: [CommonModule, FormsModule, RouteOptimizerComponent, GoogleAutocompleteDirective],
   template: `
     <div class="orders-page">
       
@@ -45,7 +46,14 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
               <div class="edit-section">
                 <label class="field-label">👤 Cliente</label>
                 <input type="text" [(ngModel)]="editData.clientName" placeholder="Nombre" class="fancy-input">
-                <input type="text" [(ngModel)]="editData.clientAddress" placeholder="Dirección" class="fancy-input" style="margin-top: 5px">
+                <input 
+                  type="text" 
+                  appGoogleAutocomplete
+                  (onAddressChange)="handleAddressChange($event)"
+                  [(ngModel)]="editData.clientAddress" 
+                  placeholder="Dirección" 
+                  class="fancy-input" 
+                  style="margin-top: 5px">
                 <input type="text" [(ngModel)]="editData.clientPhone" placeholder="Teléfono" class="fancy-input" style="margin-top: 5px">
               </div>
 
@@ -1358,6 +1366,7 @@ export class OrdersComponent implements OnInit {
       // Opcional: this.selectedIds.set(new Set());
       // Dejémoslo activo por si se arrepiente, pero el dock se ocultará si condicionamos al modo
     }
+    this.showOptimizer.set(true);
   }
 
   createRoute(): void {
@@ -1365,22 +1374,30 @@ export class OrdersComponent implements OnInit {
     this.showOptimizer.set(true);
   }
 
+  // ── ROUTE OPTIMIZER HANDLER ──
   handleRouteConfirmed(sortedOrders: OrderSummary[]) {
     this.showOptimizer.set(false);
     this.loading.set(true);
 
-    const ids = sortedOrders.map(o => o.id);
-    this.api.createRoute(ids).subscribe({
-      next: (route) => {
-        this.routeCreated.set(route);
+    const payload = {
+      orderIds: sortedOrders.map(o => o.id)
+    };
+
+    console.log('🚀 Creating Route Payload (Fixed):', JSON.stringify(payload, null, 2));
+
+    this.api.createRoute(payload).subscribe({
+      next: (res) => {
+        this.loading.set(false);
+        this.routeCreated.set(res);
+        this.loadOrders(); // Refresh status
         this.selectedIds.set(new Set());
-        this.loadOrders();
-        this.showToast('¡Ruta creada con éxito! 🚗💨');
-        this.loading.set(false);
+        this.selectionMode.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.showToast('Error al crear ruta 😿', true);
+        console.error('❌ Route Create Error:', err);
+        // CORS often hides details, but let's see.
+        this.showToast('Error al crear ruta. Revisa consola.');
       }
     });
   }
@@ -1401,6 +1418,14 @@ export class OrdersComponent implements OnInit {
       deliveryTime: order.deliveryTime || '',
       pickupDate: order.pickupDate || ''
     };
+    this.tempGeo = null; // Reset temp geo
+  }
+
+  tempGeo: { lat: number, lng: number } | null = null;
+
+  handleAddressChange(place: any) {
+    this.editData.clientAddress = place.address;
+    this.tempGeo = { lat: place.lat, lng: place.lng };
   }
 
   toggleTag(tag: string) {
@@ -1416,6 +1441,15 @@ export class OrdersComponent implements OnInit {
   saveEdit(): void {
     const order = this.orderToEdit();
     if (!order) return;
+
+    // Save Client Geo if new address selected
+    if (this.tempGeo && order.clientId) {
+      this.api.updateClient(order.clientId, {
+        latitude: this.tempGeo.lat,
+        longitude: this.tempGeo.lng,
+        address: this.editData.clientAddress // Also ensure client address is synced
+      }).subscribe();
+    }
 
     const payload = {
       status: this.editData.status,

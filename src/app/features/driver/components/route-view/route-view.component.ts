@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
-import { DeliveryRoute, RouteDelivery, ChatMessage } from '../../../../shared/models/models';
-import * as L from 'leaflet';
+import { DeliveryRoute, RouteDelivery, ChatMessage, DriverLocation } from '../../../../shared/models/models';
+
+declare var google: any;
 
 @Component({
   selector: 'app-route-view',
@@ -836,10 +837,10 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   ];
 
   private token = '';
-  private map?: L.Map;
-  private driverMarker?: L.Marker;
-  private markersLayer?: L.LayerGroup;
-  private routeLine?: L.Polyline;
+  private map: any; // Google Maps Map
+  private driverMarker: any; // Google Maps Marker
+  private markers: any[] = []; // Array of markers
+  private routePath: any; // Google Maps Polyline
   private watchId?: number;
   private updateInterval?: any;
   private lastLat = 0;
@@ -1023,109 +1024,171 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
   // ═══ MAP ═══
 
+  // ═══ MAP ═══
+
   private initMap(route: DeliveryRoute): void {
     if (!this.mapEl) return;
 
     if (this.map) {
-      this.map.remove();
+      this.markers.forEach(m => m.setMap(null));
+      this.markers = [];
+      if (this.driverMarker) this.driverMarker.setMap(null);
+      if (this.routePath) this.routePath.setMap(null);
+      // Map instance is reused or re-created? Better to re-create to be safe with DOM refs
       this.map = undefined;
-      // CRITICAL FIX: Reset markers so they are recreated on the new map instance
-      this.driverMarker = undefined;
-      this.markersLayer = undefined;
-      this.routeLine = undefined;
     }
 
-    this.map = L.map(this.mapEl.nativeElement).setView([25.75, -100.3], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OSM'
-    }).addTo(this.map);
+    const mapOptions = {
+      center: { lat: 25.75, lng: -100.3 },
+      zoom: 12,
+      disableDefaultUI: false,
+      zoomControl: true,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      styles: [
+        { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+        { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
+        { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#bdbdbd" }] },
+        { featureType: "poi", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
+        { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+        { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+        { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+        { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+        { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+        { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#dadada" }] },
+        { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+        { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+        { featureType: "transit.line", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+        { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
+        { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
+        { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] }
+      ]
+    };
 
-    this.markersLayer = L.layerGroup().addTo(this.map);
+    this.map = new google.maps.Map(this.mapEl.nativeElement, mapOptions);
+
     this.plotRoute(route);
 
-    // Try to locate user immediately to fix "always same place"
-    this.map.locate({ setView: true, maxZoom: 16 });
-    this.map.on('locationfound', (e) => {
-      // Location found, update driver marker if not started
-      if (!this.gpsActive()) {
-        this.lastLat = e.latlng.lat;
-        this.lastLng = e.latlng.lng;
-        this.updateDriverMarker(e.latlng.lat, e.latlng.lng);
-      }
-    });
+    // Try to locate user
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        if (!this.gpsActive()) {
+          this.lastLat = pos.coords.latitude;
+          this.lastLng = pos.coords.longitude;
+          this.updateDriverMarker(this.lastLat, this.lastLng);
+        }
+      });
+    }
   }
 
   private plotRoute(route: DeliveryRoute): void {
-    if (!this.map || !this.markersLayer) return;
-    this.markersLayer.clearLayers();
-    if (this.routeLine) {
-      this.map.removeLayer(this.routeLine);
-    }
+    if (!this.map) return;
 
-    const points: L.LatLngExpression[] = [];
-    const bounds: L.LatLngExpression[] = [];
+    // Clear existing
+    this.markers.forEach(m => m.setMap(null));
+    this.markers = [];
+    if (this.routePath) this.routePath.setMap(null);
+
+    const points: any[] = [];
+    const bounds = new google.maps.LatLngBounds();
 
     route.deliveries.forEach(d => {
       if (!d.latitude || !d.longitude) return;
-      const pos: L.LatLngExpression = [d.latitude, d.longitude];
-      bounds.push(pos);
+
+      const pos = { lat: d.latitude, lng: d.longitude };
+      bounds.extend(pos);
 
       // Only include non-completed in route line
       if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {
         points.push(pos);
       }
 
-      // Colored numbered marker
-      let bgColor = '#FF9DBF'; // Pending - pink soft
-      let textColor = '#fff';
-      if (d.status === 'InTransit') { bgColor = '#3B82F6'; } // Blue
-      else if (d.status === 'Delivered') { bgColor = '#34D399'; } // Green
-      else if (d.status === 'NotDelivered') { bgColor = '#F87171'; } // Red
+      // Marker Icon
+      let iconColor = 'FF9DBF'; // Pink
+      if (d.status === 'InTransit') iconColor = '3B82F6'; // Blue
+      else if (d.status === 'Delivered') iconColor = '34D399'; // Green
+      else if (d.status === 'NotDelivered') iconColor = 'F87171'; // Red
 
-      const icon = L.divIcon({
-        html: `<div style="
-          background:${bgColor}; color:${textColor};
-          width:28px; height:28px; border-radius:50%;
-          display:flex; align-items:center; justify-content:center;
-          font-weight:800; font-size:12px;
-          border:2.5px solid white;
-          box-shadow:0 2px 8px rgba(0,0,0,0.2);
-          ${d.status === 'InTransit' ? 'animation:pulse 1.5s infinite;' : ''}
-        ">${d.sortOrder}</div>
-        ${d.status === 'InTransit' ? '<style>@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,0.4)}50%{box-shadow:0 0 0 8px rgba(59,130,246,0)}}</style>' : ''}`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        className: ''
+      // Use Google Chart API for numbered markers or custom SVG
+      // Simple circle with number
+      const marker = new google.maps.Marker({
+        position: pos,
+        map: this.map,
+        label: {
+          text: d.sortOrder.toString(),
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '12px'
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 14,
+          fillColor: '#' + iconColor,
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2,
+        },
+        title: d.clientName
       });
 
-      const marker = L.marker(pos, { icon }).addTo(this.markersLayer!);
-      marker.bindPopup(`
-        <b>${d.clientName}</b><br>
-        ${d.address || 'Sin dirección'}<br>
-        <b>$${d.total.toFixed(2)}</b>
-      `);
+      // InfoWindow
+      const infoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="color: #333; font-family: sans-serif; padding: 5px;">
+            <strong style="color: #ec4899;">${d.clientName}</strong><br>
+            <span style="font-size: 12px;">${d.address || 'Sin dirección'}</span><br>
+            <strong>$${d.total.toFixed(2)}</strong>
+          </div>
+        `
+      });
+
+      marker.addListener("click", () => {
+        infoWindow.open(this.map, marker);
+      });
+
+      this.markers.push(marker);
     });
 
-    // Draw route polyline through pending/inTransit points
+    // Draw Polyline
     if (points.length >= 2) {
-      this.routeLine = L.polyline(points, {
-        color: '#FF6B9D',
-        weight: 3,
-        opacity: 0.6,
-        dashArray: '8, 8'
-      }).addTo(this.map);
+      this.routePath = new google.maps.Polyline({
+        path: points,
+        geodesic: true,
+        strokeColor: '#FF6B9D',
+        strokeOpacity: 0.6,
+        strokeWeight: 4,
+        icons: [{
+          icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW },
+          offset: '100%',
+          repeat: '50px'
+        }]
+      });
+
+      this.routePath.setMap(this.map);
     }
 
     // Fit bounds
-    if (bounds.length > 0) {
-      this.map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
+    if (!bounds.isEmpty()) {
+      this.map.fitBounds(bounds);
+      // Adjust zoom if too close
+      const listener = google.maps.event.addListener(this.map, "idle", () => {
+        if (this.map.getZoom() > 16) this.map.setZoom(16);
+        google.maps.event.removeListener(listener);
+      });
     }
   }
 
   centerOnMe() {
-    this.map?.locate({ setView: true, maxZoom: 16 });
+    if (this.map && this.lastLat && this.lastLng) {
+      this.map.panTo({ lat: this.lastLat, lng: this.lastLng });
+      this.map.setZoom(16);
+    }
   }
 
+  // ... (Google Route is same) ...
   openGoogleRoute(route: DeliveryRoute) {
     const deliveries = route.deliveries.filter(d => ((d.latitude && d.longitude) || d.address) && d.status !== 'Delivered' && d.status !== 'NotDelivered');
     if (deliveries.length === 0) return;
@@ -1172,7 +1235,6 @@ export class RouteViewComponent implements OnInit, OnDestroy {
       return;
     }
     this.gpsActive.set(true);
-    this.gpsActive.set(true);
 
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -1195,21 +1257,33 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }, 10000);
   }
 
+
+
   private updateDriverMarker(lat: number, lng: number): void {
     if (!this.map) return;
-    const icon = L.divIcon({
-      html: `<div style="
-        background:#FF3D7F; width:16px; height:16px; border-radius:50%;
-        border:3px solid white; box-shadow:0 0 12px rgba(255,61,127,0.6);
-      "></div>`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11],
-      className: ''
-    });
+    const pos = { lat, lng };
+
     if (!this.driverMarker) {
-      this.driverMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(this.map);
+      this.driverMarker = new google.maps.Marker({
+        position: pos,
+        map: this.map,
+        title: 'Mi Ubicación',
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#FF3D7F',
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2,
+        },
+        zIndex: 1000
+      });
+
+      // Pulse effect overlay?
+      // Google Maps doesn't support CSS keyframes on markers easily without custom overlays. 
+      // We'll stick to the dot for now.
     } else {
-      this.driverMarker.setLatLng([lat, lng]);
+      this.driverMarker.setPosition(pos);
     }
   }
 
