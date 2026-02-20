@@ -918,8 +918,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   }
 
   scrollChat() {
-    if (this.clientChatScroll) {
-      this.clientChatScroll.nativeElement.scrollTop = this.clientChatScroll.nativeElement.scrollHeight;
-    }
+    setTimeout(() => {
+      if (this.clientChatScroll) {
+        this.clientChatScroll.nativeElement.scrollTop = this.clientChatScroll.nativeElement.scrollHeight;
+      }
+    }, 50);
   }
 }

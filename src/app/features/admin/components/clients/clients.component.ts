@@ -16,20 +16,14 @@ import { Client, OrderSummary } from '../../../../shared/models/models';
       
       @if (toastMessage()) { <div class="toast-notification">{{ toastMessage() }}</div> }
 
-      <div class="page-header">
-        <div>
+      <div class="page-header glass-header">
+        <div class="header-text">
           <h2>Clientas 👯‍♀️</h2>
-          <p class="page-sub">Gestiona tu directorio y consiente a las VIP</p>
+          <p class="page-sub">Gestiona tu directorio y consiente a las VIP 🎀</p>
         </div>
         <div class="search-box">
           <span class="search-icon">🔍</span>
-          <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Buscar por nombre...">
-        </div>
-
-        <div class="actions-header">
-          <button class="btn-nuke" (click)="onWipeClients()">
-            💀 Borrar TODAS
-          </button>
+          <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Buscar por clienta...">
         </div>
       </div>
 
@@ -37,49 +31,57 @@ import { Client, OrderSummary } from '../../../../shared/models/models';
         @for (client of filteredClients(); track client.id) {
           <div class="client-card" [attr.data-tag]="client.tag" [routerLink]="['/admin/clients', client.id]">
             
-            <button class="btn-delete-card" (click)="$event.stopPropagation(); deleteClient(client)" title="Eliminar clienta">
-              🗑️
-            </button>
-
-            <div class="card-top">
-              <div class="avatar">
-                {{ client.name.charAt(0).toUpperCase() }}
-              </div>
-              <div class="info">
-                <div class="name-row">
-                    <h3>{{ client.name }}</h3>
-                    <!-- TIPO DE CLIENTA BADGE -->
+            <div class="card-content">
+              <div class="card-top">
+                <div class="avatar-wrapper">
+                  <div class="avatar">
+                    {{ client.name.charAt(0).toUpperCase() }}
+                  </div>
+                </div>
+                <div class="info">
+                  <h3 class="client-name">{{ client.name }}</h3>
+                  
+                  <div class="badges-row">
                     <span class="client-type-badge" 
                           [class.frecuente]="isFrecuente(client)" 
                           [class.nueva]="!isFrecuente(client)">
                         {{ isFrecuente(client) ? '💎 Frecuente' : '🌱 Nueva' }}
                     </span>
-                </div>
-                
-                <span class="tag-badge" [attr.data-tag]="client.tag">
-                  {{ getTagLabel(client.tag || 'None') }}
-                </span>
+                    <span class="tag-badge" [attr.data-tag]="client.tag">
+                      {{ getTagLabel(client.tag || 'None') }}
+                    </span>
+                  </div>
 
-                <div class="contact-info">
-                   <p class="u-phone">📞 {{ client.phone || 'Sin teléfono' }}</p>
-                   <p class="u-addr">📍 {{ client.address || 'Sin dirección' }}</p>
+                  <div class="contact-info">
+                     <p class="u-phone">📞 {{ client.phone || 'Sin teléfono' }}</p>
+                     <p class="u-addr">📍 {{ client.address || 'Sin dirección' }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stats-row">
+                <div class="stat">
+                  <small>Pedidos</small>
+                  <strong>{{ client.orderCount || client.ordersCount || 0 }}</strong>
+                </div>
+                <div class="stat">
+                  <small>Gastado</small>
+                  <strong>$ {{ (client.totalSpent || 0) | number:'1.0-0' }}</strong>
                 </div>
               </div>
             </div>
 
-
-
-            <div class="stats-row">
-              <div class="stat">
-                <small>Pedidos</small>
-                <strong>{{ client.orderCount || client.ordersCount || 0 }}</strong>
-              </div>
-              <div class="stat">
-                <small>Gastado</small>
-                <strong>$ {{ (client.totalSpent || 0) | number:'1.0-0' }}</strong>
-              </div>
+            <div class="card-actions">
+               <div class="btn-action view">Ver Perfil <span>→</span></div>
+               <button class="btn-action delete" (click)="$event.stopPropagation(); deleteClient(client)" title="Eliminar clienta">🗑️</button>
             </div>
-
+          </div>
+        }
+        @empty {
+          <div class="empty-state">
+            <div class="empty-icon">👯‍♀️</div>
+            <h3>No hay clientas</h3>
+            <p>Aún no tienes clientas registradas con ese nombre.</p>
           </div>
         }
       </div>
@@ -98,145 +100,153 @@ import { Client, OrderSummary } from '../../../../shared/models/models';
 
     .clients-page {
       padding: 1rem 1.25rem 6rem;
+      width: 100%;
       max-width: 1200px;
       margin: 0 auto;
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
-    /* HEADER */
+    /* HEADER & SEARCH */
     .page-header {
-      display: flex; justify-content: space-between; align-items: flex-end;
+      display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(12px);
+      padding: 1.5rem;
+      border-radius: 24px;
+      border: 1px solid white;
+      box-shadow: 0 8px 32px rgba(255,107,157,0.08);
     }
-    h2 {
+    .header-text h2 {
       font-family: var(--font-display); font-size: 2.5rem; color: var(--pink-600);
-      margin: 0; text-shadow: 2px 2px 0 white;
+      margin: 0; text-shadow: 2px 2px 0 white; line-height: 1.1;
     }
     .page-sub {
       font-family: var(--font-body); color: var(--text-medium); margin: 5px 0 0; font-weight: 600;
     }
 
-    .actions-header { display: flex; gap: 10px; align-items: center; }
-
-    /* SEARCH BOX */
     .search-box {
-      position: relative; width: 100%; max-width: 320px;
+      position: relative; width: 100%; max-width: 380px;
       input {
-        width: 100%; padding: 12px 20px 12px 45px; border-radius: 25px;
-        border: 2px solid transparent; background: var(--bg-card);
-        box-shadow: 0 4px 15px rgba(255,107,157,0.08);
-        font-family: var(--font-body); font-weight: 600; color: var(--text-medium);
-        transition: all 0.3s; margin-left: auto;
-        &:focus { outline: none; border-color: var(--pink-300); box-shadow: 0 6px 20px rgba(255,107,157,0.2); }
+        width: 100%; padding: 14px 20px 14px 48px; border-radius: 30px;
+        border: 2px solid white; background: rgba(255,255,255,0.8);
+        box-shadow: var(--shadow-soft);
+        font-family: var(--font-body); font-weight: 600; color: var(--text-dark); font-size: 1rem;
+        transition: all 0.3s ease;
+        &:focus { outline: none; border-color: var(--pink-400); background: white; box-shadow: 0 12px 30px rgba(255,107,157,0.15); transform: translateY(-2px); }
+        &::placeholder { color: #aaa; font-weight: 500; }
       }
       .search-icon {
-        position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-        font-size: 1.1rem; opacity: 0.5; pointer-events: none;
+        position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+        font-size: 1.2rem; pointer-events: none;
       }
-    }
-
-    .btn-nuke {
-      background: var(--bg-card); color: var(--color-danger); border: 1px solid var(--pink-200);
-      padding: 8px 16px; border-radius: 20px; font-weight: 700;
-      cursor: pointer; transition: 0.2s; font-size: 0.8rem;
-      &:hover { background: var(--pink-50); transform: translateY(-2px); }
     }
 
     /* GRID */
     .clients-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 1.5rem;
     }
 
+    /* CLIENT CARD */
     .client-card {
-      background: var(--bg-card);
-      border-radius: 1.25rem; padding: 1.5rem;
-      border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm);
-      position: relative; overflow: hidden;
-      transition: all 0.3s var(--ease-bounce);
+      background: #ffffff;
+      border-radius: 24px; padding: 1.5rem;
+      border: 2px solid transparent; box-shadow: 0 8px 25px rgba(0,0,0,0.04);
+      position: relative; overflow: hidden; cursor: pointer;
+      display: flex; flex-direction: column; justify-content: space-between;
+      transition: all 0.4s var(--ease-bounce);
       
-      &:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); z-index: 5; border-color: var(--pink-200); }
+      &:hover { 
+        transform: translateY(-6px); 
+        box-shadow: 0 15px 35px rgba(255,107,157,0.15); 
+        border-color: var(--pink-100); 
+        .avatar { transform: scale(1.1) rotate(5deg); }
+        .btn-action.view span { transform: translateX(4px); }
+      }
       
-      /* Status Lines */
+      /* Status Gradient Line */
       &::before {
-        content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 6px;
-        background: var(--pink-100); transition: 0.3s;
+        content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 8px;
+        background: var(--pink-200); transition: 0.3s;
       }
-      &[data-tag="Vip"]::before { background: linear-gradient(to bottom, #FFD700, #FDB931); }
-      &[data-tag="RisingStar"]::before { background: linear-gradient(to bottom, #d8b4fe, #a855f7); }
-      &[data-tag="Blacklist"]::before { background: linear-gradient(to bottom, #fca5a5, #ef4444); }
-      &[data-tag="None"]::before { background: var(--pink-200); }
+      &[data-tag="Vip"]::before { background: linear-gradient(180deg, #FFD700, #FDB931); }
+      &[data-tag="RisingStar"]::before { background: linear-gradient(180deg, #d8b4fe, #a855f7); }
+      &[data-tag="Blacklist"]::before { background: linear-gradient(180deg, #fca5a5, #ef4444); }
     }
 
-    .btn-delete-card {
-      position: absolute; top: 10px; right: 10px; z-index: 10;
-      width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-soft);
-      background: var(--bg-card); cursor: pointer; font-size: 0.85rem;
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      color: #e11d48;
-    }
-    .client-card:hover .btn-delete-card { opacity: 1; }
-    .btn-delete-card:hover { background: #fff0f0; border-color: #ffaaaa; transform: scale(1.1); }
-
-    .card-top { display: flex; gap: 15px; align-items: flex-start; margin-bottom: 1rem; padding-left: 10px; }
-    .avatar {
-        width: 45px; height: 45px; background: var(--bg-main); border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.3rem; font-weight: 800; color: var(--pink-500);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 2px solid var(--pink-50);
-        flex-shrink: 0;
-      }
-      .info { flex: 1; overflow: hidden; }
-      .name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-      .info h3 { margin: 0; font-size: 1.1rem; color: var(--text-dark); }
-
-      .contact-info { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
-      .u-phone, .u-addr { margin: 0; font-size: 0.75rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .u-phone { color: var(--pink-500); font-weight: 600; }
+    .card-content { flex: 1; }
+    .card-top { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 1.2rem; padding-left: 8px; }
     
-    .client-type-badge {
-        font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 800; text-transform: uppercase;
-        &.nueva { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        &.frecuente { background: #fce7f3; color: #be185d; border: 1px solid #fbcfe8; }
+    .avatar-wrapper { position: relative; }
+    .avatar {
+        width: 54px; height: 54px; border-radius: 20px;
+        background: linear-gradient(135deg, var(--pink-50), #fff);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.6rem; font-weight: 800; color: var(--pink-500);
+        box-shadow: 0 8px 16px rgba(236,72,153,0.15); border: 2px solid white;
+        flex-shrink: 0; transition: transform 0.4s var(--ease-bounce);
     }
-
-    .tag-badge {
-      font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 700;
-      text-transform: uppercase; display: inline-block;
+    
+    .info { flex: 1; overflow: hidden; }
+    .client-name { margin: 0 0 6px; font-size: 1.25rem; color: var(--text-dark); font-weight: 800; letter-spacing: -0.5px; }
+    
+    .badges-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    
+    .client-type-badge, .tag-badge {
+        font-size: 0.7rem; padding: 4px 10px; border-radius: 12px; font-weight: 800; text-transform: uppercase;
+        display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.5px;
     }
-    .tag-badge[data-tag="Vip"] { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
-    .tag-badge[data-tag="RisingStar"] { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
-    .tag-badge[data-tag="Blacklist"] { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .client-type-badge.nueva { background: #dcfce7; color: #166534; }
+    .client-type-badge.frecuente { background: #fce7f3; color: #be185d; }
+    
+    .tag-badge[data-tag="Vip"] { background: #fef08a; color: #854d0e; }
+    .tag-badge[data-tag="RisingStar"] { background: #e9d5ff; color: #6b21a8; }
+    .tag-badge[data-tag="Blacklist"] { background: #fecaca; color: #991b1b; }
     .tag-badge[data-tag="None"] { display: none; }
 
-    /* INLINE EDIT */
-    .inline-edit-section {
-        background: rgba(255,255,255,0.5); border-radius: 12px; padding: 8px;
-        margin-bottom: 1rem; display: flex; flex-direction: column; gap: 6px;
-    }
-    .edit-row { display: flex; align-items: center; gap: 8px; }
-    .icon { width: 20px; text-align: center; font-size: 0.9rem; opacity: 0.6; }
-    .edit-row input {
-        flex: 1; border: none; background: transparent; border-bottom: 1px solid transparent;
-        font-size: 0.9rem; padding: 4px; color: #555; font-family: inherit;
-        transition: 0.2s; border-radius: 4px;
-        &:focus { background: white; border-bottom-color: var(--pink-400); outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        &::placeholder { color: #ccc; }
-    }
-    .mini-select {
-        flex: 1; border: none; background: transparent; font-size: 0.85rem; color: #555; 
-        font-weight: 600; padding: 4px; border-radius: 4px; cursor: pointer;
-        &:hover { background: rgba(255,255,255,0.8); }
-    }
+    .contact-info { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .u-phone, .u-addr { margin: 0; font-size: 0.8rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .u-phone { color: var(--pink-500); font-weight: 700; }
 
     .stats-row {
-      background: var(--bg-main); border-radius: 16px; padding: 10px 15px;
-      display: flex; justify-content: space-between; margin-left: 6px;
+      background: #fdf2f8; border-radius: 16px; padding: 12px 16px;
+      display: flex; justify-content: space-around; margin-left: 8px;
     }
-    .stat { display: flex; flex-direction: column; text-align: center; }
-    .stat small { font-size: 0.7rem; color: #999; font-weight: 700; text-transform: uppercase; }
-    .stat strong { color: var(--pink-600); font-size: 1rem; }
+    .stat { display: flex; flex-direction: column; text-align: center; gap: 2px; }
+    .stat small { font-size: 0.7rem; color: var(--pink-400); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat strong { color: var(--pink-600); font-size: 1.15rem; font-family: var(--font-display); }
+
+    /* CARD ACTIONS */
+    .card-actions {
+      display: flex; gap: 10px; padding-top: 16px; margin-top: 16px;
+      border-top: 2px dashed var(--pink-100); margin-left: 8px;
+    }
+    
+    .btn-action {
+      height: 44px; border-radius: 14px; border: none; font-weight: 700; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-action.view {
+      flex: 1; background: var(--pink-50); color: var(--pink-600); gap: 6px;
+      &:hover { background: var(--pink-100); color: var(--pink-700); }
+      span { transition: transform 0.2s; font-size: 1.1rem; }
+    }
+    .btn-action.delete {
+      width: 44px; background: #fff1f2; color: #e11d48; font-size: 1.1rem; flex-shrink: 0;
+      &:hover { background: #ffe4e6; transform: scale(1.05); }
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 4rem 1rem; text-align: center; background: rgba(255,255,255,0.5); border-radius: 24px; border: 2px dashed var(--pink-200);
+    }
+    .empty-icon { font-size: 4rem; margin-bottom: 1rem; filter: drop-shadow(0 10px 10px rgba(255,107,157,0.2)); }
+    .empty-state h3 { color: var(--pink-600); font-family: var(--font-display); font-size: 1.8rem; margin: 0 0 0.5rem; }
+    .empty-state p { color: var(--text-medium); font-weight: 600; margin: 0; }
 
     /* TOAST */
     .toast-notification {
@@ -249,10 +259,14 @@ import { Client, OrderSummary } from '../../../../shared/models/models';
     @keyframes slideDown { from { transform: translate(-50%, -50px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
     @media (max-width: 768px) {
-      .page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-      .search-box { max-width: 100%; }
-      .actions-header { width: 100%; justify-content: flex-end; }
-      .clients-grid { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: stretch; padding: 1.2rem; }
+      .header-text { margin-bottom: 1rem; text-align: center; }
+      .search-box { max-width: 100%; width: 100%; }
+      .clients-grid { grid-template-columns: 1fr; gap: 1rem; }
+      .card-top { flex-wrap: wrap; }
+      .avatar { width: 48px; height: 48px; font-size: 1.4rem; }
+      .stats-row { padding: 10px; margin-left: 0; }
+      .card-actions { margin-left: 0; }
     }
   `]
 })

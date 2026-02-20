@@ -101,6 +101,10 @@ export class SignalRService {
       this.deliveryUpdate$.next(data);
     });
 
+    this.connection.on('ReceiveClientChatMessage', (msg: any) => {
+      this.clientChatUpdate$.next(msg);
+    });
+
     await this.connection.start();
   }
 
@@ -108,9 +112,6 @@ export class SignalRService {
     await this.connection?.invoke('JoinOrder', accessToken);
   }
 
-  async joinAdmin(): Promise<void> {
-    await this.connection?.invoke('JoinAdmin');
-  }
 
   async joinAdminGroup(): Promise<void> {
     console.log('Joining Admin Group...');

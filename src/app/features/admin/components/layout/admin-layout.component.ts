@@ -111,7 +111,8 @@ import { GlobalSearchComponent } from './global-search.component';
       border-right: 1px solid var(--border-soft);
       display: flex; flex-direction: column;
       position: fixed; top: 0; left: 0; bottom: 0;
-      z-index: 100;
+      z-index: 2000;
+      overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
       transition: transform 0.35s var(--ease-smooth);
       box-shadow: 4px 0 24px rgba(255, 107, 157, 0.06);
     }
@@ -161,9 +162,9 @@ import { GlobalSearchComponent } from './global-search.component';
 
       a {
         display: flex; align-items: center; gap: 0.75rem;
-        padding: 0.7rem 1rem; border-radius: 0.85rem;
+        padding: 0.85rem 1rem; border-radius: 0.85rem;
         color: var(--text-medium); text-decoration: none;
-        font-size: 0.9rem; font-weight: 600;
+        font-size: 0.95rem; font-weight: 600;
         transition: all 0.25s var(--ease-smooth);
 
         &:hover {
@@ -221,11 +222,12 @@ import { GlobalSearchComponent } from './global-search.component';
 
     .overlay {
       position: fixed; inset: 0;
-      background: rgba(61, 31, 61, 0.3);
+      background: rgba(61, 31, 61, 0.4);
       backdrop-filter: blur(4px);
-      z-index: 99;
-      display: none; /* Controlled by media query or JS logic */
+      z-index: 1999;
+      animation: fadeIn 0.3s ease-out forwards;
     }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     .main-content {
       flex: 1; margin-left: 260px;
@@ -268,9 +270,8 @@ import { GlobalSearchComponent } from './global-search.component';
       .close-btn { display: block; font-size: 1.5rem; }
       
       .overlay { 
-        display: block; opacity: 0; pointer-events: none; transition: opacity 0.3s; 
+        display: block; opacity: 1; pointer-events: auto;
       }
-      .sidebar.open ~ .overlay { opacity: 1; pointer-events: auto; }
       
       .content-area { padding: 1rem; }
     }

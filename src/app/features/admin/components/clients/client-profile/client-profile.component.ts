@@ -5,22 +5,20 @@ import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../../core/services/confirmation.service';
 import { Client, OrderSummary, LoyaltySummary, LoyaltyTransaction } from '../../../../../shared/models/models';
-import { NgxEchartsDirective, provideEcharts } from 'ngx-echarts';
 import { GoogleAutocompleteDirective } from '../../../../../shared/directives/google-autocomplete.directive';
 
 @Component({
   selector: 'app-client-profile',
   standalone: true,
-  imports: [CommonModule, RouterModule, NgxEchartsDirective, FormsModule, GoogleAutocompleteDirective],
+  imports: [CommonModule, RouterModule, FormsModule, GoogleAutocompleteDirective],
   providers: [
-    provideEcharts(),
     ConfirmationService
   ],
   template: `
     <div class="profile-page fade-in">
       <!-- ═══════════════ HEADER ═══════════════ -->
-      <div class="page-header">
-        <button class="btn-back" routerLink="/admin/clients">← Volver</button>
+      <div class="page-header glass-header">
+        <button class="btn-back" routerLink="/admin/clients">← Regresar</button>
         <div class="header-content">
           <div class="avatar-large">
             {{ client()?.name?.charAt(0) }}
@@ -30,10 +28,10 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
              @if (isEditing()) {
                <input type="text" [(ngModel)]="editForm.name" class="input-name" placeholder="Nombre Clienta">
              } @else {
-               <h2>{{ client()?.name }}</h2>
+               <h2 class="client-name">{{ client()?.name }}</h2>
              }
              
-             <div class="badges">
+             <div class="badges-row">
                @if (isEditing()) {
                  <select [(ngModel)]="editForm.tag" class="select-tag">
                     <option value="None">Normal 🌸</option>
@@ -45,11 +43,10 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
                     <option value="Nueva">Nueva 🌱</option>
                     <option value="Frecuente">Frecuente 💎</option>
                  </select>
-                 <input type="number" [(ngModel)]="editForm.totalSpent" class="input-money" placeholder="$">
                } @else {
-                 <span class="badge-tag" [attr.data-tag]="client()?.tag">{{ client()?.tag || 'Nuevo' }}</span>
+                 <span class="tag-badge" [attr.data-tag]="client()?.tag">{{ client()?.tag || 'Normal' }}</span>
                }
-               <span class="badge-type" [class.frecuente]="isFrecuente()" [class.nueva]="!isFrecuente()">
+               <span class="client-type-badge" [class.frecuente]="isFrecuente()" [class.nueva]="!isFrecuente()">
                   {{ isFrecuente() ? '💎 Frecuente' : '🌱 Nueva' }}
                </span>
                <span class="badge-id">ID: {{ client()?.id }}</span>
@@ -58,10 +55,10 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
           
           <div class="header-actions">
             @if (isEditing()) {
-              <button class="btn-cancel" (click)="toggleEdit()">Cancelar</button>
-              <button class="btn-save" (click)="saveChanges()">Guardar</button>
+              <button class="btn-action cancel" (click)="toggleEdit()">Cancelar</button>
+              <button class="btn-action save" (click)="saveChanges()">Guardar</button>
             } @else {
-              <button class="btn-edit" (click)="toggleEdit()">✏️ Editar</button>
+              <button class="btn-action edit" (click)="toggleEdit()">✏️ Editar Perfil</button>
             }
           </div>
         </div>
@@ -70,24 +67,24 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
       @if (loading()) {
         <div class="loading-state">
           <div class="spinner-cute"></div>
-          <p>Cargando perfil de la reina... ✨</p>
+          <p>Consultando perfil... ✨</p>
         </div>
       } @else {
         
         <!-- ═══════════════ STATS CARDS ═══════════════ -->
         <div class="stats-row">
           <div class="stat-card pink">
-            <span class="stat-label">Total Gastado (LTV)</span>
+            <span class="stat-label">Total Gastado</span>
             <span class="stat-value">$ {{ stats().totalSpent | number:'1.0-0' }}</span>
           </div>
           <div class="stat-card purple">
             <span class="stat-label">Pedidos Totales</span>
             <span class="stat-value">{{ stats().totalOrders }}</span>
           </div>
-          <!-- <div class="stat-card blue">
+          <div class="stat-card blue">
              <span class="stat-label">Ticket Promedio</span>
              <span class="stat-value">$ {{ stats().avgTicket | number:'1.0-0' }}</span>
-          </div> -->
+          </div>
           <div class="stat-card orange">
              <span class="stat-label">Último Pedido</span>
              <span class="stat-value text-sm">{{ stats().lastOrderDate | date:'mediumDate' }}</span>
@@ -122,31 +119,24 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
 
               } @else {
                 <div class="info-row">
-                  <span class="icon">📞</span>
+                  <div class="icon-wrap"><span class="icon">📞</span></div>
                   <div class="data">
                     <label>Teléfono</label>
                     <p>{{ client()?.phone || 'No registrado' }}</p>
                     @if(client()?.phone) {
-                      <a [href]="'https://wa.me/52' + cleanPhone(client()!.phone!)" target="_blank" class="wa-link">Abrir WhatsApp</a>
+                      <a [href]="'https://wa.me/52' + cleanPhone(client()!.phone!)" target="_blank" class="wa-link">Abrir WhatsApp <span>→</span></a>
                     }
                   </div>
                 </div>
                 <div class="info-row">
-                  <span class="icon">🏠</span>
+                  <div class="icon-wrap"><span class="icon">📍</span></div>
                   <div class="data">
                     <label>Dirección</label>
-                    <p>{{ client()?.address || 'Sin dirección' }}</p>
+                    <p class="address-text">{{ client()?.address || 'Sin dirección' }}</p>
                   </div>
                 </div>
               }
             </div>
-
-
-            <!-- TOP PRODUCTS CHART -->
-             <!-- <div class="chart-card">
-               <h3>🏆 Productos Favoritos</h3>
-               <div echarts [options]="topProductsOption" class="echart-container"></div>
-             </div> -->
 
              <!-- ═══════════════ LOYALTY CARD ═══════════════ -->
              <div class="info-card loyalty-card">
@@ -183,8 +173,10 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
                    <h4>Historial reciente</h4>
                    @for (t of loyaltyHistory().slice(0, 5); track t.id) {
                      <div class="l-row">
-                       <span class="l-date">{{ t.date | date:'shortDate' }}</span>
-                       <span class="l-reason">{{ t.reason }}</span>
+                       <div class="l-date-reason">
+                         <span class="l-date">{{ t.date | date:'dd/MM' }}</span>
+                         <span class="l-reason">{{ t.reason }}</span>
+                       </div>
                        <span class="l-points" [class.pos]="t.points > 0" [class.neg]="t.points < 0">
                          {{ t.points > 0 ? '+' : '' }}{{ t.points }}
                        </span>
@@ -234,7 +226,6 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
         </div>
       }
 
-
       <!-- ═══════════════ MODAL: AJUSTAR PUNTOS ═══════════════ -->
       @if (showPointsModal()) {
         <div class="modal-overlay" (click)="showPointsModal.set(false)">
@@ -249,12 +240,12 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
             <div class="form-group">
               <label>Motivo</label>
               <input type="text" [(ngModel)]="pointsForm.reason" class="input-field" 
-                     [placeholder]="pointsMode === 'add' ? 'Ej. Cumpleaños, Promoción...' : 'Ej. Descuento $50, Gorra de regalo...'">
+                     [placeholder]="pointsMode === 'add' ? 'Ej. Cumpleaños...' : 'Ej. Descuento $50...'">
             </div>
 
             <div class="modal-actions">
-              <button class="btn-cancel" (click)="showPointsModal.set(false)">Cancelar</button>
-              <button class="btn-save" (click)="submitPoints()" [disabled]="!pointsForm.amount || !pointsForm.reason">
+              <button class="btn-action cancel" (click)="showPointsModal.set(false)">Cancelar</button>
+              <button class="btn-action save" (click)="submitPoints()" [disabled]="!pointsForm.amount || !pointsForm.reason">
                 {{ pointsMode === 'add' ? '✨ Enviar Regalo' : '✅ Aplicar Canje' }}
               </button>
             </div>
@@ -264,150 +255,203 @@ import { GoogleAutocompleteDirective } from '../../../../../shared/directives/go
     </div>
   `,
   styles: [`
-    :host { display: block; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    /* ═══════════════════════════════════════════
+       DESIGN TOKENS & BASE
+    ═══════════════════════════════════════════ */
+    :host { 
+      display: block; padding: 2rem 1.25rem 6rem; max-width: 1200px; margin: 0 auto; 
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.8);
+      --shadow-soft: 0 10px 40px rgba(255, 107, 157, 0.1);
+      --ease-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
     .fade-in { animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+    /* HEADER */
     .page-header { margin-bottom: 2rem; }
-    .btn-back { background: none; border: none; color: #666; cursor: pointer; font-weight: 600; margin-bottom: 1rem; transition: color 0.2s; &:hover { color: var(--pink-500); } }
+    .glass-header {
+      background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(12px);
+      padding: 1.5rem; border-radius: 24px; border: 1px solid white;
+      box-shadow: 0 8px 32px rgba(255,107,157,0.08);
+    }
+    .btn-back { 
+      background: none; border: none; color: #888; cursor: pointer; font-weight: 700; font-size: 0.9rem;
+      margin-bottom: 1rem; transition: color 0.2s; 
+      &:hover { color: var(--pink-600); } 
+    }
     
-    .header-content { display: flex; align-items: center; gap: 1.5rem; }
+    .header-content { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
     .avatar-large {
-      width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #fce7f3, #fae8ff);
-      display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: 800; color: var(--pink-600);
-      position: relative; box-shadow: 0 10px 25px rgba(236,72,153,0.15); border: 4px solid white; flex-shrink: 0;
+      width: 90px; height: 90px; border-radius: 30px; 
+      background: linear-gradient(135deg, var(--pink-100), #fff);
+      display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: 800; color: var(--pink-500);
+      position: relative; box-shadow: 0 10px 25px rgba(236,72,153,0.15); border: 3px solid white; flex-shrink: 0;
     }
-    .crown { position: absolute; top: -10px; right: -5px; font-size: 1.5rem; transform: rotate(15deg); }
+    .crown { position: absolute; top: -12px; right: -8px; font-size: 2rem; transform: rotate(15deg); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
     
-    .header-text h2 { margin: 0; font-family: var(--font-display); font-size: 2.5rem; color: var(--text-dark); }
-    .badges { display: flex; gap: 10px; margin-top: 5px; align-items: center; }
-    .badge-tag {
-      background: #f3f4f6; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; color: #666;
-      &[data-tag="VIP"] { background: linear-gradient(135deg, #FFD700, #ffb347); color: white; }
-      &[data-tag="Problema"] { background: #fee2e2; color: #ef4444; }
-    }
+    .header-text { flex: 1; min-width: 250px; }
+    .client-name { margin: 0 0 8px; font-family: var(--font-display); font-size: 2.2rem; color: var(--text-dark); letter-spacing: -0.5px; line-height: 1.1; }
     
-    .badge-type {
-        font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; font-weight: 800; text-transform: uppercase;
-        &.nueva { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        &.frecuente { background: #fce7f3; color: #be185d; border: 1px solid #fbcfe8; }
+    .badges-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    
+    .client-type-badge, .tag-badge {
+        font-size: 0.75rem; padding: 4px 12px; border-radius: 12px; font-weight: 800; text-transform: uppercase;
+        display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.5px;
     }
+    .client-type-badge.nueva { background: #dcfce7; color: #166534; }
+    .client-type-badge.frecuente { background: #fce7f3; color: #be185d; }
+    
+    .tag-badge[data-tag="Vip"] { background: #fef08a; color: #854d0e; }
+    .tag-badge[data-tag="RisingStar"] { background: #e9d5ff; color: #6b21a8; }
+    .tag-badge[data-tag="Blacklist"] { background: #fecaca; color: #991b1b; }
+    .tag-badge[data-tag="None"] { display: none; }
 
-    .badge-id { font-size: 0.8rem; color: #ccc; letter-spacing: 1px; }
+    .badge-id { font-size: 0.8rem; color: #ccc; letter-spacing: 1px; font-weight: 700; margin-left: auto; }
 
-    /* Stats Grid */
+    /* EDIT ACTIONS */
+    .header-actions { display: flex; gap: 10px; }
+    .btn-action {
+      height: 44px; padding: 0 20px; border-radius: 14px; border: none; font-weight: 700; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-action.edit { background: var(--pink-50); color: var(--pink-600); &:hover { background: var(--pink-100); transform: translateY(-2px); } }
+    .btn-action.cancel { background: #fff1f2; color: #e11d48; &:hover { background: #ffe4e6; transform: translateY(-2px); } }
+    .btn-action.save { background: #f0fdf4; color: #16a34a; &:hover { background: #dcfce7; transform: translateY(-2px); } }
+
+    .input-name { font-size: 2rem; border: 2px dashed var(--pink-200); border-radius: 12px; padding: 4px 12px; width: 100%; font-family: var(--font-display); background: rgba(255,255,255,0.8); outline: none; margin-bottom: 8px; color: var(--text-dark); &:focus { border-color: var(--pink-400); } }
+    .select-tag { padding: 8px; border-radius: 12px; border: 2px solid #eee; font-family: var(--font-body); font-weight: 600; color: #555; outline: none; &:focus { border-color: var(--pink-300); } }
+    .input-money { padding: 8px; border-radius: 12px; border: 2px solid #eee; width: 100px; font-weight: 700; outline: none; &:focus { border-color: var(--pink-300); } }
+
+    /* STATS ROW */
     .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
     .stat-card {
-      background: white; padding: 1.5rem; border-radius: 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
-      border: 1px solid white; transition: transform 0.2s;
-      &:hover { transform: translateY(-3px); }
+      background: white; padding: 1.5rem; border-radius: 24px; box-shadow: var(--shadow-soft); display: flex; flex-direction: column;
+      border: 2px solid transparent; transition: all 0.4s var(--ease-bounce); position: relative; overflow: hidden;
+      &:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(255,107,157,0.15); border-color: var(--pink-100); }
     }
-    .stat-label { font-size: 0.75rem; color: #999; text-transform: uppercase; font-weight: 700; margin-bottom: 5px; }
-    .stat-value { font-size: 1.8rem; font-weight: 800; color: var(--text-dark); font-family: var(--font-body); }
-    .stat-value.text-sm { font-size: 1.2rem; }
-    .stat-card.pink .stat-value { color: var(--pink-500); }
+    .stat-label { font-size: 0.75rem; color: #999; text-transform: uppercase; font-weight: 800; margin-bottom: 8px; letter-spacing: 0.5px; z-index: 2; }
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--text-dark); font-family: var(--font-display); z-index: 2; line-height: 1; }
+    .stat-value.text-sm { font-size: 1.3rem; font-family: var(--font-body); }
+    
+    .stat-card.pink .stat-value { color: var(--pink-600); }
     .stat-card.purple .stat-value { color: #9333ea; }
     .stat-card.blue .stat-value { color: #0ea5e9; }
-    .stat-card.orange .stat-value { color: #f97316; }
+    .stat-card.orange .stat-value { color: #ea580c; }
 
-    /* Profile Grid */
-    .profile-grid { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; }
-    @media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
-
-    .info-card, .chart-card, .history-card {
-      background: white; border-radius: 24px; padding: 1.5rem; box-shadow: var(--shadow-sm); border: 1px solid white;
+    /* PROFILE GRID */
+    .profile-grid { display: grid; grid-template-columns: 380px 1fr; gap: 2rem; }
+    
+    .info-card, .history-card {
+      background: white; border-radius: 24px; padding: 1.8rem; box-shadow: var(--shadow-soft); border: 2px solid transparent;
     }
-    h3 { margin: 0 0 1.5rem; font-size: 1.1rem; color: var(--text-dark); font-weight: 800; }
+    h3 { margin: 0 0 1.5rem; font-size: 1.25rem; color: var(--text-dark); font-weight: 800; letter-spacing: -0.5px; }
 
     .info-card { margin-bottom: 2rem; }
     .info-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
     .info-row:last-child { margin-bottom: 0; }
-    .icon { width: 40px; height: 40px; background: var(--bg-main); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-    .data { display: flex; flex-direction: column; }
-    .data label { font-size: 0.75rem; color: #999; font-weight: 700; text-transform: uppercase; }
-    .data p { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-dark); }
-    .wa-link { font-size: 0.8rem; color: #25D366; text-decoration: none; font-weight: 700; margin-top: 2px; }
+    .icon-wrap { width: 44px; height: 44px; border-radius: 14px; background: var(--pink-50); display: flex; align-items: center; justify-content: center; }
+    .icon { font-size: 1.3rem; }
+    .data { display: flex; flex-direction: column; justify-content: center; flex: 1; overflow: hidden; }
+    .data label { font-size: 0.75rem; color: #999; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .data p { margin: 2px 0 0; font-size: 1.05rem; font-weight: 700; color: var(--text-dark); }
+    .address-text { white-space: normal; line-height: 1.4; }
+    .wa-link { font-size: 0.85rem; color: #16a34a; text-decoration: none; font-weight: 800; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; transition: 0.2s; &:hover { color: #15803d; span { transform: translateX(3px); } } }
 
-    .echart-container { height: 250px; width: 100%; }
-
-    /* Orders List */
-    .orders-list { display: flex; flex-direction: column; gap: 1rem; max-height: 500px; overflow-y: auto; padding-right: 4px; }
-    .order-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 1rem; border-radius: 16px; border: 1px solid var(--border-soft); background: var(--bg-list-item);
-      transition: all 0.2s; cursor: pointer;
-      &:hover { background: white; border-color: var(--pink-200); transform: translateX(5px); box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-    }
-    .order-left { display: flex; flex-direction: column; gap: 2px; width: 80px; }
-    .order-id { font-weight: 800; color: #ccc; font-size: 0.8rem; }
-    .order-date { font-weight: 600; font-size: 0.9rem; }
-    
-    .status-pill { font-size: 0.7rem; padding: 4px 8px; border-radius: 12px; background: #eee; width: fit-content; }
-    .status-pill[data-status="Pending"] { background: #fff7ed; color: #c2410c; }
-    .status-pill[data-status="Delivered"] { background: #f0fdf4; color: #15803d; }
-    
-    .items-count { font-size: 0.8rem; color: #888; display: block; margin-top: 4px; }
-
-    .order-right { text-align: right; }
-    .order-total { display: block; font-weight: 800; font-size: 1.1rem; color: var(--pink-600); }
-    .arrow { color: #ddd; font-size: 1.2rem; }
-
-    .loading-state { text-align: center; padding: 4rem; color: #999; }
-    .spinner-cute { width: 40px; height: 40px; border: 4px solid var(--pink-200); border-top-color: var(--pink-500); border-radius: 50%; animation: spin 1s infinite; margin: 0 auto 1rem; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-
-    /* EDIT STYLES */
-    .header-actions { margin-left: auto; display: flex; gap: 10px; }
-    .btn-edit, .btn-cancel, .btn-save {
-        padding: 8px 16px; border-radius: 20px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s;
-    }
-    .btn-edit { background: var(--pink-100); color: var(--pink-600); &:hover { background: var(--pink-200); } }
-    .btn-cancel { background: #fee2e2; color: #ef4444; &:hover { background: #fecaca; } }
-    .btn-save { background: #dcfce7; color: #166534; &:hover { background: #bbf7d0; } }
-
-    .input-name { font-size: 2rem; border: 1px solid #ddd; border-radius: 8px; padding: 4px 8px; width: 100%; font-family: var(--font-display); }
-    .select-tag { padding: 4px; border-radius: 8px; border: 1px solid #ddd; }
-    
+    /* FORM STYLES */
     .form-group { margin-bottom: 15px; }
-    .input-field { width: 100%; border: 1px solid #eee; background: #f9f9f9; padding: 10px; border-radius: 10px; font-family: inherit; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 800; color: #666; margin-bottom: 6px; text-transform: uppercase; }
+    .input-field { width: 100%; border: 2px solid #eee; background: #fdfdfd; padding: 12px 16px; border-radius: 14px; font-family: inherit; font-weight: 600; font-size: 0.95rem; color: var(--text-dark); transition: all 0.2s; outline: none; &:focus { border-color: var(--pink-300); background: white; box-shadow: 0 4px 15px rgba(255,107,157,0.1); } }
     
-    .delete-section { margin-top: 2rem; border-top: 1px dashed #fee2e2; padding-top: 1rem; text-align: center; }
-    .btn-delete { background: #fee2e2; color: #b91c1c; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; &:hover { background: #fecaca; } }
-    
-    /* LOYALTY CARD STYLES */
-    .loyalty-card { background: linear-gradient(135deg, #fff0f7 0%, #fff 100%); border: 1px solid #fce7f3; }
-    .loyalty-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .tier-badge { background: var(--pink-100); color: var(--pink-600); font-weight: 800; font-size: 0.75rem; padding: 4px 8px; border-radius: 12px; border: 1px solid var(--pink-200); }
-    
-    .points-circle { text-align: center; padding: 1.5rem; background: white; border-radius: 50%; width: 140px; height: 140px; margin: 0 auto 1.5rem; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 8px 20px rgba(236,72,153,0.1); border: 4px solid var(--pink-50); }
-    .points-val { font-size: 2.5rem; font-weight: 800; color: var(--pink-500); line-height: 1; display: block; }
-    .points-lbl { font-size: 0.7rem; text-transform: uppercase; color: #999; font-weight: 700; margin-top: 5px; }
+    .delete-section { margin-top: 2rem; border-top: 2px dashed #fee2e2; padding-top: 1.5rem; text-align: center; }
+    .btn-delete { background: #fff1f2; color: #e11d48; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 800; cursor: pointer; transition: 0.2s; &:hover { background: #ffe4e6; transform: scale(1.05); } }
 
-    .loyalty-stats { display: flex; justify-content: space-around; margin-bottom: 1.5rem; text-align: center; }
-    .l-stat label { font-size: 0.7rem; color: #aaa; font-weight: 700; display: block; margin-bottom: 2px; text-transform: uppercase; }
-    .l-stat span { font-weight: 700; color: #555; font-size: 0.95rem; }
+    /* LOYALTY CARD */
+    .loyalty-card { background: linear-gradient(135deg, #fff5f8 0%, #ffffff 100%); border: 2px solid #fce7f3; }
+    .loyalty-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .tier-badge { background: white; color: var(--pink-600); font-weight: 800; font-size: 0.8rem; padding: 6px 14px; border-radius: 16px; border: 2px solid var(--pink-200); box-shadow: 0 4px 10px rgba(255,107,157,0.1); }
+    
+    .points-circle { text-align: center; padding: 1.5rem; background: white; border-radius: 50%; width: 160px; height: 160px; margin: 0 auto 1.5rem; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 30px rgba(236,72,153,0.15); border: 6px solid var(--pink-50); transition: transform 0.3s var(--ease-bounce); &:hover { transform: scale(1.05) rotate(2deg); border-color: var(--pink-100); } }
+    .points-val { font-size: 3rem; font-weight: 800; color: var(--pink-500); line-height: 1; font-family: var(--font-display); display: block; }
+    .points-lbl { font-size: 0.75rem; text-transform: uppercase; color: var(--pink-400); font-weight: 800; margin-top: 5px; letter-spacing: 0.5px; }
 
-    .loyalty-actions { display: flex; gap: 10px; margin-bottom: 1.5rem; }
-    .btn-points { flex: 1; border: none; padding: 8px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: transform 0.2s; }
-    .btn-points:hover { transform: translateY(-2px); }
+    .loyalty-stats { display: flex; justify-content: space-around; margin-bottom: 1.5rem; text-align: center; background: rgba(255,255,255,0.6); border-radius: 16px; padding: 10px; }
+    .l-stat label { font-size: 0.7rem; color: #999; font-weight: 800; display: block; margin-bottom: 2px; text-transform: uppercase; }
+    .l-stat span { font-weight: 800; color: var(--text-dark); font-size: 1.1rem; }
+
+    .loyalty-actions { display: flex; gap: 12px; margin-bottom: 1.5rem; }
+    .btn-points { flex: 1; border: none; height: 44px; border-radius: 14px; font-weight: 800; font-size: 0.95rem; cursor: pointer; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-points:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.05); }
     .btn-points.add { background: #dcfce7; color: #166534; }
     .btn-points.sub { background: #fff7ed; color: #c2410c; }
 
-    .loyalty-history h4 { font-size: 0.9rem; margin: 0 0 10px; color: #888; border-bottom: 1px solid #fce7f3; padding-bottom: 5px; }
-    .l-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 6px 0; border-bottom: 1px dashed #fce7f3; }
-    .l-date { color: #999; font-size: 0.75rem; width: 60px; }
-    .l-reason { flex: 1; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
-    .l-points { font-weight: 700; }
+    .loyalty-history h4 { font-size: 1rem; margin: 0 0 12px; color: var(--text-dark); font-weight: 800; border-bottom: 2px dashed #fce7f3; padding-bottom: 8px; }
+    .l-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; padding: 10px 0; border-bottom: 1px dashed #fce7f3; }
+    .l-date-reason { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; padding-right: 10px; }
+    .l-date { color: #999; font-size: 0.75rem; font-weight: 700; border-bottom: none!important; }
+    .l-reason { color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+    .l-points { font-weight: 800; font-family: var(--font-display); font-size: 1.1rem; border-bottom: none!important;}
     .l-points.pos { color: #16a34a; }
     .l-points.neg { color: #ef4444; }
-    .no-history { text-align: center; color: #ccc; font-style: italic; font-size: 0.8rem; margin: 10px 0; }
+    .no-history { text-align: center; color: #ccc; font-style: italic; font-size: 0.9rem; margin: 20px 0; font-weight: 600; }
+
+    /* Orders List */
+    .orders-list { display: flex; flex-direction: column; gap: 1rem; max-height: 600px; overflow-y: auto; padding-right: 6px; 
+      &::-webkit-scrollbar { width: 6px; }
+      &::-webkit-scrollbar-track { background: transparent; }
+      &::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+    }
+    .order-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.2rem; border-radius: 20px; border: 2px solid transparent; background: #fafafa;
+      transition: all 0.3s var(--ease-bounce); cursor: pointer;
+      &:hover { background: white; border-color: var(--pink-200); transform: translateX(5px); box-shadow: var(--shadow-soft); }
+    }
+    .order-left { display: flex; flex-direction: column; gap: 4px; width: 80px; }
+    .order-id { font-weight: 800; color: #bbb; font-size: 0.85rem; letter-spacing: 0.5px; }
+    .order-date { font-weight: 800; font-size: 0.95rem; color: var(--text-dark); }
+    
+    .status-pill { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: #eee; width: fit-content; font-weight: 800; }
+    .status-pill[data-status="Pending"] { background: #fff7ed; color: #c2410c; }
+    .status-pill[data-status="InRoute"] { background: #e0f2fe; color: #0284c7; }
+    .status-pill[data-status="Delivered"] { background: #f0fdf4; color: #15803d; }
+    .status-pill[data-status="Canceled"] { background: #fef2f2; color: #dc2626; }
+    
+    .items-count { font-size: 0.85rem; color: #888; display: block; margin-top: 6px; font-weight: 600; }
+
+    .order-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .order-total { display: block; font-weight: 800; font-size: 1.2rem; color: var(--pink-600); font-family: var(--font-display); }
+    .arrow { color: #ddd; font-size: 1.2rem; font-weight: 800; }
+
+    .empty-history { text-align: center; padding: 3rem 1rem; color: var(--pink-400); font-weight: 700; background: var(--pink-50); border-radius: 20px; border: 2px dashed var(--pink-200); }
+    
+    .loading-state { text-align: center; padding: 5rem; color: #999; font-weight: 700; }
+    .spinner-cute { width: 50px; height: 50px; border: 4px solid var(--pink-100); border-top-color: var(--pink-500); border-radius: 50%; animation: spin 1s infinite; margin: 0 auto 1.5rem; }
 
     /* Modal Styles */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: fadeIn 0.2s; }
-    .modal-card { background: white; padding: 2rem; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); animation: slideUp 0.3s; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); animation: fadeIn 0.3s; }
+    .modal-card { background: white; padding: 2.5rem; border-radius: 24px; width: 90%; max-width: 420px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: slideUp 0.4s var(--ease-bounce); border: 1px solid white; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 2rem; }
+    @keyframes slideUp { from { transform: translateY(30px) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+
+    /* MOBILE RESPONSIVE */
+    @media (max-width: 900px) { 
+      :host { padding: 1rem 1rem 6rem; }
+      .profile-grid { grid-template-columns: 1fr; gap: 1.5rem; } 
+      .page-header { margin-bottom: 1.5rem; }
+      .header-actions { width: 100%; margin-top: 1rem; justify-content: stretch; }
+      .btn-action { flex: 1; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+      .stat-card { padding: 1.2rem 1rem; }
+      .stat-value { font-size: 1.6rem; }
+      .stat-value.text-sm { font-size: 1.1rem; }
+    }
+    @media (max-width: 480px) {
+      .header-content { flex-direction: column; align-items: center; text-align: center; gap: 1rem; }
+      .badges-row { justify-content: center; }
+      .badge-id { margin: 0 auto; display: block; width: 100%; text-align: center; margin-top: 8px; }
+      .stats-row { grid-template-columns: 1fr; }
+    }
   `]
 })
 export class ClientProfileComponent implements OnInit {

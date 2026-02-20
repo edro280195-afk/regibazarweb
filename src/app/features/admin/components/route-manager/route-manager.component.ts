@@ -1,4 +1,6 @@
-import { Component, OnInit, signal, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import {
+  Component, OnInit, signal, OnDestroy, ViewChild, ElementRef
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../../../core/services/api.service';
 import { WhatsAppService } from '../../../../core/services/whatsapp.service';
@@ -26,19 +28,22 @@ const GEOCODE_CONFIG = {
   imports: [CommonModule, FormsModule, GoogleMapsModule],
   template: `
     <div class="routes-page">
-      
+
+      <!-- ═══ TOAST ═══ -->
       @if (toastMessage()) {
         <div class="toast-notification">{{ toastMessage() }}</div>
       }
 
+      <!-- ═══ HEADER ═══ -->
       <div class="page-header">
-        <div>
+        <div class="page-header-text">
           <h2>Mis Rutas 🚗</h2>
           <p class="page-sub">Monitorea tus entregas en tiempo real, bonita</p>
         </div>
-        <button class="btn-refresh" (click)="loadRoutes()" title="Actualizar">🔄</button>
+        <button class="btn-refresh" (click)="loadRoutes()" [class.spinning]="loading()" title="Actualizar">🔄</button>
       </div>
 
+      <!-- ═══ LOADING SKELETON ═══ -->
       @if (loading() && routes().length === 0) {
         <div class="loading-state">
           <div class="spinner">🎀</div>
@@ -46,6 +51,7 @@ const GEOCODE_CONFIG = {
         </div>
       }
 
+      <!-- ═══ EMPTY ═══ -->
       @if (!loading() && routes().length === 0) {
         <div class="empty">
           <span class="empty-icon">🛣️</span>
@@ -54,10 +60,12 @@ const GEOCODE_CONFIG = {
         </div>
       }
 
+      <!-- ═══ LISTA DE RUTAS ═══ -->
       <div class="routes-container">
         @for (route of routes(); track route.id) {
           <div class="route-card" [attr.data-status]="route.status">
-            
+
+            <!-- Card Header -->
             <div class="route-header">
               <div class="route-title">
                 <span class="route-icon">🏎️</span>
@@ -66,15 +74,28 @@ const GEOCODE_CONFIG = {
                   <span class="route-date">{{ route.createdAt | date:'d MMM, h:mm a' }}</span>
                 </div>
               </div>
-              <div class="header-actions">
-                <span class="status-pill" [attr.data-status]="route.status">
-                  {{ route.status === 'Pending' ? '⏳ Pendiente' : route.status === 'Active' ? '🚀 En camino' : '✅ Finalizada' }}
-                </span>
-                <button class="btn-icon" (click)="openMap(route)" title="Ver Mapa en Vivo">🗺️</button>
-                <button class="btn-delete" (click)="askDelete(route)" title="Cancelar ruta">🗑️</button>
-              </div>
+              <span class="status-pill" [attr.data-status]="route.status">
+                {{ route.status === 'Pending' ? '⏳ Pendiente' : route.status === 'Active' ? '🚀 En camino' : '✅ Finalizada' }}
+              </span>
             </div>
 
+            <!-- Quick Actions Bar -->
+            <div class="card-actions">
+              <button class="action-chip chat" (click)="openChat(route)">
+                💬 <span>Chat</span>
+              </button>
+              <button class="action-chip map" (click)="openMap(route)">
+                🗺️ <span>Mapa</span>
+              </button>
+              <button class="action-chip wa" (click)="shareRouteWa(route)">
+                📱 <span>WhatsApp</span>
+              </button>
+              <button class="action-chip delete" (click)="askDelete(route)">
+                🗑️
+              </button>
+            </div>
+
+            <!-- Progress -->
             <div class="route-progress">
               <div class="progress-labels">
                 <span>Progreso</span>
@@ -85,25 +106,28 @@ const GEOCODE_CONFIG = {
               </div>
             </div>
 
+            <!-- Driver Link -->
             <div class="driver-link-section">
-              <span class="label">🔗 Link para el chofer:</span>
+              <span class="link-label">🔗 Link chofer</span>
               <div class="link-row">
-                <input type="text" [value]="route.driverLink" readonly #linkEl>
-                <button class="btn-copy" (click)="copy(linkEl)">📋 Copiar</button>
-                <button class="btn-copy btn-wa" (click)="shareRouteWa(route)">📱 Enviar</button>
+                <input type="text" [value]="route.driverLink" readonly class="link-input" #linkEl>
+                <button class="btn-copy" (click)="copy(linkEl)">📋</button>
               </div>
             </div>
 
+            <!-- Deliveries -->
             <div class="deliveries-list">
               @for (d of route.deliveries; track d.id) {
                 <div class="delivery-item" [attr.data-status]="d.status">
-                  <div class="order-badge">{{ d.sortOrder }}</div>
+                  <div class="order-badge" [attr.data-status]="d.status">{{ d.sortOrder }}</div>
                   <div class="delivery-info">
                     <strong>{{ d.clientName }}</strong>
-                    @if (d.address) { <span class="delivery-addr">📍 {{ d.address }}</span> }
+                    @if (d.address) {
+                      <span class="delivery-addr">📍 {{ d.address }}</span>
+                    }
                   </div>
                   <div class="delivery-right">
-                    <span class="delivery-total">$ {{ d.total | number:'1.2-2' }}</span>
+                    <span class="delivery-total">\${{ d.total | number:'1.2-2' }}</span>
                     <span class="delivery-status-icon" [title]="d.status">
                       {{ d.status === 'Pending' ? '⏳' : d.status === 'Delivered' ? '✅' : d.status === 'InTransit' ? '🏃' : '❌' }}
                     </span>
@@ -112,6 +136,7 @@ const GEOCODE_CONFIG = {
               }
             </div>
 
+            <!-- Failed Deliveries -->
             @if (getFailedDeliveries(route).length > 0) {
               <div class="failed-section">
                 <h4>😿 No entregados:</h4>
@@ -126,384 +151,892 @@ const GEOCODE_CONFIG = {
         }
       </div>
 
-      <!-- ═══════════════ MAP MODAL ═══════════════ -->
+      <!-- ═══════════════════════════════════════════
+           MODAL: MAPA EN VIVO
+           ═══════════════════════════════════════════ -->
       @if (showMapModal() && selectedRouteForMap()) {
         <div class="modal-overlay" (click)="closeMap()">
-          <div class="modal-card map-card" (click)="$event.stopPropagation()">
-            <div class="map-header">
-              <h3>🗺️ Seguimiento en Vivo</h3>
-              <p>Ruta #{{ selectedRouteForMap()!.id }}</p>
-              <button class="btn-close-map" (click)="closeMap()">✗</button>
+          <div class="modal-fullscreen map-modal" (click)="$event.stopPropagation()">
+
+            <div class="modal-top-bar">
+              <div class="modal-top-info">
+                <strong>🗺️ Seguimiento en Vivo</strong>
+                <span>Ruta #{{ selectedRouteForMap()!.id }}</span>
+              </div>
+              <button class="btn-close" (click)="closeMap()">✕</button>
             </div>
-            
-            <div class="map-container">
-               <google-map 
-                height="100%" 
-                width="100%" 
-                [center]="center" 
+
+            <div class="map-area">
+              <google-map
+                height="100%"
+                width="100%"
+                [center]="center"
                 [zoom]="zoom"
                 [options]="mapOptions">
-                
-                <!-- Base / Warehouse Marker -->
-                <map-marker 
-                  [position]="warehousePos" 
+
+                <map-marker
+                  [position]="warehousePos"
                   [options]="warehouseOptions">
                 </map-marker>
 
-                <!-- Driver Marker -->
                 @if (driverPos) {
-                  <map-marker 
-                    [position]="driverPos" 
+                  <map-marker
+                    [position]="driverPos"
                     [options]="driverOptions">
                   </map-marker>
                 }
 
-                <!-- Delivery Markers -->
                 @for (d of routeDeliveries; track d.id) {
                   @if (d.latitude && d.longitude) {
-                    <map-marker 
-                      [position]="{ lat: d.latitude, lng: d.longitude }" 
+                    <map-marker
+                      [position]="{ lat: d.latitude, lng: d.longitude }"
                       [options]="getDeliveryMarkerOptions(d)">
                     </map-marker>
                   }
                 }
 
-                <!-- Route Polyline (Directions) -->
-                 @if (directionsResult(); as result) {
-                  <map-directions-renderer 
-                    [directions]="result" 
+                @if (directionsResult(); as result) {
+                  <map-directions-renderer
+                    [directions]="result"
                     [options]="directionsOptions">
                   </map-directions-renderer>
                 }
               </google-map>
+
+              <!-- GPS Loading Overlay -->
+              @if (waitingForGps()) {
+                <div class="gps-waiting-overlay">
+                  <div class="gps-waiting-card">
+                    <div class="gps-pulse-ring"></div>
+                    <span class="gps-icon">📡</span>
+                    <p>Esperando señal GPS del chofer...</p>
+                    <span class="gps-hint">Se actualizará automáticamente</span>
+                  </div>
+                </div>
+              }
+
+              <!-- Plotting Loading -->
+              @if (plottingRoute()) {
+                <div class="plotting-indicator">
+                  <div class="mini-spinner"></div>
+                  Trazando ruta...
+                </div>
+              }
             </div>
 
             <div class="map-footer">
               @if (lastLocationUpdate()) {
                 <span class="live-indicator">
-                  <span class="dot"></span> En vivo ({{ lastLocationUpdate() | date:'h:mm:ss a' }})
+                  <span class="pulse-dot"></span>
+                  En vivo · {{ lastLocationUpdate() | date:'h:mm:ss a' }}
                 </span>
               } @else {
-                <span class="offline-indicator">Sin GPS en vivo. Mostrando ruta planificada 🗺️</span>
+                <span class="offline-indicator">📍 Sin GPS en vivo — Mostrando ruta planificada</span>
               }
             </div>
+
           </div>
         </div>
       }
 
-      <!-- ═══════════════ CHAT MODAL ═══════════════ -->
+      <!-- ═══════════════════════════════════════════
+           MODAL: CHAT CON REPARTIDOR
+           ═══════════════════════════════════════════ -->
       @if (chatRoute()) {
         <div class="modal-overlay" (click)="closeChat()">
-          <div class="modal-card chat-card" (click)="$event.stopPropagation()">
-            <div class="chat-header">
-              <div class="driver-info">
+          <div class="modal-fullscreen chat-modal" (click)="$event.stopPropagation()">
+
+            <div class="modal-top-bar chat-top">
+              <div class="driver-badge">
                 <span class="driver-avatar">🧢</span>
-                <div>
-                  <h3>Chat con Repartidor</h3>
-                  <span class="status">Ruta #{{ chatRoute()!.id }}</span>
+                <div class="modal-top-info">
+                  <strong>Chat con Repartidor</strong>
+                  <span>Ruta #{{ chatRoute()!.id }}</span>
                 </div>
               </div>
-              <button class="btn-close-map" (click)="closeChat()">✕</button>
+              <button class="btn-close" (click)="closeChat()">✕</button>
             </div>
 
             <div class="chat-messages" #chatScroll>
-              @if (activeMessages().length === 0) {
-                <div class="empty-chat">
+              @if (loadingChat()) {
+                <div class="chat-loading">
+                  <div class="mini-spinner pink"></div>
+                  <span>Cargando mensajes...</span>
+                </div>
+              }
+              @if (!loadingChat() && activeMessages().length === 0) {
+                <div class="chat-empty">
                   <span>💬</span>
                   <p>Inicia la conversación con tu repartidor</p>
                 </div>
               }
               @for (msg of activeMessages(); track msg.id) {
-                <div class="message-bubble" [class.me]="msg.sender === 'Admin'" [class.them]="msg.sender === 'Driver'">
-                  <div class="bubble-content">
-                    {{ msg.text }}
-                  </div>
+                <div class="msg-bubble"
+                     [class.me]="msg.sender === 'Admin'"
+                     [class.them]="msg.sender !== 'Admin'">
+                  <span class="msg-text">{{ msg.text }}</span>
                   <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
                 </div>
               }
             </div>
 
             <div class="chat-input-area">
-              <input type="text" [(ngModel)]="newMessage" (keydown.enter)="sendMessage()" placeholder="Escribe un mensaje...">
-              <button class="btn-send" (click)="sendMessage()" [disabled]="!newMessage.trim()">➤</button>
+              <input type="text"
+                     [(ngModel)]="newMessage"
+                     (keydown.enter)="sendMessage()"
+                     placeholder="Escribe un mensaje..."
+                     autocomplete="off">
+              <button class="send-btn" (click)="sendMessage()" [disabled]="!newMessage.trim()">➤</button>
             </div>
+
           </div>
         </div>
       }
+
     </div>
   `,
   styles: [`
     /* ═══════════════════════════════════════════
-       DESIGN TOKENS
-           ═══════════════════════════════════════════ */
+       BASE
+       ═══════════════════════════════════════════ */
     :host {
+      display: block;
       --glass-bg: rgba(255, 255, 255, 0.75);
       --shadow-soft: 0 10px 40px rgba(255, 107, 157, 0.1);
-      --gradient-card: linear-gradient(145deg, #ffffff, #fff0f6);
     }
 
     .routes-page {
-      padding: 1rem 1.25rem 6rem;
+      padding: 1rem;
+      padding-bottom: 6rem;
       max-width: 900px;
       margin: 0 auto;
       min-height: 100vh;
+      min-height: 100dvh;
     }
 
-    /* HEADER */
-    .page-header {
-      display: flex; justify-content: space-between; align-items: flex-end;
-      margin-bottom: 2.5rem;
+    /* ═══ TOAST ═══ */
+    .toast-notification {
+      position: fixed;
+      top: env(safe-area-inset-top, 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f2937;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      z-index: 6000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      animation: toastIn 0.3s ease-out;
+      max-width: calc(100vw - 2rem);
+      text-align: center;
     }
-    h2 {
-      font-family: var(--font-display); font-size: 2.5rem;
-      color: var(--pink-600); margin: 0;
-      text-shadow: 2px 2px 0 white;
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════ */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .page-header-text h2 {
+      font-size: 1.8rem;
+      color: var(--pink-600, #db2777);
+      margin: 0;
     }
     .page-sub {
-      font-family: var(--font-body); color: var(--text-medium);
-      margin: 5px 0 0; font-weight: 600;
+      color: #9ca3af;
+      margin: 4px 0 0;
+      font-weight: 600;
+      font-size: 0.82rem;
     }
     .btn-refresh {
-      background: white; border: 1px solid var(--pink-200); width: 45px; height: 45px;
-      border-radius: 50%; font-size: 1.2rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 4px 10px rgba(255,107,157,0.1);
+      background: white;
+      border: 1.5px solid #fce7f3;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.4s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      flex-shrink: 0;
     }
-    .btn-refresh:hover { transform: rotate(180deg) scale(1.1); background: var(--pink-50); }
-
-    /* LOADING & EMPTY */
-    .loading-state {
-      text-align: center; color: var(--pink-400); font-family: var(--font-display);
-      margin-top: 4rem;
-    }
-    .spinner { font-size: 3rem; animation: spin 1s infinite linear; margin-bottom: 1rem; }
+    .btn-refresh:active { transform: rotate(180deg) scale(0.9); }
+    .btn-refresh.spinning { animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .empty {
-      text-align: center; padding: 4rem 1rem; color: #ccc;
-      background: rgba(255,255,255,0.5); border-radius: 30px; border: 2px dashed #eee;
+    /* ═══ LOADING & EMPTY ═══ */
+    .loading-state {
+      text-align: center;
+      color: #ec4899;
+      margin-top: 4rem;
     }
-    .empty-icon { font-size: 4rem; opacity: 0.4; margin-bottom: 1rem; display: block; }
-    .empty p { font-weight: 700; margin: 0; font-size: 1.1rem; color: #aaa; }
-    .empty-hint { font-size: 0.9rem !important; color: var(--pink-300) !important; margin-top: 5px !important; }
+    .loading-state .spinner {
+      font-size: 3rem;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
 
-    /* CARD LIST */
-    .routes-container { display: flex; flex-direction: column; gap: 1.5rem; }
+    .empty {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      color: #d1d5db;
+      background: rgba(255,255,255,0.5);
+      border-radius: 24px;
+      border: 2px dashed #e5e7eb;
+    }
+    .empty-icon { font-size: 3rem; opacity: 0.4; display: block; margin-bottom: 0.75rem; }
+    .empty p { font-weight: 700; margin: 0; font-size: 1rem; color: #9ca3af; }
+    .empty-hint { font-size: 0.85rem !important; color: #f9a8d4 !important; margin-top: 6px !important; }
+
+    /* ═══════════════════════════════════════════
+       ROUTE CARDS
+       ═══════════════════════════════════════════ */
+    .routes-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
 
     .route-card {
       background: var(--glass-bg);
       backdrop-filter: blur(12px);
-      border-radius: 28px;
-      padding: 1.5rem;
-      border: 1px solid white;
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 1rem;
+      border: 1.5px solid #fce7f3;
       box-shadow: var(--shadow-soft);
-      transition: transform 0.3s;
-      position: relative; overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+      overflow: hidden;
     }
-    .route-card:hover { transform: translateY(-5px); box-shadow: 0 15px 50px rgba(255, 107, 157, 0.2); }
-    
-    .route-header {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 1.5rem;
-    }
-    .route-title { display: flex; align-items: center; gap: 12px; }
-    .route-icon {
-      font-size: 2rem; background: var(--pink-50); width: 50px; height: 50px;
-      border-radius: 18px; display: flex; align-items: center; justify-content: center;
-      box-shadow: inset 0 0 10px rgba(236,72,153,0.1);
-    }
-    .route-meta { display: flex; flex-direction: column; }
-    .route-id { font-size: 1.1rem; font-weight: 800; color: var(--text-dark); }
-    .route-date { font-size: 0.8rem; color: #999; font-weight: 600; text-transform: uppercase; }
 
-    .header-actions { display: flex; align-items: center; gap: 8px; }
-    .btn-icon {
-      background: #f0f9ff; border: none; width: 38px; height: 38px; border-radius: 12px;
-      font-size: 1.1rem; cursor: pointer; transition: 0.2s;
+    /* ═══ Card Header ═══ */
+    .route-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      gap: 8px;
     }
-    .btn-icon:hover { background: #e0f2fe; transform: translateY(-2px); }
-    .btn-delete {
-      background: #fff1f2; border: none; width: 38px; height: 38px; border-radius: 12px;
-      font-size: 1.1rem; cursor: pointer; transition: 0.2s; color: #e11d48;
+    .route-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
-    .btn-delete:hover { background: #ffe4e6; transform: translateY(-2px); }
+    .route-icon {
+      font-size: 1.5rem;
+      background: #fdf2f8;
+      width: 42px; height: 42px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .route-meta { display: flex; flex-direction: column; min-width: 0; }
+    .route-id {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #1f2937;
+      white-space: nowrap;
+    }
+    .route-date {
+      font-size: 0.72rem;
+      color: #9ca3af;
+      font-weight: 600;
+    }
 
     .status-pill {
-      padding: 6px 12px; border-radius: 20px; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-weight: 800;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    [data-status="Pending"] { background: #fffbeb; color: #d97706; }
-    [data-status="Active"]  { background: #eff6ff; color: #3b82f6; border: 1px solid #bfdbfe; }
-    [data-status="Completed"] { background: #f0fdf4; color: #16a34a; }
+    .status-pill[data-status="Pending"]   { background: #fef3c7; color: #d97706; }
+    .status-pill[data-status="Active"]    { background: #dbeafe; color: #2563eb; }
+    .status-pill[data-status="Completed"] { background: #d1fae5; color: #059669; }
 
-    /* PROGRESS */
-    .route-progress { margin-bottom: 1.5rem; }
-    .progress-labels { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: #888; margin-bottom: 6px; text-transform: uppercase; }
+    /* ═══ Action Chips ═══ */
+    .card-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .action-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1.5px solid #f3f4f6;
+      background: white;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      color: #374151;
+      white-space: nowrap;
+    }
+    .action-chip:active { transform: scale(0.95); }
+    .action-chip span { display: inline; }
+    .action-chip.chat:active { background: #fdf2f8; }
+    .action-chip.map:active  { background: #eff6ff; }
+    .action-chip.wa:active   { background: #f0fdf4; }
+    .action-chip.delete {
+      border-color: #fecaca;
+      color: #dc2626;
+      margin-left: auto;
+    }
+    .action-chip.delete:active { background: #fef2f2; }
+
+    /* ═══ Progress ═══ */
+    .route-progress { margin-bottom: 0.75rem; }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #9ca3af;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
     .progress-track {
-      background: #f0f0f0; border-radius: 10px; height: 10px; overflow: hidden;
+      background: #f3f4f6;
+      border-radius: 10px;
+      height: 8px;
+      overflow: hidden;
     }
     .progress-fill {
-      height: 100%; background: linear-gradient(90deg, #ff6b9d, #c084fc);
-      border-radius: 10px; transition: width 0.5s ease-out;
+      height: 100%;
+      background: linear-gradient(90deg, #ec4899, #c084fc);
+      border-radius: 10px;
+      transition: width 0.5s ease;
     }
 
-    /* LINK SECTION */
+    /* ═══ Driver Link ═══ */
     .driver-link-section {
-      background: rgba(255,255,255,0.6); border: 1px solid #f0f0f0;
-      border-radius: 16px; padding: 12px; display: flex; align-items: center;
-      gap: 12px; margin-bottom: 2rem;
+      background: #fafafa;
+      border: 1.5px solid #f3f4f6;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 0.75rem;
     }
-    .label { font-weight: 800; color: #aaa; font-size: 0.75rem; text-transform: uppercase; white-space: nowrap; }
-    .link-row { flex: 1; display: flex; gap: 8px; }
-    input {
-      flex: 1; border: none; background: transparent; font-family: monospace; font-size: 0.9rem; color: #555;
-      background: white; padding: 6px 10px; border-radius: 8px; outline: none;
+    .link-label {
+      display: block;
+      font-weight: 700;
+      color: #9ca3af;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .link-row {
+      display: flex;
+      gap: 6px;
+    }
+    .link-input {
+      flex: 1;
+      min-width: 0;
+      border: 1.5px solid #e5e7eb;
+      background: white;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: #6b7280;
+      outline: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .btn-copy {
-      background: var(--pink-500); color: white; border: none; padding: 6px 14px;
-      border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.8rem;
-      transition: 0.2s;
+      background: var(--pink-500, #ec4899);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform 0.1s;
     }
-    .btn-copy:hover { box-shadow: 0 4px 12px rgba(236,72,153,0.3); transform: translateY(-1px); }
-    .btn-wa { background: #25D366; margin-left: 5px; }
-    .btn-wa:hover { box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4); }
+    .btn-copy:active { transform: scale(0.92); }
 
-    /* DELIVERIES LIST */
+    /* ═══ Deliveries List ═══ */
     .deliveries-list {
-      display: flex; flex-direction: column; gap: 10px; position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
     }
     .deliveries-list::before {
-      content: ''; position: absolute; left: 14px; top: 15px; bottom: 15px;
-      width: 2px; background: #eee; z-index: 0;
+      content: '';
+      position: absolute;
+      left: 19px;
+      top: 12px;
+      bottom: 12px;
+      width: 2px;
+      background: #f3f4f6;
+      z-index: 0;
     }
-    
+
     .delivery-item {
-      display: flex; align-items: center; gap: 12px;
-      background: white; padding: 12px; border-radius: 16px;
-      border: 1.5px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-      position: relative; z-index: 1; transition: 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: white;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1.5px solid #f9fafb;
+      position: relative;
+      z-index: 1;
+      transition: border-color 0.15s;
     }
-    .delivery-item:hover { transform: translateX(5px); border-color: var(--pink-100); }
-    
+    .delivery-item[data-status="Delivered"]    { opacity: 0.6; }
+    .delivery-item[data-status="NotDelivered"] { opacity: 0.5; border-color: #fecaca; }
+    .delivery-item[data-status="InTransit"]    { border-color: #93c5fd; background: #f0f7ff; }
+
     .order-badge {
-      width: 30px; height: 30px; background: var(--pink-100); color: var(--pink-600);
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 0.9rem; flex-shrink: 0;
-      border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      width: 28px; height: 28px;
+      background: #fce7f3;
+      color: #db2777;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.78rem;
+      flex-shrink: 0;
+      border: 2px solid white;
     }
-    
-    .delivery-info { flex: 1; display: flex; flex-direction: column; }
-    .delivery-info strong { color: #444; font-size: 0.95rem; }
-    .delivery-addr { font-size: 0.8rem; color: #888; margin-top: 2px; }
-    
-    .delivery-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-    .delivery-total { font-weight: 800; color: var(--pink-500); font-size: 0.9rem; }
-    .delivery-status-icon { font-size: 1.1rem; }
+    .order-badge[data-status="InTransit"]    { background: #dbeafe; color: #2563eb; }
+    .order-badge[data-status="Delivered"]    { background: #d1fae5; color: #059669; }
+    .order-badge[data-status="NotDelivered"] { background: #fecaca; color: #dc2626; }
 
-    /* FAILED */
+    .delivery-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .delivery-info strong {
+      font-size: 0.88rem;
+      color: #374151;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .delivery-addr {
+      font-size: 0.72rem;
+      color: #9ca3af;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    .delivery-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .delivery-total {
+      font-weight: 800;
+      color: #ec4899;
+      font-size: 0.82rem;
+    }
+    .delivery-status-icon { font-size: 1rem; }
+
+    /* ═══ Failed Section ═══ */
     .failed-section {
-      background: #fff1f2; border: 1px solid #fecdd3; border-radius: 16px;
-      padding: 1rem; margin-top: 1rem;
+      background: #fef2f2;
+      border: 1.5px solid #fecaca;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-top: 0.75rem;
     }
-    .failed-item { font-size: 0.85rem; color: #be123c; margin-bottom: 4px; }
+    .failed-section h4 { margin: 0 0 6px; font-size: 0.85rem; }
+    .failed-item {
+      font-size: 0.8rem;
+      color: #be123c;
+      margin-bottom: 3px;
+    }
 
-    /* ═══ MAP MODAL ═══ */
+    /* ═══════════════════════════════════════════
+       MODAL OVERLAY (Shared)
+       ═══════════════════════════════════════════ */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
-      z-index: 2000; display: flex; align-items: center; justify-content: center;
-      padding: 1rem; animation: fadeIn 0.3s;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 3000;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      animation: fadeIn 0.2s ease-out;
     }
-    .map-card {
-      background: white; width: 100%; max-width: 800px; height: 80vh;
-      border-radius: 30px; overflow: hidden; display: flex; flex-direction: column;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.3); border: 4px solid white;
-      animation: popIn 0.4s var(--ease-spring);
-    }
-    .map-header {
-      padding: 1rem 1.5rem; background: white; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eee;
-    }
-    .map-header h3 { margin: 0; font-family: var(--font-display); font-size: 1.5rem; color: #333; }
-    .map-header p { margin: 0; font-size: 0.9rem; color: #bbb; font-weight: 700; margin-left: auto; margin-right: 15px; }
-    .btn-close-map {
-      background: #f5f5f5; border: none; width: 36px; height: 36px; border-radius: 50%;
-      font-size: 1.2rem; cursor: pointer; color: #888;
-    }
-    
-    .map-container { flex: 1; background: #eee; position: relative; }
-    
-    .map-footer {
-      padding: 10px 15px; background: #222; color: white; font-size: 0.85rem;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .live-indicator { display: flex; align-items: center; gap: 6px; color: #34d399; font-weight: 700; }
-    .dot { width: 10px; height: 10px; background: #34d399; border-radius: 50%; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(2); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* ═══ CHAT MODAL ═══ */
-    .chat-card {
-      max-width: 400px; height: 600px;
-      display: flex; flex-direction: column;
+    /* ═══ Modal Base (fullscreen bottom sheet on mobile) ═══ */
+    .modal-fullscreen {
+      width: 100%;
+      max-width: 600px;
+      background: white;
+      border-radius: 20px 20px 0 0;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 0.3s ease-out;
+      overflow: hidden;
     }
-    .chat-header {
-      padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
-      background: #fdf2f8;
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
     }
-    .driver-info { display: flex; align-items: center; gap: 10px; }
-    .driver-avatar { font-size: 1.5rem; background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-    .chat-header h3 { margin: 0; font-size: 1rem; color: var(--pink-600); }
-    .chat-header .status { font-size: 0.75rem; color: #666; font-weight: 700; }
+
+    .modal-top-bar {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      border-bottom: 1px solid #f3f4f6;
+      background: white;
+    }
+    .chat-top { background: #fdf2f8; }
+    .modal-top-info strong {
+      display: block;
+      font-size: 0.95rem;
+      color: #1f2937;
+    }
+    .modal-top-info span {
+      font-size: 0.72rem;
+      color: #9ca3af;
+    }
+    .driver-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .driver-avatar {
+      font-size: 1.3rem;
+      background: white;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid #fce7f3;
+    }
+    .btn-close {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #f3f4f6;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      flex-shrink: 0;
+    }
+    .btn-close:active { background: #e5e7eb; }
+
+    /* ═══════════════════════════════════════════
+       MAP MODAL
+       ═══════════════════════════════════════════ */
+    .map-modal {
+      height: 92dvh;
+      max-height: 92dvh;
+    }
+
+    .map-area {
+      flex: 1;
+      position: relative;
+      background: #f3f4f6;
+      min-height: 0;
+    }
+
+    /* GPS Waiting Overlay */
+    .gps-waiting-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .gps-waiting-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+      padding: 2rem;
+    }
+    .gps-icon { font-size: 2.5rem; position: relative; z-index: 1; }
+    .gps-pulse-ring {
+      width: 80px; height: 80px;
+      border: 3px solid #ec4899;
+      border-radius: 50%;
+      position: absolute;
+      animation: gpsPulse 2s ease-out infinite;
+      opacity: 0;
+    }
+    @keyframes gpsPulse {
+      0%   { transform: scale(0.5); opacity: 0.6; }
+      100% { transform: scale(1.8); opacity: 0; }
+    }
+    .gps-waiting-card p {
+      margin: 0;
+      font-weight: 700;
+      color: #374151;
+      font-size: 0.95rem;
+    }
+    .gps-hint {
+      font-size: 0.75rem;
+      color: #9ca3af;
+    }
+
+    /* Plotting Indicator */
+    .plotting-indicator {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #6b7280;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .mini-spinner {
+      width: 16px; height: 16px;
+      border: 2.5px solid #e5e7eb;
+      border-top-color: #ec4899;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    .mini-spinner.pink {
+      border-color: #fce7f3;
+      border-top-color: #ec4899;
+    }
+
+    /* Map Footer */
+    .map-footer {
+      padding: 10px 16px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      background: #1f2937;
+      color: white;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #34d399;
+      font-weight: 700;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px;
+      background: #34d399;
+      border-radius: 50%;
+      animation: pulseDot 1.5s ease-in-out infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(1.5); }
+    }
+    .offline-indicator {
+      color: #9ca3af;
+      font-weight: 600;
+    }
+
+    /* ═══════════════════════════════════════════
+       CHAT MODAL
+       ═══════════════════════════════════════════ */
+    .chat-modal {
+      height: 85dvh;
+      max-height: 85dvh;
+    }
 
     .chat-messages {
-      flex: 1; overflow-y: auto; padding: 1rem; background: #fffbff;
-      display: flex; flex-direction: column; gap: 10px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f9fafb;
+      -webkit-overflow-scrolling: touch;
+      min-height: 0;
     }
-    .message-bubble {
-      max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 0.9rem; position: relative;
+
+    .chat-loading {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #9ca3af;
+      font-size: 0.85rem;
+      font-weight: 600;
     }
-    .message-bubble.me {
-      align-self: flex-end; background: var(--pink-500); color: white; border-bottom-right-radius: 4px;
+
+    .chat-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #d1d5db;
+      gap: 6px;
     }
-    .message-bubble.them {
-      align-self: flex-start; background: white; border: 1px solid #eee; color: #444; border-bottom-left-radius: 4px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    .chat-empty span { font-size: 2.5rem; opacity: 0.5; }
+    .chat-empty p { margin: 0; font-size: 0.85rem; }
+
+    /* Bubbles */
+    .msg-bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 0.88rem;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      word-break: break-word;
     }
-    .msg-time { display: block; font-size: 0.65rem; margin-top: 4px; opacity: 0.7; text-align: right; }
-    
+    .msg-bubble.me {
+      align-self: flex-end;
+      background: #ec4899;
+      color: white;
+      border-bottom-right-radius: 6px;
+    }
+    .msg-bubble.them {
+      align-self: flex-start;
+      background: white;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+      border-bottom-left-radius: 6px;
+    }
+    .msg-text { display: block; }
+    .msg-time {
+      display: block;
+      font-size: 0.6rem;
+      margin-top: 4px;
+      opacity: 0.65;
+      text-align: right;
+    }
+
+    /* Input */
     .chat-input-area {
-      padding: 10px; border-top: 1px solid #eee; display: flex; gap: 8px; background: white;
+      padding: 12px 14px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 8px));
+      border-top: 1px solid #f3f4f6;
+      display: flex;
+      gap: 8px;
+      background: white;
+      flex-shrink: 0;
     }
     .chat-input-area input {
-      flex: 1; border: 1px solid #eee; padding: 10px 14px; border-radius: 24px; outline: none; transition: 0.2s;
+      flex: 1;
+      padding: 11px 16px;
+      border-radius: 25px;
+      border: 1.5px solid #e5e7eb;
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      min-width: 0;
+      background: white;
     }
-    .chat-input-area input:focus { border-color: var(--pink-400); }
-    
-    .empty-chat {
-      text-align: center; color: #ccc; margin-top: 2rem;
-      display: flex; flex-direction: column; align-items: center;
-    }
-    .empty-chat span { font-size: 3rem; opacity: 0.5; margin-bottom: 5px; }
+    .chat-input-area input:focus { border-color: #f9a8d4; }
 
-    /* ═══ RESPONSIVE ═══ */
-    @media (max-width: 600px) {
-      .routes-page { padding: 1rem 1rem 5rem; }
-      h2 { font-size: 2rem; }
-      .route-card { padding: 1.2rem; }
-      
-      .page-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
-      .btn-refresh { align-self: flex-end; }
-      
-      .route-header { flex-direction: column; gap: 1rem; }
-      .header-actions { width: 100%; justify-content: space-between; }
-      
-      .driver-link-section { flex-direction: column; }
-      .link-row { width: 100%; }
-      input { width: 100%; }
-    }    
+    .send-btn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: none;
+      background: #ec4899;
+      color: white;
+      font-size: 1.1rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    .send-btn:disabled { opacity: 0.35; }
+    .send-btn:active:not(:disabled) { transform: scale(0.9); }
+
+    /* ═══════════════════════════════════════════
+       DESKTOP ENHANCEMENTS
+       ═══════════════════════════════════════════ */
+    @media (min-width: 640px) {
+      .routes-page { padding: 1.5rem 2rem 4rem; }
+      .page-header-text h2 { font-size: 2.2rem; }
+
+      .route-card { padding: 1.25rem; border-radius: 24px; }
+      .route-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(255,107,157,0.15);
+      }
+
+      .action-chip { padding: 8px 14px; }
+
+      /* Desktop modals: centered card instead of bottom sheet */
+      .modal-overlay {
+        align-items: center;
+      }
+      .modal-fullscreen {
+        border-radius: 24px;
+        max-height: 85vh;
+      }
+      .map-modal { height: 80vh; max-height: 80vh; }
+      .chat-modal {
+        max-width: 440px;
+        height: 600px;
+        max-height: 80vh;
+      }
+    }
   `]
 })
 export class RouteManagerComponent implements OnInit, OnDestroy {
   @ViewChild(GoogleMap) map!: GoogleMap;
+  @ViewChild('chatScroll') chatScroll?: ElementRef;
 
+  // ═══ SIGNALS ═══
   routes = signal<DeliveryRoute[]>([]);
   loading = signal(false);
   toastMessage = signal('');
@@ -512,12 +1045,17 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   showMapModal = signal(false);
   selectedRouteForMap = signal<DeliveryRoute | null>(null);
   lastLocationUpdate = signal<string | null>(null);
+  waitingForGps = signal(false);
+  plottingRoute = signal(false);
 
   // Chat State
   chatRoute = signal<DeliveryRoute | null>(null);
   activeMessages = signal<ChatMessage[]>([]);
+  loadingChat = signal(false);
   newMessage = '';
-  @ViewChild('chatScroll') chatScroll?: ElementRef;
+
+  /** Anti-duplicado de mensajes */
+  private chatMsgIds = new Set<number | string>();
 
   // Google Maps Config
   center: google.maps.LatLngLiteral = { lat: GEOCODE_CONFIG.defaultLat, lng: GEOCODE_CONFIG.defaultLng };
@@ -526,11 +1064,12 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     disableDefaultUI: false,
     zoomControl: true,
     mapTypeControl: false,
-    streetViewControl: false
+    streetViewControl: false,
+    gestureHandling: 'greedy'
   };
 
   // Markers
-  warehousePos: google.maps.LatLngLiteral = { lat: 27.5146982, lng: -99.571329 }; //Bodega, osea la casa
+  warehousePos: google.maps.LatLngLiteral = { lat: 27.5146982, lng: -99.571329 };
   driverPos?: google.maps.LatLngLiteral;
   routeDeliveries: RouteDelivery[] = [];
   directionsResult = signal<google.maps.DirectionsResult | undefined>(undefined);
@@ -563,8 +1102,8 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     }
   };
 
-  // Helper for geocoding
   private geocodeCache = new Map<string, { lat: number; lng: number } | null>();
+  private gpsTimeoutId?: ReturnType<typeof setTimeout>;
 
   constructor(
     private api: ApiService,
@@ -576,29 +1115,36 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadRoutes();
     this.signalr.connect().then(() => {
-      this.signalr.joinAdmin();
+      this.signalr.joinAdminGroup();
     });
 
+    // GPS del chofer
     this.signalr.locationUpdate$.subscribe(loc => {
       this.handleLocationUpdate(loc);
     });
 
+    // Chat de chofer → admin (con anti-duplicado)
     this.signalr.adminChatUpdate$.subscribe(msg => {
       if (this.chatRoute()?.id === msg.deliveryRouteId) {
-        this.activeMessages.update(msgs => [...msgs, msg]);
-        this.scrollToBottom();
+        if (!this.chatMsgIds.has(msg.id)) {
+          this.chatMsgIds.add(msg.id);
+          this.activeMessages.update(msgs => [...msgs, msg]);
+          this.scrollToBottom();
+        }
       } else {
         this.showToast(`💬 Mensaje del chofer (Ruta #${msg.deliveryRouteId})`);
       }
     });
   }
 
-
-
   ngOnDestroy(): void {
     this.signalr.disconnect();
+    if (this.gpsTimeoutId) clearTimeout(this.gpsTimeoutId);
   }
 
+  // ═══════════════════════════════════════════
+  //  RUTAS
+  // ═══════════════════════════════════════════
   loadRoutes(): void {
     this.loading.set(true);
     this.api.getRoutes().subscribe({
@@ -611,7 +1157,7 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     });
   }
 
-  async askDelete(route: DeliveryRoute) {
+  async askDelete(route: DeliveryRoute): Promise<void> {
     const confirmed = await this.confirm.confirm({
       title: '¿Cancelar esta ruta? 🚫',
       message: `La ruta #${route.id} se eliminará y los pedidos volverán a estar pendientes. ✍`,
@@ -632,15 +1178,14 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   }
 
   getProgress(r: DeliveryRoute): number {
-    if (r.deliveries.length === 0) return 0;
-    return (this.getDelivered(r) / r.deliveries.length) * 100;
+    return r.deliveries.length ? (this.getDelivered(r) / r.deliveries.length) * 100 : 0;
   }
 
   getDelivered(r: DeliveryRoute): number {
     return r.deliveries.filter(d => d.status === 'Delivered').length;
   }
 
-  getFailedDeliveries(r: DeliveryRoute): any[] {
+  getFailedDeliveries(r: DeliveryRoute): RouteDelivery[] {
     return r.deliveries.filter(d => d.status === 'NotDelivered');
   }
 
@@ -650,7 +1195,7 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   }
 
   shareRouteWa(route: DeliveryRoute): void {
-    const phone = '8671794003'; // Example
+    const phone = '8671794003';
     this.whatsapp.shareRouteWithDriver(phone, route);
   }
 
@@ -659,105 +1204,101 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     setTimeout(() => this.toastMessage.set(''), 3000);
   }
 
-  // ═══ MAP LOGIC ═══
-  openMap(route: DeliveryRoute) {
+  // ═══════════════════════════════════════════
+  //  MAPA EN VIVO
+  // ═══════════════════════════════════════════
+  openMap(route: DeliveryRoute): void {
     this.selectedRouteForMap.set(route);
     this.showMapModal.set(true);
     this.routeDeliveries = route.deliveries;
     this.directionsResult.set(undefined);
     this.driverPos = undefined;
+    this.lastLocationUpdate.set(null);
 
     if (route.driverToken) {
       this.signalr.joinRoute(route.driverToken);
     }
 
-    // Initial driver location
-    if (route.driverLocation && route.driverLocation.latitude) {
-      this.driverPos = { lat: route.driverLocation.latitude, lng: route.driverLocation.longitude };
+    // Check initial driver location
+    if (route.driverLocation?.latitude) {
+      this.driverPos = {
+        lat: route.driverLocation.latitude,
+        lng: route.driverLocation.longitude
+      };
       this.lastLocationUpdate.set(route.driverLocation.lastUpdate);
-    }
-
-    // Center map logic
-    if (this.driverPos) {
-      this.center = this.driverPos;
+      this.waitingForGps.set(false);
     } else {
-      this.center = this.warehousePos;
+      // Show GPS waiting state with auto-timeout
+      this.waitingForGps.set(true);
+      if (this.gpsTimeoutId) clearTimeout(this.gpsTimeoutId);
+      this.gpsTimeoutId = setTimeout(() => {
+        if (this.waitingForGps()) {
+          this.waitingForGps.set(false);
+        }
+      }, 15000); // 15s timeout
     }
 
-    // Trigger plotting with slight delay for modal to open
-    setTimeout(() => {
-      this.plotRoute(route);
-    }, 200);
+    this.center = this.driverPos || this.warehousePos;
+
+    setTimeout(() => this.plotRoute(route), 250);
   }
 
-  closeMap() {
+  closeMap(): void {
     this.showMapModal.set(false);
     this.selectedRouteForMap.set(null);
+    this.waitingForGps.set(false);
   }
 
   getDeliveryMarkerOptions(d: RouteDelivery): google.maps.MarkerOptions {
-    let color = '#f472b6'; // Default
+    let color = '#f472b6';
     if (d.status === 'InTransit') color = '#3b82f6';
     else if (d.status === 'Delivered') color = '#22c55e';
     else if (d.status === 'NotDelivered') color = '#ef4444';
 
     return {
-      label: {
-        text: d.sortOrder.toString(),
-        color: 'white',
-        fontWeight: 'bold'
-      },
+      label: { text: d.sortOrder.toString(), color: 'white', fontWeight: 'bold' },
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         fillColor: color,
         fillOpacity: 1,
         strokeColor: 'white',
         strokeWeight: 2,
-        scale: 10
+        scale: 12
       },
       title: `${d.sortOrder}. ${d.clientName} (${d.status})`
     };
   }
 
-  private async plotRoute(route: DeliveryRoute) {
-    // 1. Prepare Waypoints
-    // Needs Coordinates. If missing, we warn? Or just skip?
-    // We assume route optimizer did its job, but lets be safe.
+  private async plotRoute(route: DeliveryRoute): Promise<void> {
+    this.plottingRoute.set(true);
 
-    // Sort logic from API should be correct (sortOrder), but lets verify
     const sortedDeliveries = [...route.deliveries].sort((a, b) => a.sortOrder - b.sortOrder);
-
     const waypoints: google.maps.DirectionsWaypoint[] = [];
     const path: google.maps.LatLngLiteral[] = [this.warehousePos];
 
-    // Filter valid ones
     for (const d of sortedDeliveries) {
       let lat = d.latitude;
       let lng = d.longitude;
 
-      // Fallback geocoding if needed (optional)
       if (!lat || !lng) {
         const coords = await this.geocodeAddress(d.address || d.clientAddress || '');
-        if (coords) {
-          lat = coords.lat;
-          lng = coords.lng;
-        }
+        if (coords) { lat = coords.lat; lng = coords.lng; }
       }
 
       if (lat && lng) {
         waypoints.push({ location: { lat, lng }, stopover: true });
         path.push({ lat, lng });
-        // Update internal model for marker rendering
         d.latitude = lat;
         d.longitude = lng;
       }
     }
 
     if (path.length > 1) {
-      this.calculateDirections(this.warehousePos, path[path.length - 1], waypoints.slice(0, -1)); // last is destination
+      this.calculateDirections(this.warehousePos, path[path.length - 1], waypoints.slice(0, -1));
     }
 
-    // Auto fit bounds
+    this.plottingRoute.set(false);
+
     setTimeout(() => {
       if (this.map) {
         const bounds = new google.maps.LatLngBounds();
@@ -766,22 +1307,26 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
         if (this.driverPos) bounds.extend(this.driverPos);
         this.map.fitBounds(bounds, 50);
       }
-    }, 500);
+    }, 400);
   }
 
-  private calculateDirections(start: google.maps.LatLngLiteral, end: google.maps.LatLngLiteral, waypoints: google.maps.DirectionsWaypoint[]) {
+  private calculateDirections(
+    start: google.maps.LatLngLiteral,
+    end: google.maps.LatLngLiteral,
+    waypoints: google.maps.DirectionsWaypoint[]
+  ): void {
     const directionsService = new google.maps.DirectionsService();
     directionsService.route({
       origin: start,
       destination: end,
-      waypoints: waypoints,
-      optimizeWaypoints: false, // Maintain order strictly
+      waypoints,
+      optimizeWaypoints: false,
       travelMode: google.maps.TravelMode.DRIVING
     }, (result, status) => {
       if (status === google.maps.DirectionsStatus.OK && result) {
         this.directionsResult.set(result);
       } else {
-        console.warn('Google Maps Directions failed', status);
+        console.warn('Directions failed:', status);
       }
     });
   }
@@ -796,7 +1341,7 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
       const fullAddress = `${address}, ${GEOCODE_CONFIG.city}, ${GEOCODE_CONFIG.state}, México`;
 
       geocoder.geocode({ address: fullAddress }, (results, status) => {
-        if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+        if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
           const res = {
             lat: results[0].geometry.location.lat(),
             lng: results[0].geometry.location.lng()
@@ -804,53 +1349,81 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
           this.geocodeCache.set(cacheKey, res);
           resolve(res);
         } else {
+          this.geocodeCache.set(cacheKey, null);
           resolve(null);
         }
       });
     });
   }
 
-  private handleLocationUpdate(loc: any) {
-    const currentRoute = this.selectedRouteForMap();
-    if (!currentRoute || !this.showMapModal()) return;
+  private handleLocationUpdate(loc: any): void {
+    if (!this.selectedRouteForMap() || !this.showMapModal()) return;
 
     if (loc.latitude && loc.longitude) {
       this.driverPos = { lat: loc.latitude, lng: loc.longitude };
       this.lastLocationUpdate.set(new Date().toISOString());
 
-      this.map.panTo(this.driverPos);
+      // Si estábamos esperando GPS, ocultar overlay
+      if (this.waitingForGps()) {
+        this.waitingForGps.set(false);
+        this.showToast('📡 GPS del chofer conectado');
+      }
+
+      if (this.map) {
+        this.map.panTo(this.driverPos);
+      }
     }
   }
 
-  // ═══ CHAT LOGIC ═══
-  openChat(route: DeliveryRoute) {
+  // ═══════════════════════════════════════════
+  //  CHAT
+  // ═══════════════════════════════════════════
+  openChat(route: DeliveryRoute): void {
     this.chatRoute.set(route);
     this.activeMessages.set([]);
-    this.api.getRouteChat(route.id).subscribe(msgs => {
-      this.activeMessages.set(msgs);
-      setTimeout(() => this.scrollToBottom(), 100);
+    this.chatMsgIds.clear();
+    this.loadingChat.set(true);
+    this.newMessage = '';
+
+    this.api.getRouteChat(route.id).subscribe({
+      next: (msgs) => {
+        msgs.forEach(m => this.chatMsgIds.add(m.id));
+        this.activeMessages.set(msgs);
+        this.loadingChat.set(false);
+        this.scrollToBottom();
+      },
+      error: () => {
+        this.loadingChat.set(false);
+        this.showToast('Error cargando chat 😔');
+      }
     });
   }
 
-  closeChat() {
+  closeChat(): void {
     this.chatRoute.set(null);
+    this.activeMessages.set([]);
+    this.chatMsgIds.clear();
   }
 
-  sendMessage() {
-    if (!this.newMessage.trim() || !this.chatRoute()) return;
-
+  sendMessage(): void {
     const text = this.newMessage.trim();
+    if (!text || !this.chatRoute()) return;
     this.newMessage = '';
 
     this.api.sendAdminMessage(this.chatRoute()!.id, text).subscribe(msg => {
-      this.activeMessages.update(msgs => [...msgs, msg]);
-      setTimeout(() => this.scrollToBottom(), 50);
+      if (!this.chatMsgIds.has(msg.id)) {
+        this.chatMsgIds.add(msg.id);
+        this.activeMessages.update(msgs => [...msgs, msg]);
+      }
+      this.scrollToBottom();
     });
   }
 
-  scrollToBottom() {
-    if (this.chatScroll) {
-      this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
-    }
+  private scrollToBottom(): void {
+    setTimeout(() => {
+      if (this.chatScroll?.nativeElement) {
+        this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight;
+      }
+    }, 60);
   }
 }

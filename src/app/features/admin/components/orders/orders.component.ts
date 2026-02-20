@@ -312,11 +312,6 @@ import { Subscription } from 'rxjs';
           <p class="page-sub">Administra tus ventas, CEO ✨</p>
         </div>
         <div class="header-controls">
-          <div class="actions-toolbar">
-            <button class="btn-nuke" (click)="onWipeOrders()">
-              🗑️ Borrar TODO
-            </button>
-          </div>
           <button class="btn-toggle-select" [class.active]="selectionMode()" (click)="toggleSelectionMode()">
             {{ selectionMode() ? '❌ Salir' : '✨ Organizar Ruta' }}
           </button>
@@ -580,13 +575,6 @@ import { Subscription } from 'rxjs';
     }
     
     /* ═════════ MISSING STYLES ═════════ */
-    .btn-nuke {
-      background: var(--color-danger); color: white; border: none; padding: 0.6rem 1rem;
-      border-radius: 20px; font-weight: 700; cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; gap: 6px; font-size: 0.85rem;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      &:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(220, 38, 38, 0.25); }
-    }
     
     .filter-select {
       appearance: none; background: var(--bg-card); border: 2px solid var(--pink-200);
@@ -643,7 +631,9 @@ import { Subscription } from 'rxjs';
     .dock-avatars {
       flex: 1; display: flex; align-items: center; gap: -8px; overflow-x: auto;
       padding: 4px; mask-image: linear-gradient(to right, transparent, black 10px, black 90%, transparent);
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
     }
+    .dock-avatars::-webkit-scrollbar { display: none; }
     .mini-avatar {
       width: 32px; height: 32px; border-radius: 50%;
       background: white; border: 2px solid white;
@@ -707,10 +697,12 @@ import { Subscription } from 'rxjs';
     ═══════════════════════════════════════════ */
     .orders-page {
       padding: 1rem 1.25rem 6rem;
+      width: 100%;
       max-width: 1360px;
       margin: 0 auto;
       background: var(--bg-main);
       min-height: 100vh;
+      overflow-x: hidden; /* Fix horizontal overflow on tablets */
     }
 
     /* ═══════════════════════════════════════════
@@ -831,7 +823,8 @@ import { Subscription } from 'rxjs';
       border: 1px solid var(--border-soft);
     }
     .type-switch button {
-      flex: 1; border: none; background: transparent; padding: 8px; border-radius: 10px;
+      flex: 1; border: none; background: transparent; padding: 12px 8px;
+      border-radius: 10px;
       font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.2s;
       display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.9rem;
     }
@@ -845,7 +838,7 @@ import { Subscription } from 'rxjs';
     .status-pill-btn {
       flex: 1; white-space: nowrap; 
       border: 1px solid var(--border-soft); background: var(--bg-main);
-      color: var(--text-medium); padding: 8px 10px; border-radius: 12px;
+      color: var(--text-medium); padding: 10px 12px; border-radius: 12px;
       font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
       display: flex; align-items: center; justify-content: center; gap: 4px;
     }
@@ -859,7 +852,7 @@ import { Subscription } from 'rxjs';
     .tags-selector { display: flex; flex-wrap: wrap; gap: 6px; }
     .tag-btn {
       background: var(--bg-main); border: 1px solid var(--border-soft); border-radius: 20px;
-      padding: 6px 12px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; color: var(--text-medium);
+      padding: 8px 14px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; color: var(--text-medium);
     }
     .tag-btn.active { background: var(--pink-100); color: var(--pink-600); border-color: var(--pink-400); font-weight: 700; }
 
@@ -907,7 +900,7 @@ import { Subscription } from 'rxjs';
     .page-sub { margin: 5px 0 0; color: #777; font-weight: 600; font-size: 0.95rem; font-family: var(--font-body); }
 
     .header-controls {
-      display: flex; align-items: center; gap: 12px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap; /* Ensure elements wrap on medium screens */
     }
 
     .search-box {
@@ -1054,7 +1047,8 @@ import { Subscription } from 'rxjs';
     .postponed-alert .note { font-size: 0.8rem; color: #666; margin: 2px 0 0; font-style: italic; }
 
     /* Order Items */
-    .items-scroll-row { overflow-x: auto; padding-bottom: 5px; margin: 0 -5px; padding: 5px; }
+    .items-scroll-row { overflow-x: auto; padding-bottom: 5px; margin: 0 -5px; padding: 5px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .items-scroll-row::-webkit-scrollbar { display: none; }
     .items-track { display: flex; gap: 8px; }
     .item-chip {
       background: var(--bg-main); border-radius: 12px; padding: 6px 10px;
@@ -1147,18 +1141,18 @@ import { Subscription } from 'rxjs';
     }
 
     @media (max-width: 480px) {
-      .orders-page { padding: 0.75rem 0.75rem 5rem; }
+      .orders-page { padding: 0.75rem 0.75rem 7rem; }
       h2 { font-size: 1.8rem; }
       
       .orders-grid { grid-template-columns: 1fr; }
       
-      .quick-stats { flex-direction: column; gap: 0.5rem; }
-      .qs-chip { width: 100%; justify-content: space-between; }
+      .quick-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+      .qs-chip { width: 100%; align-items: flex-start; justify-content: flex-start; padding: 10px; }
       
       .card-footer { flex-direction: column; gap: 1rem; align-items: stretch; }
       .total-section { justify-content: space-between; width: 100%; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; margin-bottom: 0.5rem; flex-direction: row; align-items: center; }
       .card-buttons { justify-content: space-between; width: 100%; gap: 10px; }
-      .action-btn { flex: 1; justify-content: center; height: 40px; }
+      .action-btn { flex: 1; justify-content: center; height: 44px; }
 
       /* Mobile Modal: Centered Compact Card */
       .modal-card {
@@ -1198,8 +1192,56 @@ import { Subscription } from 'rxjs';
     .status-pill[data-status="Delivered"] { background: #f0fdf4; color: #16a34a; }
     
     .whatsapp-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-    .btn-wa { flex: 1; padding: 0.5rem; border: 1px solid #25D366; background: #dcfce7; color: #15803d; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.8rem; }
+    .btn-wa { flex: 1; padding: 0.8rem 0.5rem; border: 1px solid #25D366; background: #dcfce7; color: #15803d; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.8rem; }
     .btn-wa:hover { background: #25D366; color: white; transform: translateY(-2px); }
+
+    /* ═══════════════════════════════════════════
+       DRAWER 
+    ═══════════════════════════════════════════ */
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2500;
+      backdrop-filter: blur(4px); animation: fadeIn 0.3s ease-out;
+    }
+    .drawer-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--bg-card); border-radius: 24px 24px 0 0;
+      padding: 1.5rem; z-index: 2501; max-height: 90vh; overflow-y: auto;
+      transform: translateY(100%); transition: transform 0.4s var(--ease-bounce);
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
+    }
+    .drawer-panel.open { transform: translateY(0); }
+    .drawer-header { display: flex; flex-direction: column; align-items: center; position: relative; margin-bottom: 1.5rem; }
+    .drawer-grab { width: 40px; height: 5px; background: #ddd; border-radius: 5px; margin-bottom: 15px; }
+    .drawer-header h3 { font-family: var(--font-display); color: var(--pink-600); font-size: 1.5rem; margin: 0; }
+    .drawer-subtitle { font-size: 0.9rem; color: #888; margin: 0; font-weight: 700; }
+    .btn-close-drawer { position: absolute; right: 0; top: 0; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #ccc; }
+    .drawer-body { display: flex; flex-direction: column; gap: 1rem; }
+    .drawer-field { display: flex; flex-direction: column; gap: 5px; }
+    .drawer-field label { font-size: 0.75rem; font-weight: 800; color: var(--pink-500); text-transform: uppercase; }
+    .drawer-input { width: 100%; border: 1px solid var(--border-soft); border-radius: 12px; padding: 12px; font-size: 1rem; background: var(--bg-main); outline: none; }
+    .drawer-input:focus { border-color: var(--pink-400); box-shadow: 0 0 0 3px rgba(236,72,153,0.1); }
+    .drawer-row { display: flex; gap: 1rem; }
+    .drawer-field.half { flex: 1; }
+    .qty-stepper { display: flex; align-items: center; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--bg-main); overflow: hidden; }
+    .qty-stepper button { flex: 1; border: none; background: transparent; font-size: 1.2rem; font-weight: 800; color: var(--pink-600); cursor: pointer; padding: 10px; }
+    .drawer-input.center { text-align: center; border: none; padding: 12px 0; border-radius: 0; background: transparent; }
+    .price-input-wrap { position: relative; display: flex; align-items: center; }
+    .currency { position: absolute; left: 12px; font-weight: 800; color: #888; }
+    .drawer-input.with-prefix { padding-left: 25px; }
+    .preview-line { display: flex; align-items: center; gap: 10px; background: #fdf2f8; padding: 10px 15px; border-radius: 12px; font-weight: 700; }
+    .preview-qty { color: var(--pink-600); }
+    .preview-name { flex: 1; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .preview-total { color: var(--pink-600); font-size: 1.1rem; }
+    .btn-add-item { background: var(--pink-500); color: white; border: none; border-radius: 14px; padding: 14px; font-size: 1rem; font-weight: 800; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 15px rgba(236,72,153,0.3); }
+    .btn-add-item:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+    .drawer-current-items { margin-top: 1.5rem; border-top: 1px dashed var(--border-soft); padding-top: 1.5rem; }
+    .section-label { font-size: 0.75rem; font-weight: 800; color: #888; text-transform: uppercase; margin-bottom: 10px; display: block; }
+    .mini-item-chip { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; margin-bottom: 8px; }
+    .chip-qty { font-weight: 800; color: var(--pink-500); background: var(--pink-50); padding: 2px 6px; border-radius: 6px; }
+    .chip-name { flex: 1; color: var(--text-medium); }
+    .chip-price { font-weight: 700; color: #666; }
+    .drawer-total-row { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; font-weight: 800; color: var(--text-dark); }
+    .drawer-total-value { font-size: 1.3rem; color: var(--pink-600); }
   `]
 })
 export class OrdersComponent implements OnInit {
