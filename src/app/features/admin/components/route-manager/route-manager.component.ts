@@ -530,20 +530,28 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   };
 
   // Markers
-  warehousePos: google.maps.LatLngLiteral = { lat: 27.4861, lng: -99.5069 }; // Mock warehouse
+  warehousePos: google.maps.LatLngLiteral = { lat: 27.5146982, lng: -99.571329 }; //Bodega, osea la casa
   driverPos?: google.maps.LatLngLiteral;
   routeDeliveries: RouteDelivery[] = [];
   directionsResult = signal<google.maps.DirectionsResult | undefined>(undefined);
 
   warehouseOptions: google.maps.MarkerOptions = {
-    label: { text: '🏭', fontSize: '24px' },
-    title: 'Base / Almacén'
+    label: { text: '🏠', fontSize: '24px' },
+    title: 'Cueva',
+    icon: {
+      url: 'https://cdn-icons-png.flaticon.com/512/2555/2555572.png',
+      scaledSize: new google.maps.Size(40, 40)
+    }
   };
 
   driverOptions: google.maps.MarkerOptions = {
     label: { text: '🚚', fontSize: '30px' },
     title: 'Repartidor',
-    zIndex: 1000
+    zIndex: 1000,
+    icon: {
+      url: 'https://cdn-icons-png.flaticon.com/512/2555/2555572.png',
+      scaledSize: new google.maps.Size(40, 40)
+    }
   };
 
   directionsOptions: google.maps.DirectionsRendererOptions = {
@@ -646,6 +654,10 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     this.routeDeliveries = route.deliveries;
     this.directionsResult.set(undefined);
     this.driverPos = undefined;
+
+    if (route.driverToken) {
+      this.signalr.joinRoute(route.driverToken);
+    }
 
     // Initial driver location
     if (route.driverLocation && route.driverLocation.latitude) {
@@ -794,8 +806,7 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
       this.driverPos = { lat: loc.latitude, lng: loc.longitude };
       this.lastLocationUpdate.set(new Date().toISOString());
 
-      // Optional: Pan map to driver if tracking?
-      // this.map.panTo(this.driverPos);
+      this.map.panTo(this.driverPos);
     }
   }
 

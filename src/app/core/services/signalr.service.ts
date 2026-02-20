@@ -33,6 +33,16 @@ export class SignalRService {
       .withAutomaticReconnect()
       .build();
 
+    this.connection.on('ReceiveLocation', (routeId: number, lat: number, lng: number) => {
+      const locationData: LocationUpdate = {
+        latitude: lat,
+        longitude: lng,
+        timestamp: new Date().toISOString()
+      };
+
+      this.locationUpdate$.next(locationData);
+    });
+
     this.connection.on('LocationUpdate', (data: LocationUpdate) => {
       this.locationUpdate$.next(data);
     });
