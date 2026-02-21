@@ -49,10 +49,20 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
         <div class="client-header">
           <span class="header-ribbon">🎀</span>
           <h1>¡Hola, {{ o.clientName }}! 💖</h1>
-          <p class="subtitle">Aquí está el detalle de tu pedido</p>
-          <button class="btn-notify" (click)="enableNotifications(o.clientId)">
-            Activar Notificaciones 🔔
-          </button>
+          <p class="subtitle">
+            @if (o.status === 'Delivered') {
+              ¡Gracias por tu compra! 🌸
+            } @else if (o.status === 'NotDelivered') {
+              Hubo un problema con tu entrega 💌
+            } @else {
+              Aquí está el detalle de tu pedido
+            }
+          </p>
+          @if (o.status !== 'Delivered' && o.status !== 'NotDelivered') {
+            <button class="btn-notify" (click)="enableNotifications(o.clientId)">
+              Activar Notificaciones 🔔
+            </button>
+          }
         </div>
 
         @if (o.status === 'Pending') {
@@ -60,13 +70,25 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
             <div class="confirm-card">
               <h3>¡Tu pedido está listo! ✨</h3>
               <p>Revisa los detalles abajo y confirma cuando estés lista para recibirlo.</p>
-              <button class="btn-confirm-order" (click)="confirmOrder()">
-                Sí, Confirmar Pedido 💖
-              </button>
+              <button class="btn-confirm-order" (click)="openConfirmModal()">
+          Sí, Confirmar Pedido 💖
+        </button>
             </div>
           </div>
         }
-
+        @if (showConfirmModal()) {
+            <div class="coquette-modal-overlay" (click)="closeConfirmModal()">
+              <div class="coquette-modal" (click)="$event.stopPropagation()">
+                <div class="modal-deco">🎀</div>
+                <h3>¿Lista para tu pedido? ✨</h3>
+                <p>Confirma que estás lista para recibir tus cositas hermosas.</p>
+                <div class="modal-actions">
+                  <button class="btn-cancel" (click)="closeConfirmModal()">Aún no 🙈</button>
+                  <button class="btn-accept" (click)="confirmOrder()">¡Sí, lo quiero! 💖</button>
+                </div>
+              </div>
+            </div>
+          }
         <!-- ⏳ Countdown Section (Moved UP) -->
         @if (deliveryDate() && (o.status === 'Pending' || o.status === 'InRoute' || o.status === 'InTransit')) {
           <div class="countdown-section">
@@ -107,7 +129,7 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
             
             <div class="timeline-track">
               @for (step of timelineSteps(); track $index) {
-                <div class="timeline-step" [class.completed]="step.done" [class.active]="step.active">
+                <div class="timeline-step" [class.completed]="step.done" [class.active]="step.active" [class.failed]="step.icon === '❌'">
                   
                   <div class="step-indicator">
                     <div class="step-icon">{{ step.icon }}</div>
@@ -131,6 +153,7 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
             <div class="status-alert" [attr.data-status]="o.status">
               @switch (o.status) {
                 @case ('Pending') { <p>Tu pedido está listo, pronto saldrá a entrega ✨</p> }
+                @case ('Confirmed') { <p>¡Pedido confirmado! Estamos preparando tu paquete con mucho cariño 🎀</p> }
                 @case ('Shipped') { <p>Tu pedido está empacado y listo ✨</p> }
                 @case ('InRoute') { 
                   <p>Tu pedido en camino. 
@@ -143,8 +166,8 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
                 }
                 @case ('InTransit') { <p>¡Prepárate, tu pedido está a punto de llegar! 🎉</p> }
                 @case ('Delivered') { <p>Tu pedido fue entregado, muchas gracias por tu compra 🌸</p> }
-                @case ('NotDelivered') { <p>No se pudo entregar. Contacta a tu vendedora para reprogramar 💌</p> }
-                @default { <p>Consultando estado... 🔍</p> }
+                @case ('NotDelivered') { <p>No se pudo entregar tu pedido. Contacta a tu vendedora para reprogramar 💌</p> }
+                @default { <p>Estamos procesando tu pedido, pronto tendrás novedades 💕</p> }
               }
             </div>
           </div>
@@ -531,6 +554,137 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
     .chat-input input:focus { border-color: var(--pink-400); }
     .chat-input button { background: var(--pink-500); color: white; border: none; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; }
     .chat-input button:disabled { background: #f3f4f6; color: #9ca3af; }
+
+    /* 🔥 BOTÓN PRINCIPAL DE CONFIRMAR 🔥 */
+  .btn-confirm-order {
+    background: linear-gradient(135deg, var(--pink-400, #f472b6), var(--pink-600, #db2777));
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 30px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(236, 72, 153, 0.3);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    margin-top: 1rem;
+    width: 100%;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .btn-confirm-order:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 12px 25px rgba(236, 72, 153, 0.4);
+    background: linear-gradient(135deg, var(--pink-500, #ec4899), var(--pink-700, #be185d));
+  }
+  .btn-confirm-order:active {
+    transform: translateY(1px);
+  }
+
+  /* 🎀 MODAL COQUETTE 🎀 */
+  .coquette-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 240, 245, 0.65); /* Fondo rosado translúcido */
+    backdrop-filter: blur(8px);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeInOverlay 0.3s ease;
+  }
+  @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+
+  .coquette-modal {
+    background: white;
+    width: 85%;
+    max-width: 340px;
+    border-radius: 28px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    box-shadow: 0 15px 40px rgba(236, 72, 153, 0.2);
+    border: 2px solid var(--pink-100, #fce7f3);
+    position: relative;
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes popIn {
+    0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .modal-deco {
+    font-size: 3.5rem;
+    margin-top: -4.5rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 4px 15px rgba(255, 107, 157, 0.15);
+    border: 3px solid var(--pink-50, #fdf2f8);
+    animation: float-bow 3s ease-in-out infinite;
+  }
+  @keyframes float-bow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+  .coquette-modal h3 {
+    color: var(--pink-600, #db2777);
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .coquette-modal p {
+    color: var(--text-medium, #6b7280);
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.4;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn-cancel, .btn-accept {
+    flex: 1;
+    padding: 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    font-size: 0.9rem;
+  }
+
+  .btn-cancel {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+  .btn-cancel:hover {
+    background: #e5e7eb;
+    color: #374151;
+  }
+
+  .btn-accept {
+    background: var(--pink-500, #ec4899);
+    color: white;
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.25);
+  }
+  .btn-accept:hover {
+    background: var(--pink-600, #db2777);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(236, 72, 153, 0.35);
+  }
+
+  /* ❌ TIMELINE - PASO NO ENTREGADO (ROJO) */
+    .timeline-step.failed .step-icon { background: #FEE2E2 !important; border-color: #EF4444 !important; box-shadow: 0 0 0 4px rgba(239,68,68,0.2) !important; animation: pulse-fail 2s infinite !important; }
+    .timeline-step.failed .step-label { color: #DC2626 !important; }
+    .timeline-step.failed .step-date { color: #EF4444 !important; }
+    @keyframes pulse-fail { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy {
@@ -648,6 +802,16 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     this.showToast('🔔 ¡Suscripción solicitada!');
   }
 
+  showConfirmModal = signal(false);
+
+  openConfirmModal() {
+    this.showConfirmModal.set(true);
+  }
+
+  closeConfirmModal() {
+    this.showConfirmModal.set(false);
+  }
+
   private async loadOrder(): Promise<void> {
     this.api.getClientOrder(this.accessToken).subscribe({
       next: async (order: any) => {
@@ -663,7 +827,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
 
         this.order.set(order);
         if (order.clientId && !this.previousStatus) {
-          this.pushService.subscribeToNotifications(order.clientId);
+          this.pushService.subscribeToNotifications('client', { clientId: order.clientId });
         }
 
         // 🔔 PUSH: Detectar cambio de estado → InTransit
@@ -916,59 +1080,68 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  // 🔥 UPDATE TIMELINE
   private updateTimeline(o: any) {
     const created = new Date(o.createdAt);
-    const now = new Date();
-
-    // Generar tiempos estimados si no están en DB
-    const confirmed = new Date(created.getTime() + 15 * 60000); // +15 min
-    let enRuta = new Date(created.getTime() + 24 * 60 * 60000); // +1 dia default
-    let entregado = null;
-
     const weight = this.getStatusWeight(o.status);
+    const isNotDelivered = o.status === 'NotDelivered';
 
-    // Si ya está en ruta, usamos ahora si no tenemos el dato real, 
-    // pero para que no baile la fecha, usamos una constante basada en created o el today a las 10am
-    if (weight >= 2) {
-      enRuta = new Date();
-      enRuta.setHours(10, 0, 0, 0);
-    }
+    // Generar tiempos estimados
+    const confirmed = new Date(created.getTime() + 15 * 60000);
+    let enRuta = new Date();
+    enRuta.setHours(10, 0, 0, 0);
+    let entregado = null;
 
     if (weight >= 4) {
       entregado = new Date();
     }
 
-    const steps = [
+    // Para NotDelivered: determinamos hasta dónde llegó basándonos en
+    // si tiene datos de ruta/driver. Asumimos que al menos llegó a "En Ruta"
+    // porque NotDelivered implica que el chofer intentó entregar.
+    const reachedWeight = isNotDelivered ? 3 : weight; // Llegó hasta InTransit mínimo
+
+    const steps: { label: string, date: Date | null, done: boolean, active: boolean, icon: string }[] = [
       {
         label: 'Pedido Recibido',
         date: created,
-        done: weight >= 0,
-        active: weight === 0,
+        done: reachedWeight >= 0,
+        active: !isNotDelivered && weight === 0,
         icon: '📝'
       },
       {
         label: 'Confirmado',
-        date: weight >= 1 ? confirmed : null,
-        done: weight >= 1,
-        active: weight === 1,
+        date: reachedWeight >= 1 ? confirmed : null,
+        done: reachedWeight >= 1,
+        active: !isNotDelivered && weight === 1,
         icon: '✨'
       },
       {
         label: 'En Ruta',
-        date: weight >= 2 ? enRuta : null,
-        done: weight >= 2,
-        active: weight === 2 || weight === 3,
+        date: reachedWeight >= 2 ? enRuta : null,
+        done: reachedWeight >= 2,
+        active: !isNotDelivered && (weight === 2 || weight === 3),
         icon: '🚗'
-      },
-      {
+      }
+    ];
+
+    if (isNotDelivered) {
+      // Agregar paso rojo de "No Entregado" en lugar de "Entregado"
+      steps.push({
+        label: 'No Entregado',
+        date: new Date(),
+        done: false,
+        active: true,
+        icon: '❌'
+      });
+    } else {
+      steps.push({
         label: 'Entregado',
         date: weight >= 4 ? entregado : null,
         done: weight >= 4,
         active: weight === 4,
         icon: '💝'
-      }
-    ];
+      });
+    }
 
     this.timelineSteps.set(steps);
   }
@@ -980,12 +1153,12 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       case 'InRoute': return 2;
       case 'InTransit': return 3;
       case 'Delivered': return 4;
+      case 'NotDelivered': return -1; // Caso especial, manejado en updateTimeline
       default: return -1;
     }
   }
 
   confirmOrder() {
-    if (!confirm('¿Confirmas que has recibido tu pedido? ✨')) return;
     this.api.confirmClientOrder(this.accessToken).subscribe({
       next: () => {
         this.showToast('¡Pedido confirmado! Gracias 💕');
@@ -993,6 +1166,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       },
       error: () => this.showToast('Error al confirmar, intenta de nuevo 😿')
     });
+    this.closeConfirmModal();
   }
 
   getQueueDots(o: ClientOrderView): { done: boolean; current: boolean; you: boolean }[] {
