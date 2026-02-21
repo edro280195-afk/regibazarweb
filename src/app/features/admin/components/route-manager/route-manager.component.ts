@@ -10,6 +10,7 @@ import { SignalRService } from '../../../../core/services/signalr.service';
 import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../../environments/environment';
+import { PushNotificationService } from '../../../../core/services/push-notification.service';
 
 // ─── CONFIG ────────────────────────────────────────────────────
 const GEOCODE_CONFIG = {
@@ -1109,13 +1110,19 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private confirm: ConfirmationService,
     private signalr: SignalRService,
-    private whatsapp: WhatsAppService
+    private whatsapp: WhatsAppService,
+    private pushService: PushNotificationService
   ) { }
 
   ngOnInit(): void {
     this.loadRoutes();
     this.signalr.connect().then(() => {
       this.signalr.joinAdminGroup();
+    });
+
+    // 🔔 Solicitar permiso de notificaciones
+    this.pushService.requestPermission().then(granted => {
+      if (granted) console.log('✅ Notificaciones habilitadas para admin');
     });
 
     // GPS del chofer
@@ -1133,6 +1140,12 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
         }
       } else {
         this.showToast(`💬 Mensaje del chofer (Ruta #${msg.deliveryRouteId})`);
+        // 🔔 PUSH: Notificar mensaje del chofer
+        this.pushService.notifyNewMessage(
+          msg.senderName || 'Chofer',
+          msg.text || msg.message || 'Nuevo mensaje',
+          'admin'
+        );
       }
     });
   }

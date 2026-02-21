@@ -7,6 +7,7 @@ import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
 import { DeliveryRoute, RouteDelivery, ChatMessage } from '../../../../shared/models/models';
+import { PushNotificationService } from '../../../../core/services/push-notification.service';
 
 declare var google: any;
 
@@ -1039,12 +1040,17 @@ export class RouteViewComponent implements OnInit, OnDestroy {
   constructor(
     private routeParam: ActivatedRoute,
     private api: ApiService,
-    private signalr: SignalRService
+    private signalr: SignalRService,
+    private pushService: PushNotificationService
   ) { }
 
   ngOnInit(): void {
     this.token = this.routeParam.snapshot.paramMap.get('token') || '';
     this.loadRoute();
+
+    this.pushService.requestPermission().then(granted => {
+      if (granted) console.log('✅ Notificaciones habilitadas para el chofer');
+    });
 
     // SignalR: Admin Chat - con proteccion anti-duplicado
     this.signalr.adminChatUpdate$.subscribe(msg => {
@@ -1057,10 +1063,15 @@ export class RouteViewComponent implements OnInit, OnDestroy {
       } else {
         this.unreadAdminCount.update(c => c + 1);
         this.showToast('💬 Mensaje de la Base');
+        // 🔔 PUSH: Notificar mensaje del admin
+        this.pushService.notifyNewMessage(
+          'Base',
+          msg.text || msg.message || 'Nuevo mensaje',
+          'admin'
+        );
       }
     });
 
-    // SignalR: Client Chat - con proteccion anti-duplicado
     this.signalr.clientChatUpdate$.subscribe(msg => {
       if (this.clientMsgIds.has(msg.id)) return;
       this.clientMsgIds.add(msg.id);
@@ -1070,6 +1081,12 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         this.scrollToBottom('client');
       } else {
         this.showToast('🌸 Mensaje de clienta');
+        // 🔔 PUSH: Notificar mensaje de clienta
+        this.pushService.notifyNewMessage(
+          msg.senderName || 'Clienta',
+          msg.text || msg.message || 'Nuevo mensaje',
+          'driver'
+        );
       }
     });
   }

@@ -555,6 +555,12 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   chatMessages = signal<any[]>([]);
   newChatMessage = '';
 
+  // Flags para notificaciones (evita duplicados)
+  private proximityNotified = false;      // Solo notificar 1 vez que está cerca
+  private inTransitNotified = false;       // Solo notificar 1 vez que va en camino
+  private deliveredNotified = false;       // Solo notificar 1 vez que se entregó
+  private previousStatus = '';             // Para detectar cambios de estado
+
   toastVisible = signal(false);
   toastMessage = signal('');
   private timerInterval: any;
@@ -620,6 +626,12 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.accessToken = this.route.snapshot.paramMap.get('token') || '';
     this.loadOrder();
+
+    this.pushService.requestPermission().then(granted => {
+      if (granted) {
+        console.log('✅ Notificaciones habilitadas para la clienta');
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -648,6 +660,23 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         }
 
         this.order.set(order);
+        if (order.clientId && !this.previousStatus) {
+          this.pushService.subscribeToNotifications(order.clientId);
+        }
+
+        // 🔔 PUSH: Detectar cambio de estado → InTransit
+        if (order.status === 'InTransit' && this.previousStatus !== 'InTransit' && !this.inTransitNotified) {
+          this.inTransitNotified = true;
+          this.pushService.notifyDriverEnRoute();
+        }
+
+        // 🔔 PUSH: Detectar cambio de estado → Delivered
+        if (order.status === 'Delivered' && this.previousStatus !== 'Delivered' && !this.deliveredNotified) {
+          this.deliveredNotified = true;
+          this.pushService.notifyDelivered();
+        }
+
+        this.previousStatus = order.status;
         this.loading.set(false);
 
         let isFrecuente = (order.clientType || '').toLowerCase() === 'frecuente';
@@ -750,6 +779,29 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     if ((this.order()?.status === 'InTransit' || this.order()?.status === 'InRoute') && this.clientPos()) {
       this.calculateRoute(driver, this.clientPos()!);
     }
+
+    this.checkDriverProximity(lat, lng);
+  }
+
+  private checkDriverProximity(driverLat: number, driverLng: number): void {
+    // Si ya notificamos, no repetir
+    if (this.proximityNotified) return;
+
+    const clientCoords = this.clientPos();
+    if (!clientCoords) return;
+
+    const { isNearby, distance } = this.pushService.checkProximity(
+      driverLat, driverLng,
+      clientCoords.lat, clientCoords.lng,
+      500 // umbral en metros
+    );
+
+    if (isNearby) {
+      this.proximityNotified = true;
+      this.pushService.notifyDriverNearby(distance);
+      this.showToast('📍 ¡El repartidor está muy cerca de tu domicilio!');
+      console.log(`📍 Chofer a ${Math.round(distance)}m del domicilio`);
+    }
   }
 
   private calculateRoute(origin: google.maps.LatLngLiteral, dest: google.maps.LatLngLiteral) {
@@ -809,8 +861,15 @@ export class OrderViewComponent implements OnInit, OnDestroy {
             this.scrollChat();
           } else {
             this.showToast('💬 Nuevo mensaje del repartidor');
+            this.pushService.notifyNewMessage(
+              'Repartidor',
+              msg.text || msg.message || 'Nuevo mensaje',
+              'client'
+            );
           }
         }
+
+
       });
     } catch (err) {
       console.error('SignalR connection failed:', err);
@@ -826,8 +885,24 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   private reloadOrder(): void {
     this.api.getClientOrder(this.accessToken).subscribe({
       next: (order) => {
+        // 🔔 PUSH: Detectar cambio de estado en reload
+        const prevStatus = this.order()?.status;
+
         this.order.set(order);
         this.updateTimeline(order);
+
+        // 🔔 PUSH: InTransit notification
+        if (order.status === 'InTransit' && prevStatus !== 'InTransit' && !this.inTransitNotified) {
+          this.inTransitNotified = true;
+          this.pushService.notifyDriverEnRoute();
+          this.showToast('🚗 ¡Tu repartidor va en camino!');
+        }
+
+        // 🔔 PUSH: Delivered notification
+        if (order.status === 'Delivered' && prevStatus !== 'Delivered' && !this.deliveredNotified) {
+          this.deliveredNotified = true;
+          this.pushService.notifyDelivered();
+        }
 
         const needsMap = order.status === 'InRoute' || order.status === 'InTransit';
         this.showMap.set(needsMap);
