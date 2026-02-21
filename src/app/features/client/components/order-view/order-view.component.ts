@@ -642,7 +642,9 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   }
 
   enableNotifications(clientId?: number) {
-    this.pushService.subscribeToNotifications(clientId);
+    if (clientId && !this.previousStatus) {
+      this.pushService.subscribeToNotifications('client', { clientId });
+    }
     this.showToast('🔔 ¡Suscripción solicitada!');
   }
 
