@@ -3,6 +3,8 @@ import { SwPush } from '@angular/service-worker';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
+export type PushRole = 'client' | 'driver' | 'admin';
+
 @Injectable({
     providedIn: 'root'
 })
@@ -10,6 +12,7 @@ export class PushNotificationService {
     private readonly VAPID_PUBLIC_KEY = 'BNR4b92lH7N43gqzFmXlXmNmsw09EvIiNAyhqKj0j1M66oVMXYX3MRFB3fec3iOrupzPnWe1l7k9Un8o_itTJYs';
     private apiUrl = environment.apiUrl;
     private permissionGranted = false;
+    private subscribed = false; // Evita suscribir múltiples veces
 
     constructor(private swPush: SwPush, private http: HttpClient) {
         if ('Notification' in window) {
@@ -18,50 +21,9 @@ export class PushNotificationService {
     }
 
     // ═══════════════════════════════════════════
-    //  SUSCRIPCIÓN PUSH (Backend)
+    //  PERMISO DE NOTIFICACIONES
     // ═══════════════════════════════════════════
 
-    subscribeToNotifications(clientId?: number) {
-        if (!this.swPush.isEnabled) {
-            console.warn('🛠️ Service Worker - Push no está habilitado en este navegador.');
-            return;
-        }
-
-        this.swPush.requestSubscription({
-            serverPublicKey: this.VAPID_PUBLIC_KEY
-        })
-            .then(sub => {
-                const payload = {
-                    ...sub.toJSON(),
-                    clientId: clientId
-                };
-
-                this.http.post(`${this.apiUrl}/push/subscribe`, payload).subscribe({
-                    next: () => console.log('✅ Push subscription registrada en servidor.'),
-                    error: err => console.error('❌ Error guardando push subscription', err)
-                });
-            })
-            .catch(err => console.error('No se pudo suscribir a notificaciones', err));
-    }
-
-    unsubscribeFromNotifications() {
-        this.swPush.subscription.subscribe(sub => {
-            if (sub) {
-                this.http.delete(`${this.apiUrl}/push/unsubscribe?endpoint=${encodeURIComponent(sub.endpoint)}`)
-                    .subscribe();
-                sub.unsubscribe().catch(err => console.error('Client unsubscribe failed', err));
-            }
-        });
-    }
-
-    // ═══════════════════════════════════════════
-    //  PERMISO DE NOTIFICACIONES (Browser API)
-    // ═══════════════════════════════════════════
-
-    /**
-     * Solicita permiso de notificaciones al navegador.
-     * Retorna true si fue concedido.
-     */
     async requestPermission(): Promise<boolean> {
         if (!('Notification' in window)) {
             console.warn('Este navegador no soporta notificaciones');
@@ -88,33 +50,83 @@ export class PushNotificationService {
     }
 
     // ═══════════════════════════════════════════
-    //  NOTIFICACIONES LOCALES
+    //  SUSCRIPCIÓN PUSH (con Role)
     // ═══════════════════════════════════════════
 
     /**
-     * Muestra una notificación local del navegador.
-     * Solo se muestra si:
-     *   - El usuario ya dio permiso
-     *   - El tab NO tiene foco (para no molestar si ya está viendo la app)
+     * Suscribe al navegador para recibir push del servidor.
+     * Ahora soporta roles: 'client', 'driver', 'admin'.
      *
-     * Si hay Service Worker activo, usa ServiceWorkerRegistration.showNotification()
-     * (funciona mejor en móvil y cuando el tab está en background).
-     * Si no, usa el constructor Notification() como fallback.
+     * Ejemplos:
+     *   subscribeToNotifications('client', { clientId: 42 })
+     *   subscribeToNotifications('driver', { driverRouteToken: 'abc123' })
+     *   subscribeToNotifications('admin')
+     */
+    subscribeToNotifications(
+        role: PushRole = 'client',
+        options?: { clientId?: number; driverRouteToken?: string }
+    ): void {
+        if (this.subscribed) return; // Ya se suscribió en esta sesión
+
+        if (!this.swPush.isEnabled) {
+            console.warn('🛠️ Service Worker Push no habilitado.');
+            return;
+        }
+
+        this.swPush.requestSubscription({
+            serverPublicKey: this.VAPID_PUBLIC_KEY
+        })
+            .then(sub => {
+                const payload: any = {
+                    ...sub.toJSON(),
+                    role,
+                    clientId: options?.clientId || null,
+                    driverRouteToken: options?.driverRouteToken || null
+                };
+
+                this.http.post(`${this.apiUrl}/push/subscribe`, payload).subscribe({
+                    next: () => {
+                        this.subscribed = true;
+                        console.log(`✅ Push subscription registrada (role: ${role})`);
+                    },
+                    error: err => console.error('❌ Error guardando push subscription', err)
+                });
+            })
+            .catch(err => console.error('No se pudo suscribir a notificaciones', err));
+    }
+
+    unsubscribeFromNotifications(): void {
+        this.swPush.subscription.subscribe(sub => {
+            if (sub) {
+                this.http.delete(`${this.apiUrl}/push/unsubscribe?endpoint=${encodeURIComponent(sub.endpoint)}`)
+                    .subscribe();
+                sub.unsubscribe().catch(err => console.error('Client unsubscribe failed', err));
+                this.subscribed = false;
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    //  NOTIFICACIONES LOCALES (Browser API)
+    // ═══════════════════════════════════════════
+
+    /**
+     * Muestra notificación local del navegador.
+     * Solo se muestra si el tab NO tiene foco.
+     * Usa ServiceWorker si está disponible, Notification() como fallback.
      */
     showLocalNotification(
         title: string,
         body: string,
         options?: {
             icon?: string;
-            tag?: string;       // Agrupa notificaciones del mismo tipo (reemplaza en vez de apilar)
-            data?: any;         // Data extra para el click handler del SW
+            tag?: string;
+            data?: any;
             requireInteraction?: boolean;
             silent?: boolean;
         }
     ): void {
         if (!this.permissionGranted) return;
-
-        // Si el tab tiene foco, no molestamos con notificación del sistema
         if (document.hasFocus()) return;
 
         const notifOptions: NotificationOptions = {
@@ -128,14 +140,10 @@ export class PushNotificationService {
         };
 
         try {
-            // Preferimos Service Worker (funciona en background y móvil)
             if (navigator.serviceWorker?.controller) {
                 navigator.serviceWorker.ready.then(reg => {
                     reg.showNotification(title, notifOptions);
-                }).catch(() => {
-                    // Fallback al constructor directo
-                    this.fallbackNotification(title, notifOptions);
-                });
+                }).catch(() => this.fallbackNotification(title, notifOptions));
             } else {
                 this.fallbackNotification(title, notifOptions);
             }
@@ -147,7 +155,6 @@ export class PushNotificationService {
     private fallbackNotification(title: string, options: NotificationOptions): void {
         try {
             const n = new Notification(title, options);
-            // Auto-cerrar después de 6 segundos
             setTimeout(() => n.close(), 6000);
         } catch (err) {
             console.warn('Fallback notification failed:', err);
@@ -155,7 +162,7 @@ export class PushNotificationService {
     }
 
     // ═══════════════════════════════════════════
-    //  NOTIFICACIONES ESPECÍFICAS (Helpers)
+    //  HELPERS DE NOTIFICACIÓN POR CONTEXTO
     // ═══════════════════════════════════════════
 
     /** 💬 Mensaje de chat nuevo */
@@ -163,7 +170,7 @@ export class PushNotificationService {
         const titles: Record<string, string> = {
             client: '💬 Mensaje de tu repartidor',
             driver: `🌸 Mensaje de ${senderName}`,
-            admin: `💬 Mensaje del chofer`,
+            admin: '💬 Mensaje del chofer',
         };
 
         this.showLocalNotification(
@@ -173,16 +180,16 @@ export class PushNotificationService {
         );
     }
 
-    /** 🚗 Chofer en camino hacia la clienta (InTransit) */
-    notifyDriverEnRoute(): void {
+    /** 🚗 Chofer en camino (InTransit) */
+    notifyDriverEnRoute(driverName?: string): void {
         this.showLocalNotification(
             '🚗 ¡Tu pedido va en camino!',
-            `El repartidor salió hacia tu domicilio. ¡Prepárate! 💕`,
+            `${driverName || 'El repartidor'} salió hacia tu domicilio. ¡Prepárate! 💕`,
             { tag: 'driver-en-route', requireInteraction: true }
         );
     }
 
-    /** 📍 Chofer cerca del domicilio (< 500m) */
+    /** 📍 Chofer cerca (< 500m) */
     notifyDriverNearby(distanceMeters: number): void {
         const distText = distanceMeters < 100
             ? 'a menos de 100 metros'
@@ -205,45 +212,28 @@ export class PushNotificationService {
     }
 
     // ═══════════════════════════════════════════
-    //  CÁLCULO DE PROXIMIDAD (Haversine)
+    //  PROXIMIDAD (Haversine)
     // ═══════════════════════════════════════════
 
-    /**
-     * Calcula la distancia en metros entre dos coordenadas
-     * usando la fórmula de Haversine (precisión suficiente para distancias cortas).
-     */
-    calculateDistance(
-        lat1: number, lng1: number,
-        lat2: number, lng2: number
-    ): number {
-        const R = 6_371_000; // Radio de la Tierra en metros
+    calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+        const R = 6_371_000;
         const dLat = this.toRad(lat2 - lat1);
         const dLng = this.toRad(lng2 - lng1);
-
         const a =
             Math.sin(dLat / 2) ** 2 +
             Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
             Math.sin(dLng / 2) ** 2;
-
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }
 
-    /**
-     * Verifica si el chofer está dentro del rango de proximidad de la clienta.
-     * @param thresholdMeters - Distancia en metros (default: 500)
-     * @returns { isNearby: boolean, distance: number }
-     */
     checkProximity(
         driverLat: number, driverLng: number,
         clientLat: number, clientLng: number,
         thresholdMeters = 500
     ): { isNearby: boolean; distance: number } {
         const distance = this.calculateDistance(driverLat, driverLng, clientLat, clientLng);
-        return {
-            isNearby: distance <= thresholdMeters,
-            distance
-        };
+        return { isNearby: distance <= thresholdMeters, distance };
     }
 
     private toRad(degrees: number): number {
