@@ -9,7 +9,7 @@ import { ClientOrderView, LoyaltySummary } from '../../../../shared/models/model
 
 declare var google: any;
 
-import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/google-maps';
+import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@angular/google-maps';
 
 @Component({
   selector: 'app-order-view',
@@ -51,7 +51,6 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           <p class="subtitle">Aquí está el detalle de tu pedido</p>
         </div>
 
-        <!-- Status banner -->
         <div class="status-banner" [attr.data-status]="o.status">
           @switch (o.status) {
             @case ('Pending') {
@@ -81,7 +80,6 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           }
         </div>
 
-        <!-- LOYALTY BANNER -->
         @if (loyalty(); as l) {
           <div class="loyalty-banner">
             <div class="lb-icon">💎</div>
@@ -95,7 +93,6 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           </div>
         }
 
-        <!-- Queue position -->
         @if (o.status === 'InRoute' && o.queuePosition && o.totalDeliveries) {
           <div class="queue-info">
             <div class="queue-position">
@@ -113,7 +110,6 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           </div>
         }
 
-        <!-- In Transit alert -->
         @if (o.status === 'InTransit') {
           <div class="transit-alert">
             <div class="transit-icon-wrap">
@@ -124,43 +120,41 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           </div>
         }
 
-        <!-- MAP — always visible when InRoute or InTransit -->
-        <!-- MAP — always visible when InRoute or InTransit -->
         @if (showMap()) {
           <div class="map-section">
             <h3>📍 ¿Dónde va tu pedido?</h3>
             
-            <google-map 
-              height="300px" 
-              width="100%" 
-              [options]="mapOptions"
-              [center]="centerSignal()"
-              [zoom]="zoomSignal()">
-              
-              <!-- Driver Marker -->
-              @if (driverPos()) {
-                <map-marker 
-                  [position]="driverPos()!" 
-                  [options]="driverMarkerOptions">
-                </map-marker>
-              }
+            <div class="map-wrapper-beautiful">
+              <google-map 
+                #googleMap
+                height="100%" 
+                width="100%" 
+                [options]="mapOptions"
+                [center]="centerSignal()"
+                [zoom]="zoomSignal()">
+                
+                @if (driverPos()) {
+                  <map-marker 
+                    [position]="driverPos()!" 
+                    [options]="driverMarkerOptions">
+                  </map-marker>
+                }
 
-              <!-- Client Marker -->
-              @if (clientPos()) {
-                <map-marker 
-                  [position]="clientPos()!" 
-                  [options]="clientMarkerOptions">
-                </map-marker>
-              }
+                @if (clientPos()) {
+                  <map-marker 
+                    [position]="clientPos()!" 
+                    [options]="clientMarkerOptions">
+                  </map-marker>
+                }
 
-              <!-- Directions (Only InTransit) -->
-              @if (o.status === 'InTransit' && directionsResult()) {
-                <map-directions-renderer 
-                  [directions]="directionsResult()!"
-                  [options]="rendererOptions">
-                </map-directions-renderer>
-              }
-            </google-map>
+                @if (o.status === 'InTransit' && directionsResult()) {
+                  <map-directions-renderer 
+                    [directions]="directionsResult()!"
+                    [options]="rendererOptions">
+                  </map-directions-renderer>
+                }
+              </google-map>
+            </div>
 
             @if (!driverPos()) {
               <p class="map-hint">El repartidor aún no ha compartido su ubicación, espera un poquito ✨</p>
@@ -168,7 +162,6 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           </div>
         }
 
-        <!-- Delivery Countdown (Only if Pending or similar status where date matters) -->
         @if (deliveryDate() && (o.status === 'Pending' || o.status === 'InRoute')) {
           <div class="countdown-section">
             <h3>⏳ Tiempo para tu entrega</h3>
@@ -198,8 +191,6 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           </div>
         }
 
-
-        <!-- Order items (Full List) -->
         <div class="order-section">
           <div class="order-header-row">
             <h3>Tu pedido 🛍️</h3>
@@ -230,21 +221,14 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           </div>
         </div>
         
-        <!-- Payment Info (Tabbed) -->
         <div class="payment-section">
           <h3>Formas de Pago 💸</h3>
           <p class="pay-hint">Elige cómo quieres pagar hoy ✨</p>
           
           <div class="payment-tabs">
-            <button class="pay-tab" [class.active]="paymentTab() === 'cash'" (click)="paymentTab.set('cash')">
-              💵 Efectivo
-            </button>
-            <button class="pay-tab" [class.active]="paymentTab() === 'transfer'" (click)="paymentTab.set('transfer')">
-              🏦 Transferencia
-            </button>
-            <button class="pay-tab" [class.active]="paymentTab() === 'oxxo'" (click)="paymentTab.set('oxxo')">
-              🏪 Deposito
-            </button>
+            <button class="pay-tab" [class.active]="paymentTab() === 'cash'" (click)="paymentTab.set('cash')">💵 Efectivo</button>
+            <button class="pay-tab" [class.active]="paymentTab() === 'transfer'" (click)="paymentTab.set('transfer')">🏦 Transferencia</button>
+            <button class="pay-tab" [class.active]="paymentTab() === 'oxxo'" (click)="paymentTab.set('oxxo')">🏪 Depósito</button>
           </div>
 
           <div class="payment-content">
@@ -306,49 +290,47 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
           <span>{{ toastMessage() }}</span>
         </div>
       }
-    </div>
-    @if (order()?.status === 'InRoute' || order()?.status === 'InTransit') {
-        <button class="floating-chat-btn" (click)="toggleChat()" [class.unread]="false">
+
+      @if (order()?.status === 'InRoute' || order()?.status === 'InTransit') {
+        <button class="floating-chat-btn" (click)="toggleChat()">
           💬
         </button>
       }
 
       @if (showChat()) {
-        <div class="chat-modal">
-          <div class="chat-header">
-            <div>
-              <strong>Repartidor de Regi Bazar</strong>
-              <span class="status-text">En camino 🚗</span>
-            </div>
-            <button class="btn-close" (click)="toggleChat()">✕</button>
-          </div>
-          
-          <div class="chat-body" #clientChatScroll>
-            @if (chatMessages().length === 0) {
-              <p class="chat-empty">Escríbele a tu repartidor si necesitas darle indicaciones ✨</p>
-            }
-            @for (msg of chatMessages(); track msg.id) {
-              <div class="msg-bubble" [class.me]="msg.sender === 'Client'" [class.them]="msg.sender === 'Driver'">
-                {{ msg.text }}
-                <span class="time">{{ msg.timestamp | date:'shortTime' }}</span>
+        <div class="chat-modal-overlay" (click)="toggleChat()">
+          <div class="chat-modal" (click)="$event.stopPropagation()">
+            <div class="chat-header">
+              <div>
+                <strong>Repartidor de Regi Bazar</strong>
+                <span class="status-text">En camino 🚗</span>
               </div>
-            }
-          </div>
+              <button class="btn-close" (click)="toggleChat()">✕</button>
+            </div>
+            
+            <div class="chat-body" #clientChatScroll>
+              @if (chatMessages().length === 0) {
+                <p class="chat-empty">Escríbele a tu repartidor si necesitas darle indicaciones ✨</p>
+              }
+              @for (msg of chatMessages(); track msg.id) {
+                <div class="msg-bubble" [class.me]="msg.sender === 'Client'" [class.them]="msg.sender === 'Driver'">
+                  {{ msg.text }}
+                  <span class="time">{{ msg.timestamp | date:'shortTime' }}</span>
+                </div>
+              }
+            </div>
 
-          <div class="chat-input">
-            <input type="text" [(ngModel)]="newChatMessage" (keydown.enter)="sendChat()" placeholder="Mensaje...">
-            <button (click)="sendChat()" [disabled]="!newChatMessage.trim()">➤</button>
+            <div class="chat-input">
+              <input type="text" [(ngModel)]="newChatMessage" (keydown.enter)="sendChat()" placeholder="Mensaje...">
+              <button (click)="sendChat()" [disabled]="!newChatMessage.trim()">➤</button>
+            </div>
           </div>
         </div>
       }
+    </div>
   `,
   styles: [`
-    .client-page {
-      min-height: 100vh;
-      background: linear-gradient(180deg, #FFF0F5 0%, #FFF5F9 50%, #F3E5F5 100%);
-      padding: 1.25rem; max-width: 480px; margin: 0 auto;
-      position: relative; overflow-x: hidden;
-    }
+    .client-page { min-height: 100vh; background: linear-gradient(180deg, #FFF0F5 0%, #FFF5F9 50%, #F3E5F5 100%); padding: 1.25rem; padding-bottom: 80px; max-width: 480px; margin: 0 auto; position: relative; overflow-x: hidden; font-family: 'Segoe UI', Roboto, sans-serif; }
     .deco { position: absolute; font-size: 1.8rem; animation: float 5s ease-in-out infinite; opacity: 0.35; pointer-events: none; }
     .deco-1 { top: 5%; right: 8%; } .deco-2 { top: 40%; left: 5%; animation-delay: 1.5s; font-size: 1.3rem; } .deco-3 { bottom: 10%; right: 12%; animation-delay: 3s; }
     @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -367,9 +349,7 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
     }
 
     .status-banner {
-      display: flex; align-items: center; gap: 1rem; padding: 1rem; border-radius: 1.25rem;
-      margin-bottom: 1rem; backdrop-filter: blur(12px); animation: fadeInUp 0.5s ease; position: relative; z-index: 1;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,255,255,0.4);
+      display: flex; align-items: center; gap: 1rem; padding: 1rem; border-radius: 1.25rem; margin-bottom: 1rem; backdrop-filter: blur(12px); animation: fadeInUp 0.5s ease; position: relative; z-index: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,255,255,0.4);
       .status-icon { font-size: 2rem; &.pulse { animation: heartbeat 1.2s infinite; } }
       @keyframes heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.2); } }
       strong { color: var(--text-dark); display: block; font-family: var(--font-display); font-size: 0.95rem; }
@@ -380,29 +360,9 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
       &[data-status="InTransit"] { background: linear-gradient(135deg, rgba(219,234,254,0.8), rgba(191,219,254,0.8)); border: 2px solid rgba(59,130,246,0.4); p { color: #1D4ED8; } }
       &[data-status="Delivered"] { background: rgba(236,253,245,0.6); p { color: #065F46; } }
     }
-    .btn-confirm-order {
-      margin-top: 1rem; width: 100%;
-      background: linear-gradient(135deg, #10b981, #059669); 
-      color: white; border: none; padding: 12px 20px; 
-      border-radius: 12px; font-weight: 800; cursor: pointer; 
-      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-      font-size: 1rem; letter-spacing: 0.5px;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      transition: all 0.2s; 
-      &:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5); }
-      &:active { transform: scale(0.98); }
-    }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
-    .loyalty-banner {
-      background: linear-gradient(135deg, rgba(255,240,247,0.8) 0%, rgba(255,255,255,0.8) 100%);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(252, 231, 243, 0.6);
-      border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem;
-      display: flex; align-items: center; gap: 1rem;
-      position: relative; z-index: 1;
-      box-shadow: 0 8px 20px rgba(236, 72, 153, 0.08);
-    }
+    .loyalty-banner { background: linear-gradient(135deg, rgba(255,240,247,0.8) 0%, rgba(255,255,255,0.8) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(252, 231, 243, 0.6); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem; position: relative; z-index: 1; box-shadow: 0 8px 20px rgba(236, 72, 153, 0.08); }
     .lb-icon { font-size: 2rem; background: rgba(255,255,255,0.8); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid #fce7f3; }
     .lb-info { flex: 1; }
     .lb-tier { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pink-600); font-weight: 800; background: rgba(252, 231, 243, 0.5); padding: 2px 8px; border-radius: 10px; }
@@ -420,23 +380,17 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
     }
     @keyframes pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 0 6px rgba(59,130,246,0); } }
 
-    .transit-alert { display: flex; align-items: center; gap: 1rem; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(96,165,250,0.08)); border: 1.5px solid rgba(59,130,246,0.2); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem; position: relative; z-index: 1;
-      p { color: #1D4ED8; font-weight: 600; font-size: 0.9rem; margin: 0; }
-    }
+    .transit-alert { display: flex; align-items: center; gap: 1rem; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(96,165,250,0.08)); border: 1.5px solid rgba(59,130,246,0.2); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem; position: relative; z-index: 1; p { color: #1D4ED8; font-weight: 600; font-size: 0.9rem; margin: 0; } }
     .transit-icon { font-size: 2rem; }
     .transit-pulse { position: absolute; inset: -4px; border-radius: 50%; background: rgba(59,130,246,0.2); animation: transit-ring 1.5s infinite; }
 
-    .map-section { margin-bottom: 1.5rem; position: relative; z-index: 1;
-      h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.5rem; font-family: var(--font-display); }
-    }
-    .map-container { width: 100%; height: 240px; border-radius: 1.25rem; overflow: hidden; border: 2px solid rgba(255,157,191,0.2); box-shadow: var(--shadow-md); }
+    /* 🗺️ ESTILOS DEL MAPA MEJORADOS */
+    .map-section { margin-bottom: 1.5rem; position: relative; z-index: 1; h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.5rem; font-family: var(--font-display); } }
+    .map-wrapper-beautiful { width: 100%; height: 250px; border-radius: 1.5rem; overflow: hidden; border: 3px solid white; box-shadow: 0 8px 25px rgba(255,107,157,0.2); }
     .map-hint { color: var(--text-muted); font-size: 0.8rem; margin: 0.5rem 0 0; text-align: center; font-style: italic; }
 
     .order-section { position: relative; z-index: 1; background: rgba(255,255,255,0.65); backdrop-filter: blur(12px); border-radius: 1.25rem; padding: 1rem; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 4px 20px rgba(0,0,0,0.02); margin-bottom: 1.25rem; transition: all 0.3s ease; }
     .order-header-row { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
-    .toggle-icon { font-size: 0.8rem; color: var(--pink-400); font-weight: bold; }
-    .order-summary-text { font-size: 0.85rem; color: var(--text-medium); margin: 0.25rem 0 0.5rem; font-style: italic; }
-    
     .items-list { margin-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.5rem; }
     .item-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px dashed rgba(0,0,0,0.05); &:last-child { border-bottom: none; } }
     .item-name { color: var(--text-dark); font-size: 0.9rem; font-weight: 600; }
@@ -444,28 +398,15 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
     .item-price { color: var(--pink-500); font-weight: 700; font-size: 0.9rem; }
     
     .order-totals { margin-top: 0.5rem; }
-    .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--text-medium); font-size: 0.85rem;
-      &.grand { margin-top: 0.3rem; color: var(--pink-600); font-weight: 800; font-size: 1.1rem; font-family: var(--font-display); border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.5rem; }
-    }
+    .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--text-medium); font-size: 0.85rem; &.grand { margin-top: 0.3rem; color: var(--pink-600); font-weight: 800; font-size: 1.1rem; font-family: var(--font-display); border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.5rem; } }
     
-    .payment-section { margin-top: 1rem; position: relative; z-index: 1; }
-    .payment-section h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.2rem; font-family: var(--font-display); }
+    .payment-section { margin-top: 1rem; position: relative; z-index: 1; h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.2rem; font-family: var(--font-display); } }
     .pay-hint { font-size: 0.8rem; color: var(--text-medium); margin-bottom: 0.8rem; }
-    
     .payment-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; background: rgba(255,255,255,0.4); padding: 4px; border-radius: 12px; }
-    .pay-tab { flex: 1; border: none; background: none; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-medium); cursor: pointer; transition: all 0.2s;
-       &:hover { background: rgba(255,255,255,0.5); }
-       &.active { background: white; color: var(--pink-600); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    }
+    .pay-tab { flex: 1; border: none; background: none; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: var(--text-medium); cursor: pointer; transition: all 0.2s; &:hover { background: rgba(255,255,255,0.5); } &.active { background: white; color: var(--pink-600); box-shadow: 0 2px 5px rgba(0,0,0,0.05); } }
 
     .payment-content { min-height: 120px; }
-    .pay-card {
-      background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,245,248,0.9));
-      border: 1px solid white; border-radius: 1rem; padding: 1.25rem;
-      box-shadow: 0 10px 30px rgba(255,107,157,0.1);
-      position: relative; overflow: hidden;
-      animation: scaleIn 0.3s ease-out;
-    }
+    .pay-card { background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,245,248,0.9)); border: 1px solid white; border-radius: 1rem; padding: 1.25rem; box-shadow: 0 10px 30px rgba(255,107,157,0.1); position: relative; overflow: hidden; animation: scaleIn 0.3s ease-out; }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     .pay-card::before { content: '🎀'; position: absolute; top: -10px; right: -10px; font-size: 4rem; opacity: 0.05; transform: rotate(15deg); }
     
@@ -480,69 +421,51 @@ import { GoogleMapsModule, MapDirectionsRenderer, MapMarker } from '@angular/goo
     .card-num { font-family: monospace; font-size: 0.95rem; font-weight: 700; color: var(--text-dark); letter-spacing: 0.5px; }
     .card-name { font-weight: 600; color: var(--text-dark); }
     
-    .btn-copy-card {
-      background: var(--pink-500); color: white; border: none; border-radius: 0.5rem;
-      padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;
-      box-shadow: 0 2px 5px rgba(236,72,153,0.3);
-      transition: all 0.2s; &:active { transform: scale(0.95); }
-    }
+    .btn-copy-card { background: var(--pink-500); color: white; border: none; border-radius: 0.5rem; padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 5px rgba(236,72,153,0.3); transition: all 0.2s; &:active { transform: scale(0.95); } }
     
-    .store-logos { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; opacity: 0.8; font-size: 0.75rem; font-weight: 600; color: #555; }
     .footer-msg { text-align: center; margin-top: 2rem; font-family: var(--font-script); color: var(--rose-gold); font-size: 0.9rem; position: relative; z-index: 1; opacity: 0.8; }
-    
     .fade-in { animation: fadeIn 0.3s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* COUNTDOWN */
-    .countdown-section {
-      background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(8px);
-      border: 1px dashed var(--pink-300);
-      border-radius: 1rem; padding: 0.8rem; margin-bottom: 1.25rem;
-      text-align: center; position: relative; z-index: 1;
-    }
-    .countdown-section h3 { color: var(--text-dark); font-size: 0.9rem; margin: 0 0 0.5rem; font-family: var(--font-display); }
+    .countdown-section { background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(8px); border: 1px dashed var(--pink-300); border-radius: 1rem; padding: 0.8rem; margin-bottom: 1.25rem; text-align: center; position: relative; z-index: 1; h3 { color: var(--text-dark); font-size: 0.9rem; margin: 0 0 0.5rem; font-family: var(--font-display); } }
     .countdown-timer { display: flex; justify-content: center; gap: 0.6rem; margin-bottom: 0.4rem; }
     .time-block { display: flex; flex-direction: column; align-items: center; background: white; padding: 0.3rem 0.6rem; border-radius: 0.6rem; box-shadow: 0 2px 8px rgba(255, 107, 157, 0.1); min-width: 44px; }
     .time-val { font-size: 1.1rem; font-weight: 800; color: var(--pink-600); font-family: monospace; }
     .time-label { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
-    /* TOAST */
-    .toast-notification {
-      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
-      background: rgba(40, 40, 40, 0.85); backdrop-filter: blur(12px);
-      color: white; padding: 0.75rem 1.5rem; border-radius: 2rem;
-      display: flex; align-items: center; gap: 0.5rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1);
-      z-index: 9999; animation: toastFadeIn 0.3s ease-out; font-size: 0.9rem; font-weight: 500;
-    }
+    .toast-notification { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: rgba(40, 40, 40, 0.85); backdrop-filter: blur(12px); color: white; padding: 0.75rem 1.5rem; border-radius: 2rem; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.1); z-index: 9999; animation: toastFadeIn 0.3s ease-out; font-size: 0.9rem; font-weight: 500; }
+    @keyframes toastFadeIn { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-    /* CHAT FLOTANTE */
-    .floating-chat-btn { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: var(--pink-500); color: white; border: none; font-size: 1.8rem; box-shadow: 0 4px 15px rgba(236,72,153,0.4); cursor: pointer; z-index: 1000; transition: 0.2s; }
+    /* CHAT FLOTANTE Y MODAL */
+    .floating-chat-btn { position: fixed; bottom: 20px; right: 20px; width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #ec4899, #db2777); color: white; border: none; font-size: 1.8rem; box-shadow: 0 8px 20px rgba(236,72,153,0.4); cursor: pointer; z-index: 1000; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     .floating-chat-btn:hover { transform: scale(1.1); }
     
-    .chat-modal { position: fixed; bottom: 90px; right: 20px; width: calc(100% - 40px); max-width: 350px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); z-index: 1000; display: flex; flex-direction: column; height: 400px; overflow: hidden; border: 1px solid var(--pink-100); animation: slideUp 0.3s ease; }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .chat-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); z-index: 2000; display: flex; align-items: flex-end; }
+    .chat-modal { width: 100%; background: white; border-radius: 25px 25px 0 0; height: 85vh; display: flex; flex-direction: column; overflow: hidden; animation: slideUpChat 0.3s ease; }
+    @keyframes slideUpChat { from { transform: translateY(100%); } to { transform: translateY(0); } }
     
-    .chat-modal .chat-header { background: var(--pink-50); padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pink-100); }
-    .chat-modal .chat-header strong { display: block; color: var(--pink-600); font-size: 0.95rem; }
-    .chat-modal .chat-header .status-text { font-size: 0.75rem; color: #888; }
-    .chat-modal .btn-close { background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; }
+    .chat-header { background: #fdf2f8; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #fce7f3; }
+    .chat-header strong { display: block; color: var(--pink-600); font-size: 1.05rem; }
+    .chat-header .status-text { font-size: 0.8rem; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+    .chat-header .status-text::before { content: ''; width: 8px; height: 8px; background: #10b981; border-radius: 50%; }
+    .btn-close { background: none; border: none; font-size: 1.4rem; color: #999; cursor: pointer; }
     
-    .chat-modal .chat-body { flex: 1; padding: 15px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
-    .chat-empty { text-align: center; color: #aaa; font-size: 0.85rem; font-style: italic; margin: auto; }
-    .msg-bubble { max-width: 80%; padding: 8px 12px; border-radius: 15px; font-size: 0.9rem; position: relative; }
-    .msg-bubble.me { background: var(--pink-500); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-    .msg-bubble.them { background: white; color: #444; align-self: flex-start; border: 1px solid #eee; border-bottom-left-radius: 4px; }
-    .msg-bubble .time { display: block; font-size: 0.65rem; text-align: right; opacity: 0.7; margin-top: 4px; }
+    .chat-body { flex: 1; padding: 15px; overflow-y: auto; background: #f9fafb; display: flex; flex-direction: column; gap: 12px; }
+    .chat-empty { text-align: center; color: #aaa; font-size: 0.9rem; font-style: italic; margin: auto; }
+    .msg-bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; font-size: 0.95rem; line-height: 1.4; position: relative; word-wrap: break-word; }
+    .msg-bubble.me { background: var(--pink-500); color: white; align-self: flex-end; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(236,72,153,0.2); }
+    .msg-bubble.them { background: white; color: #1f2937; align-self: flex-start; border: 1px solid #e5e7eb; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+    .msg-bubble .time { display: block; font-size: 0.65rem; text-align: right; opacity: 0.7; margin-top: 5px; }
     
-    .chat-modal .chat-input { padding: 10px; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
-    .chat-modal .chat-input input { flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; outline: none; }
-    .chat-modal .chat-input input:focus { border-color: var(--pink-400); }
-    .chat-modal .chat-input button { background: var(--pink-500); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .chat-input { padding: 15px; background: white; border-top: 1px solid #f3f4f6; display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 20px); }
+    .chat-input input { flex: 1; border: 1px solid #e5e7eb; border-radius: 30px; padding: 12px 20px; outline: none; font-size: 0.95rem; }
+    .chat-input input:focus { border-color: var(--pink-400); }
+    .chat-input button { background: var(--pink-500); color: white; border: none; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; }
+    .chat-input button:disabled { background: #f3f4f6; color: #9ca3af; }
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy {
-  @ViewChild('mapContainer') mapEl?: ElementRef;
+  @ViewChild('googleMap') mapComponent!: GoogleMap;
+  @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
   order = signal<ClientOrderView | null>(null);
   loading = signal(true);
@@ -551,12 +474,8 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   showMap = signal(false);
 
   loyalty = signal<LoyaltySummary | null>(null);
-
-  // UI States
-  // showOrderDetails = signal(false); // Removed as per user request
   paymentTab = signal<'transfer' | 'cash' | 'oxxo'>('transfer');
 
-  // Countdown & Toast
   deliveryDate = signal<Date | null>(null);
   deliveryDateFormatted = signal('');
   deliveryReason = signal<string>('');
@@ -565,15 +484,14 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   showChat = signal(false);
   chatMessages = signal<any[]>([]);
   newChatMessage = '';
-  @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
   toastVisible = signal(false);
   toastMessage = signal('');
   private timerInterval: any;
 
-  // Maps State
-  centerSignal = signal<google.maps.LatLngLiteral>({ lat: 25.6866, lng: -100.3161 }); // MTY
-  zoomSignal = signal(12);
+  // 🗺️ Maps State
+  centerSignal = signal<google.maps.LatLngLiteral>({ lat: 27.4861, lng: -99.5069 });
+  zoomSignal = signal(14);
   driverPos = signal<google.maps.LatLngLiteral | null>(null);
   clientPos = signal<google.maps.LatLngLiteral | null>(null);
   directionsResult = signal<google.maps.DirectionsResult | undefined>(undefined);
@@ -589,19 +507,27 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     ]
   };
 
+  // 🚀 ICONOS MEJORADOS (Carrito y Casita)
   driverMarkerOptions: google.maps.MarkerOptions = {
-    icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' },
-    title: 'Repartidor 🚗'
+    icon: {
+      url: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png', // Un carrito bonito
+      scaledSize: new google.maps.Size(45, 45)
+    },
+    title: 'Repartidor 🚗',
+    zIndex: 999
   };
 
   clientMarkerOptions: google.maps.MarkerOptions = {
-    icon: { url: 'http://maps.google.com/mapfiles/ms/icons/pink-dot.png' },
-    title: 'Tú 💖'
+    icon: {
+      url: 'https://cdn-icons-png.flaticon.com/512/2555/2555572.png', // Una casita
+      scaledSize: new google.maps.Size(40, 40)
+    },
+    title: 'Tu hogar 💖'
   };
 
   rendererOptions: google.maps.DirectionsRendererOptions = {
-    suppressMarkers: true,
-    polylineOptions: { strokeColor: '#3B82F6', strokeOpacity: 0.7, strokeWeight: 5 }
+    suppressMarkers: true, // Importante: Oculta los marcadores por defecto de la ruta
+    polylineOptions: { strokeColor: '#FF6B9D', strokeOpacity: 0.8, strokeWeight: 6 } // Ruta color rosa
   };
 
   private accessToken = '';
@@ -629,19 +555,26 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     if (this.timerInterval) clearInterval(this.timerInterval);
   }
 
-  private loadOrder(): void {
+  private async loadOrder(): Promise<void> {
     this.api.getClientOrder(this.accessToken).subscribe({
-      next: (order) => {
-        const prevStatus = this.order()?.status;
+      next: async (order: any) => {
+
+        // 🚀 MAGIA DE GEOCODING: Si no hay lat/lng pero hay dirección, buscamos las coordenadas
+        if ((!order.clientLatitude || !order.clientLongitude) && order.clientAddress) {
+          const coords = await this.geocodeAddress(order.clientAddress);
+          if (coords) {
+            order.clientLatitude = coords.lat;
+            order.clientLongitude = coords.lng;
+          }
+        }
+
         this.order.set(order);
         this.loading.set(false);
 
-        // 1. Initial Delivery Calculation
         let isFrecuente = (order.clientType || '').toLowerCase() === 'frecuente';
         const createdStr = order.createdAt || new Date().toISOString();
         this.calculateDelivery(createdStr, isFrecuente);
 
-        // 2. Map Setup
         const needsMap = order.status === 'InRoute' || order.status === 'InTransit';
         this.showMap.set(needsMap);
 
@@ -652,7 +585,6 @@ export class OrderViewComponent implements OnInit, OnDestroy {
           }
         }
 
-        // 3. Loyalty & Client Info
         const defaultLoyalty: LoyaltySummary = {
           clientId: order.clientId || 0,
           clientName: order.clientName,
@@ -677,63 +609,83 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ═══ REAL-TIME UPDATES & MAP LOGIC ═══
+  // 1️⃣ CAMBIAMOS A GOOGLE GEOCODER (Es súper exacto)
+  private async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    if (!address) return null;
 
-  private updateMapState(order: ClientOrderView): void {
-    // 1. Client Position
-    const lat = (order as any).latitude || (order as any).clientLat || order.clientLatitude;
-    const lng = (order as any).longitude || (order as any).clientLng || order.clientLongitude;
+    return new Promise((resolve) => {
+      const geocoder = new google.maps.Geocoder();
+      // Le agregamos la ciudad para ayudar a Google
+      const fullAddress = `${address}, Nuevo Laredo, Tamaulipas, México`;
+
+      geocoder.geocode({ address: fullAddress }, (results: any, status: any) => {
+        if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
+          console.log('✅ Dirección encontrada por Google:', fullAddress);
+          resolve({
+            lat: results[0].geometry.location.lat(),
+            lng: results[0].geometry.location.lng()
+          });
+        } else {
+          console.warn('❌ Google no encontró la dirección:', fullAddress, status);
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  // 2️⃣ ACTUALIZAMOS MAP STATE (Trazamos la ruta si el chofer ya reportó)
+  private updateMapState(order: any): void {
+    const lat = order.clientLatitude || order.latitude || order.clientLat;
+    const lng = order.clientLongitude || order.longitude || order.clientLng;
 
     if (lat && lng) {
       this.clientPos.set({ lat: Number(lat), lng: Number(lng) });
-      this.centerSignal.set({ lat: Number(lat), lng: Number(lng) });
-      this.zoomSignal.set(14);
+
+      // 🚀 Si ya tenemos al chofer y a la clienta, trazamos la ruta de una vez
+      if (this.driverPos() && order.status === 'InTransit') {
+        this.calculateRoute(this.driverPos()!, this.clientPos()!);
+      }
     }
 
-    // 2. Driver Position (Init)
     if (order.driverLocation && order.driverLocation.latitude) {
       this.updateDriverPosition(order.driverLocation.latitude, order.driverLocation.longitude);
     }
   }
 
+  // 3️⃣ ACTUALIZAMOS DRIVER POSITION (Reparado para tiempos exactos)
   private updateDriverPosition(lat: number, lng: number): void {
     if (!lat || !lng) return;
     const driver = { lat, lng };
     this.driverPos.set(driver);
-    // If not client pos, center on driver
-    if (!this.clientPos()) {
+
+    // Centramos la cámara en el carrito
+    if (this.mapComponent && this.mapComponent.googleMap) {
+      this.mapComponent.googleMap.panTo(driver);
+    } else if (!this.clientPos()) {
       this.centerSignal.set(driver);
     }
 
-    // 3. Routing (Only if InTransit)
+    // Trazamos la ruta solo si la clienta ya tiene coordenadas
     if (this.order()?.status === 'InTransit' && this.clientPos()) {
       this.calculateRoute(driver, this.clientPos()!);
-    } else {
-      this.directionsResult.set(undefined);
     }
   }
 
   private calculateRoute(origin: google.maps.LatLngLiteral, dest: google.maps.LatLngLiteral) {
+    console.log('🛣️ [8] Solicitando ruta a Google Maps de', origin, 'a', dest);
     this.directionsService.route({
       origin,
       destination: dest,
       travelMode: google.maps.TravelMode.DRIVING
     }, (result: any, status: any) => {
+      console.log(`🏁 [9] Respuesta de Google Maps: Status = ${status}`);
       // @ts-ignore
       if (status === 'OK' && result) {
+        console.log('✅ [10] ¡Ruta calculada con éxito! Guardando en directionsResult.');
         this.directionsResult.set(result);
+      } else {
+        console.error('❌ [10] Error al calcular la ruta de Google Maps. Respuesta completa:', result);
       }
-    });
-  }
-
-  confirmOrder() {
-    if (!confirm('¿Confirmas que has recibido tu pedido? ✨')) return;
-    this.api.confirmClientOrder(this.accessToken).subscribe({
-      next: () => {
-        this.showToast('¡Pedido confirmado! Gracias 💕');
-        this.loadOrder();
-      },
-      error: () => this.showToast('Error al confirmar, intenta de nuevo 😿')
     });
   }
 
@@ -750,12 +702,16 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       this.deliverySub = this.signalr.deliveryUpdate$.subscribe(() => {
         this.reloadOrder();
       });
+
       this.signalr.clientChatUpdate$.subscribe(msg => {
-        if (this.showChat()) {
+        // Prevención de duplicados
+        if (!this.chatMessages().some(m => m.id === msg.id)) {
           this.chatMessages.update(msgs => [...msgs, msg]);
-          this.scrollChat();
-        } else {
-          this.showToast('💬 Nuevo mensaje del repartidor');
+          if (this.showChat()) {
+            this.scrollChat();
+          } else {
+            this.showToast('💬 Nuevo mensaje del repartidor');
+          }
         }
       });
     } catch (err) {
@@ -764,9 +720,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     }
   }
 
-
   private pollingInterval?: any;
-
   private startPolling(): void {
     this.pollingInterval = setInterval(() => this.reloadOrder(), 15000);
   }
@@ -774,23 +728,27 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   private reloadOrder(): void {
     this.api.getClientOrder(this.accessToken).subscribe({
       next: (order) => {
-        const prevStatus = this.order()?.status;
         this.order.set(order);
-
         const needsMap = order.status === 'InRoute' || order.status === 'InTransit';
         this.showMap.set(needsMap);
-
         if (needsMap) {
           this.updateMapState(order);
-          if (!this.signalrConnected) {
-            this.connectRealtime();
-          }
+          if (!this.signalrConnected) this.connectRealtime();
         }
       }
     });
   }
 
-  // ═══ QUEUE DOTS ═══
+  confirmOrder() {
+    if (!confirm('¿Confirmas que has recibido tu pedido? ✨')) return;
+    this.api.confirmClientOrder(this.accessToken).subscribe({
+      next: () => {
+        this.showToast('¡Pedido confirmado! Gracias 💕');
+        this.loadOrder();
+      },
+      error: () => this.showToast('Error al confirmar, intenta de nuevo 😿')
+    });
+  }
 
   getQueueDots(o: ClientOrderView): { done: boolean; current: boolean; you: boolean }[] {
     if (!o.queuePosition || !o.totalDeliveries) return [];
@@ -809,13 +767,10 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     return dots;
   }
 
-
   copyText(val: string) {
     navigator.clipboard.writeText(val);
     this.showToast('¡Número de tarjeta copiado! 💳');
   }
-
-  // toggleOrderDetails() { this.showOrderDetails.update(v => !v); }
 
   showToast(msg: string) {
     this.toastMessage.set(msg);
@@ -826,40 +781,22 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   private calculateDelivery(createdAtStr: string, isFrecuente: boolean) {
     const created = new Date(createdAtStr);
     const delivery = new Date(created);
-
-    // Logic:
-    // If order is created Mon-Sat -> Delivery is *This coming Sunday*
-    // If order is created Sun -> Delivery is *Next Sunday* (7 days later) or *Today*?
-    // Assumption: "Cierre de pedidos" is usually mid-week. If I order Sunday, it's for next Sunday.
-    // Standard rule: Delivery is always on Sunday.
-    // Calculate days until next Sunday.
-
-    // 0=Sun, 1=Mon, ..., 6=Sat
     const dayOfWeek = created.getDay();
-    // Days to add to reach next Sunday
-    // If Today is Sun(0), target is next Sun(0) => +7 days
-    // If Today is Mon(1), target is Sun(0) => +6 days
-    // If Today is Sat(6), target is Sun(0) => +1 days
     let daysUntilSunday = (7 - dayOfWeek) % 7;
-    if (daysUntilSunday === 0) daysUntilSunday = 7; // If today is Sunday, move to next Sunday
-
+    if (daysUntilSunday === 0) daysUntilSunday = 7;
     let addDays = daysUntilSunday;
 
-    // If client is "Frecuente":
-    // "Second Sunday" means +7 days on top of the next Sunday.
     if (isFrecuente) {
       addDays += 7;
-      this.deliveryReason.set('✨ Por ser clienta frecuente, tu entrega es el segundo domingo (para que juntes más pedidos) 💕');
+      this.deliveryReason.set('✨ Por ser clienta frecuente, tu entrega es el segundo domingo 💕');
     } else {
       this.deliveryReason.set('🌸 Por ser clienta nueva, tu entrega es este próximo domingo ✨');
     }
 
-    // Apply date change
     delivery.setDate(created.getDate() + addDays);
-    delivery.setHours(12, 0, 0, 0); // Noon
+    delivery.setHours(12, 0, 0, 0);
 
     const fmt = formatDate(delivery, "EEEE d 'de' MMMM", this.locale);
-    // Capitalize first letter
     this.deliveryDateFormatted.set(fmt.charAt(0).toUpperCase() + fmt.slice(1));
     this.deliveryDate.set(delivery);
     this.startCountdown();
@@ -867,19 +804,15 @@ export class OrderViewComponent implements OnInit, OnDestroy {
 
   private startCountdown() {
     if (this.timerInterval) clearInterval(this.timerInterval);
-
     const update = () => {
       const target = this.deliveryDate();
       if (!target) return;
-
       const now = new Date();
       const diff = target.getTime() - now.getTime();
-
       if (diff <= 0) {
         this.countdown.set({ days: 0, hours: 0, minutes: 0, seconds: 0 });
         return;
       }
-
       this.countdown.set({
         days: Math.floor(diff / (1000 * 60 * 60 * 24)),
         hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
@@ -887,7 +820,6 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         seconds: Math.floor((diff / 1000) % 60)
       });
     };
-
     update();
     this.timerInterval = setInterval(update, 1000);
   }
@@ -902,7 +834,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   loadChat() {
     this.api.getClientChat(this.accessToken).subscribe(msgs => {
       this.chatMessages.set(msgs);
-      setTimeout(() => this.scrollChat(), 50);
+      this.scrollChat();
     });
   }
 
@@ -911,10 +843,8 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     const text = this.newChatMessage.trim();
     this.newChatMessage = '';
 
-    this.api.sendClientMessage(this.accessToken, text).subscribe(msg => {
-      this.chatMessages.update(msgs => [...msgs, msg]);
-      this.scrollChat();
-    });
+    // No agregamos localmente para evitar duplicados, SignalR responderá
+    this.api.sendClientMessage(this.accessToken, text).subscribe();
   }
 
   scrollChat() {
@@ -922,6 +852,6 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       if (this.clientChatScroll) {
         this.clientChatScroll.nativeElement.scrollTop = this.clientChatScroll.nativeElement.scrollHeight;
       }
-    }, 50);
+    }, 60);
   }
 }
