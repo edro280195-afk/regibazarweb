@@ -5,6 +5,20 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
 
+/** Rutas/endpoints que no deben disparar logout en 401 */
+const PUBLIC_ROUTE_PATTERNS = [
+    '/pedido/',
+    '/driver/',
+    '/api/clientorder/',
+    '/api/driverroute/',
+    '/api/push/',
+];
+
+function isPublicRoute(url: string): boolean {
+    const lower = url.toLowerCase();
+    return PUBLIC_ROUTE_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     const auth = inject(AuthService);
     const toast = inject(ToastService);
@@ -12,17 +26,14 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
     return next(req).pipe(
         catchError((error: HttpErrorResponse) => {
-            // Don't auto-logout on public routes (client order view, driver view)
-            const isPublicRoute = req.url.includes('/pedido/') || req.url.includes('/driver/');
 
             switch (error.status) {
                 case 0:
-                    // Network error or CORS issue
                     toast.error('⚠️ Sin conexión. Verifica tu internet e intenta de nuevo.');
                     break;
 
                 case 401:
-                    if (!isPublicRoute) {
+                    if (!isPublicRoute(req.url)) {
                         toast.warning('🔒 Tu sesión ha expirado. Inicia sesión de nuevo.');
                         auth.logout();
                     }
@@ -33,7 +44,6 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                     break;
 
                 case 404:
-                    // Only show toast for non-GET requests (GET 404s are often expected)
                     if (req.method !== 'GET') {
                         toast.warning('🔍 El recurso solicitado no fue encontrado.');
                     }
@@ -48,7 +58,6 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                     break;
 
                 case 422:
-                    // Validation error — show server message if available
                     const validationMsg = error.error?.message || error.error?.title || 'Datos inválidos.';
                     toast.warning(`📝 ${validationMsg}`);
                     break;
@@ -64,7 +73,6 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                     break;
             }
 
-            // Always re-throw so component-level handlers can still react
             return throwError(() => error);
         })
     );
