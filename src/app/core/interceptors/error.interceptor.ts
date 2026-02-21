@@ -5,18 +5,16 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
 
-/** Rutas/endpoints que no deben disparar logout en 401 */
-const PUBLIC_ROUTE_PATTERNS = [
-    '/pedido/',
-    '/driver/',
-    '/api/clientorder/',
-    '/api/driverroute/',
-    '/api/push/',
-];
-
-function isPublicRoute(url: string): boolean {
-    const lower = url.toLowerCase();
-    return PUBLIC_ROUTE_PATTERNS.some(pattern => lower.includes(pattern));
+/**
+ * Determina si el usuario está en una página pública
+ * revisando la RUTA de Angular (no la URL del request API).
+ * 
+ * Así cualquier request que falle con 401 desde /pedido/* o /repartidor/*
+ * nunca dispara logout, sin importar a qué endpoint de API vaya.
+ */
+function isOnPublicPage(): boolean {
+    const path = window.location.pathname.toLowerCase();
+    return path.startsWith('/pedido/') || path.startsWith('/repartidor/');
 }
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
@@ -33,7 +31,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
                     break;
 
                 case 401:
-                    if (!isPublicRoute(req.url)) {
+                    // Solo hacer logout si NO estamos en una página pública
+                    if (!isOnPublicPage()) {
                         toast.warning('🔒 Tu sesión ha expirado. Inicia sesión de nuevo.');
                         auth.logout();
                     }
