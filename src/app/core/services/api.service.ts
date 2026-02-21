@@ -32,6 +32,22 @@ export class ApiService {
     return this.http.get<OrderSummary[]>(`${this.url}/orders`);
   }
 
+  getOrder(id: number): Observable<OrderSummary> {
+    return this.http.get<OrderSummary>(`${this.url}/orders/${id}`);
+  }
+
+  getOrdersPaginated(page: number, pageSize: number, search: string = '', status: string = '', clientType: string = ''): Observable<{ items: OrderSummary[], totalCount: number }> {
+    let query = `${this.url}/orders/paged?page=${page}&pageSize=${pageSize}`;
+    if (search) query += `&search=${encodeURIComponent(search)}`;
+    if (status) query += `&status=${encodeURIComponent(status)}`;
+    if (clientType) query += `&clientType=${encodeURIComponent(clientType)}`;
+    return this.http.get<{ items: OrderSummary[], totalCount: number }>(query);
+  }
+
+  getOrderStats(): Observable<{ total: number, pending: number, pendingAmount: number, collectedToday: number }> {
+    return this.http.get<{ total: number, pending: number, pendingAmount: number, collectedToday: number }>(`${this.url}/orders/stats`);
+  }
+
   uploadExcel(file: File): Observable<ExcelUploadResult> {
     const fd = new FormData();
     fd.append('file', file);

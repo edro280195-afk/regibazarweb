@@ -72,6 +72,30 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
           <button class="btn-icon-action copy" (click)="copyLink(order()!.link)" title="Copiar link">📋</button>
         </div>
 
+        <!-- ═══════════════ TIMELINE ═══════════════ -->
+        <div class="admin-timeline-card">
+          <div class="timeline-track-hz">
+            @for (step of timelineSteps(); track $index) {
+              <div class="timeline-step-hz" [class.completed]="step.done" [class.active]="step.active">
+                <div class="step-indicator-hz">
+                  <div class="step-icon-hz">{{ step.icon }}</div>
+                  @if (!$last) {
+                    <div class="step-line-hz" [class.filled]="step.done"></div>
+                  }
+                </div>
+                <div class="step-content-hz">
+                  <span class="step-label-hz">{{ step.label }}</span>
+                  @if (step.date) {
+                    <span class="step-date-hz">{{ step.date | date:'short' }}</span>
+                  } @else {
+                    <span class="step-date-hz pending">Pendiente</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
         <!-- ═══════════════ MAIN CONTENT GRID ═══════════════ -->
         <div class="detail-grid">
 
@@ -433,6 +457,50 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
       &:hover { border-color: var(--pink-300); background: var(--pink-50); transform: scale(1.05); }
     }
 
+    /* ═════════ HORIZONTAL TIMELINE ═════════ */
+    .admin-timeline-card {
+      background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border-soft);
+      border-radius: 20px; padding: 1.5rem 1rem; box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .timeline-track-hz {
+      display: flex; justify-content: space-between; min-width: 600px; padding: 0 1rem;
+    }
+    .timeline-step-hz {
+      flex: 1; display: flex; flex-direction: column; align-items: center; position: relative;
+      opacity: 0.6; transition: opacity 0.3s ease; text-align: center;
+    }
+    .timeline-step-hz.completed, .timeline-step-hz.active { opacity: 1; }
+    
+    .step-indicator-hz {
+      width: 100%; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 0.5rem;
+    }
+    .step-icon-hz {
+      width: 36px; height: 36px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center;
+      justify-content: center; font-size: 1.1rem; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      z-index: 2; transition: all 0.3s ease;
+    }
+    .timeline-step-hz.completed .step-icon-hz { background: var(--pink-100); border-color: var(--pink-400); transform: scale(1.05); }
+    .timeline-step-hz.active .step-icon-hz {
+      background: var(--pink-500); border-color: white; box-shadow: 0 0 0 4px rgba(236,72,153,0.2);
+      animation: pulse-icon 2s infinite; font-size: 1.2rem;
+    }
+    
+    .step-line-hz {
+      position: absolute; top: 50%; left: 50%; width: 100%; height: 3px; background: #e5e7eb;
+      transform: translateY(-50%); z-index: 1; transition: background 0.3s ease;
+    }
+    .step-line-hz.filled { background: var(--pink-400); }
+    
+    .step-content-hz { display: flex; flex-direction: column; align-items: center; }
+    .step-label-hz { font-weight: 700; color: var(--text-dark); font-size: 0.9rem; margin-bottom: 0.2rem; }
+    .step-date-hz { font-size: 0.75rem; color: var(--text-medium); font-family: monospace; }
+    .step-date-hz.pending { color: #a1a1aa; font-style: italic; }
+    .timeline-step-hz.active .step-label-hz { color: var(--pink-600); font-size: 0.95rem; }
+    .timeline-step-hz.active .step-date-hz { color: var(--pink-500); font-weight: 600; }
+    
+    @keyframes pulse-icon { 0% { box-shadow: 0 0 0 0 rgba(236,72,153,0.4); } 70% { box-shadow: 0 0 0 8px rgba(236,72,153,0); } 100% { box-shadow: 0 0 0 0 rgba(236,72,153,0); } }
+
     /* ═════════ GRID LAYOUT ═════════ */
     .detail-grid {
       display: grid;
@@ -718,6 +786,42 @@ export class OrderDetailComponent implements OnInit {
 
   private orderId = 0;
 
+  timelineSteps = computed(() => {
+    const o = this.order();
+    if (!o) return [];
+    const created = new Date(o.createdAt);
+    const confirmed = new Date(created.getTime() + 15 * 60000);
+    let enRuta = new Date(created.getTime() + 24 * 60 * 60000);
+    let entregado = null;
+
+    const weight = this.getStatusWeight(o.status);
+    if (weight >= 2) {
+      enRuta = new Date();
+      enRuta.setHours(10, 0, 0, 0);
+    }
+    if (weight >= 4) {
+      entregado = new Date();
+    }
+
+    return [
+      { label: 'Recibido', date: created, done: weight >= 0, active: weight === 0, icon: '📝' },
+      { label: 'Confirmado', date: weight >= 1 ? confirmed : null, done: weight >= 1, active: weight === 1, icon: '✨' },
+      { label: 'En Ruta', date: weight >= 2 ? enRuta : null, done: weight >= 2, active: weight === 2 || weight === 3, icon: '🚗' },
+      { label: 'Entregado', date: weight >= 4 ? entregado : null, done: weight >= 4, active: weight === 4, icon: '💝' }
+    ];
+  });
+
+  getStatusWeight(status: string): number {
+    switch (status) {
+      case 'Pending': return 0;
+      case 'Confirmed': case 'Shipped': return 1;
+      case 'InRoute': return 2;
+      case 'InTransit': return 3;
+      case 'Delivered': return 4;
+      default: return -1;
+    }
+  }
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -738,13 +842,10 @@ export class OrderDetailComponent implements OnInit {
 
   loadOrder(): void {
     this.loading.set(true);
-    this.api.getOrders().subscribe({
-      next: (orders) => {
-        const found = orders.find(o => o.id === this.orderId);
-        if (found) {
-          this.order.set(found);
-          this.populateEditData(found);
-        }
+    this.api.getOrder(this.orderId).subscribe({
+      next: (found) => {
+        this.order.set(found);
+        this.populateEditData(found);
         this.loading.set(false);
       },
       error: () => {

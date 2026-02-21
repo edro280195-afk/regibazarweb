@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "serve:pwa": "ng build && npx http-server -p 4200 -c-1 dist/frontend"
   },
   "private": true,
   "dependencies": {
@@ -21,9 +22,7 @@
     "@angular/router": "^18.2.0",
     "@angular/service-worker": "^18.2.14",
     "@microsoft/signalr": "^10.0.0",
-    "@types/leaflet": "^1.9.21",
     "echarts": "^6.0.0",
-    "leaflet": "^1.9.4",
     "ngx-echarts": "^18.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

@@ -1,0 +1,562 @@
+<div class="orders-page">
+      
+      <!-- ═══════════════ TOAST ═══════════════ -->
+      @if (toastMessage()) {
+        <div class="toast-notification" [class.error]="toastIsError()">
+          <span class="toast-icon">{{ toastIsError() ? '😿' : '✨' }}</span>
+          <span>{{ toastMessage() }}</span>
+        </div>
+      }
+
+      <!-- ═══════════════ MODAL: BORRAR PEDIDO ═══════════════ -->
+
+
+      <!-- ═══════════════ MODAL: GESTIONAR PEDIDO ═══════════════ -->
+      @if (orderToEdit()) {
+        <div class="modal-overlay" (click)="orderToEdit.set(null)">
+          <div class="modal-card edit-modal" (click)="$event.stopPropagation()">
+
+            <div class="edit-modal-header">
+              <div class="edit-modal-bg-blur"></div>
+              <div class="sparkle-row">
+                <span>✨</span><span>💖</span><span>✨</span>
+              </div>
+              <h3>Gestionar Pedido</h3>
+              <p class="client-title">{{ orderToEdit()!.clientName }}</p>
+              <button class="btn-close-modal" (click)="orderToEdit.set(null)">✕</button>
+            </div>
+
+            <div class="edit-modal-body">
+              <div class="edit-section">
+                <label class="field-label">👤 Cliente</label>
+                <input type="text" [(ngModel)]="editData.clientName" placeholder="Nombre" class="fancy-input">
+                <input 
+                  type="text" 
+                  appGoogleAutocomplete
+                  (onAddressChange)="handleAddressChange($event)"
+                  [(ngModel)]="editData.clientAddress" 
+                  placeholder="Dirección" 
+                  class="fancy-input" 
+                  style="margin-top: 5px">
+                <input type="text" [(ngModel)]="editData.clientPhone" placeholder="Teléfono" class="fancy-input" style="margin-top: 5px">
+              </div>
+
+              <div class="edit-section">
+                <label class="field-label">📦 Método de Entrega</label>
+                <div class="type-switch">
+                  <button [class.active]="editData.orderType === 'Delivery'" (click)="editData.orderType = 'Delivery'">
+                    <span class="switch-icon">🛵</span><span>Envío</span>
+                  </button>
+                  <button [class.active]="editData.orderType === 'PickUp'" (click)="editData.orderType = 'PickUp'">
+                    <span class="switch-icon">🛍️</span><span>Local</span>
+                  </button>
+                </div>
+                
+                @if (editData.orderType === 'Delivery') {
+                    <div class="field-row" style="margin-top: 10px;">
+                        <label class="mini-label">Hora estipulada</label>
+                        <input type="time" [(ngModel)]="editData.deliveryTime" class="fancy-input">
+                    </div>
+                } @else {
+                     <div class="field-row" style="margin-top: 10px;">
+                        <label class="mini-label">Fecha de Recolección</label>
+                        <input type="date" [(ngModel)]="editData.pickupDate" class="fancy-input">
+                        <input type="time" [(ngModel)]="editData.deliveryTime" class="fancy-input" style="margin-top:5px">
+                    </div>
+                }
+              </div>
+
+              <div class="edit-section">
+                <label class="field-label">🎀 Estatus del Pedido</label>
+                <div class="status-pills-selector">
+                  <button class="status-pill-btn" [class.active]="editData.status === 'Pending'"   (click)="editData.status = 'Pending'">⏳ Pendiente</button>
+                  <button class="status-pill-btn" [class.active]="editData.status === 'Shipped'"   (click)="editData.status = 'Shipped'">📦 Enviado</button>
+                  <button class="status-pill-btn" [class.active]="editData.status === 'Delivered'" (click)="editData.status = 'Delivered'">💝 Entregado</button>
+                  <button class="status-pill-btn" [class.active]="editData.status === 'Canceled'"  (click)="editData.status = 'Canceled'">🚫 Cancelado</button>
+                  <button class="status-pill-btn" [class.active]="editData.status === 'Postponed'" (click)="editData.status = 'Postponed'">📅 Posponer</button>
+                </div>
+              </div>
+
+              <div class="edit-section">
+                <label class="field-label">🏷️ Etiquetas</label>
+                <div class="tags-selector">
+                  @for (tag of availableTags; track tag) {
+                    <button class="tag-btn" 
+                            [class.active]="editData.tags.includes(tag)"
+                            (click)="toggleTag(tag)">
+                      {{ tag }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              @if (editData.status === 'Postponed') {
+                <div class="postponed-box">
+                  <div class="field">
+                    <label class="field-label">📅 ¿Cuándo entregamos?</label>
+                    <input type="datetime-local" [(ngModel)]="editData.postponedAt" class="fancy-input">
+                  </div>
+                  <div class="field">
+                    <label class="field-label">📝 Nota rápida</label>
+                    <input type="text" [(ngModel)]="editData.postponedNote" placeholder="Ej. Cambio de horario" class="fancy-input">
+                  </div>
+                </div>
+              }
+
+              <div class="edit-section">
+                <label class="field-label">📱 Notificaciones WhatsApp</label>
+                <div class="whatsapp-actions">
+                  <button class="btn-wa" (click)="sendWaConfirmation()">✅ Confirmación</button>
+                  <button class="btn-wa" (click)="sendWaOnWay()">🚗 En Camino</button>
+                  <button class="btn-wa" (click)="sendWaPayment()">💸 Cobro</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="edit-modal-footer">
+              <button class="btn-modal-cancel" (click)="orderToEdit.set(null)">Cerrar</button>
+              <button class="btn-modal-pink" (click)="saveEdit()">💾 Guardar cambios</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════ MODAL: CONFIRMAR COBRO ═══════════════ -->
+      @if (selectedOrderForPayment()) {
+        <div class="modal-overlay" (click)="selectedOrderForPayment.set(null)">
+          <div class="modal-card" style="max-width: 400px;" (click)="$event.stopPropagation()">
+            <div class="edit-modal-header">
+              <h3>Confirmar Cobro 💸</h3>
+              <p class="client-title">{{ selectedOrderForPayment()!.clientName }}</p>
+              <button class="btn-close-modal" (click)="selectedOrderForPayment.set(null)">✕</button>
+            </div>
+            <div class="edit-modal-body" style="display: block;">
+               <div style="text-align: center; margin-bottom: 1.5rem;">
+                 <p style="font-size: 1.5rem; font-weight: 800; color: var(--pink-600); margin: 0;">
+                   $ {{ selectedOrderForPayment()!.total | number:'1.2-2' }}
+                 </p>
+                 <p style="color: #888; margin: 5px 0 0;">Total a cobrar</p>
+               </div>
+               
+               <div class="edit-section">
+                  <label class="field-label">Método de Pago</label>
+                  <div class="type-switch">
+                    <button [class.active]="paymentMethod() === 'Efectivo'" (click)="paymentMethod.set('Efectivo')">💵 Efectivo</button>
+                    <button [class.active]="paymentMethod() === 'Transferencia'" (click)="paymentMethod.set('Transferencia')">🏦 Transferencia</button>
+                    <button [class.active]="paymentMethod() === 'Tarjeta'" (click)="paymentMethod.set('Tarjeta')">💳 Tarjeta</button>
+                  </div>
+               </div>
+
+               <div class="edit-modal-footer" style="margin-top: 2rem; justify-content: center;">
+                 <button class="btn-modal-cancel" (click)="selectedOrderForPayment.set(null)">Cancelar</button>
+                 <button class="btn-modal-pink" [disabled]="confirmingPayment()" (click)="confirmPayment()">
+                    {{ confirmingPayment() ? 'Procesando...' : '✅ Confirmar Cobro' }}
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════ DRAWER: AGREGAR ARTÍCULO ═══════════════ -->
+      @if (drawerOrder()) {
+        <div class="drawer-overlay" (click)="closeDrawer()">
+          <div class="drawer-panel" [class.open]="drawerOpen()" (click)="$event.stopPropagation()">
+            
+            <div class="drawer-header">
+              <div class="drawer-grab"></div>
+              <h3>Agregar artículo</h3>
+              <p class="drawer-subtitle">{{ drawerOrder()?.clientName }} 🛍️</p>
+              <button class="btn-close-drawer" (click)="closeDrawer()">✕</button>
+            </div>
+
+            <div class="drawer-body">
+              <div class="drawer-field">
+                <label>Producto</label>
+                <input type="text" [(ngModel)]="newItem.productName" 
+                       placeholder="Ej. Edredón King rosa"
+                       class="drawer-input" 
+                       (keydown.enter)="focusField('qty')">
+              </div>
+
+              <div class="drawer-row">
+                <div class="drawer-field half">
+                  <label>Cantidad</label>
+                  <div class="qty-stepper">
+                    <button (click)="newItem.quantity = Math.max(1, newItem.quantity - 1)">−</button>
+                    <input type="number" [(ngModel)]="newItem.quantity" min="1" #qtyInput
+                           class="drawer-input center" (keydown.enter)="focusField('price')">
+                    <button (click)="newItem.quantity = newItem.quantity + 1">+</button>
+                  </div>
+                </div>
+                <div class="drawer-field half">
+                  <label>Precio unitario</label>
+                  <div class="price-input-wrap">
+                    <span class="currency">$</span>
+                    <input type="number" [(ngModel)]="newItem.unitPrice" min="0" #priceInput
+                           class="drawer-input with-prefix" (keydown.enter)="addItemToOrder()">
+                  </div>
+                </div>
+              </div>
+
+              @if (newItem.productName && newItem.unitPrice > 0) {
+                <div class="preview-line">
+                  <span class="preview-qty">{{ newItem.quantity }}x</span>
+                  <span class="preview-name">{{ newItem.productName }}</span>
+                  <span class="preview-total">$ {{ (newItem.quantity * newItem.unitPrice) | number:'1.2-2' }}</span>
+                </div>
+
+
+              }
+
+              @if (editingItem()) {
+                 <button class="btn-add-item info" (click)="saveItemChanges()" 
+                        [disabled]="!newItem.productName || newItem.unitPrice <= 0">
+                  💾 Guardar cambios
+                </button>
+              } @else {
+                <button class="btn-add-item" (click)="addItemToOrder()" 
+                        [disabled]="!newItem.productName || newItem.unitPrice <= 0">
+                  ✨ Agregar al pedido
+                </button>
+              }
+
+              <!-- Items ya en el pedido -->
+              @if (drawerOrder()?.items?.length) {
+                <div class="drawer-current-items">
+                  <label class="section-label">En este pedido:</label>
+                  @for (item of drawerOrder()!.items; track item.id) {
+                    <div class="mini-item-chip">
+                      <span class="chip-qty">{{ item.quantity }}×</span>
+                      <span class="chip-name">{{ item.productName }}</span>
+                      <span class="chip-price">$ {{ item.lineTotal | number:'1.2-2' }}</span>
+                    </div>
+                  }
+                  <div class="drawer-total-row">
+                    <span>Total actual</span>
+                    <span class="drawer-total-value">$ {{ drawerOrder()!.total | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════ MODAL: RESULTADO UPLOAD EXCEL ═══════════════ -->
+      @if (uploadResult()) {
+        <div class="modal-overlay" (click)="uploadResult.set(null)">
+          <div class="modal-card upload-result-modal" (click)="$event.stopPropagation()">
+            <div class="modal-petals">
+              <span class="petal p1">📄</span>
+              <span class="petal p2">✨</span>
+              <span class="petal p3">🎉</span>
+            </div>
+            <div class="modal-icon-circle success">🎉</div>
+            <h3>¡Excel cargado!</h3>
+            <div class="upload-stats">
+              <div class="stat-bubble">
+                <span class="stat-num">{{ uploadResult()!.ordersCreated }}</span>
+                <span class="stat-txt">Pedidos</span>
+              </div>
+              <div class="stat-bubble">
+                <span class="stat-num">{{ uploadResult()!.clientsCreated }}</span>
+                <span class="stat-txt">Clientes nuevos</span>
+              </div>
+            </div>
+            @if (uploadResult()!.warnings.length) {
+              <div class="upload-warnings">
+                <label>⚠️ Notas:</label>
+                @for (w of uploadResult()!.warnings; track w) {
+                  <p>{{ w }}</p>
+                }
+              </div>
+            }
+            <div class="modal-actions">
+              <button class="btn-modal-pink" (click)="uploadResult.set(null)">¡Perfecto! 💅</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (showOptimizer()) {
+        <app-route-optimizer 
+          [orders]="selectedOrdersList()"
+          (cancel)="showOptimizer.set(false)"
+          (confirmRoute)="handleRouteConfirmed($event)">
+        </app-route-optimizer>
+      }
+
+      <!-- ═══════════════ PÁGINA PRINCIPAL ═══════════════ -->
+      <div class="page-header">
+        <div class="header-text">
+          <h2>Pedidos 🛒</h2>
+          <p class="page-sub">Administra tus ventas, CEO ✨</p>
+        </div>
+        <div class="header-controls">
+          <button class="btn-toggle-select" [class.active]="selectionMode()" (click)="toggleSelectionMode()">
+            {{ selectionMode() ? '❌ Salir' : '✨ Organizar Ruta' }}
+          </button>
+          <button class="btn-icon-circle" (click)="loadOrders()" title="Recargar">🔄</button>
+
+          <!-- Upload rápido -->
+          <label class="btn-upload-quick" title="Cargar Excel">
+            <span>📄</span>
+            <input type="file" accept=".xlsx,.xls" (change)="onQuickUpload($event)" hidden>
+          </label>
+
+          <select [(ngModel)]="statusFilter" (change)="applyFilter()" class="filter-select">
+            <option value="">Todos</option>
+            <option value="Pending">⏳ Pendientes</option>
+            <option value="InRoute">🚗 En ruta</option>
+            <option value="Shipped">📦 Enviado</option>
+            <option value="Delivered">💝 Entregados</option>
+            <option value="Postponed">📅 Pospuestos</option>
+            <option value="PaymentPending" style="font-weight: 800; color: #db2777;">💸 Por Cobrar</option>
+            <option value="Canceled">🚫 Cancelados</option>
+          </select>
+
+          <select [(ngModel)]="clientTypeFilter" (change)="applyFilter()" class="filter-select">
+            <option value="">👤 Tipo Clienta</option>
+            <option value="Nueva">🌱 Nueva</option>
+            <option value="Frecuente">💎 Frecuente</option>
+          </select>
+
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" [(ngModel)]="searchTerm" (input)="onSearchChange()" 
+                   placeholder="Buscar cliente o #ID..." class="search-input">
+            @if (searchTerm) {
+              <button class="search-clear" (click)="searchTerm = ''; applyFilter()">✕</button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick stats -->
+      <div class="quick-stats">
+        <div class="qs-chip">
+          <span class="qs-num">{{ orderStats().total }}</span>
+          <span class="qs-label">Total</span>
+        </div>
+        <div class="qs-chip pending">
+          <span class="qs-num">{{ orderStats().pending }}</span>
+          <span class="qs-label">Pendientes</span>
+        </div>
+        <div class="qs-chip revenue">
+          <span class="qs-num">$ {{ orderStats().pendingAmount | number:'1.0-0' }}</span>
+          <span class="qs-label">Por Cobrar</span>
+        </div>
+        <div class="qs-chip delivered">
+          <span class="qs-num">$ {{ orderStats().collectedToday | number:'1.0-0' }}</span>
+          <span class="qs-label">Cobrado Hoy</span>
+        </div>
+      </div>
+
+      <!-- Upload Drop Zone (drag & drop) -->
+      <div class="drop-zone" 
+           [class.active]="isDragging()"
+           (dragover)="onDragOver($event)" 
+           (dragleave)="isDragging.set(false)" 
+           (drop)="onDrop($event)">
+        @if (uploading()) {
+          <div class="upload-progress">
+            <div class="spinner-cute"></div>
+            <p>Procesando Excel... ✨</p>
+          </div>
+        } @else {
+          <div class="drop-content">
+            <span class="drop-icon">📄</span>
+            <p class="drop-text">Arrastra tu archivo Excel aquí</p>
+            <p class="drop-hint">o usa el botón 📄 de arriba</p>
+          </div>
+        }
+      </div>
+
+      <!-- ═══════════════ ROUTE BASKET (DOCK) ═══════════════ -->
+      @if (selectionMode() || selectedIds().size > 0) {
+        <div class="route-dock-container">
+          <div class="route-dock">
+            
+            <div class="dock-left">
+              <div class="dock-icon-wrapper">
+                <span class="dock-icon">🛵</span>
+                <span class="badge-count">{{ selectedIds().size }}</span>
+              </div>
+              <div class="dock-info">
+                <h4>Ruta en proceso</h4>
+                <p>Total: <strong>$ {{ selectedOrdersTotal() | number:'1.0-0' }}</strong></p>
+              </div>
+            </div>
+
+            <div class="dock-avatars">
+              @for (order of selectedOrdersList(); track order.id) {
+                <div class="mini-avatar" [title]="order.clientName">
+                  {{ order.clientName.charAt(0) }}
+                  <span class="check-mini">✓</span>
+                </div>
+              }
+              @if (selectedIds().size === 0) {
+                <span class="empty-hint">Toca las tarjetas para agregar...</span>
+              }
+            </div>
+
+            <button class="btn-create-route-dock" (click)="createRoute()" 
+                    [disabled]="selectedIds().size === 0 || loading()">
+              <span>Crear Ruta</span>
+              <span class="arrow">→</span>
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Orders grid -->
+      <div class="orders-grid">
+        @for (order of filteredOrders(); track order.id) {
+          <div class="order-card" 
+               [class.selection-mode]="selectionMode()"
+               [class.selected]="selectedIds().has(order.id)"
+               [attr.data-status]="order.status"
+               (click)="selectionMode() ? toggleOrder(order.id) : goToOrder(order.id)">
+            
+            @if (selectionMode() && selectedIds().has(order.id)) {
+              <div class="selection-stamp">
+                <span>🎀</span>
+              </div>
+            }
+            
+            <div class="card-header">
+              <div class="client-meta">
+                <span class="order-id">#{{ order.id }}</span>
+                <span class="order-type-tag" [class.pickup]="order.orderType === 'PickUp'">
+                  {{ order.orderType === 'PickUp' ? '🛍️ LOCAL' : '🛵 ENVÍO' }}
+                </span>
+                @for (tag of order.tags; track tag) {
+                  <span class="tag-pill">{{ tag }}</span>
+                }
+              </div>
+              <span class="status-pill" [attr.data-status]="order.status">
+                {{ statusLabel(order.status) }}
+              </span>
+            </div>
+
+            <div class="card-body">
+              <div class="client-info">
+                <div class="name-check">
+                  @if (order.status === 'Pending' && order.orderType === 'Delivery') {
+                    <label class="custom-checkbox" (click)="$event.stopPropagation()">
+                      <input type="checkbox" [checked]="selectedIds().has(order.id)" (change)="toggleOrder(order.id)">
+                      <span class="checkmark"></span>
+                    </label>
+                  }
+                  <h3 class="client-name">{{ order.clientName }}</h3>
+                </div>
+                
+                <!-- CLIENT TYPE BADGE -->
+                <div class="client-badges">
+                    @if (order.clientType === 'Frecuente') {
+                      <span class="badge-vip">💎 FRECUENTE</span>
+                    } @else {
+                      <span class="badge-new">🌱 NUEVA</span>
+                    }
+                </div>
+              </div>
+
+              @if (order.status === 'Postponed' && order.postponedAt) {
+                <div class="postponed-alert">
+                  <span class="alert-icon">📅</span>
+                  <div>
+                    <p class="date">{{ order.postponedAt | date:'fullDate' }}</p>
+                    @if (order.postponedNote) { <p class="note">"{{ order.postponedNote }}"</p> }
+                  </div>
+                </div>
+              }
+
+              <div class="items-scroll-row">
+                <div class="items-track">
+                  @for (item of order.items; track item.id) {
+                    <div class="item-chip">
+                      <span class="qty">{{ item.quantity }}×</span>
+                      <span class="name">{{ item.productName }}</span>
+                      <span class="price">$ {{ item.lineTotal | number:'1.0-0' }}</span>
+                      @if (order.status === 'Pending') {
+                        <button class="btn-icon-mini edit" (click)="$event.stopPropagation(); openEditItem(order, item)" title="Editar">✏️</button>
+                        <button class="btn-icon-mini delete" (click)="$event.stopPropagation(); askDeleteItem(order, item)" title="Eliminar">✕</button>
+                      }
+                    </div>
+                  }
+                  @if (order.status === 'Pending') {
+                    <button class="item-chip add-chip" (click)="openDrawer(order)">
+                      <span class="plus">＋</span>
+                    </button>
+                  }
+                </div>
+              </div>
+              @if (order.items.length > 0) {
+                <div class="items-summary">
+                  <span>{{ order.items.length }} artículo{{ order.items.length > 1 ? 's' : '' }}</span>
+                  <span class="swipe-hint">desliza →</span>
+                </div>
+              }
+            </div>
+
+            <div class="card-footer">
+              <div class="total-section">
+                <span class="total-label">Total</span>
+                <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
+              </div>
+              <div class="card-buttons">
+                @if (order.status === 'Pending' || order.status === 'InRoute') {
+                    <button class="action-btn pay" (click)="$event.stopPropagation(); openConfirmPayment(order)" title="Confirmar Cobro">💰</button>
+                }
+                <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.link)" title="Copiar Link">📋</button>
+                <button class="action-btn edit" (click)="$event.stopPropagation(); openEditModal(order)" title="Editar">✏️</button>
+                <button class="action-btn delete" (click)="$event.stopPropagation(); askDeleteOrder(order)" title="Eliminar">🗑️</button>
+                <span class="action-arrow" title="Ver detalle">→</span>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          @if (!loading()) {
+            <div class="empty-state">
+              <div class="empty-icon">🛍️</div>
+              <h3>No hay pedidos</h3>
+              <p>Carga un Excel, crea uno manual o ajusta tus filtros.</p>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <div class="empty-icon spinner-cute"></div>
+              <h3>Cargando pedidos...</h3>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- ═══════════════ PAGINATION ═══════════════ -->
+      @if (totalPages() > 1 && !loading()) {
+        <div class="pagination-controls">
+          <button class="btn-page" (click)="changePage(-1)" [disabled]="currentPage() === 1">← Anterior</button>
+          <div class="page-info">
+            Página <strong>{{ currentPage() }}</strong> de {{ totalPages() }}
+            <span class="total-hint">({{ totalOrdersCount() }} pedidos)</span>
+          </div>
+          <button class="btn-page" (click)="changePage(1)" [disabled]="currentPage() >= totalPages()">Siguiente →</button>
+        </div>
+      }
+
+      <!-- Route success -->
+      @if (routeCreated()) {
+        <div class="route-success-card">
+          <div class="icon">🚗💨</div>
+          <div class="info">
+            <h4>¡Ruta creada con éxito!</h4>
+            <p>Envía este link al repartidor:</p>
+            <div class="copy-box">
+              <input type="text" [value]="routeCreated()!.driverLink" readonly>
+              <button (click)="copyDriverLink()">Copiar</button>
+            </div>
+          </div>
+          <button class="close-btn" (click)="routeCreated.set(null)">✕</button>
+        </div>
+      }
+    </div>

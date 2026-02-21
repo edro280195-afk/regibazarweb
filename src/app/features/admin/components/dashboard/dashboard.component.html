@@ -1,0 +1,135 @@
+<div class="dashboard-container">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+
+      <!-- ═══ HEADER ═══ -->
+      <header class="dash-header">
+        <div class="greeting">
+          <h1>Hola👑</h1>
+          <p class="subtitle">Así van las cosas en Regi Bazar✨</p>
+        </div>
+        <div class="date-badge">
+          📅 {{ today | date:'EEEE d MMMM' }}
+        </div>
+      </header>
+
+      @if (loading()) {
+        <div class="loading-state">
+          <div class="spinner">🎀</div>
+          <p>Cargando tus éxitos...</p>
+        </div>
+      } @else {
+        @if (data(); as d) {
+
+          <!-- ═══ KPIs PRINCIPALES ═══ -->
+          <div class="kpi-row fade-in">
+            <div class="kpi-card">
+              <span class="kpi-icon">💰</span>
+              <div class="kpi-data">
+                <span class="kpi-label">Ventas Hoy</span>
+                <span class="kpi-value">{{ metrics().salesToday | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-icon">📊</span>
+              <div class="kpi-data">
+                <span class="kpi-label">Esta Semana</span>
+                <span class="kpi-value">{{ metrics().salesWeek | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-icon">📈</span>
+              <div class="kpi-data">
+                <span class="kpi-label">Este Mes</span>
+                <span class="kpi-value">{{ metrics().salesMonth | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+            </div>
+            <div class="kpi-card highlight">
+              <span class="kpi-icon">⚠️</span>
+              <div class="kpi-data">
+                <span class="kpi-label">Por Cobrar</span>
+                <span class="kpi-value text-red">{{ metrics().pendingCollection | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ STATS GRID ═══ -->
+          <div class="stats-grid">
+
+            <div class="stat-card revenue-card">
+              <div class="card-content">
+                <div class="card-icon">💸</div>
+                <div class="card-data">
+                  <span class="label">Ingresos Totales</span>
+                  <span class="value">$ {{ d.totalRevenue | number:'1.0-0' }}</span>
+                </div>
+              </div>
+              <div class="sparkles">✨</div>
+            </div>
+
+            <div class="stat-card pink-glass">
+              <div class="stat-header">
+                <span class="emoji">💁‍♀️</span>
+                <span class="trend">Clientas</span>
+              </div>
+              <span class="stat-number">{{ d.totalClients }}</span>
+            </div>
+
+            <div class="stat-card purple-glass">
+              <div class="stat-header">
+                <span class="emoji">🛍️</span>
+                <span class="trend">Pedidos</span>
+              </div>
+              <span class="stat-number">{{ d.totalOrders }}</span>
+            </div>
+
+            <div class="stat-card peach-glass">
+              <div class="stat-header">
+                <span class="emoji">⏳</span>
+                <span class="trend">Pendientes</span>
+              </div>
+              <span class="stat-number">{{ d.pendingOrders }}</span>
+            </div>
+
+            <div class="stat-card mint-glass">
+              <div class="stat-header">
+                <span class="emoji">💝</span>
+                <span class="trend">Entregados</span>
+              </div>
+              <div>
+                <span class="stat-number">{{ d.deliveredOrders }}</span>
+                <span class="sub-stat">({{ metrics().successRate }}%)</span>
+              </div>
+            </div>
+
+            <div class="stat-card blue-glass">
+              <div class="stat-header">
+                <span class="emoji">🚗</span>
+                <span class="trend">Rutas</span>
+              </div>
+              <span class="stat-number">{{ d.activeRoutes }}</span>
+            </div>
+
+          </div>
+
+          <!-- ═══ CHARTS ═══ -->
+          <div class="charts-grid">
+            <div class="chart-card wide">
+              <h3>📈 Ventas vs Inversión</h3>
+              <div echarts [options]="salesVsInvOptions" class="chart-container"></div>
+            </div>
+
+            <div class="chart-card">
+              <h3>🎀 Tipos de Clientas</h3>
+              <div echarts [options]="clientTypeOptions" class="chart-container"></div>
+            </div>
+
+            <div class="chart-card">
+              <h3>🚚 Envíos vs PickUp</h3>
+              <div echarts [options]="deliveryMethodOptions" class="chart-container"></div>
+            </div>
+          </div>
+
+        }
+      }
+    </div>

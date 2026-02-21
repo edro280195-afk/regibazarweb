@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { SignalRService } from '../../../../core/services/signalr.service';
+import { PushNotificationService } from '../../../../core/services/push-notification.service';
 import { ClientOrderView, LoyaltySummary } from '../../../../shared/models/models';
 
 declare var google: any;
@@ -49,56 +50,119 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
           <span class="header-ribbon">🎀</span>
           <h1>¡Hola, {{ o.clientName }}! 💖</h1>
           <p class="subtitle">Aquí está el detalle de tu pedido</p>
+          <button class="btn-notify" (click)="enableNotifications(o.clientId)">
+            Activar Notificaciones 🔔
+          </button>
         </div>
 
-        <div class="status-banner" [attr.data-status]="o.status">
-          @switch (o.status) {
-            @case ('Pending') {
-              <span class="status-icon">📦</span>
-              <div><strong>Pedido confirmado</strong><p>Tu pedido está listo, pronto saldrá a entrega ✨</p></div>
-            }
-            @case ('Shipped') {
-              <span class="status-icon">🚚</span>
-              <div><strong>Pedido confirmado</strong><p>Tu pedido está listo, pronto saldrá a entrega ✨</p></div>
-            }
-            @case ('InRoute') {
-              <span class="status-icon">🚗</span>
-              <div><strong>En ruta de entrega</strong><p>Tu pedido está en camino. El repartidor tiene entregas antes de ti 💕</p></div>
-            }
-            @case ('InTransit') {
-              <span class="status-icon pulse">🏃💨</span>
-              <div><strong>¡El repartidor viene hacia ti!</strong><p>Prepárate, tu pedido está a punto de llegar 🎉</p></div>
-            }
-            @case ('Delivered') {
-              <span class="status-icon">💝</span>
-              <div><strong>¡Entregado!</strong><p>Tu pedido fue entregado, muchas gracias por tu compra 🌸</p></div>
-            }
-            @case ('NotDelivered') {
-              <span class="status-icon">😿</span>
-              <div><strong>No se pudo entregar</strong><p>Contacta a tu vendedora para reprogramar 💌</p></div>
-            }
-          }
-        </div>
-
-        @if (loyalty(); as l) {
-          <div class="loyalty-banner">
-            <div class="lb-icon">💎</div>
-            <div class="lb-info">
-              <span class="lb-tier">{{ l.tier }}</span>
-              <div class="lb-points">
-                <strong>{{ l.currentPoints }}</strong> RegiPuntos
-              </div>
-              <p class="lb-promo">¡Por cada $100 m.n. acumulas 10 RegiPuntos! 🌸 Acumula y obtén beneficios.</p>
+        @if (o.status === 'Pending') {
+          <div class="confirm-action-section fade-in">
+            <div class="confirm-card">
+              <h3>¡Tu pedido está listo! ✨</h3>
+              <p>Revisa los detalles abajo y confirma cuando estés lista para recibirlo.</p>
+              <button class="btn-confirm-order" (click)="confirmOrder()">
+                Sí, Confirmar Pedido 💖
+              </button>
             </div>
           </div>
         }
 
+        <!-- ⏳ Countdown Section (Moved UP) -->
+        @if (deliveryDate() && (o.status === 'Pending' || o.status === 'InRoute' || o.status === 'InTransit')) {
+          <div class="countdown-section">
+            <h3>⏳ Tiempo para tu entrega</h3>
+            <div class="countdown-timer">
+              <div class="time-block">
+                <span class="time-val">{{ countdown().days }}</span>
+                <span class="time-label">Días</span>
+              </div>
+              <div class="time-block">
+                <span class="time-val">{{ countdown().hours }}</span>
+                <span class="time-label">Hrs</span>
+              </div>
+              <div class="time-block">
+                <span class="time-val">{{ countdown().minutes }}</span>
+                <span class="time-label">Mins</span>
+              </div>
+              <div class="time-block">
+                <span class="time-val">{{ countdown().seconds }}</span>
+                <span class="time-label">Segs</span>
+              </div>
+            </div>
+            <p class="delivery-date-hint">
+              @if (o.status === 'Pending') {
+                Tu entrega está programada para el <strong>{{ deliveryDateFormatted() }}</strong> 📅
+              } @else {
+                <strong>{{ deliveryDateFormatted() }}</strong>
+              }
+              <br>
+              <span class="delivery-reason">{{ deliveryReason() }}</span>
+            </p>
+          </div>
+        }
+
+        <div class="timeline-container">
+          <div class="timeline-card">
+            <h3 class="timeline-title">Estado de tu pedido</h3>
+            
+            <div class="timeline-track">
+              @for (step of timelineSteps(); track $index) {
+                <div class="timeline-step" [class.completed]="step.done" [class.active]="step.active">
+                  
+                  <div class="step-indicator">
+                    <div class="step-icon">{{ step.icon }}</div>
+                    @if (!$last) {
+                      <div class="step-line" [class.filled]="step.done"></div>
+                    }
+                  </div>
+                  
+                  <div class="step-content">
+                    <span class="step-label">{{ step.label }}</span>
+                    @if (step.date) {
+                      <span class="step-date">{{ step.date | date:'shortTime' }}</span>
+                    } @else {
+                      <span class="step-date pending">Pendiente</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            
+            <div class="status-alert" [attr.data-status]="o.status">
+              @switch (o.status) {
+                @case ('Pending') { <p>Tu pedido está listo, pronto saldrá a entrega ✨</p> }
+                @case ('Shipped') { <p>Tu pedido está empacado y listo ✨</p> }
+                @case ('InRoute') { 
+                  <p>Tu pedido en camino. 
+                    @if ((o.deliveriesAhead ?? 0) > 0) {
+                      El repartidor tiene entregas antes de ti 💕
+                    } @else {
+                      ¡Prepárate, eres la siguiente parada! ✨
+                    }
+                  </p> 
+                }
+                @case ('InTransit') { <p>¡Prepárate, tu pedido está a punto de llegar! 🎉</p> }
+                @case ('Delivered') { <p>Tu pedido fue entregado, muchas gracias por tu compra 🌸</p> }
+                @case ('NotDelivered') { <p>No se pudo entregar. Contacta a tu vendedora para reprogramar 💌</p> }
+                @default { <p>Consultando estado... 🔍</p> }
+              }
+            </div>
+          </div>
+        </div>
+
         @if (o.status === 'InRoute' && o.queuePosition && o.totalDeliveries) {
           <div class="queue-info">
-            <div class="queue-position">
-              <span class="queue-number">{{ o.deliveriesAhead ?? 0 }}</span>
-              <span class="queue-label">entregas antes de la tuya</span>
-            </div>
+            @if ((o.deliveriesAhead ?? 0) === 0) {
+              <div class="queue-position">
+                <span class="queue-label">¡Eres la siguiente entrega en la ruta! 🚗</span>
+              </div>
+            } @else {
+              <div class="queue-position">
+                <span class="queue-number">{{ o.deliveriesAhead }}</span>
+                <span class="queue-label">entregas antes de la tuya</span>
+              </div>
+            }
+
             <div class="queue-bar">
               @for (i of getQueueDots(o); track $index) {
                 <div class="queue-dot" [class.done]="i.done" [class.current]="i.current" [class.you]="i.you">
@@ -106,7 +170,10 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
                 </div>
               }
             </div>
-            <p class="queue-hint">Eres la entrega #{{ o.queuePosition }} de {{ o.totalDeliveries }} 📍</p>
+            
+            @if ((o.deliveriesAhead ?? 0) > 0) {
+              <p class="queue-hint">Eres la entrega #{{ o.queuePosition }} de {{ o.totalDeliveries }} 📍</p>
+            }
           </div>
         }
 
@@ -162,35 +229,6 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
           </div>
         }
 
-        @if (deliveryDate() && (o.status === 'Pending' || o.status === 'InRoute')) {
-          <div class="countdown-section">
-            <h3>⏳ Tiempo para tu entrega</h3>
-            <div class="countdown-timer">
-              <div class="time-block">
-                <span class="time-val">{{ countdown().days }}</span>
-                <span class="time-label">Días</span>
-              </div>
-              <div class="time-block">
-                <span class="time-val">{{ countdown().hours }}</span>
-                <span class="time-label">Hrs</span>
-              </div>
-              <div class="time-block">
-                <span class="time-val">{{ countdown().minutes }}</span>
-                <span class="time-label">Mins</span>
-              </div>
-              <div class="time-block">
-                <span class="time-val">{{ countdown().seconds }}</span>
-                <span class="time-label">Segs</span>
-              </div>
-            </div>
-            <p class="delivery-date-hint">
-              Tu entrega está programada para el <strong>{{ deliveryDateFormatted() }}</strong> 📅
-              <br>
-              <span class="delivery-reason">{{ deliveryReason() }}</span>
-            </p>
-          </div>
-        }
-
         <div class="order-section">
           <div class="order-header-row">
             <h3>Tu pedido 🛍️</h3>
@@ -220,6 +258,19 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
             <div class="total-row grand"><span>Total a pagar</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
           </div>
         </div>
+
+        @if (loyalty(); as l) {
+          <div class="loyalty-banner">
+            <div class="lb-icon">💎</div>
+            <div class="lb-info">
+              <span class="lb-tier">{{ l.tier }}</span>
+              <div class="lb-points">
+                <strong>{{ l.currentPoints }}</strong> RegiPuntos
+              </div>
+              <p class="lb-promo">¡Por cada $100 m.n. acumulas 10 RegiPuntos! 🌸 Acumula y obtén beneficios.</p>
+            </div>
+          </div>
+        }
         
         <div class="payment-section">
           <h3>Formas de Pago 💸</h3>
@@ -346,20 +397,39 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
       @keyframes bow-sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
       h1 { font-family: var(--font-display); color: var(--pink-600); font-size: 1.6rem; margin: 0; text-shadow: 0 2px 4px rgba(236,72,153,0.1); }
       .subtitle { font-family: var(--font-script); color: var(--rose-gold); font-size: 1.1rem; margin: 0.15rem 0 0; }
+      .btn-notify { margin-top: 1rem; background: var(--pink-100); color: var(--pink-600); border: 2px solid var(--pink-200); padding: 8px 16px; border-radius: 20px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-size: 0.85rem; box-shadow: 0 4px 10px rgba(255,107,157,0.1); }
+      .btn-notify:hover { background: var(--pink-500); color: white; border-color: var(--pink-400); transform: translateY(-2px); }
     }
 
-    .status-banner {
-      display: flex; align-items: center; gap: 1rem; padding: 1rem; border-radius: 1.25rem; margin-bottom: 1rem; backdrop-filter: blur(12px); animation: fadeInUp 0.5s ease; position: relative; z-index: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(255,255,255,0.4);
-      .status-icon { font-size: 2rem; &.pulse { animation: heartbeat 1.2s infinite; } }
-      @keyframes heartbeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.2); } }
-      strong { color: var(--text-dark); display: block; font-family: var(--font-display); font-size: 0.95rem; }
-      p { margin: 0.1rem 0 0; font-size: 0.8rem; line-height: 1.3; }
-      &[data-status="Pending"] { background: rgba(255,253,240,0.6); p { color: #92400E; } }
-      &[data-status="Shipped"] { background: rgba(243, 232, 255, 0.6); border: 1px solid #e9d5ff; p { color: #6b21a8; } }
-      &[data-status="InRoute"] { background: rgba(239,246,255,0.6); p { color: #1E40AF; } }
-      &[data-status="InTransit"] { background: linear-gradient(135deg, rgba(219,234,254,0.8), rgba(191,219,254,0.8)); border: 2px solid rgba(59,130,246,0.4); p { color: #1D4ED8; } }
-      &[data-status="Delivered"] { background: rgba(236,253,245,0.6); p { color: #065F46; } }
-    }
+    /* 🔥 TIMELINE V2 (AMAZON STYLE) 🔥 */
+    .timeline-container { position: relative; z-index: 1; margin-bottom: 1.5rem; animation: fadeInUp 0.5s ease; }
+    .timeline-card { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-radius: 1.5rem; padding: 1.25rem; box-shadow: 0 6px 20px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.6); }
+    .timeline-title { color: var(--text-dark); font-family: var(--font-display); font-size: 1.1rem; margin: 0 0 1rem 0; text-align: center; }
+    
+    .timeline-track { display: flex; flex-direction: column; gap: 0; margin-bottom: 1rem; padding-left: 0.5rem; }
+    .timeline-step { display: flex; gap: 1rem; position: relative; min-height: 60px; opacity: 0.6; transition: opacity 0.3s ease; }
+    .timeline-step.completed, .timeline-step.active { opacity: 1; }
+    
+    .step-indicator { display: flex; flex-direction: column; align-items: center; width: 36px; z-index: 2; }
+    .step-icon { width: 32px; height: 32px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 1rem; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 2; transition: all 0.3s ease; }
+    .timeline-step.completed .step-icon { background: var(--pink-100); border-color: var(--pink-400); transform: scale(1.05); }
+    .timeline-step.active .step-icon { background: var(--pink-500); border-color: white; box-shadow: 0 0 0 4px rgba(236,72,153,0.2); animation: pulse-icon 2s infinite; font-size: 1.1rem; }
+    
+    .step-line { width: 3px; flex-grow: 1; background: #e5e7eb; margin: 4px 0; border-radius: 2px; transition: background 0.3s ease; }
+    .step-line.filled { background: var(--pink-400); }
+    
+    .step-content { flex: 1; padding-top: 4px; padding-bottom: 1rem; }
+    .step-label { display: block; font-weight: 700; color: var(--text-dark); font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .step-date { display: block; font-size: 0.75rem; color: var(--text-medium); font-family: monospace; }
+    .step-date.pending { color: #a1a1aa; font-style: italic; }
+    
+    .timeline-step.active .step-label { color: var(--pink-600); font-size: 1.05rem; }
+    .timeline-step.active .step-date { color: var(--pink-500); font-weight: 600; }
+    
+    .status-alert { margin-top: 0.5rem; padding: 0.8rem; border-radius: 0.75rem; background: rgba(243,244,246,0.6); font-size: 0.85rem; text-align: center; color: var(--text-dark); border: 1px dashed rgba(0,0,0,0.1); }
+    .status-alert p { margin: 0; line-weight: 1.4; font-weight: 500; }
+    
+    @keyframes pulse-icon { 0% { box-shadow: 0 0 0 0 rgba(236,72,153,0.4); } 70% { box-shadow: 0 0 0 8px rgba(236,72,153,0); } 100% { box-shadow: 0 0 0 0 rgba(236,72,153,0); } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
     .loyalty-banner { background: linear-gradient(135deg, rgba(255,240,247,0.8) 0%, rgba(255,255,255,0.8) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(252, 231, 243, 0.6); border-radius: 1.25rem; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem; position: relative; z-index: 1; box-shadow: 0 8px 20px rgba(236, 72, 153, 0.08); }
@@ -489,6 +559,9 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   toastMessage = signal('');
   private timerInterval: any;
 
+  // Timeline signals
+  timelineSteps = signal<{ label: string, date: Date | null, done: boolean, active: boolean, icon: string }[]>([]);
+
   // 🗺️ Maps State
   centerSignal = signal<google.maps.LatLngLiteral>({ lat: 27.4861, lng: -99.5069 });
   zoomSignal = signal(14);
@@ -540,6 +613,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private api: ApiService,
     private signalr: SignalRService,
+    private pushService: PushNotificationService,
     @Inject(LOCALE_ID) private locale: string
   ) { }
 
@@ -553,6 +627,11 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     this.deliverySub?.unsubscribe();
     this.signalr.disconnect();
     if (this.timerInterval) clearInterval(this.timerInterval);
+  }
+
+  enableNotifications(clientId?: number) {
+    this.pushService.subscribeToNotifications(clientId);
+    this.showToast('🔔 ¡Suscripción solicitada!');
   }
 
   private async loadOrder(): Promise<void> {
@@ -600,6 +679,8 @@ export class OrderViewComponent implements OnInit, OnDestroy {
             error: (err) => console.warn('Keeping default loyalty', err)
           });
         }
+
+        this.updateTimeline(order);
       },
       error: (err) => {
         this.loading.set(false);
@@ -642,7 +723,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       this.clientPos.set({ lat: Number(lat), lng: Number(lng) });
 
       // 🚀 Si ya tenemos al chofer y a la clienta, trazamos la ruta de una vez
-      if (this.driverPos() && order.status === 'InTransit') {
+      if (this.driverPos() && (order.status === 'InTransit' || order.status === 'InRoute')) {
         this.calculateRoute(this.driverPos()!, this.clientPos()!);
       }
     }
@@ -666,7 +747,7 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     }
 
     // Trazamos la ruta solo si la clienta ya tiene coordenadas
-    if (this.order()?.status === 'InTransit' && this.clientPos()) {
+    if ((this.order()?.status === 'InTransit' || this.order()?.status === 'InRoute') && this.clientPos()) {
       this.calculateRoute(driver, this.clientPos()!);
     }
   }
@@ -683,6 +764,23 @@ export class OrderViewComponent implements OnInit, OnDestroy {
       if (status === 'OK' && result) {
         console.log('✅ [10] ¡Ruta calculada con éxito! Guardando en directionsResult.');
         this.directionsResult.set(result);
+
+        // Use Maps ETA to update countdown timer
+        // @ts-ignore
+        const routeLeg = result.routes[0]?.legs[0];
+        if (routeLeg?.duration) {
+          const durationSeconds = routeLeg.duration.value;
+          const etaDate = new Date(Date.now() + durationSeconds * 1000);
+          this.deliveryDate.set(etaDate);
+          this.deliveryDateFormatted.set('¡Repartidor en Camino!');
+
+          if ((this.order()?.deliveriesAhead ?? 0) > 0) {
+            this.deliveryReason.set(`⏳ ETA: ${routeLeg.duration.text} desde ubicación del repartidor (El tiempo puede variar por otras entregas)`);
+          } else {
+            this.deliveryReason.set(`⏳ ETA: Llegará aproximadamente en ${routeLeg.duration.text} 🚗`);
+          }
+          this.startCountdown();
+        }
       } else {
         console.error('❌ [10] Error al calcular la ruta de Google Maps. Respuesta completa:', result);
       }
@@ -729,6 +827,8 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     this.api.getClientOrder(this.accessToken).subscribe({
       next: (order) => {
         this.order.set(order);
+        this.updateTimeline(order);
+
         const needsMap = order.status === 'InRoute' || order.status === 'InTransit';
         this.showMap.set(needsMap);
         if (needsMap) {
@@ -737,6 +837,74 @@ export class OrderViewComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  // 🔥 UPDATE TIMELINE
+  private updateTimeline(o: any) {
+    const created = new Date(o.createdAt);
+    const now = new Date();
+
+    // Generar tiempos estimados si no están en DB
+    const confirmed = new Date(created.getTime() + 15 * 60000); // +15 min
+    let enRuta = new Date(created.getTime() + 24 * 60 * 60000); // +1 dia default
+    let entregado = null;
+
+    const weight = this.getStatusWeight(o.status);
+
+    // Si ya está en ruta, usamos ahora si no tenemos el dato real, 
+    // pero para que no baile la fecha, usamos una constante basada en created o el today a las 10am
+    if (weight >= 2) {
+      enRuta = new Date();
+      enRuta.setHours(10, 0, 0, 0);
+    }
+
+    if (weight >= 4) {
+      entregado = new Date();
+    }
+
+    const steps = [
+      {
+        label: 'Pedido Recibido',
+        date: created,
+        done: weight >= 0,
+        active: weight === 0,
+        icon: '📝'
+      },
+      {
+        label: 'Confirmado',
+        date: weight >= 1 ? confirmed : null,
+        done: weight >= 1,
+        active: weight === 1,
+        icon: '✨'
+      },
+      {
+        label: 'En Ruta',
+        date: weight >= 2 ? enRuta : null,
+        done: weight >= 2,
+        active: weight === 2 || weight === 3,
+        icon: '🚗'
+      },
+      {
+        label: 'Entregado',
+        date: weight >= 4 ? entregado : null,
+        done: weight >= 4,
+        active: weight === 4,
+        icon: '💝'
+      }
+    ];
+
+    this.timelineSteps.set(steps);
+  }
+
+  private getStatusWeight(status: string): number {
+    switch (status) {
+      case 'Pending': return 0;
+      case 'Confirmed': case 'Shipped': return 1;
+      case 'InRoute': return 2;
+      case 'InTransit': return 3;
+      case 'Delivered': return 4;
+      default: return -1;
+    }
   }
 
   confirmOrder() {
@@ -843,8 +1011,13 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     const text = this.newChatMessage.trim();
     this.newChatMessage = '';
 
-    // No agregamos localmente para evitar duplicados, SignalR responderá
-    this.api.sendClientMessage(this.accessToken, text).subscribe();
+    // Agregamos el mensaje a la vista localmente cuando la API responda exitosamente
+    this.api.sendClientMessage(this.accessToken, text).subscribe(newMsg => {
+      if (!this.chatMessages().some(m => m.id === newMsg.id)) {
+        this.chatMessages.update(msgs => [...msgs, newMsg]);
+        this.scrollChat();
+      }
+    });
   }
 
   scrollChat() {
