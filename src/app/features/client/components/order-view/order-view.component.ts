@@ -278,6 +278,9 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
             @if (o.shippingCost > 0) {
                <div class="total-row"><span>Envío 🚗</span><span>\${{ o.shippingCost | number:'1.2-2' }}</span></div>
             }
+            @if ((o.advancePayment || 0) > 0) {
+               <div class="total-row"><span>Abono / Anticipo 💳</span><span>-\${{ o.advancePayment | number:'1.2-2' }}</span></div>
+            }
             <div class="total-row grand"><span>Total a pagar</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
           </div>
         </div>
@@ -450,7 +453,7 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
     .timeline-step.active .step-date { color: var(--pink-500); font-weight: 600; }
     
     .status-alert { margin-top: 0.5rem; padding: 0.8rem; border-radius: 0.75rem; background: rgba(243,244,246,0.6); font-size: 0.85rem; text-align: center; color: var(--text-dark); border: 1px dashed rgba(0,0,0,0.1); }
-    .status-alert p { margin: 0; line-weight: 1.4; font-weight: 500; }
+    .status-alert p { margin: 0; line-height: 1.4; font-weight: 500; }
     
     @keyframes pulse-icon { 0% { box-shadow: 0 0 0 0 rgba(236,72,153,0.4); } 70% { box-shadow: 0 0 0 8px rgba(236,72,153,0); } 100% { box-shadow: 0 0 0 0 rgba(236,72,153,0); } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }

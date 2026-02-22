@@ -31,6 +31,7 @@ export interface OrderSummary {
   postponedNote?: string; // Motivo
   subtotal: number;
   shippingCost: number;
+  advancePayment?: number;
   total: number;
   status: string; // 'Pending', 'InRoute', 'Delivered', 'NotDelivered', 'Canceled', 'Postponed'
   link: string;
@@ -139,6 +140,7 @@ export interface ClientOrderView {
   clientLongitude?: number;
   createdAt: string;       // [NEW] Para calcular fecha de entrega
   clientType?: 'Nueva' | 'Frecuente';     // [NEW] 'Nueva' | 'Frecuente'
+  advancePayment?: number;
 }
 
 export interface DriverLocation {
@@ -156,6 +158,7 @@ export interface Dashboard {
   notDeliveredOrders: number;
   activeRoutes: number;
   totalRevenue: number;
+  totalInvestment: number;
 }
 
 // ── Client entity ──
@@ -181,6 +184,7 @@ export interface Supplier {
   phone?: string;
   notes?: string;
   createdAt: string;
+  totalInvested?: number;
 }
 
 export interface Investment {

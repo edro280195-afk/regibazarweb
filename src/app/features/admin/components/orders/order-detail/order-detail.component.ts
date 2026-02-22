@@ -297,13 +297,23 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
                   <span>Subtotal</span>
                   <span>$ {{ order()!.subtotal | number:'1.2-2' }}</span>
                 </div>
-                <div class="total-row">
-                  <span>Envío</span>
-                  <span>$ {{ order()!.shippingCost | number:'1.2-2' }}</span>
+                <div class="total-row editing-totals">
+                  <span>📦 Costo de Envío</span>
+                  <div class="input-money">
+                    <span>$</span>
+                    <input type="number" [(ngModel)]="editData.shippingCost" class="field-input" (change)="markDirty()">
+                  </div>
+                </div>
+                <div class="total-row editing-totals">
+                  <span>💳 Abono / Anticipo</span>
+                  <div class="input-money">
+                    <span>$</span>
+                    <input type="number" [(ngModel)]="editData.advancePayment" class="field-input" (change)="markDirty()">
+                  </div>
                 </div>
                 <div class="total-row grand">
-                  <span>Total</span>
-                  <span>$ {{ order()!.total | number:'1.2-2' }}</span>
+                  <span>Total Restante</span>
+                  <span>$ {{ (order()!.subtotal + (editData.shippingCost || 0) - (editData.advancePayment || 0)) | number:'1.2-2' }}</span>
                 </div>
               </div>
             </section>
@@ -314,7 +324,7 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
         <div class="bottom-bar">
           <button class="btn-danger-outline" (click)="askDeleteOrder()">🗑️ Eliminar Pedido</button>
           <div class="bottom-right">
-            <span class="grand-total">Total: <strong>$ {{ order()!.total | number:'1.2-2' }}</strong></span>
+            <span class="grand-total">Total a Cobrar: <strong>$ {{ (order()!.subtotal + (editData.shippingCost || 0) - (editData.advancePayment || 0)) | number:'1.2-2' }}</strong></span>
             <button class="btn-save-main" (click)="saveChanges()" [disabled]="!isDirty() || saving()">
               {{ saving() ? 'Guardando...' : '💾 Guardar cambios' }}
             </button>
@@ -689,14 +699,18 @@ import { OrderSummary, OrderItem } from '../../../../../shared/models/models';
 
     .empty-items { text-align: center; padding: 2rem; color: var(--text-muted); font-weight: 600; }
 
-    /* Totals */
     .totals-section {
       padding: 1rem 1.25rem; border-top: 1px solid var(--border-soft);
       margin-top: 8px;
     }
     .total-row {
-      display: flex; justify-content: space-between; padding: 4px 0;
+      display: flex; justify-content: space-between; align-items: center; padding: 6px 0;
       font-size: 0.9rem; color: var(--text-medium); font-weight: 600;
+    }
+    .editing-totals .input-money {
+      display: flex; align-items: center; gap: 4px;
+      span { font-weight: 800; color: var(--text-dark); }
+      input { width: 80px; text-align: right; padding: 6px 10px; }
     }
     .total-row.grand {
       margin-top: 8px; padding-top: 10px; border-top: 2px solid var(--border-soft);
@@ -778,7 +792,9 @@ export class OrderDetailComponent implements OnInit {
     clientPhone: '',
     tags: [] as string[],
     deliveryTime: '',
-    pickupDate: ''
+    pickupDate: '',
+    shippingCost: 0,
+    advancePayment: 0
   };
 
   itemEdit = { productName: '', quantity: 1, unitPrice: 0 };
@@ -866,7 +882,9 @@ export class OrderDetailComponent implements OnInit {
       clientPhone: o.clientPhone || '',
       tags: o.tags ? [...o.tags] : [],
       deliveryTime: o.deliveryTime || '',
-      pickupDate: o.pickupDate || ''
+      pickupDate: o.pickupDate || '',
+      shippingCost: o.shippingCost || 0,
+      advancePayment: o.advancePayment || 0
     };
     this.isDirty.set(false);
   }
@@ -893,7 +911,9 @@ export class OrderDetailComponent implements OnInit {
       clientPhone: this.editData.clientPhone,
       tags: this.editData.tags,
       deliveryTime: this.editData.deliveryTime || null,
-      pickupDate: this.editData.pickupDate || null
+      pickupDate: this.editData.pickupDate || null,
+      shippingCost: this.editData.shippingCost,
+      advancePayment: this.editData.advancePayment
     };
 
     if (this.editData.status === 'Postponed') {

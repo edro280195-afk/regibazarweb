@@ -182,6 +182,15 @@ interface GeocodedOrder extends OrderSummary {
     .warn-header { padding: 8px 12px; font-size: 0.8rem; font-weight: 700; color: #b45309; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
     .warn-list { padding: 0 12px 8px; }
     .warn-item { padding: 6px 0; border-bottom: 1px solid #fef3c7; font-size: 0.75rem; }
+
+    @media (max-width: 768px) {
+      .optimizer-modal { padding: 1rem; }
+      .modal-content { height: 95vh; border-radius: 16px; }
+      .modal-body { flex-direction: column-reverse; }
+      .sidebar { width: 100%; height: 50%; border-right: none; border-top: 1px solid #eee; }
+      .map-wrapper { height: 50%; }
+      .start-btn { padding: 10px 20px; font-size: 1rem; }
+    }
   `]
 })
 export class RouteOptimizerComponent implements OnInit {

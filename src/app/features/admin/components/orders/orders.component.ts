@@ -24,7 +24,8 @@ export class OrdersComponent implements OnInit {
   // ── Data ──
   orders = signal<OrderSummary[]>([]);
   filteredOrders = signal<OrderSummary[]>([]);
-  selectedIds = signal<Set<number>>(new Set());
+  selectedOrdersMap = signal<Map<number, OrderSummary>>(new Map());
+  selectedIds = computed(() => new Set(this.selectedOrdersMap().keys()));
   routeCreated = signal<any>(null);
 
   // ── UI state ──
@@ -93,8 +94,7 @@ export class OrdersComponent implements OnInit {
 
   // Lista de objetos orden completos seleccionados (para el Dock)
   selectedOrdersList = computed(() => {
-    const ids = this.selectedIds();
-    return this.orders().filter(o => ids.has(o.id));
+    return Array.from(this.selectedOrdersMap().values());
   });
 
   selectedOrdersTotal = computed(() => {
@@ -197,10 +197,14 @@ export class OrdersComponent implements OnInit {
 
   // ═══════════════ SELECTION & ROUTE ═══════════════
 
-  toggleOrder(id: number): void {
-    const ids = new Set(this.selectedIds());
-    ids.has(id) ? ids.delete(id) : ids.add(id);
-    this.selectedIds.set(ids);
+  toggleOrder(order: OrderSummary): void {
+    const map = new Map(this.selectedOrdersMap());
+    if (map.has(order.id)) {
+      map.delete(order.id);
+    } else {
+      map.set(order.id, order);
+    }
+    this.selectedOrdersMap.set(map);
   }
 
   toggleSelectionMode(): void {
@@ -234,7 +238,7 @@ export class OrdersComponent implements OnInit {
         this.loading.set(false);
         this.routeCreated.set(res);
         this.loadOrders(); // Refresh status
-        this.selectedIds.set(new Set());
+        this.selectedOrdersMap.set(new Map());
         this.selectionMode.set(false);
       },
       error: (err) => {

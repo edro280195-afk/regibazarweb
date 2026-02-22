@@ -44,6 +44,7 @@ import { Supplier, Investment } from '../../../../shared/models/models';
                 <h3>{{ supplier.name }}</h3>
                 <p class="contact-name">👤 {{ supplier.contactName || 'Sin contacto' }}</p>
                 <p class="contact-phone">📞 {{ supplier.phone || 'Sin teléfono' }}</p>
+                <p class="contact-name" style="color: #2e7d32; font-weight: bold; margin-top:0.4rem;">💰 Invertido: $ {{ supplier.totalInvested | number:'1.2-2' }}</p>
               </div>
             </div>
             <div class="card-actions">
