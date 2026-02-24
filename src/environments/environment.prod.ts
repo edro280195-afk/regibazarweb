@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://localhost:56164/api',
-  hubUrl: 'https://localhost:56164/hubs/tracking',
+  apiUrl: 'https://regibazarapi.onrender.com/api',
+  hubUrl: 'https://regibazarapi.onrender.com/hubs/tracking',
   frontendUrl: 'https://regibazar.com',
   googleMapsApiKey: 'AIzaSyD0h3ou4iWXQtthgXE-LMewALcWpYdzzJk',
 };
