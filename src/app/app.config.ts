@@ -3,6 +3,7 @@ import { registerLocaleData } from '@angular/common';
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideEcharts } from 'ngx-echarts';
 import localeEsMx from '@angular/common/locales/es-MX';
 
@@ -17,6 +18,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+    provideAnimationsAsync(),
     provideEcharts(),
     { provide: LOCALE_ID, useValue: 'es-MX' },
     provideServiceWorker('ngsw-worker.js', {

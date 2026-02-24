@@ -1,0 +1,156 @@
+<div class="order-card" [class.selection-mode]="selectionMode" [class.selected]="isSelected"
+    [attr.data-status]="order.status" [@statusPop]="order.status">
+
+    <!-- Drag Handle (solo en Kanban) -->
+    @if (viewMode === 'kanban') {
+    <div class="drag-handle" cdkDragHandle>
+        <span class="drag-icon">⠿</span>
+    </div>
+    }
+
+    @if (selectionMode && isSelected) {
+    <div class="selection-stamp">
+        <span>🎀</span>
+    </div>
+    }
+
+    <div class="card-header">
+        <div class="client-meta">
+            <span class="order-id">#{{ order.id }}</span>
+            <span class="order-type-tag" [class.pickup]="order.orderType === 'PickUp'">
+                {{ order.orderType === 'PickUp' ? '🛍️ LOCAL' : '🛵 ENVÍO' }}
+            </span>
+            @for (tag of order.tags; track tag) {
+            <span class="tag-pill">{{ tag }}</span>
+            }
+        </div>
+        <span class="status-pill" [attr.data-status]="order.status">
+            {{ statusLabel(order.status) }}
+        </span>
+    </div>
+
+    <div class="card-body">
+        <div class="client-info">
+            <div class="name-check">
+                @if ((order.status === 'Pending' || order.status === 'Confirmed' || order.status === 'Shipped') &&
+                order.orderType === 'Delivery') {
+                <label class="custom-checkbox" (click)="$event.stopPropagation()">
+                    <input type="checkbox" [checked]="isSelected" (change)="toggleSelect.emit(order)">
+                    <span class="checkmark"></span>
+                </label>
+                }
+                <h3 class="client-name">{{ order.clientName }}</h3>
+            </div>
+
+            <div class="client-badges">
+                @if (order.clientType === 'Frecuente') {
+                <span class="badge-vip">💎 FRECUENTE</span>
+                } @else {
+                <span class="badge-new">🌱 NUEVA</span>
+                }
+            </div>
+        </div>
+
+        @if (order.status === 'Postponed' && order.postponedAt) {
+        <div class="postponed-alert">
+            <span class="alert-icon">📅</span>
+            <div>
+                <p class="date">{{ order.postponedAt | date:'fullDate' }}</p>
+                @if (order.postponedNote) { <p class="note">"{{ order.postponedNote }}"</p> }
+            </div>
+        </div>
+        }
+
+        @if (order.items.length > 0) {
+        <div class="items-summary toggleable" (click)="$event.stopPropagation(); itemsExpanded = !itemsExpanded">
+            <span>
+                {{ order.items.length }} artículo{{ order.items.length > 1 ? 's' : '' }}
+                <span class="chevron" [class.rotated]="itemsExpanded">▼</span>
+            </span>
+            @if (viewMode === 'list' && itemsExpanded) {
+            <span class="swipe-hint">desliza →</span>
+            }
+            @if (!itemsExpanded) {
+            <span class="click-to-view">(ver productos)</span>
+            }
+        </div>
+
+        @if (itemsExpanded) {
+        <div class="items-scroll-row" [class.condensed]="viewMode === 'kanban'" [@expandCollapse]>
+            <div class="items-track">
+                @for (item of order.items; track item.id) {
+                <div class="item-chip">
+                    <span class="qty">{{ item.quantity }}×</span>
+                    <span class="name">{{ item.productName }}</span>
+                    <span class="price">$ {{ item.lineTotal | number:'1.0-0' }}</span>
+                    @if (order.status === 'Pending' && viewMode === 'list') {
+                    <button class="btn-icon-mini edit"
+                        (click)="$event.stopPropagation(); editItem.emit({ order, item })" title="Editar">✏️</button>
+                    <button class="btn-icon-mini delete"
+                        (click)="$event.stopPropagation(); deleteItem.emit({ order, item })" title="Eliminar">✕</button>
+                    }
+                </div>
+                }
+                @if (order.status === 'Pending' && viewMode === 'list') {
+                <button class="item-chip add-chip" (click)="addItem.emit(order)">
+                    <span class="plus">＋</span>
+                </button>
+                }
+            </div>
+        </div>
+        }
+        }
+    </div>
+
+    <!-- Footer completo (solo en List) -->
+    @if (viewMode === 'list') {
+    <div class="card-footer">
+        <div class="total-section">
+            <span class="total-label">Total</span>
+            <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
+        </div>
+        <div class="card-buttons">
+            @if (order.status !== 'Canceled') {
+            <button class="action-btn pay" (click)="$event.stopPropagation(); pay.emit(order)"
+                title="Confirmar Cobro">💰</button>
+            }
+            <button class="action-btn link" (click)="$event.stopPropagation(); copyLink.emit(order.link)"
+                title="Copiar Link">📋</button>
+            <button class="action-btn edit" (click)="$event.stopPropagation(); edit.emit(order)"
+                title="Editar">✏️</button>
+            <button class="action-btn delete" (click)="$event.stopPropagation(); delete.emit(order)"
+                title="Eliminar">🗑️</button>
+            <span class="action-arrow" title="Ver detalle"
+                (click)="$event.stopPropagation(); goToDetail.emit(order.id)">→</span>
+        </div>
+    </div>
+    }
+
+    <!-- Footer compacto (solo en Kanban) -->
+    @if (viewMode === 'kanban') {
+    <div class="kanban-card-footer">
+        <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
+        <div class="card-buttons">
+            <!-- Quick Move (for mobile/touch) -->
+            <div class="move-menu-wrap">
+                <button class="action-btn move-btn" (click)="$event.stopPropagation(); showMoveMenu = !showMoveMenu"
+                    title="Mover a...">
+                    ↗️
+                </button>
+                @if (showMoveMenu) {
+                <div class="move-dropdown">
+                    @for (opt of moveOptions; track opt.key) {
+                    <button class="move-option"
+                        (click)="$event.stopPropagation(); showMoveMenu = false; moveToStatus.emit({ order, newStatus: opt.key })">
+                        {{ opt.label }}
+                    </button>
+                    }
+                </div>
+                }
+            </div>
+            <span class="action-arrow" title="Ver detalle"
+                (click)="$event.stopPropagation(); goToDetail.emit(order.id)">→</span>
+        </div>
+    </div>
+    }
+</div>

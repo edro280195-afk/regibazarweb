@@ -135,6 +135,14 @@ export class ApiService {
     return this.http.delete<void>(`${this.url}/routes/${id}`);
   }
 
+  reorderRouteDeliveries(id: number, deliveryIds: number[]): Observable<any> {
+    return this.http.put<any>(`${this.url}/routes/${id}/reorder`, deliveryIds);
+  }
+
+  liquidateRoute(id: number): Observable<any> {
+    return this.http.post<any>(`${this.url}/routes/${id}/liquidate`, {});
+  }
+
   // --- CHAT ADMIN (NUEVO) ---
   getRouteChat(routeId: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.url}/routes/${routeId}/chat`);
@@ -161,11 +169,27 @@ export class ApiService {
     });
   }
 
-  markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[]): Observable<any> {
+  markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number, method: string, notes?: string }[]): Observable<any> {
     const fd = new FormData();
     fd.append('notes', notes || '');
+    if (payments && payments.length > 0) {
+      payments.forEach((p, i) => {
+        fd.append(`payments[${i}].amount`, p.amount.toString());
+        fd.append(`payments[${i}].method`, p.method);
+        if (p.notes) fd.append(`payments[${i}].notes`, p.notes);
+      });
+    }
     photos.forEach(p => fd.append('photos', p));
     return this.http.post(`${this.url}/driver/${driverToken}/deliver/${deliveryId}`, fd);
+  }
+
+  // ── Order Payments (Libro de Transacciones) ──
+  addPayment(orderId: number, data: { amount: number, method: string, registeredBy?: string, notes?: string }): Observable<any> {
+    return this.http.post(`${this.url}/orders/${orderId}/payments`, data);
+  }
+
+  deletePayment(orderId: number, paymentId: number): Observable<void> {
+    return this.http.delete<void>(`${this.url}/orders/${orderId}/payments/${paymentId}`);
   }
 
   markFailed(driverToken: string, deliveryId: number, reason: string, notes: string, photos: File[]): Observable<any> {
@@ -207,6 +231,18 @@ export class ApiService {
     let params = '';
     if (period) params = `?period=${period}`;
     return this.http.get<import('../../shared/models/models').DriverExpense[]>(`${this.url}/admin/expenses${params}`);
+  }
+
+  createAdminExpense(data: any): Observable<any> {
+    return this.http.post(`${this.url}/admin/expenses`, data);
+  }
+
+  updateAdminExpense(id: number, data: any): Observable<any> {
+    return this.http.put(`${this.url}/admin/expenses/${id}`, data);
+  }
+
+  deleteAdminExpense(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.url}/admin/expenses/${id}`);
   }
 
   // ═══════════════════════════════════════════
@@ -260,7 +296,21 @@ export class ApiService {
     );
   }
 
+  getReportData(startDate: string, endDate: string): Observable<import('../../shared/models/models').ReportData> {
+    return this.http.get<import('../../shared/models/models').ReportData>(
+      `${this.url}/orders/reports?start=${startDate}&end=${endDate}`
+    );
+  }
 
+
+  // ═══════════════════════════════════════════
+  //  GLOW UP REPORT
+  // ═══════════════════════════════════════════
+  getGlowUpReport(): Observable<import('../../shared/models/models').GlowUpReportDto> {
+    return this.http.get<import('../../shared/models/models').GlowUpReportDto>(
+      `${this.url}/reports/glow-up-current-month`
+    );
+  }
 
   // ═══════════════════════════════════════════
   //  LOYALTY (REGIPUNTOS)

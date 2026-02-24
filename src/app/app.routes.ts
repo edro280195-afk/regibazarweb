@@ -28,11 +28,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/components/orders/orders.component')
           .then(m => m.OrdersComponent)
       },
-      {
-        path: 'orders/:id',
-        loadComponent: () => import('./features/admin/components/orders/order-detail/order-detail.component')
-          .then(m => m.OrderDetailComponent)
-      },
+
       {
         path: 'routes',
         loadComponent: () => import('./features/admin/components/route-manager/route-manager.component')
@@ -62,6 +58,16 @@ export const routes: Routes = [
         path: 'financials',
         loadComponent: () => import('./features/admin/components/financials/financials.component')
           .then(m => m.FinancialsComponent)
+      },
+      {
+        path: 'reports',
+        loadComponent: () => import('./features/admin/components/reports/reports.component')
+          .then(m => m.ReportsComponent)
+      },
+      {
+        path: 'glow-up',
+        loadComponent: () => import('./features/admin/components/glow-up/glow-up.component')
+          .then(m => m.GlowUpComponent)
       },
 
     ]

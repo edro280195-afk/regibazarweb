@@ -40,25 +40,25 @@ export interface OrderSummary {
   items: OrderItem[];
   createdAt: string; // ISO Date
 
-  // Payments
-  paymentStatus?: 'Unpaid' | 'Partial' | 'Paid';
-  payments?: Payment[];
+  // Payments (Libro de Transacciones)
+  payments?: OrderPayment[];
   amountPaid?: number;
+  balanceDue?: number;
   amountDue?: number;
 
   // Tags
   tags?: string[];
+  paymentMethod?: string; // Legacy
 }
 
-export interface Payment {
+export interface OrderPayment {
   id: number;
   orderId: number;
   amount: number;
-  method: 'Efectivo' | 'Transferencia' | 'OXXO' | 'Tarjeta';
-  reference?: string;
+  method: string; // 'Efectivo' | 'Transferencia' | 'Deposito' | 'Tarjeta'
   date: string; // ISO
+  registeredBy: string; // 'Admin' | 'Driver'
   notes?: string;
-  createdAt: string;
 }
 
 export interface OrderItem {
@@ -90,12 +90,14 @@ export interface ManualOrderRequest {
 // ── Routes ──
 export interface DeliveryRoute {
   id: number;
+  name?: string;
   driverToken: string;
   driverLink: string;
   status: string;
   createdAt: string;
   startedAt?: string;
   deliveries: RouteDelivery[];
+  expenses?: DriverExpense[];
   driverLocation?: {
     latitude: number;
     longitude: number;
@@ -119,6 +121,11 @@ export interface RouteDelivery {
   notes?: string;
   failureReason?: string;
   evidenceUrls: string[];
+  clientPhone?: string;
+  paymentMethod?: string; // Legacy
+  payments?: OrderPayment[];
+  amountPaid?: number;
+  balanceDue?: number;
 }
 
 // ── Client View ──
@@ -139,8 +146,12 @@ export interface ClientOrderView {
   clientLatitude?: number;
   clientLongitude?: number;
   createdAt: string;       // [NEW] Para calcular fecha de entrega
-  clientType?: 'Nueva' | 'Frecuente';     // [NEW] 'Nueva' | 'Frecuente'
-  advancePayment?: number;
+  clientType?: 'Nueva' | 'Frecuente';
+  advancePayment?: number; // Legacy
+  payments?: OrderPayment[];
+  amountPaid?: number;
+  balanceDue?: number;
+  clientAddress?: string;
 }
 
 export interface DriverLocation {
@@ -159,9 +170,56 @@ export interface Dashboard {
   activeRoutes: number;
   totalRevenue: number;
   totalInvestment: number;
+  totalCashOrders: number;
+  totalCashAmount: number;
+  totalTransferOrders: number;
+  totalTransferAmount: number;
+  totalDepositOrders: number;
+  totalDepositAmount: number;
 }
 
-// ── Client entity ──
+// ── Reports ──
+export interface ReportData {
+  totalRevenue: number;
+  totalInvestment: number;
+  totalExpenses: number;
+  netProfit: number;
+  totalOrders: number;
+  pendingOrders: number;
+  inRouteOrders: number;
+  deliveredOrders: number;
+  notDeliveredOrders: number;
+  canceledOrders: number;
+  deliveryOrders: number;
+  pickUpOrders: number;
+  avgTicket: number;
+  topProducts: { name: string; quantity: number; revenue: number }[];
+  ordersByDay: { date: string; count: number; amount: number }[];
+  totalRoutes: number;
+  completedRoutes: number;
+  successRate: number;
+  totalDriverExpenses: number;
+  newClients: number;
+  frequentClients: number;
+  activeClients: number;
+  topClients: { name: string; orders: number; totalSpent: number }[];
+  cashOrders: number;
+  cashAmount: number;
+  transferOrders: number;
+  transferAmount: number;
+  depositOrders: number;
+  depositAmount: number;
+  unassignedPaymentOrders: number;
+  supplierSummaries: { name: string; totalInvested: number; investmentCount: number }[];
+}
+
+// ── Glow Up (IG Story) ──
+export interface GlowUpReportDto {
+  monthName: string;
+  totalDeliveries: number;
+  topProduct: string;
+  newClients: number;
+}
 export interface Client {
   id: number;
   name: string;
@@ -203,14 +261,15 @@ export interface Investment {
 
 export interface DriverExpense {
   id: number;
-  driverId: number;
+  driverRouteId?: number;
+  routeName?: string;
   driverName?: string;
   amount: number;
   expenseType: string; // 'Gasolina', 'Comida', 'Otros'
   date: string; // ISO
   notes?: string;
   evidenceUrl?: string; // Foto del ticket
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface FinancialReport {

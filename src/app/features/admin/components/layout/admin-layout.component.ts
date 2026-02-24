@@ -59,6 +59,14 @@ import { GlobalSearchComponent } from './global-search.component';
              (click)="sidebarOpen = false">
             <span class="nav-icon">📈</span> Finanzas
           </a>
+          <a routerLink="/admin/reports" routerLinkActive="active"
+             (click)="sidebarOpen = false">
+            <span class="nav-icon">📊</span> Reportes
+          </a>
+          <a routerLink="/admin/glow-up" routerLinkActive="active"
+             (click)="sidebarOpen = false">
+            <span class="nav-icon">✨</span> Glow Up
+          </a>
 
         </nav>
 

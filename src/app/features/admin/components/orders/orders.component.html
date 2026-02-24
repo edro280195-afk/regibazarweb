@@ -66,6 +66,8 @@
           <div class="status-pills-selector">
             <button class="status-pill-btn" [class.active]="editData.status === 'Pending'"
               (click)="editData.status = 'Pending'">⏳ Pendiente</button>
+            <button class="status-pill-btn" [class.active]="editData.status === 'Confirmed'"
+              (click)="editData.status = 'Confirmed'">✅ Confirmado</button>
             <button class="status-pill-btn" [class.active]="editData.status === 'Shipped'"
               (click)="editData.status = 'Shipped'">📦 Enviado</button>
             <button class="status-pill-btn" [class.active]="editData.status === 'Delivered'"
@@ -292,6 +294,12 @@
       <p class="page-sub">Administra tus ventas, CEO ✨</p>
     </div>
     <div class="header-controls">
+      <div class="view-toggles">
+        <button class="btn-toggle-view" [class.active]="viewMode() === 'list'" (click)="viewMode.set('list')"
+          title="Vista Lista">📝</button>
+        <button class="btn-toggle-view" [class.active]="viewMode() === 'kanban'" (click)="viewMode.set('kanban')"
+          title="Tablero Kanban">📌</button>
+      </div>
       <button class="btn-toggle-select" [class.active]="selectionMode()" (click)="toggleSelectionMode()">
         {{ selectionMode() ? '❌ Salir' : '✨ Organizar Ruta' }}
       </button>
@@ -306,6 +314,7 @@
       <select [(ngModel)]="statusFilter" (change)="applyFilter()" class="filter-select">
         <option value="">Todos</option>
         <option value="Pending">⏳ Pendientes</option>
+        <option value="Confirmed">✅ Confirmado</option>
         <option value="InRoute">🚗 En ruta</option>
         <option value="Shipped">📦 Enviado</option>
         <option value="Delivered">💝 Entregados</option>
@@ -341,6 +350,7 @@
       <span class="qs-num">{{ orderStats().pending }}</span>
       <span class="qs-label">Pendientes</span>
     </div>
+
     <div class="qs-chip revenue">
       <span class="qs-num">$ {{ orderStats().pendingAmount | number:'1.0-0' }}</span>
       <span class="qs-label">Por Cobrar</span>
@@ -404,116 +414,101 @@
   </div>
   }
 
-  <!-- Orders grid -->
-  <div class="orders-grid">
-    @for (order of filteredOrders(); track order.id) {
-    <div class="order-card" [class.selection-mode]="selectionMode()" [class.selected]="selectedIds().has(order.id)"
-      [attr.data-status]="order.status" (click)="selectionMode() ? toggleOrder(order) : goToOrder(order.id)">
+  <!-- ═══════════════ KANBAN BOARD ═══════════════ -->
+  @if (viewMode() === 'kanban') {
 
-      @if (selectionMode() && selectedIds().has(order.id)) {
-      <div class="selection-stamp">
-        <span>🎀</span>
+  <!-- Mobile Tab Bar -->
+  <div class="kanban-tabs">
+    @for (tab of kanbanTabs; track tab.key) {
+    <button class="kanban-tab" [class.active]="activeKanbanTab() === tab.key" (click)="activeKanbanTab.set(tab.key)">
+      <span class="tab-emoji">{{ tab.label }}</span>
+      <span class="tab-title">{{ tab.title }}</span>
+    </button>
+    }
+  </div>
+
+  <div class="kanban-board" cdkDropListGroup>
+
+    <!-- Columna: PENDIENTES -->
+    <div class="kanban-column pending-col" [class.mobile-hidden]="activeKanbanTab() !== 'Pending'">
+      <div class="kanban-header">
+        ⏳ Pendientes <span class="count-badge">{{ boardPending().length }}</span>
       </div>
-      }
-
-      <div class="card-header">
-        <div class="client-meta">
-          <span class="order-id">#{{ order.id }}</span>
-          <span class="order-type-tag" [class.pickup]="order.orderType === 'PickUp'">
-            {{ order.orderType === 'PickUp' ? '🛍️ LOCAL' : '🛵 ENVÍO' }}
-          </span>
-          @for (tag of order.tags; track tag) {
-          <span class="tag-pill">{{ tag }}</span>
-          }
-        </div>
-        <span class="status-pill" [attr.data-status]="order.status">
-          {{ statusLabel(order.status) }}
-        </span>
-      </div>
-
-      <div class="card-body">
-        <div class="client-info">
-          <div class="name-check">
-            @if ((order.status === 'Pending' || order.status === 'Confirmed' || order.status === 'Shipped') &&
-            order.orderType === 'Delivery') {
-            <label class="custom-checkbox" (click)="$event.stopPropagation()">
-              <input type="checkbox" [checked]="selectedIds().has(order.id)" (change)="toggleOrder(order)">
-              <span class="checkmark"></span>
-            </label>
-            }
-            <h3 class="client-name">{{ order.clientName }}</h3>
-          </div>
-
-          <!-- CLIENT TYPE BADGE -->
-          <div class="client-badges">
-            @if (order.clientType === 'Frecuente') {
-            <span class="badge-vip">💎 FRECUENTE</span>
-            } @else {
-            <span class="badge-new">🌱 NUEVA</span>
-            }
-          </div>
-        </div>
-
-        @if (order.status === 'Postponed' && order.postponedAt) {
-        <div class="postponed-alert">
-          <span class="alert-icon">📅</span>
-          <div>
-            <p class="date">{{ order.postponedAt | date:'fullDate' }}</p>
-            @if (order.postponedNote) { <p class="note">"{{ order.postponedNote }}"</p> }
-          </div>
-        </div>
+      <div class="kanban-list" id="listPending"
+        [cdkDropListConnectedTo]="['listConfirmed', 'listInRoute', 'listDelivered']" cdkDropList
+        [cdkDropListData]="boardPending()" (cdkDropListDropped)="onOrderDrop($event, 'Pending')">
+        @for (order of boardPending(); track order.id) {
+        <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
+          [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
+          (pay)="openConfirmPayment($event)" (copyLink)="copyLink($event)" (toggleSelect)="toggleOrder($event)"
+          (goToDetail)="goToOrder($event)" (moveToStatus)="quickMoveStatus($event.order, $event.newStatus)" />
         }
-
-        <div class="items-scroll-row">
-          <div class="items-track">
-            @for (item of order.items; track item.id) {
-            <div class="item-chip">
-              <span class="qty">{{ item.quantity }}×</span>
-              <span class="name">{{ item.productName }}</span>
-              <span class="price">$ {{ item.lineTotal | number:'1.0-0' }}</span>
-              @if (order.status === 'Pending') {
-              <button class="btn-icon-mini edit" (click)="$event.stopPropagation(); openEditItem(order, item)"
-                title="Editar">✏️</button>
-              <button class="btn-icon-mini delete" (click)="$event.stopPropagation(); askDeleteItem(order, item)"
-                title="Eliminar">✕</button>
-              }
-            </div>
-            }
-            @if (order.status === 'Pending') {
-            <button class="item-chip add-chip" (click)="openDrawer(order)">
-              <span class="plus">＋</span>
-            </button>
-            }
-          </div>
-        </div>
-        @if (order.items.length > 0) {
-        <div class="items-summary">
-          <span>{{ order.items.length }} artículo{{ order.items.length > 1 ? 's' : '' }}</span>
-          <span class="swipe-hint">desliza →</span>
-        </div>
-        }
-      </div>
-
-      <div class="card-footer">
-        <div class="total-section">
-          <span class="total-label">Total</span>
-          <span class="total-amount">$ {{ order.total | number:'1.2-2' }}</span>
-        </div>
-        <div class="card-buttons">
-          @if (order.status === 'Pending' || order.status === 'InRoute') {
-          <button class="action-btn pay" (click)="$event.stopPropagation(); openConfirmPayment(order)"
-            title="Confirmar Cobro">💰</button>
-          }
-          <button class="action-btn link" (click)="$event.stopPropagation(); copyLink(order.link)"
-            title="Copiar Link">📋</button>
-          <button class="action-btn edit" (click)="$event.stopPropagation(); openEditModal(order)"
-            title="Editar">✏️</button>
-          <button class="action-btn delete" (click)="$event.stopPropagation(); askDeleteOrder(order)"
-            title="Eliminar">🗑️</button>
-          <span class="action-arrow" title="Ver detalle">→</span>
-        </div>
       </div>
     </div>
+
+    <!-- Columna: CONFIRMADOS -->
+    <div class="kanban-column confirmed-col" [class.mobile-hidden]="activeKanbanTab() !== 'Confirmed'">
+      <div class="kanban-header">
+        ✅ Confirmados/Enviados <span class="count-badge">{{ boardConfirmed().length }}</span>
+      </div>
+      <div class="kanban-list" id="listConfirmed"
+        [cdkDropListConnectedTo]="['listPending', 'listInRoute', 'listDelivered']" cdkDropList
+        [cdkDropListData]="boardConfirmed()" (cdkDropListDropped)="onOrderDrop($event, 'Confirmed')">
+        @for (order of boardConfirmed(); track order.id) {
+        <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
+          [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
+          (toggleSelect)="toggleOrder($event)" (goToDetail)="goToOrder($event)"
+          (moveToStatus)="quickMoveStatus($event.order, $event.newStatus)" />
+        }
+      </div>
+    </div>
+
+    <!-- Columna: EN RUTA -->
+    <div class="kanban-column route-col" [class.mobile-hidden]="activeKanbanTab() !== 'InRoute'">
+      <div class="kanban-header">
+        🚗 En Ruta <span class="count-badge">{{ boardInRoute().length }}</span>
+      </div>
+      <div class="kanban-list" id="listInRoute"
+        [cdkDropListConnectedTo]="['listPending', 'listConfirmed', 'listDelivered']" cdkDropList
+        [cdkDropListData]="boardInRoute()" (cdkDropListDropped)="onOrderDrop($event, 'InRoute')">
+        @for (order of boardInRoute(); track order.id) {
+        <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
+          [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
+          (toggleSelect)="toggleOrder($event)" (goToDetail)="goToOrder($event)"
+          (moveToStatus)="quickMoveStatus($event.order, $event.newStatus)" />
+        }
+      </div>
+    </div>
+
+    <!-- Columna: ENTREGADOS -->
+    <div class="kanban-column delivered-col" [class.mobile-hidden]="activeKanbanTab() !== 'Delivered'">
+      <div class="kanban-header">
+        💝 Entregados <span class="count-badge">{{ boardDelivered().length }}</span>
+      </div>
+      <div class="kanban-list" id="listDelivered"
+        [cdkDropListConnectedTo]="['listPending', 'listConfirmed', 'listInRoute']" cdkDropList
+        [cdkDropListData]="boardDelivered()" (cdkDropListDropped)="onOrderDrop($event, 'Delivered')">
+        @for (order of boardDelivered(); track order.id) {
+        <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
+          [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
+          (toggleSelect)="toggleOrder($event)" (goToDetail)="goToOrder($event)"
+          (moveToStatus)="quickMoveStatus($event.order, $event.newStatus)" />
+        }
+      </div>
+    </div>
+
+  </div>
+  }
+
+  <!-- Orders grid (VISTA LISTA) -->
+  @if (viewMode() === 'list') {
+  <div class="orders-grid">
+    @for (order of filteredOrders(); track order.id) {
+    <app-order-card [order]="order" [viewMode]="'list'" [isSelected]="selectedIds().has(order.id)"
+      [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
+      (pay)="openConfirmPayment($event)" (copyLink)="copyLink($event)" (toggleSelect)="toggleOrder($event)"
+      (goToDetail)="goToOrder($event)" (addItem)="openDrawer($event)"
+      (editItem)="openEditItem($event.order, $event.item)" (deleteItem)="askDeleteItem($event.order, $event.item)" />
     } @empty {
     @if (!loading()) {
     <div class="empty-state">
@@ -529,6 +524,7 @@
     }
     }
   </div>
+  }
 
   <!-- ═══════════════ PAGINATION ═══════════════ -->
   @if (totalPages() > 1 && !loading()) {

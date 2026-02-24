@@ -91,6 +91,9 @@ const GEOCODE_CONFIG = {
               <button class="action-chip wa" (click)="shareRouteWa(route)">
                 📱 <span>WhatsApp</span>
               </button>
+              <button *ngIf="route.status !== 'Completed'" class="action-chip corte" (click)="openCorteModal(route)">
+                💰 <span>Liquidar</span>
+              </button>
               <button class="action-chip delete" (click)="askDelete(route)">
                 🗑️
               </button>
@@ -290,6 +293,69 @@ const GEOCODE_CONFIG = {
               <button class="send-btn" (click)="sendMessage()" [disabled]="!newMessage.trim()">➤</button>
             </div>
 
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════════════════════════════════
+           MODAL: CORTE DE CAJA (LIQUIDACIÓN)
+           ═══════════════════════════════════════════ -->
+      @if (showCorteModal() && selectedRouteForCorte()) {
+        <div class="modal-overlay" (click)="closeCorteModal()">
+          <div class="modal-fullscreen ticket-modal" (click)="$event.stopPropagation()">
+            <div class="ticket-header">
+              <h3>Liquidación de Chofer</h3>
+              <p>Ruta #{{ selectedRouteForCorte()!.id }}</p>
+              <div class="zig-zag-top"></div>
+            </div>
+
+            <div class="ticket-body">
+              <div class="ticket-section">
+                <div class="ticket-row">
+                  <span>Efectivo Cobrado 💵</span>
+                  <span class="ticket-val positive">\${{ routeCorte().totalEfectivo | number:'1.2-2' }}</span>
+                </div>
+                <div class="ticket-row small-text">
+                  <span>Transferencias / Otros</span>
+                  <span>\${{ routeCorte().totalTransferencias | number:'1.2-2' }}</span>
+                </div>
+              </div>
+
+              <div class="ticket-divider"></div>
+
+              <div class="ticket-section">
+                <h4>Gastos Registrados 📉</h4>
+                @if (selectedRouteForCorte()!.expenses?.length) {
+                  @for (exp of selectedRouteForCorte()!.expenses; track exp.id) {
+                    <div class="ticket-row expense-row">
+                      <span>{{ exp.expenseType }} {{ exp.notes ? '(' + exp.notes + ')' : '' }}</span>
+                      <span class="ticket-val negative">-\${{ exp.amount | number:'1.2-2' }}</span>
+                    </div>
+                  }
+                } @else {
+                  <p class="no-expenses">Sin gastos registrados en esta ruta.</p>
+                }
+                
+                <div class="ticket-row subtotal">
+                  <span>Total Gastos</span>
+                  <span class="ticket-val negative">-\${{ routeCorte().totalGastos | number:'1.2-2' }}</span>
+                </div>
+              </div>
+
+              <div class="ticket-divider bold"></div>
+
+              <div class="ticket-section total-section">
+                <span>Total a Entregar</span>
+                <span class="ticket-total highlight">\${{ routeCorte().totalAEntregar | number:'1.2-2' }}</span>
+              </div>
+            </div>
+
+            <div class="ticket-footer">
+              <button class="btn-cancel" (click)="closeCorteModal()">Cancelar</button>
+              <button class="btn-confirm" (click)="confirmLiquidate()" [disabled]="liquidating()">
+                {{ liquidating() ? 'Procesando...' : 'Confirmar Liquidación ✅' }}
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -499,6 +565,8 @@ const GEOCODE_CONFIG = {
     .action-chip.chat:active { background: #fdf2f8; }
     .action-chip.map:active  { background: #eff6ff; }
     .action-chip.wa:active   { background: #f0fdf4; }
+    .action-chip.corte { border-color: #fef08a; color: #b45309; }
+    .action-chip.corte:active { background: #fefce8; }
     .action-chip.delete {
       border-color: #fecaca;
       color: #dc2626;
@@ -769,6 +837,116 @@ const GEOCODE_CONFIG = {
       height: 92dvh;
       max-height: 92dvh;
     }
+
+    /* ═══════════════════════════════════════════
+       MODAL: TICKET DE CORTE (LIQUIDACIÓN)
+       ═══════════════════════════════════════════ */
+    .ticket-modal {
+      width: 90% !important;
+      max-width: 420px !important;
+      margin: auto;
+      border-radius: 16px;
+      overflow: visible;
+      background: #fdfbf7;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+    
+    .ticket-header {
+      background: #ec4899;
+      color: white;
+      text-align: center;
+      padding: 1.5rem 1rem 1rem;
+      border-radius: 16px 16px 0 0;
+      position: relative;
+    }
+    .ticket-header h3 { margin: 0; font-size: 1.3rem; font-weight: 800; letter-spacing: 0.5px; }
+    .ticket-header p { margin: 4px 0 0; opacity: 0.9; font-size: 0.85rem; }
+    
+    .zig-zag-top {
+      position: absolute;
+      bottom: -10px;
+      left: 0; right: 0;
+      height: 10px;
+      background: linear-gradient(-45deg, #fdfbf7 5px, transparent 0), linear-gradient(45deg, #fdfbf7 5px, transparent 0);
+      background-position: left-bottom;
+      background-repeat: repeat-x;
+      background-size: 10px 10px;
+    }
+
+    .ticket-body {
+      padding: 1.5rem 1.25rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .ticket-section { margin-bottom: 1rem; }
+    .ticket-section h4 { margin: 0 0 10px; color: #9ca3af; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: #374151;
+    }
+    .ticket-row.small-text { font-size: 0.8rem; color: #6b7280; }
+    .expense-row { font-size: 0.8rem; }
+    .subtotal { margin-top: 10px; font-weight: 700; border-top: 1px dashed #e5e7eb; padding-top: 8px; }
+    
+    .ticket-val.positive { color: #059669; font-weight: 700; }
+    .ticket-val.negative { color: #dc2626; font-weight: 700; }
+    
+    .ticket-divider {
+      height: 1px;
+      border-bottom: 1px dashed #d1d5db;
+      margin: 1rem 0;
+    }
+    .ticket-divider.bold {
+      border-bottom: 2px dashed #9ca3af;
+    }
+
+    .no-expenses { font-size: 0.8rem; color: #9ca3af; font-style: italic; margin: 0; }
+
+    .total-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      margin: 1.5rem 0 0.5rem;
+    }
+    .total-section span:first-child { text-transform: uppercase; font-size: 0.8rem; color: #6b7280; font-weight: 700; }
+    .ticket-total.highlight {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: #ec4899;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .ticket-footer {
+      display: flex;
+      gap: 10px;
+      padding: 0 1.25rem 1.25rem;
+    }
+    .btn-cancel {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: #f3f4f6;
+      border-radius: 12px;
+      font-weight: 700;
+      color: #6b7280;
+      cursor: pointer;
+    }
+    .btn-confirm {
+      flex: 2;
+      padding: 12px;
+      border: none;
+      background: #ec4899;
+      color: white;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(236, 72, 153, 0.3);
+    }
+    .btn-confirm:disabled { opacity: 0.5; pointer-events: none; }
 
     .map-area {
       flex: 1;
@@ -1155,6 +1333,10 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
     if (this.gpsTimeoutId) clearTimeout(this.gpsTimeoutId);
   }
 
+  showCorteModal = signal(false);
+  selectedRouteForCorte = signal<DeliveryRoute | null>(null);
+  liquidating = signal(false);
+
   // ═══════════════════════════════════════════
   //  RUTAS
   // ═══════════════════════════════════════════
@@ -1215,6 +1397,71 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   showToast(msg: string): void {
     this.toastMessage.set(msg);
     setTimeout(() => this.toastMessage.set(''), 3000);
+  }
+
+  // ═══════════════════════════════════════════
+  //  CORTE DE CAJA (LIQUIDACIÓN)
+  // ═══════════════════════════════════════════
+  openCorteModal(route: DeliveryRoute): void {
+    this.selectedRouteForCorte.set(route);
+    this.showCorteModal.set(true);
+  }
+
+  closeCorteModal(): void {
+    this.selectedRouteForCorte.set(null);
+    this.showCorteModal.set(false);
+  }
+
+  routeCorte(): { totalEfectivo: number, totalTransferencias: number, totalGastos: number, totalAEntregar: number } {
+    const route = this.selectedRouteForCorte();
+    if (!route) return { totalEfectivo: 0, totalTransferencias: 0, totalGastos: 0, totalAEntregar: 0 };
+
+    let totalEfectivo = 0;
+    let totalTransferencias = 0;
+
+    // Solo sumar pagos de órdenes que han sido marcadas como entregadas o están en ruta cobradas
+    route.deliveries.forEach(d => {
+      if (d.payments && d.payments.length > 0) {
+        d.payments.forEach(p => {
+          if (p.method === 'Efectivo') {
+            totalEfectivo += p.amount;
+          } else {
+            totalTransferencias += p.amount;
+          }
+        });
+      }
+    });
+
+    let totalGastos = 0;
+    if (route.expenses && route.expenses.length > 0) {
+      totalGastos = route.expenses.reduce((sum, e) => sum + e.amount, 0);
+    }
+
+    return {
+      totalEfectivo,
+      totalTransferencias,
+      totalGastos,
+      totalAEntregar: totalEfectivo - totalGastos
+    };
+  }
+
+  confirmLiquidate(): void {
+    const route = this.selectedRouteForCorte();
+    if (!route) return;
+
+    this.liquidating.set(true);
+    this.api.liquidateRoute(route.id).subscribe({
+      next: () => {
+        this.liquidating.set(false);
+        this.showToast('✅ Ruta liquidada correctamente.');
+        this.closeCorteModal();
+        this.loadRoutes(); // Refrescar para ver estado completado
+      },
+      error: () => {
+        this.liquidating.set(false);
+        this.showToast('❌ Error al liquidar la ruta.');
+      }
+    });
   }
 
   // ═══════════════════════════════════════════
@@ -1392,24 +1639,29 @@ export class RouteManagerComponent implements OnInit, OnDestroy {
   //  CHAT
   // ═══════════════════════════════════════════
   openChat(route: DeliveryRoute): void {
-    this.chatRoute.set(route);
-    this.activeMessages.set([]);
-    this.chatMsgIds.clear();
-    this.loadingChat.set(true);
-    this.newMessage = '';
+    if (this.chatRoute()?.id === route.id) {
+      this.scrollToBottom();
+      return;
+    }
+    this.closeChat();
 
-    this.api.getRouteChat(route.id).subscribe({
-      next: (msgs) => {
-        msgs.forEach(m => this.chatMsgIds.add(m.id));
-        this.activeMessages.set(msgs);
-        this.loadingChat.set(false);
-        this.scrollToBottom();
-      },
-      error: () => {
-        this.loadingChat.set(false);
-        this.showToast('Error cargando chat 😔');
-      }
-    });
+    setTimeout(() => {
+      this.chatRoute.set(route);
+      this.loadingChat.set(true);
+
+      this.api.getRouteChat(route.id).subscribe({
+        next: (msgs) => {
+          msgs.forEach(m => this.chatMsgIds.add(m.id));
+          this.activeMessages.set(msgs);
+          this.loadingChat.set(false);
+          this.scrollToBottom();
+        },
+        error: () => {
+          this.loadingChat.set(false);
+          this.showToast('Error cargando chat 😔');
+        }
+      });
+    }, 50);
   }
 
   closeChat(): void {

@@ -1,0 +1,458 @@
+<div class="profile-page fade-in">
+  <!-- ═══════════════ HEADER ═══════════════ -->
+  <div class="page-header glass-header">
+    <button class="btn-back" routerLink="/admin/clients">← Regresar a Clientas</button>
+    <div class="header-content">
+      <div class="avatar-large">
+        {{ client()?.name?.charAt(0) }}
+        @if(client()?.tag === 'VIP') { <span class="crown">👑</span> }
+      </div>
+      <div class="header-text">
+        @if (isEditing()) {
+        <input type="text" [(ngModel)]="editForm.name" class="input-name" placeholder="Nombre Clienta">
+        } @else {
+        <h2 class="client-name">{{ client()?.name }}</h2>
+        }
+
+        <div class="badges-row">
+          @if (isEditing()) {
+          <select [(ngModel)]="editForm.tag" class="select-tag">
+            <option value="None">Normal 🌸</option>
+            <option value="RisingStar">Ascenso 🚀</option>
+            <option value="VIP">VIP 👑</option>
+            <option value="Blacklist">Blacklist 🚫</option>
+          </select>
+          <select [(ngModel)]="editForm.type" class="select-tag">
+            <option value="Nueva">Nueva 🌱</option>
+            <option value="Frecuente">Frecuente 💎</option>
+          </select>
+          } @else {
+          <span class="tag-badge" [attr.data-tag]="client()?.tag">{{ client()?.tag || 'Normal' }}</span>
+          }
+          <span class="client-type-badge" [class.frecuente]="isFrecuente()" [class.nueva]="!isFrecuente()">
+            {{ isFrecuente() ? '💎 Frecuente' : '🌱 Nueva' }}
+          </span>
+          <span class="badge-id">ID: {{ client()?.id }}</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        @if (isEditing()) {
+        <button class="btn-action cancel" (click)="toggleEditClient()">Cancelar</button>
+        <button class="btn-action save" (click)="saveClientChanges()">Guardar</button>
+        } @else {
+        <button class="btn-action edit" (click)="toggleEditClient()">✏️ Editar Perfil</button>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (toastMessage()) {
+  <div class="toast" [class.error]="toastIsError()">
+    <span class="toast-icon">{{ toastIsError() ? '😿' : '✨' }}</span>
+    <span>{{ toastMessage() }}</span>
+  </div>
+  }
+
+  @if (loading()) {
+  <div class="loading-state">
+    <div class="spinner-cute"></div>
+    <p>Cargando Perfil 360... ✨</p>
+  </div>
+  } @else {
+
+  <!-- ═══════════════ TABS NAVIGATION ═══════════════ -->
+  <div class="tabs-nav">
+    <button class="tab-btn" [class.active]="activeTab() === 'resume'" (click)="setTab('resume')">
+      <span class="tab-icon">👤</span> Resumen
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'activeOrder'" (click)="setTab('activeOrder')">
+      <span class="tab-icon">🛍️</span> Pedido Activo
+      @if (activeOrder()) { <span class="tab-badge">1</span> }
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')">
+      <span class="tab-icon">📜</span> Historial ({{ orders().length }})
+    </button>
+  </div>
+
+  <div class="tab-content">
+
+    <!-- ═══════════════ TAB 1: RESUMEN ═══════════════ -->
+    @if (activeTab() === 'resume') {
+    <div class="stats-row fade-in">
+      <div class="stat-card pink">
+        <span class="stat-label">Total Gastado</span>
+        <span class="stat-value">$ {{ stats().totalSpent | number:'1.0-0' }}</span>
+      </div>
+      <div class="stat-card purple">
+        <span class="stat-label">Pedidos Totales</span>
+        <span class="stat-value">{{ stats().totalOrders }}</span>
+      </div>
+      <div class="stat-card blue">
+        <span class="stat-label">Ticket Promedio</span>
+        <span class="stat-value">$ {{ stats().avgTicket | number:'1.0-0' }}</span>
+      </div>
+      <div class="stat-card orange">
+        <span class="stat-label">Último Pedido</span>
+        <span class="stat-value text-sm">{{ stats().lastOrderDate ? (stats().lastOrderDate | date:'mediumDate') :
+          'Ninguno' }}</span>
+      </div>
+    </div>
+
+    <div class="profile-grid fade-in">
+      <div class="col-left">
+        <div class="info-card">
+          <h3>📝 Datos Personales</h3>
+          @if (isEditing()) {
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" [(ngModel)]="editForm.phone" placeholder="Ej. 81..." class="input-field">
+          </div>
+          <div class="form-group">
+            <label>Dirección</label>
+            <textarea appGoogleAutocomplete (onAddressChange)="handleAddressChange($event)"
+              [(ngModel)]="editForm.address" placeholder="Ej. Calle 123..." class="input-field" rows="3"></textarea>
+          </div>
+          <div class="delete-section">
+            <button class="btn-delete" (click)="askDeleteClient()">💀 Eliminar Clienta</button>
+          </div>
+          } @else {
+          <div class="info-row">
+            <div class="icon-wrap"><span class="icon">📞</span></div>
+            <div class="data">
+              <label>Teléfono</label>
+              <p>{{ client()?.phone || 'No registrado' }}</p>
+              @if(client()?.phone) {
+              <a [href]="'https://wa.me/52' + cleanPhone(client()!.phone!)" target="_blank" class="wa-link">Abrir
+                WhatsApp <span>→</span></a>
+              }
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="icon-wrap"><span class="icon">📍</span></div>
+            <div class="data">
+              <label>Dirección</label>
+              <p class="address-text">{{ client()?.address || 'Sin dirección' }}</p>
+            </div>
+          </div>
+          }
+        </div>
+      </div>
+
+      <div class="col-right">
+        <!-- LOYALTY CARD -->
+        <div class="info-card loyalty-card">
+          <div class="loyalty-header">
+            <h3>💎 RegiPuntos</h3>
+            @if (loyalty()) { <span class="tier-badge">{{ loyalty()?.tier }}</span> }
+          </div>
+
+          @if (loyalty()) {
+          <div class="points-circle">
+            <span class="points-val">{{ loyalty()?.currentPoints }}</span>
+            <span class="points-lbl">Disponibles</span>
+          </div>
+          <div class="loyalty-stats">
+            <div class="l-stat"><label>De por vida</label><span>{{ loyalty()?.lifetimePoints }}</span></div>
+            <div class="l-stat"><label>Último mov.</label><span>{{ loyalty()?.lastAccrual | date:'shortDate' }}</span>
+            </div>
+          </div>
+          <div class="loyalty-actions">
+            <button class="btn-points add" (click)="openPointsModal('add')">🎁 Regalar</button>
+            <button class="btn-points sub" (click)="openPointsModal('subtract')">🛍️ Canjear</button>
+          </div>
+          } @else {
+          <div class="loyalty-loading">
+            <p>Cargando puntos...</p>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+    }
+
+    <!-- ═══════════════ TAB 2: PEDIDO ACTIVO ═══════════════ -->
+    @if (activeTab() === 'activeOrder') {
+    <div class="fade-in">
+      @if (!activeOrder()) {
+      <div class="empty-state">
+        <span class="empty-icon">🛒</span>
+        <h3>Sin Pedidos Activos</h3>
+        <p>Esta clienta no tiene un pedido pendiente en proceso.</p>
+        <!-- Could add functionality to create a new order here -->
+      </div>
+      } @else {
+      <div class="detail-top-bar">
+        <div class="order-badge">
+          <span class="order-id">#{{ activeOrder()!.id }}</span>
+          <span class="status-pill" [attr.data-status]="activeOrder()!.status">
+            {{ statusLabel(activeOrder()!.status) }}
+          </span>
+          <span class="type-pill" [class.pickup]="activeOrder()!.orderType === 'PickUp'">
+            {{ activeOrder()!.orderType === 'PickUp' ? '🛍️ Local' : '🛵 Envío' }}
+          </span>
+        </div>
+        <button class="btn-icon-action copy" (click)="copyLink(activeOrder()!.link)"
+          title="Copiar link del pedido">📋</button>
+      </div>
+
+      <div class="admin-timeline-card">
+        <div class="timeline-track-hz">
+          @for (step of timelineSteps(); track $index) {
+          <div class="timeline-step-hz" [class.completed]="step.done" [class.active]="step.active">
+            <div class="step-indicator-hz">
+              <div class="step-icon-hz">{{ step.icon }}</div>
+              @if (!$last) { <div class="step-line-hz" [class.filled]="step.done"></div> }
+            </div>
+            <div class="step-content-hz">
+              <span class="step-label-hz">{{ step.label }}</span>
+            </div>
+          </div>
+          }
+        </div>
+      </div>
+
+      <div class="detail-grid">
+        <!-- LEFT COL: Status & Delivery -->
+        <div class="detail-col">
+          <section class="detail-card">
+            <h3 class="section-title">📦 Método y Estatus</h3>
+
+            <div class="type-switch">
+              <button [class.active]="orderEditData.orderType === 'Delivery'"
+                (click)="orderEditData.orderType = 'Delivery'; markOrderDirty()"><span>🛵</span> Envío</button>
+              <button [class.active]="orderEditData.orderType === 'PickUp'"
+                (click)="orderEditData.orderType = 'PickUp'; markOrderDirty()"><span>🛍️</span> Local</button>
+            </div>
+
+            @if (orderEditData.orderType === 'Delivery') {
+            <div class="field" style="margin-top: 12px">
+              <label>Hora estipulada</label>
+              <input type="time" [(ngModel)]="orderEditData.deliveryTime" class="field-input"
+                (change)="markOrderDirty()">
+            </div>
+            } @else {
+            <div class="field" style="margin-top: 12px">
+              <label>Fecha de recolección</label>
+              <input type="date" [(ngModel)]="orderEditData.pickupDate" class="field-input" (change)="markOrderDirty()">
+            </div>
+            <div class="field" style="margin-top: 8px">
+              <label>Hora</label>
+              <input type="time" [(ngModel)]="orderEditData.deliveryTime" class="field-input"
+                (change)="markOrderDirty()">
+            </div>
+            }
+
+            <div class="status-pills" style="margin-top: 1rem;">
+              <button class="status-btn" [class.active]="orderEditData.status === 'Pending'"
+                (click)="orderEditData.status = 'Pending'; markOrderDirty()">⏳ Pendiente</button>
+              <button class="status-btn" [class.active]="orderEditData.status === 'Confirmed'"
+                (click)="orderEditData.status = 'Confirmed'; markOrderDirty()">✅ Confirmado</button>
+              <button class="status-btn" [class.active]="orderEditData.status === 'Shipped'"
+                (click)="orderEditData.status = 'Shipped'; markOrderDirty()">📦 Enviado</button>
+              <button class="status-btn" [class.active]="orderEditData.status === 'Delivered'"
+                (click)="orderEditData.status = 'Delivered'; markOrderDirty()">💝 Entregado</button>
+              <button class="status-btn" [class.active]="orderEditData.status === 'Canceled'"
+                (click)="orderEditData.status = 'Canceled'; markOrderDirty()">🚫 Cancelar</button>
+              <button class="status-btn" [class.active]="orderEditData.status === 'Postponed'"
+                (click)="orderEditData.status = 'Postponed'; markOrderDirty()">📅 Posponer</button>
+            </div>
+
+            @if (orderEditData.status === 'Postponed') {
+            <div class="postponed-fields">
+              <div class="field">
+                <label>📅 ¿Cuándo entregamos?</label>
+                <input type="datetime-local" [(ngModel)]="orderEditData.postponedAt" class="field-input"
+                  (change)="markOrderDirty()">
+              </div>
+              <div class="field">
+                <label>📝 Nota rápida</label>
+                <input type="text" [(ngModel)]="orderEditData.postponedNote" placeholder="Ej. Cambio de horario"
+                  class="field-input" (blur)="markOrderDirty()">
+              </div>
+            </div>
+            }
+          </section>
+
+          <section class="detail-card">
+            <h3 class="section-title">🏷️ Etiquetas y Comunicación</h3>
+            <div class="tags-selector">
+              @for (tag of availableTags; track tag) {
+              <button class="tag-btn" [class.active]="orderEditData.tags.includes(tag)" (click)="toggleOrderTag(tag)">{{
+                tag }}</button>
+              }
+            </div>
+            <div class="wa-buttons" style="margin-top: 1rem;">
+              <button class="btn-wa" (click)="sendWa('confirm')">✅ Confirmación</button>
+              <button class="btn-wa" (click)="sendWa('onway')">🚗 En Camino</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT COL: Items Manager -->
+        <div class="detail-col">
+          <section class="detail-card products-card">
+            <app-order-items-manager [order]="activeOrder()" (orderChanged)="onOrderItemsChanged($event)"
+              (notify)="handleNotify($event)">
+            </app-order-items-manager>
+
+            <div class="totals-section">
+              <div class="total-row">
+                <span>Subtotal</span>
+                <span>$ {{ activeOrder()!.subtotal | number:'1.2-2' }}</span>
+              </div>
+              <div class="total-row editing-totals">
+                <span>📦 Costo de Envío</span>
+                <div class="input-money">
+                  <span>$</span>
+                  <input type="number" [(ngModel)]="orderEditData.shippingCost" class="field-input"
+                    (change)="markOrderDirty()">
+                </div>
+              </div>
+              <div class="total-row grand">
+                <span>Total del Pedido</span>
+                <span>$ {{ activeOrder()!.total | number:'1.2-2' }}</span>
+              </div>
+            </div>
+
+            <!-- 💳 LIBRO DE PAGOS -->
+            <div class="payments-ledger">
+              <div class="ledger-header">
+                <h4>💳 Historial de Pagos</h4>
+                <button class="btn-add-payment" (click)="showPaymentModal.set(true)">+ Registrar Pago</button>
+              </div>
+              @if (activeOrder()!.payments && activeOrder()!.payments!.length > 0) {
+              <div class="payments-table">
+                @for (p of activeOrder()!.payments!; track p.id) {
+                <div class="payment-row">
+                  <span class="payment-method">{{ p.method === 'Efectivo' ? '💵' : p.method === 'Transferencia' ? '🏦' :
+                    '💳' }} {{ p.method }}</span>
+                  <span class="payment-amount">$ {{ p.amount | number:'1.2-2' }}</span>
+                  <span class="payment-date">{{ p.date | date:'dd/MM HH:mm' }}</span>
+                  <span class="payment-by">{{ p.registeredBy }}</span>
+                  <button class="btn-delete-payment" (click)="deletePayment(p.id)" title="Eliminar pago">🗑️</button>
+                </div>
+                }
+              </div>
+              } @else {
+              <p class="no-payments">Sin pagos registrados aún</p>
+              }
+              <div class="balance-summary">
+                <div class="balance-row paid">
+                  <span>Pagado</span>
+                  <span>$ {{ (activeOrder()!.amountPaid || 0) | number:'1.2-2' }}</span>
+                </div>
+                <div class="balance-row due" [class.zero]="(activeOrder()!.balanceDue || 0) <= 0">
+                  <span>{{ (activeOrder()!.balanceDue || 0) > 0 ? '⚠️ Saldo Pendiente' : '✅ Pagado' }}</span>
+                  <span>$ {{ (activeOrder()!.balanceDue || 0) | number:'1.2-2' }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ORDER BOTTOM ACTION BAR -->
+      <div class="bottom-bar">
+        <button class="btn-danger-outline" (click)="askDeleteActiveOrder()">🗑️ Eliminar Pedido</button>
+        <div class="bottom-right">
+          <span class="grand-total">Saldo: <strong>$ {{ (activeOrder()!.balanceDue || 0) | number:'1.2-2'
+              }}</strong></span>
+          <button class="btn-save-main" (click)="saveOrderChanges()" [disabled]="!orderEditDirty() || savingOrder()">
+            {{ savingOrder() ? 'Guardando...' : '💾 Guardar cambios' }}
+          </button>
+        </div>
+      </div>
+      }
+    </div>
+    }
+
+    <!-- ═══════════════ TAB 3: HISTORIAL ═══════════════ -->
+    @if (activeTab() === 'history') {
+    <div class="history-card fade-in">
+      <h3>🛍️ Historial de Pedidos</h3>
+      <div class="orders-list">
+        @for (order of orders(); track order.id) {
+        <div class="order-item" (click)="viewOrderDetails(order.id)">
+          <div class="order-left">
+            <span class="order-id">#{{ order.id }}</span>
+            <span class="order-date">{{ order.createdAt | date:'shortDate' }}</span>
+          </div>
+          <div class="order-center">
+            <span class="status-pill" [attr.data-status]="order.status">{{ statusLabel(order.status) }}</span>
+            <span class="items-count">{{ order.items.length }} artículos</span>
+          </div>
+          <div class="order-right">
+            <span class="order-total">$ {{ order.total | number:'1.0-0' }}</span>
+            <span class="arrow">→</span>
+          </div>
+        </div>
+        } @empty {
+        <div class="empty-history">
+          <p>Aún no ha realizado pedidos 😿</p>
+        </div>
+        }
+      </div>
+    </div>
+    }
+
+  </div>
+  }
+
+  <!-- ═══════════════ MODAL PUNTOS ═══════════════ -->
+  @if (showPointsModal()) {
+  <div class="modal-overlay" (click)="showPointsModal.set(false)">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <h3>{{ pointsMode === 'add' ? '🎁 Regalar Puntos' : '🛍️ Canjear Puntos' }}</h3>
+      <div class="form-group">
+        <label>Puntos</label>
+        <input type="number" [(ngModel)]="pointsForm.amount" min="1" class="input-field" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label>Motivo</label>
+        <input type="text" [(ngModel)]="pointsForm.reason" class="input-field"
+          [placeholder]="pointsMode === 'add' ? 'Ej. Cumpleaños...' : 'Ej. Descuento $50...'">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-action cancel" (click)="showPointsModal.set(false)">Cancelar</button>
+        <button class="btn-action save" (click)="submitPoints()" [disabled]="!pointsForm.amount || !pointsForm.reason">
+          {{ pointsMode === 'add' ? '✨ Enviar Regalo' : '✅ Aplicar Canje' }}
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- ═══════════════ MODAL REGISTRAR PAGO ═══════════════ -->
+  @if (showPaymentModal()) {
+  <div class="modal-overlay" (click)="showPaymentModal.set(false)">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <h3>💳 Registrar Pago</h3>
+      <div class="form-group">
+        <label>Monto</label>
+        <input type="number" [(ngModel)]="paymentForm.amount" min="1" class="input-field" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label>Método</label>
+        <select [(ngModel)]="paymentForm.method" class="input-field">
+          <option value="Efectivo">💵 Efectivo</option>
+          <option value="Transferencia">🏦 Transferencia</option>
+          <option value="Deposito">🏧 Depósito</option>
+          <option value="Tarjeta">💳 Tarjeta</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nota (opcional)</label>
+        <input type="text" [(ngModel)]="paymentForm.notes" class="input-field" placeholder="Ej. Anticipo parcial...">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-action cancel" (click)="showPaymentModal.set(false)">Cancelar</button>
+        <button class="btn-action save" (click)="submitPayment()"
+          [disabled]="!paymentForm.amount || paymentForm.amount <= 0">
+          ✅ Registrar Pago
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+</div>

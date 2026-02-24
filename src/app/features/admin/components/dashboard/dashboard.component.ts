@@ -2,9 +2,9 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { NgxEchartsDirective } from 'ngx-echarts';
-import { forkJoin, map, switchMap, of } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
-import { Dashboard, OrderSummary, Investment, Client } from '../../../../shared/models/models';
+import { Dashboard, OrderSummary, Client } from '../../../../shared/models/models';
 
 @Component({
   selector: 'app-dashboard',
@@ -42,32 +42,16 @@ export class DashboardComponent implements OnInit {
   loadData(): void {
     this.loading.set(true);
 
-    const obs$ = forkJoin({
+    // 🚀 OPTIMIZACIÓN: Solo pedimos las órdenes completas y el dashboard.
+    // Lo ideal a futuro es que TODO esto venga calculado directo del getDashboard() en C#.
+    forkJoin({
       dashboard: this.api.getDashboard(),
       orders: this.api.getOrders(),
-      suppliers: this.api.getSuppliers(),
       clients: this.api.getClients()
-    });
-
-    obs$.pipe(
-      switchMap((res: any) => {
-        const suppliers = res.suppliers || [];
-        if (suppliers.length === 0) {
-          return of({ ...res, investments: [] });
-        }
-
-        const invObservables = suppliers.map((s: any) => this.api.getInvestments(s.id));
-        return forkJoin(invObservables).pipe(
-          map((invGroups: any) => ({
-            ...res,
-            investments: invGroups.flat()
-          }))
-        );
-      })
-    ).subscribe({
-      next: (fullData: any) => {
-        this.data.set(fullData.dashboard);
-        this.processCharts(fullData.orders, fullData.investments, fullData.clients);
+    }).subscribe({
+      next: (res) => {
+        this.data.set(res.dashboard);
+        this.processMetricsAndCharts(res.orders, res.clients);
         this.loading.set(false);
       },
       error: (err) => {
@@ -77,16 +61,25 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  processCharts(orders: OrderSummary[], investments: Investment[], clients: Client[]): void {
-    // ─── FECHAS (sin mutar el objeto original) ───
+  processMetricsAndCharts(orders: OrderSummary[], clients: Client[]): void {
+    // ─── FECHAS (Corrección de Zona Horaria) ───
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Inicio de la semana (domingo)
+    // Función para obtener la fecha local en formato YYYY-MM-DD para evitar fallos de Timezone
+    const getLocalYYYYMMDD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const todayStr = getLocalYYYYMMDD(now);
+
     const dayOfWeek = now.getDay();
-    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
 
-    // Inicio del mes
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     let salesToday = 0;
@@ -96,7 +89,7 @@ export class DashboardComponent implements OnInit {
     let pendingCollection = 0;
     let deliveredCount = 0;
 
-    const productCounts: Record<string, number> = {};
+    const salesByMonth = new Map<string, number>();
 
     orders.forEach(o => {
       if (o.status === 'Canceled') return;
@@ -104,34 +97,31 @@ export class DashboardComponent implements OnInit {
       const createdDate = new Date(o.createdAt);
       if (isNaN(createdDate.getTime())) return;
 
-      // ─── VENTAS HOY: Solo pedidos ENTREGADOS hoy ───
-      // Usa deliveredAt si existe, si no usa createdAt para pedidos Delivered
+      // ─── POR COBRAR ───
+      if (o.status !== 'Delivered') {
+        // Asumiendo que amountDue existe, si no, usa el total
+        pendingCollection += ((o as any).amountDue ?? o.total);
+      }
+
+      // ─── VENTAS Y ENTREGAS ───
       if (o.status === 'Delivered') {
-        const deliveredDate = (o as any).deliveredAt
-          ? new Date((o as any).deliveredAt)
-          : createdDate;
+        const deliveredDate = (o as any).deliveredAt ? new Date((o as any).deliveredAt) : createdDate;
 
         if (!isNaN(deliveredDate.getTime())) {
-          if (deliveredDate >= startOfToday) salesToday += o.total;
+          const deliveredStr = getLocalYYYYMMDD(deliveredDate);
+
+          // 🚀 BUG ARREGLADO: Ahora compara strings precisos (ej. "2026-02-23" === "2026-02-23")
+          if (deliveredStr === todayStr) salesToday += o.total;
           if (deliveredDate >= startOfWeek) salesWeek += o.total;
           if (deliveredDate >= startOfMonth) salesMonth += o.total;
+
+          // Datos para Gráfico de Ventas Mensuales
+          const monthKey = `${deliveredDate.getFullYear()}-${String(deliveredDate.getMonth() + 1).padStart(2, '0')}`;
+          salesByMonth.set(monthKey, (salesByMonth.get(monthKey) || 0) + o.total);
         }
 
         deliveredCount++;
         totalSales += o.total;
-      }
-
-      // ─── POR COBRAR: Solo pedidos activos NO entregados ───
-      if (o.status !== 'Delivered' && o.status !== 'Canceled') {
-        pendingCollection += (o.amountDue ?? o.total);
-      }
-
-      // Count products
-      if (o.items) {
-        o.items.forEach(item => {
-          const name = item.productName.trim();
-          productCounts[name] = (productCounts[name] || 0) + item.quantity;
-        });
       }
     });
 
@@ -148,58 +138,41 @@ export class DashboardComponent implements OnInit {
       successRate
     });
 
-    // ─── 1. Sales vs Investment (by month) ───
-    const salesByMonth = new Map<string, number>();
-    const invByMonth = new Map<string, number>();
-    const months = new Set<string>();
+    // ─── ACTUALIZAR GRÁFICOS ───
+    this.updateSalesChart(salesByMonth);
+    this.updateClientsChart(clients);
+    this.updateDeliveryChart(orders);
+  }
 
-    orders.forEach(o => {
-      if (o.status === 'Canceled') return;
-
-      const date = new Date(o.createdAt);
-      if (isNaN(date.getTime())) return;
-
-      const key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      months.add(key);
-      salesByMonth.set(key, (salesByMonth.get(key) || 0) + o.total);
-    });
-
-    investments.forEach(i => {
-      const date = new Date(i.date);
-      if (isNaN(date.getTime())) return;
-
-      const key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      months.add(key);
-      invByMonth.set(key, (invByMonth.get(key) || 0) + i.amount);
-    });
-
-    const sortedMonths = Array.from(months).sort();
+  private updateSalesChart(salesByMonth: Map<string, number>) {
+    // Ordenar los meses cronológicamente
+    const sortedMonths = Array.from(salesByMonth.keys()).sort();
     const salesData = sortedMonths.map(m => salesByMonth.get(m) || 0);
-    const invData = sortedMonths.map(m => invByMonth.get(m) || 0);
+
     const monthLabels = sortedMonths.map(m => {
       const [y, month] = m.split('-');
       const date = new Date(parseInt(y), parseInt(month) - 1, 1);
-      return date.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' });
+      // Capitaliza la primera letra del mes
+      let label = date.toLocaleDateString('es-MX', { month: 'short' });
+      return label.charAt(0).toUpperCase() + label.slice(1);
     });
 
     this.salesVsInvOptions = {
       ...this.salesVsInvOptions,
       xAxis: { ...this.salesVsInvOptions.xAxis, data: monthLabels },
       series: [
-        { ...this.salesVsInvOptions.series[0], data: salesData },
-        { ...this.salesVsInvOptions.series[1], data: invData }
+        { ...this.salesVsInvOptions.series[0], data: salesData }
+        // Se quitó la serie de Inversiones temporalmente para evitar la sobrecarga N+1
       ]
     };
+  }
 
-    // ─── 2. Client Types ───
+  private updateClientsChart(clients: Client[]) {
     let countNueva = 0;
     let countFrecuente = 0;
 
     clients.forEach(c => {
-      const isFrecuente =
-        (c.orderCount > 1) ||
-        ((c as any).ordersCount || 0) > 1 ||
-        c.type === 'Frecuente';
+      const isFrecuente = (c as any).orderCount > 1 || c.type === 'Frecuente';
       if (isFrecuente) countFrecuente++;
       else countNueva++;
     });
@@ -210,16 +183,16 @@ export class DashboardComponent implements OnInit {
         ...this.clientTypeOptions.series[0],
         data: [
           { name: '🌱 Nueva', value: countNueva },
-          { name: '🔥 Frecuente', value: countFrecuente }
+          { name: '💎 Frecuente', value: countFrecuente }
         ]
       }]
     };
+  }
 
-    // ─── 3. Delivery Methods ───
+  private updateDeliveryChart(orders: OrderSummary[]) {
     const deliveryMethods = orders.reduce((acc, o) => {
       if (o.status === 'Canceled') return acc;
-      const type = o.orderType === 'Delivery' ? 'Domicilio'
-        : (o.orderType === 'PickUp' ? 'PickUp' : o.orderType);
+      const type = o.orderType === 'Delivery' ? 'Domicilio' : (o.orderType === 'PickUp' ? 'PickUp' : o.orderType);
       acc[type] = (acc[type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -240,88 +213,38 @@ export class DashboardComponent implements OnInit {
 
     this.salesVsInvOptions = {
       color: colors,
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        borderColor: '#fce7f3',
-        textStyle: { color: '#374151', fontSize: 12 },
-        confine: true
-      },
-      legend: { bottom: 0, textStyle: { fontSize: 11 } },
+      tooltip: { trigger: 'axis', confine: true },
+      legend: { bottom: 0 },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: [],
-        axisLine: { lineStyle: { color: '#E8A0BF' } },
-        axisLabel: { fontSize: 10, rotate: 0 }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: false },
-        axisTick: { show: false },
-        splitLine: { lineStyle: { type: 'dashed', color: '#FFE0EB' } },
-        axisLabel: { fontSize: 10 }
-      },
+      xAxis: { type: 'category', boundaryGap: false, data: [] },
+      yAxis: { type: 'value' },
       series: [
         {
           name: 'Ventas', type: 'line', smooth: true,
           data: [],
           itemStyle: { color: '#FF5C96' },
-          lineStyle: { width: 3, shadowBlur: 8, shadowColor: 'rgba(255, 92, 150, 0.2)' },
           areaStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: 'rgba(255, 92, 150, 0.3)' },
-                { offset: 1, color: 'rgba(255, 255, 255, 0)' }
-              ]
+              colorStops: [{ offset: 0, color: 'rgba(255, 92, 150, 0.3)' }, { offset: 1, color: 'rgba(255, 255, 255, 0)' }]
             }
           }
-        },
-        {
-          name: 'Inversión', type: 'line', smooth: true,
-          data: [],
-          itemStyle: { color: '#85E3D5' },
-          lineStyle: { width: 2.5, type: 'dashed' }
         }
       ]
     };
 
     this.clientTypeOptions = {
-      color: ['#FF9DBF', '#FFC5D9', '#E8A0BF', '#D4C4D4'],
+      color: ['#FF9DBF', '#D4C4D4'],
       tooltip: { trigger: 'item', confine: true },
-      legend: { bottom: '0%', textStyle: { fontSize: 11 } },
-      series: [
-        {
-          name: 'Tipo Clienta', type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['50%', '45%'],
-          avoidLabelOverlap: false,
-          itemStyle: { borderRadius: 12, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false, position: 'center' },
-          emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
-          data: []
-        }
-      ]
+      legend: { bottom: '0%' },
+      series: [{ name: 'Tipo Clienta', type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'], data: [] }]
     };
 
     this.deliveryMethodOptions = {
-      color: ['#87E8DE', '#FFD666', '#FF85C0'],
+      color: ['#87E8DE', '#FF85C0'],
       tooltip: { trigger: 'item', confine: true },
-      legend: { bottom: '0%', textStyle: { fontSize: 11 } },
-      series: [
-        {
-          name: 'Método', type: 'pie',
-          radius: '55%',
-          center: ['50%', '45%'],
-          data: [],
-          itemStyle: { borderRadius: 12, borderColor: '#fff', borderWidth: 2 },
-          emphasis: {
-            itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.1)' }
-          }
-        }
-      ]
+      legend: { bottom: '0%' },
+      series: [{ name: 'Método', type: 'pie', radius: '55%', center: ['50%', '45%'], data: [] }]
     };
   }
 }

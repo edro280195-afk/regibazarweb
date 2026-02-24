@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, Inject, LOCALE_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, Inject, LOCALE_ID, HostListener } from '@angular/core';
 import { CommonModule, formatDate } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -278,10 +278,15 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
             @if (o.shippingCost > 0) {
                <div class="total-row"><span>Envío 🚗</span><span>\${{ o.shippingCost | number:'1.2-2' }}</span></div>
             }
-            @if ((o.advancePayment || 0) > 0) {
-               <div class="total-row"><span>Abono / Anticipo 💳</span><span>-\${{ o.advancePayment | number:'1.2-2' }}</span></div>
+            <div class="total-row"><span>Total del Pedido</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
+            @if (o.payments && o.payments.length > 0) {
+              @for (p of o.payments; track p.id) {
+                <div class="total-row" style="color: #16a34a"><span>💳 Abono ({{ p.method }})</span><span>-\${{ p.amount | number:'1.2-2' }}</span></div>
+              }
+              <div class="total-row grand"><span>Saldo Pendiente</span><span>\${{ (o.balanceDue || 0) | number:'1.2-2' }}</span></div>
+            } @else {
+              <div class="total-row grand"><span>Total a Pagar</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
             }
-            <div class="total-row grand"><span>Total a pagar</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
           </div>
         </div>
 
@@ -796,6 +801,13 @@ export class OrderViewComponent implements OnInit, OnDestroy {
     this.deliverySub?.unsubscribe();
     this.signalr.disconnect();
     if (this.timerInterval) clearInterval(this.timerInterval);
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange() {
+    if (document.visibilityState === 'visible' && this.accessToken) {
+      this.loadOrder();
+    }
   }
 
   enableNotifications(clientId?: number) {

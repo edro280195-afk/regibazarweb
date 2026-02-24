@@ -10,11 +10,13 @@ import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.compo
 import { GoogleAutocompleteDirective } from '../../../../shared/directives/google-autocomplete.directive';
 import { SignalRService } from '../../../../core/services/signalr.service';
 import { Subscription } from 'rxjs';
+import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { OrderCardComponent } from './order-card/order-card.component';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouteOptimizerComponent, GoogleAutocompleteDirective],
+  imports: [CommonModule, FormsModule, RouteOptimizerComponent, GoogleAutocompleteDirective, DragDropModule, OrderCardComponent],
   templateUrl: './orders.component.html',
   styleUrl: './orders.component.scss'
 })
@@ -29,7 +31,9 @@ export class OrdersComponent implements OnInit {
   routeCreated = signal<any>(null);
 
   // ── UI state ──
-  selectionMode = signal(false); // New!
+  viewMode = signal<'list' | 'kanban'>('kanban');
+  activeKanbanTab = signal<string>('Pending');
+  selectionMode = signal(false);
   loading = signal(false);
   toastMessage = signal('');
   toastIsError = signal(false);
@@ -101,6 +105,12 @@ export class OrdersComponent implements OnInit {
     return this.selectedOrdersList().reduce((sum, o) => sum + o.total, 0);
   });
 
+  boardPending = signal<OrderSummary[]>([]);
+  boardConfirmed = signal<OrderSummary[]>([]);
+  boardInRoute = signal<OrderSummary[]>([]);
+  boardDelivered = signal<OrderSummary[]>([]);
+
+
   private orderSub?: Subscription;
   private searchTimeout: any;
 
@@ -164,6 +174,7 @@ export class OrdersComponent implements OnInit {
 
         this.orders.set(list);
         this.filteredOrders.set(list);
+        this.rebuildBoards(list);
         this.totalOrdersCount.set(res.totalCount);
         this.loading.set(false);
       },
@@ -611,7 +622,28 @@ export class OrdersComponent implements OnInit {
   // ═══════════════ UTILITIES ═══════════════
 
   goToOrder(id: number): void {
-    this.router.navigate(['/admin/orders', id]);
+    const order = this.orders().find(o => o.id === id);
+    if (!order) return;
+
+    if (order.clientId) {
+      this.router.navigate(['/admin/clients', order.clientId], { queryParams: { orderId: order.id } });
+    } else {
+      // Find client by name fallback
+      this.api.getClients().subscribe({
+        next: (clients) => {
+          const match = clients.find(c => c.name.trim().toLowerCase() === order.clientName.trim().toLowerCase());
+          if (match) {
+            this.router.navigate(['/admin/clients', match.id], { queryParams: { orderId: order.id } });
+          } else {
+            // Orphan Order profile fallback
+            this.router.navigate(['/admin/clients', 0], { queryParams: { orderId: order.id } });
+          }
+        },
+        error: () => {
+          this.router.navigate(['/admin/clients', 0], { queryParams: { orderId: order.id } });
+        }
+      });
+    }
   }
 
   copyLink(link: string): void {
@@ -633,6 +665,7 @@ export class OrdersComponent implements OnInit {
   statusLabel(s: string): string {
     const labels: Record<string, string> = {
       Pending: '⏳ Pendiente',
+      Confirmed: '✅ Confirmado',
       InRoute: '🚗 En ruta',
       Delivered: '💝 Entregado',
       NotDelivered: '😿 Fallido',
@@ -640,5 +673,77 @@ export class OrdersComponent implements OnInit {
       Postponed: '📅 Pospuesto'
     };
     return labels[s] || s;
+  }
+
+  // ═══════════════ KANBAN HELPERS ═══════════════
+  rebuildBoards(list: OrderSummary[]): void {
+    this.boardPending.set(list.filter(o => o.status === 'Pending'));
+    this.boardConfirmed.set(list.filter(o => o.status === 'Confirmed' || o.status === 'Shipped'));
+    this.boardInRoute.set(list.filter(o => o.status === 'InRoute'));
+    this.boardDelivered.set(list.filter(o => o.status === 'Delivered'));
+  }
+
+  kanbanTabs = [
+    { key: 'Pending', label: '⏳', title: 'Pendientes' },
+    { key: 'Confirmed', label: '✅', title: 'Confirmados' },
+    { key: 'InRoute', label: '🚗', title: 'En Ruta' },
+    { key: 'Delivered', label: '💝', title: 'Entregados' }
+  ];
+
+  /** Quick-move from mobile card button */
+  quickMoveStatus(order: OrderSummary, newStatus: string): void {
+    const oldStatus = order.status;
+    order.status = newStatus;
+    // Remove from old board, add to new
+    this.rebuildBoards(this.filteredOrders());
+
+    this.api.updateOrderStatus(order.id, { status: newStatus }).subscribe({
+      next: (updated) => {
+        Object.assign(order, updated);
+        this.showToast(`Movido a ${this.statusLabel(newStatus)} ✨`);
+        this.loadOrderStats();
+      },
+      error: () => {
+        order.status = oldStatus;
+        this.rebuildBoards(this.filteredOrders());
+        this.showToast('Error al mover 😿', true);
+      }
+    });
+  }
+
+  // ═══════════════ KANBAN DRAG & DROP ═══════════════
+  onOrderDrop(event: CdkDragDrop<OrderSummary[]>, newStatus: string): void {
+    if (event.previousContainer === event.container) {
+      moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
+    } else {
+      const orderToMove = event.previousContainer.data[event.previousIndex];
+
+      // Mover entre arrays mutables — CDK anima esto suavemente
+      transferArrayItem(
+        event.previousContainer.data,
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex,
+      );
+
+      // Mutar el status in-place para que el card refleje el nuevo color inmediatamente
+      orderToMove.status = newStatus;
+
+      const rawStatus = newStatus;
+
+      this.api.updateOrderStatus(orderToMove.id, { status: rawStatus }).subscribe({
+        next: (updatedOrder) => {
+          // Mutar in-place sin regenerar signals — preserva nodos DOM
+          Object.assign(orderToMove, updatedOrder);
+          this.showToast(`Estatus actualizado a ${this.statusLabel(rawStatus)} ✨`);
+          this.loadOrderStats();
+        },
+        error: () => {
+          this.showToast('Error al mover la orden 😿', true);
+          // Si falla, revertimos refrescando todo desde DB
+          this.loadOrders();
+        }
+      });
+    }
   }
 }
