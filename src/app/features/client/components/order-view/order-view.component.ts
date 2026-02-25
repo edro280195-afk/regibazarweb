@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, Inject, LOCALE_ID, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, Inject, LOCALE_ID, HostListener, computed } from '@angular/core';
 import { CommonModule, formatDate } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -272,21 +272,42 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
           </div>
 
           <div class="order-totals">
-            @if (o.subtotal > 0) {
-               <div class="total-row"><span>Subtotal</span><span>\${{ o.subtotal | number:'1.2-2' }}</span></div>
-            }
+            <div class="total-row">
+              <span>Subtotal</span>
+              <span>\${{ o.subtotal | number:'1.2-2' }}</span>
+            </div>
+
             @if (o.shippingCost > 0) {
-               <div class="total-row"><span>Envío 🚗</span><span>\${{ o.shippingCost | number:'1.2-2' }}</span></div>
+              <div class="total-row">
+                <span>Envío 🚗</span>
+                <span>\${{ o.shippingCost | number:'1.2-2' }}</span>
+              </div>
             }
-            <div class="total-row"><span>Total del Pedido</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
-            @if (o.payments && o.payments.length > 0) {
-              @for (p of o.payments; track p.id) {
-                <div class="total-row" style="color: #16a34a"><span>💳 Abono ({{ p.method }})</span><span>-\${{ p.amount | number:'1.2-2' }}</span></div>
+
+            <div class="total-row order-sum">
+              <span>Total del Pedido</span>
+              <span>\${{ o.total | number:'1.2-2' }}</span>
+            </div>
+
+            @if (totalAbonado() > 0) {
+              <div class="total-row payment-highlight" 
+                   [title]="o.payments?.length + ' pagos registrados'">
+                <span>
+                  Abono 
+                  @if ((o.payments?.length ?? 0) > 1) {
+                    <small class="payment-count">({{ o.payments?.length }} pagos)</small>
+                  }
+                </span>
+                <span>- \${{ totalAbonado() | number:'1.2-2' }}</span>
+              </div>
+            }
+
+            <div class="total-row grand" [class.liquidated]="(o.balanceDue || 0) <= 0">
+              <span>{{ (o.balanceDue || 0) <= 0 ? '¡Pedido Liquidado! ✅' : 'Total a Pagar' }}</span>
+              @if ((o.balanceDue || 0) > 0) {
+                <span>\${{ o.balanceDue | number:'1.2-2' }}</span>
               }
-              <div class="total-row grand"><span>Saldo Pendiente</span><span>\${{ (o.balanceDue || 0) | number:'1.2-2' }}</span></div>
-            } @else {
-              <div class="total-row grand"><span>Total a Pagar</span><span>\${{ o.total | number:'1.2-2' }}</span></div>
-            }
+            </div>
           </div>
         </div>
 
@@ -498,8 +519,13 @@ import { GoogleMapsModule, GoogleMap, MapDirectionsRenderer, MapMarker } from '@
     .item-qty { color: var(--text-muted); font-size: 0.8rem; }
     .item-price { color: var(--pink-500); font-weight: 700; font-size: 0.9rem; }
     
-    .order-totals { margin-top: 0.5rem; }
-    .total-row { display: flex; justify-content: space-between; padding: 0.2rem 0; color: var(--text-medium); font-size: 0.85rem; &.grand { margin-top: 0.3rem; color: var(--pink-600); font-weight: 800; font-size: 1.1rem; font-family: var(--font-display); border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.5rem; } }
+    .order-totals { margin-top: 0.8rem; padding: 1rem; background: rgba(255, 255, 255, 0.4); border-radius: 1rem; border: 1px dashed var(--pink-200); }
+    .total-row { display: flex; justify-content: space-between; padding: 0.35rem 0; color: var(--text-medium); font-size: 0.9rem; }
+    .order-sum { border-top: 1px solid rgba(0,0,0,0.05); margin-top: 0.25rem; padding-top: 0.5rem; font-weight: 600; color: var(--text-dark); }
+    .payment-highlight { color: #16a34a; font-weight: 700; background: rgba(22, 163, 74, 0.05); padding: 0.4rem 0.6rem; border-radius: 8px; margin: 0.25rem -0.6rem; }
+    .payment-count { font-weight: normal; opacity: 0.8; font-size: 0.75rem; margin-left: 4px; }
+    .total-row.grand { margin-top: 0.5rem; color: var(--pink-600); font-weight: 800; font-size: 1.25rem; font-family: var(--font-display); border-top: 2px solid var(--pink-100); padding-top: 0.75rem; transition: all 0.3s ease; }
+    .total-row.grand.liquidated { color: #16a34a; font-size: 1.15rem; border-top-color: #dcfce7; }
     
     .payment-section { margin-top: 1rem; position: relative; z-index: 1; h3 { color: var(--text-dark); font-size: 0.95rem; margin: 0 0 0.2rem; font-family: var(--font-display); } }
     .pay-hint { font-size: 0.8rem; color: var(--text-medium); margin-bottom: 0.8rem; }
@@ -700,6 +726,11 @@ export class OrderViewComponent implements OnInit, OnDestroy {
   @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
   order = signal<ClientOrderView | null>(null);
+  totalAbonado = computed(() => {
+    const o = this.order();
+    if (!o || !o.payments) return 0;
+    return o.payments.reduce((sum, p) => sum + p.amount, 0);
+  });
   loading = signal(true);
   expired = signal(false);
   notFound = signal(false);
