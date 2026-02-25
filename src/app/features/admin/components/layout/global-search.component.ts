@@ -10,6 +10,8 @@ import { OrderSummary, Client } from '../../../../shared/models/models';
 interface SearchResult {
   type: 'order' | 'client';
   id: number;
+  clientId?: number;
+  clientName?: string;
   title: string;
   subtitle: string;
   icon: string;
@@ -239,6 +241,8 @@ export class GlobalSearchComponent implements OnInit {
       .map(o => ({
         type: 'order' as const,
         id: o.id,
+        clientId: o.clientId,
+        clientName: o.clientName,
         title: `#${o.id} — ${o.clientName}`,
         subtitle: `$${o.total.toLocaleString()} · ${o.status}`,
         icon: o.status === 'Delivered' ? '✅' : o.status === 'Pending' ? '⏳' : '🚗'
@@ -269,7 +273,16 @@ export class GlobalSearchComponent implements OnInit {
     this.closeDropdown();
     this.searchTerm = '';
     if (result.type === 'order') {
-      this.router.navigate(['/admin/orders', result.id]);
+      if (result.clientId) {
+        this.router.navigate(['/admin/clients', result.clientId], { queryParams: { orderId: result.id } });
+      } else {
+        const match = this.allClients.find(c => c.name.trim().toLowerCase() === (result.clientName || '').trim().toLowerCase());
+        if (match) {
+          this.router.navigate(['/admin/clients', match.id], { queryParams: { orderId: result.id } });
+        } else {
+          this.router.navigate(['/admin/clients', 0], { queryParams: { orderId: result.id } });
+        }
+      }
     } else {
       this.router.navigate(['/admin/clients', result.id]);
     }
