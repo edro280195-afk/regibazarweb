@@ -47,11 +47,14 @@ export class DashboardComponent implements OnInit {
     forkJoin({
       dashboard: this.api.getDashboard(),
       orders: this.api.getOrders(),
-      clients: this.api.getClients()
-    }).subscribe({
+      clients: this.api.getClients(),
+      stats: this.api.getOrderStats()
+    }).pipe(
+      // Optional: hide loading when logic starts if needed, but subscribe is fine
+    ).subscribe({
       next: (res) => {
         this.data.set(res.dashboard);
-        this.processMetricsAndCharts(res.orders, res.clients);
+        this.processMetricsAndCharts(res.orders, res.clients, res.stats);
         this.loading.set(false);
       },
       error: (err) => {
@@ -61,7 +64,7 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  processMetricsAndCharts(orders: OrderSummary[], clients: Client[]): void {
+  processMetricsAndCharts(orders: OrderSummary[], clients: Client[], stats: { total: number, pending: number, pendingAmount: number, collectedToday: number }): void {
     // ─── FECHAS (Corrección de Zona Horaria) ───
     const now = new Date();
 
@@ -82,11 +85,9 @@ export class DashboardComponent implements OnInit {
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let salesToday = 0;
     let salesWeek = 0;
     let salesMonth = 0;
     let totalSales = 0;
-    let pendingCollection = 0;
     let deliveredCount = 0;
 
     const salesByMonth = new Map<string, number>();
@@ -97,12 +98,6 @@ export class DashboardComponent implements OnInit {
       const createdDate = new Date(o.createdAt);
       if (isNaN(createdDate.getTime())) return;
 
-      // ─── POR COBRAR ───
-      if (o.status !== 'Delivered') {
-        // Asumiendo que amountDue existe, si no, usa el total
-        pendingCollection += ((o as any).amountDue ?? o.total);
-      }
-
       // ─── VENTAS Y ENTREGAS ───
       if (o.status === 'Delivered') {
         const deliveredDate = (o as any).deliveredAt ? new Date((o as any).deliveredAt) : createdDate;
@@ -111,7 +106,6 @@ export class DashboardComponent implements OnInit {
           const deliveredStr = getLocalYYYYMMDD(deliveredDate);
 
           // 🚀 BUG ARREGLADO: Ahora compara strings precisos (ej. "2026-02-23" === "2026-02-23")
-          if (deliveredStr === todayStr) salesToday += o.total;
           if (deliveredDate >= startOfWeek) salesWeek += o.total;
           if (deliveredDate >= startOfMonth) salesMonth += o.total;
 
@@ -130,11 +124,11 @@ export class DashboardComponent implements OnInit {
     const successRate = activeOrders > 0 ? Math.round((deliveredCount / activeOrders) * 100) : 0;
 
     this.metrics.set({
-      salesToday,
+      salesToday: stats.collectedToday,
       salesWeek,
       salesMonth,
       avgTicket,
-      pendingCollection,
+      pendingCollection: stats.pendingAmount,
       successRate
     });
 

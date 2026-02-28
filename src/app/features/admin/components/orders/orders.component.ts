@@ -102,7 +102,7 @@ export class OrdersComponent implements OnInit {
   });
 
   selectedOrdersTotal = computed(() => {
-    return this.selectedOrdersList().reduce((sum, o) => sum + o.total, 0);
+    return this.selectedOrdersList().reduce((sum, o) => sum + (o.amountDue ?? o.total), 0);
   });
 
   boardPending = signal<OrderSummary[]>([]);
