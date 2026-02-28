@@ -692,6 +692,11 @@ export class OrdersComponent implements OnInit {
 
   /** Quick-move from mobile card button */
   quickMoveStatus(order: OrderSummary, newStatus: string): void {
+    if (newStatus === 'Delivered') {
+      this.openConfirmPayment(order);
+      return;
+    }
+
     const oldStatus = order.status;
     order.status = newStatus;
     // Remove from old board, add to new
@@ -713,11 +718,16 @@ export class OrdersComponent implements OnInit {
 
   // ═══════════════ KANBAN DRAG & DROP ═══════════════
   onOrderDrop(event: CdkDragDrop<OrderSummary[]>, newStatus: string): void {
+    const orderToMove = event.previousContainer.data[event.previousIndex];
+
+    if (newStatus === 'Delivered' && event.previousContainer !== event.container) {
+      this.openConfirmPayment(orderToMove);
+      return;
+    }
+
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
-      const orderToMove = event.previousContainer.data[event.previousIndex];
-
       // Mover entre arrays mutables — CDK anima esto suavemente
       transferArrayItem(
         event.previousContainer.data,

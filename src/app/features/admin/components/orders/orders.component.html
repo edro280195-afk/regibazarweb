@@ -134,9 +134,12 @@
       <div class="edit-modal-body" style="display: block;">
         <div style="text-align: center; margin-bottom: 1.5rem;">
           <p style="font-size: 1.5rem; font-weight: 800; color: var(--pink-600); margin: 0;">
-            $ {{ selectedOrderForPayment()!.total | number:'1.2-2' }}
+            $ {{ (selectedOrderForPayment()!.amountDue ?? selectedOrderForPayment()!.total) | number:'1.2-2' }}
           </p>
-          <p style="color: #888; margin: 5px 0 0;">Total a cobrar</p>
+          <p style="color: #888; margin: 5px 0 0;">
+            @if (selectedOrderForPayment()!.amountDue !== undefined && selectedOrderForPayment()!.amountDue! <
+              selectedOrderForPayment()!.total) { Saldo Pendiente (Total: ${{ selectedOrderForPayment()!.total }}) }
+              @else { Total a cobrar } </p>
         </div>
 
         <div class="edit-section">
