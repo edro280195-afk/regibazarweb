@@ -169,6 +169,8 @@ export interface Dashboard {
   notDeliveredOrders: number;
   activeRoutes: number;
   totalRevenue: number;
+  revenueMonth: number;
+  revenueToday: number;
   totalInvestment: number;
   totalCashOrders: number;
   totalCashAmount: number;

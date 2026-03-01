@@ -345,10 +345,18 @@ export class OrdersComponent implements OnInit {
   selectedOrderForPayment = signal<OrderSummary | null>(null);
   paymentMethod = signal('Efectivo');
   confirmingPayment = signal(false);
+  paymentAmount = signal<number>(0);
+  pendingStatusChange = signal<string | null>(null);
 
-  openConfirmPayment(order: OrderSummary): void {
+  openConfirmPayment(order: OrderSummary, statusDestino?: string): void {
     this.selectedOrderForPayment.set(order);
     this.paymentMethod.set('Efectivo');
+    this.pendingStatusChange.set(statusDestino || null);
+
+    const amount = (order.amountDue !== undefined && order.amountDue !== null)
+      ? order.amountDue
+      : (order.balanceDue !== undefined && order.balanceDue !== null ? order.balanceDue : order.total);
+    this.paymentAmount.set(amount);
   }
 
   confirmPayment(): void {
@@ -356,24 +364,66 @@ export class OrdersComponent implements OnInit {
     if (!order) return;
     this.confirmingPayment.set(true);
 
-    // Mark as delivered (and paid)
-    this.api.updateOrderStatus(order.id, { status: 'Delivered' }).subscribe({
-      next: (updated) => {
-        this.showToast(`¡Cobro de $${order.total} registrado! 💸`);
-        // Update local state
-        const current = this.orders();
-        const idx = current.findIndex(o => o.id === order.id);
-        if (idx !== -1) {
-          current[idx] = updated;
-          this.orders.set([...current]);
-          this.applyFilter();
+    // Calculamos el monto a cobrar basado en el input del usuario o el fallback si lo dejó en blanco
+    const defaultAmount = (order.amountDue !== undefined && order.amountDue !== null)
+      ? order.amountDue
+      : (order.balanceDue !== undefined && order.balanceDue !== null ? order.balanceDue : order.total);
+
+    const amountToPay = this.paymentAmount() || defaultAmount;
+
+    if (amountToPay <= 0) {
+      this.showToast('El monto debe ser mayor a 0', true);
+      this.confirmingPayment.set(false);
+      return;
+    }
+
+    // 1. Registrar el pago en el libro de transacciones
+    this.api.addPayment(order.id, {
+      amount: amountToPay,
+      method: this.paymentMethod(),
+      registeredBy: 'Admin',
+      notes: this.pendingStatusChange() ? 'Cobro al entregar pedido' : 'Abono/Cobro manual registrado'
+    }).subscribe({
+      next: () => {
+        const nextStatus = this.pendingStatusChange();
+
+        if (nextStatus) {
+          // 2. Marcar como entregado (o el estado de destino configurado)
+          this.api.updateOrderStatus(order.id, { status: nextStatus }).subscribe({
+            next: (updated) => {
+              this.showToast(`¡Cobro de $${amountToPay} registrado con éxito y pedido entregado! 💸`);
+              const current = this.orders();
+              const idx = current.findIndex(o => o.id === order.id);
+              if (idx !== -1) {
+                current[idx] = updated;
+                this.orders.set([...current]);
+                this.applyFilter();
+              }
+              this.selectedOrderForPayment.set(null);
+              this.pendingStatusChange.set(null);
+              this.confirmingPayment.set(false);
+              this.loadOrderStats(); // ✅ Actualizar el Panel Superior (Por Cobrar)
+            },
+            error: () => {
+              this.showToast('Pago registrado, pero falló al actualizar el estatus 😿', true);
+              this.confirmingPayment.set(false);
+              this.pendingStatusChange.set(null);
+              this.loadOrderStats(); // ✅ Actualizar el Panel Superior aunque falle la entrega
+            }
+          });
+        } else {
+          // Era solo un abono o pago sin cambio de estado
+          this.showToast(`¡Abono de $${amountToPay} cobrado con éxito! 💸`);
+          this.selectedOrderForPayment.set(null);
+          this.confirmingPayment.set(false);
+          this.loadOrders();
+          this.loadOrderStats(); // ✅ Actualizar el Panel Superior (Por Cobrar)
         }
-        this.selectedOrderForPayment.set(null);
-        this.confirmingPayment.set(false);
       },
       error: () => {
-        this.showToast('Error al registrar cobro 😿', true);
+        this.showToast('Error al registrar cobro en el sistema 😿', true);
         this.confirmingPayment.set(false);
+        this.pendingStatusChange.set(null);
       }
     });
   }
@@ -692,8 +742,11 @@ export class OrdersComponent implements OnInit {
 
   /** Quick-move from mobile card button */
   quickMoveStatus(order: OrderSummary, newStatus: string): void {
-    if (newStatus === 'Delivered') {
-      this.openConfirmPayment(order);
+    const isDelivered = newStatus === 'Delivered';
+    const balance = order.balanceDue !== undefined ? order.balanceDue : order.total;
+
+    if (isDelivered && balance > 0) {
+      this.openConfirmPayment(order, 'Delivered');
       return;
     }
 
@@ -719,9 +772,11 @@ export class OrdersComponent implements OnInit {
   // ═══════════════ KANBAN DRAG & DROP ═══════════════
   onOrderDrop(event: CdkDragDrop<OrderSummary[]>, newStatus: string): void {
     const orderToMove = event.previousContainer.data[event.previousIndex];
+    const isDelivered = newStatus === 'Delivered';
+    const balance = orderToMove.balanceDue !== undefined ? orderToMove.balanceDue : orderToMove.total;
 
-    if (newStatus === 'Delivered' && event.previousContainer !== event.container) {
-      this.openConfirmPayment(orderToMove);
+    if (isDelivered && event.previousContainer !== event.container && balance > 0) {
+      this.openConfirmPayment(orderToMove, 'Delivered');
       return;
     }
 

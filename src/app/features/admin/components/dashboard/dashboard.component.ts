@@ -85,10 +85,11 @@ export class DashboardComponent implements OnInit {
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let salesWeek = 0;
-    let salesMonth = 0;
-    let totalSales = 0;
     let deliveredCount = 0;
+    let totalSales = 0; // Solo para avg ticket referencial si se desea, o usar dashboard.totalRevenue
+
+    // Obtenemos el Dashboard que se cargó antes de esta función
+    const d = this.data();
 
     const salesByMonth = new Map<string, number>();
 
@@ -98,18 +99,12 @@ export class DashboardComponent implements OnInit {
       const createdDate = new Date(o.createdAt);
       if (isNaN(createdDate.getTime())) return;
 
-      // ─── VENTAS Y ENTREGAS ───
+      // ─── VENTAS Y ENTREGAS (Para el gráfico) ───
       if (o.status === 'Delivered') {
         const deliveredDate = (o as any).deliveredAt ? new Date((o as any).deliveredAt) : createdDate;
 
         if (!isNaN(deliveredDate.getTime())) {
-          const deliveredStr = getLocalYYYYMMDD(deliveredDate);
-
-          // 🚀 BUG ARREGLADO: Ahora compara strings precisos (ej. "2026-02-23" === "2026-02-23")
-          if (deliveredDate >= startOfWeek) salesWeek += o.total;
-          if (deliveredDate >= startOfMonth) salesMonth += o.total;
-
-          // Datos para Gráfico de Ventas Mensuales
+          // Datos para Gráfico de Ventas Mensuales (Se mantiene iterando orders por ahora)
           const monthKey = `${deliveredDate.getFullYear()}-${String(deliveredDate.getMonth() + 1).padStart(2, '0')}`;
           salesByMonth.set(monthKey, (salesByMonth.get(monthKey) || 0) + o.total);
         }
@@ -124,9 +119,9 @@ export class DashboardComponent implements OnInit {
     const successRate = activeOrders > 0 ? Math.round((deliveredCount / activeOrders) * 100) : 0;
 
     this.metrics.set({
-      salesToday: stats.collectedToday,
-      salesWeek,
-      salesMonth,
+      salesToday: d?.revenueToday || 0,
+      salesWeek: 0, // Ignorado
+      salesMonth: d?.revenueMonth || 0,
       avgTicket,
       pendingCollection: stats.pendingAmount,
       successRate

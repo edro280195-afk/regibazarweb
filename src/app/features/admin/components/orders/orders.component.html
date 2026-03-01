@@ -133,13 +133,16 @@
       </div>
       <div class="edit-modal-body" style="display: block;">
         <div style="text-align: center; margin-bottom: 1.5rem;">
-          <p style="font-size: 1.5rem; font-weight: 800; color: var(--pink-600); margin: 0;">
-            $ {{ (selectedOrderForPayment()!.amountDue ?? selectedOrderForPayment()!.total) | number:'1.2-2' }}
-          </p>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <span style="font-size: 1.5rem; font-weight: 800; color: var(--pink-600);">$</span>
+            <input type="number" class="fancy-input"
+              style="width: 120px; font-size: 1.5rem; font-weight: 800; text-align: center; color: var(--pink-600); margin: 0; padding: 0.5rem;"
+              [ngModel]="paymentAmount()" (ngModelChange)="paymentAmount.set($event)" min="0.5" step="0.5">
+          </div>
           <p style="color: #888; margin: 5px 0 0;">
             @if (selectedOrderForPayment()!.amountDue !== undefined && selectedOrderForPayment()!.amountDue! <
               selectedOrderForPayment()!.total) { Saldo Pendiente (Total: ${{ selectedOrderForPayment()!.total }}) }
-              @else { Total a cobrar } </p>
+              @else { Total a cobrar (Edita si es solo un abono) } </p>
         </div>
 
         <div class="edit-section">
