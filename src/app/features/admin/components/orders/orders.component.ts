@@ -402,12 +402,14 @@ export class OrdersComponent implements OnInit {
               this.selectedOrderForPayment.set(null);
               this.pendingStatusChange.set(null);
               this.confirmingPayment.set(false);
+              this.loadOrders(); // ✅ Asegurar que la grilla carga los totales mas recientes
               this.loadOrderStats(); // ✅ Actualizar el Panel Superior (Por Cobrar)
             },
             error: () => {
               this.showToast('Pago registrado, pero falló al actualizar el estatus 😿', true);
               this.confirmingPayment.set(false);
               this.pendingStatusChange.set(null);
+              this.loadOrders(); // ✅ Asegurar
               this.loadOrderStats(); // ✅ Actualizar el Panel Superior aunque falle la entrega
             }
           });

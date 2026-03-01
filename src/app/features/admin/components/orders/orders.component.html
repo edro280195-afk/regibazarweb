@@ -317,7 +317,7 @@
         <input type="file" accept=".xlsx,.xls" (change)="onQuickUpload($event)" hidden>
       </label>
 
-      <select [(ngModel)]="statusFilter" (change)="applyFilter()" class="filter-select">
+      <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilter()" class="filter-select">
         <option value="">Todos</option>
         <option value="Pending">⏳ Pendientes</option>
         <option value="Confirmed">✅ Confirmado</option>
@@ -329,7 +329,7 @@
         <option value="Canceled">🚫 Cancelados</option>
       </select>
 
-      <select [(ngModel)]="clientTypeFilter" (change)="applyFilter()" class="filter-select">
+      <select [(ngModel)]="clientTypeFilter" (ngModelChange)="applyFilter()" class="filter-select">
         <option value="">👤 Tipo Clienta</option>
         <option value="Nueva">🌱 Nueva</option>
         <option value="Frecuente">💎 Frecuente</option>
@@ -337,8 +337,8 @@
 
       <div class="search-box">
         <span class="search-icon">🔍</span>
-        <input type="text" [(ngModel)]="searchTerm" (input)="onSearchChange()" placeholder="Buscar cliente o #ID..."
-          class="search-input">
+        <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()"
+          placeholder="Buscar cliente o #ID..." class="search-input">
         @if (searchTerm) {
         <button class="search-clear" (click)="searchTerm = ''; applyFilter()">✕</button>
         }

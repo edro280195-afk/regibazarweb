@@ -173,11 +173,7 @@ export class ApiService {
     const fd = new FormData();
     fd.append('notes', notes || '');
     if (payments && payments.length > 0) {
-      payments.forEach((p, i) => {
-        fd.append(`payments[${i}].amount`, p.amount.toString());
-        fd.append(`payments[${i}].method`, p.method);
-        if (p.notes) fd.append(`payments[${i}].notes`, p.notes);
-      });
+      fd.append('paymentsJson', JSON.stringify(payments));
     }
     photos.forEach(p => fd.append('photos', p));
     return this.http.post(`${this.url}/driver/${driverToken}/deliver/${deliveryId}`, fd);
