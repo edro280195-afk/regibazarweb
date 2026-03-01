@@ -218,8 +218,8 @@ export class ApiService {
   // ═══════════════════════════════════════════
   addDriverExpense(driverToken: string, data: any): Observable<any> {
     const fd = new FormData();
-    fd.append('amount', data.amount);
-    fd.append('expenseType', data.expenseType);
+    fd.append('amount', data.amount?.toString() ?? '0');
+    fd.append('expenseType', data.type || data.expenseType || 'Otro');  // ✅
     fd.append('notes', data.notes || '');
     if (data.photo) {
       fd.append('photo', data.photo);
