@@ -1465,28 +1465,22 @@ export class UploadExcelComponent implements OnInit, OnDestroy {
 
     this.liveCreating.set(true);
     let createdCount = 0;
-    const createdOrders: OrderSummary[] = []; // Collect results
+    const createdOrders: OrderSummary[] = [];
+    const failedWarnings: string[] = [];
     this.liveCreateProgress.set(`Creando 0 de ${ordersToCreate.length}...`);
 
     const processNext = (i: number) => {
       if (i >= ordersToCreate.length) {
         this.liveCreating.set(false);
-        // We successfully created them.
-        // We should remove them from `liveCaptures`.
-        // The `ordersToCreate` are Grouped. We need to find which captured items belong to them.
-        // A `LiveOrder` (grouped) contains original items? No, it has mapped items.
-        // But we know the Client Name.
-        // So we should remove all captures for that client?
 
         const createdClients = new Set(ordersToCreate.map(o => o.clientName.toLowerCase().trim()));
-
         this.liveCaptures.update(prev => prev.filter(c => !createdClients.has(c.parsed.clientName.toLowerCase().trim())));
 
         this.result.set({
           ordersCreated: createdCount,
           clientsCreated: 0,
           orders: createdOrders,
-          warnings: []
+          warnings: failedWarnings
         });
 
         if (this.liveCaptures().length === 0) {
@@ -1502,9 +1496,9 @@ export class UploadExcelComponent implements OnInit, OnDestroy {
 
       this.api.createManualOrder({
         clientName: o.clientName,
-        clientType: this.getClientType(o.clientName) as 'Nueva' | 'Frecuente', // Use helper
+        clientType: this.getClientType(o.clientName) as 'Nueva' | 'Frecuente',
         orderType: o.orderType,
-        items: o.items // These match structure {productName, quantity, unitPrice}
+        items: o.items
       }).subscribe({
         next: (res) => {
           createdCount++;
@@ -1512,8 +1506,8 @@ export class UploadExcelComponent implements OnInit, OnDestroy {
           processNext(i + 1);
         },
         error: (err) => {
-          console.error('Error creating order', err);
-          // Optionally add to warnings?
+          const msg = err?.error?.message || err?.message || 'Error desconocido';
+          failedWarnings.push(`❌ ${o.clientName}: ${msg}`);
           processNext(i + 1);
         }
       });

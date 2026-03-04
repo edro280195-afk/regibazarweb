@@ -91,9 +91,11 @@ const GEOCODE_CONFIG = {
               <button class="action-chip wa" (click)="shareRouteWa(route)">
                 📱 <span>WhatsApp</span>
               </button>
-              <button *ngIf="route.status !== 'Completed'" class="action-chip corte" (click)="openCorteModal(route)">
+              @if (route.status !== 'Completed') {
+              <button class="action-chip corte" (click)="openCorteModal(route)">
                 💰 <span>Liquidar</span>
               </button>
+              }
               <button class="action-chip delete" (click)="askDelete(route)">
                 🗑️
               </button>

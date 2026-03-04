@@ -20,6 +20,158 @@
   --shadow-magic: 0 10px 30px rgba(236, 72, 153, 0.08);
 }
 
+/* ═══ ACTIVE PERIOD ROI ═══ */
+.active-period-roi {
+  margin-bottom: 1.5rem;
+}
+
+.roi-card {
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid var(--pink-soft);
+  position: relative;
+  overflow: hidden;
+
+  &.gold-border {
+    border: 2px solid #fbbf24;
+    box-shadow: 0 10px 25px rgba(251, 191, 36, 0.1);
+  }
+}
+
+.roi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+
+  .roi-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: #1e293b;
+    }
+  }
+
+  .roi-link {
+    font-size: 0.8rem;
+    color: var(--pink-main);
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.roi-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.roi-stat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 140px;
+
+  .label {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .value {
+    font-size: clamp(1.1rem, 3vw, 1.5rem);
+    font-weight: 900;
+  }
+}
+
+.roi-divider {
+  width: 1px;
+  height: 35px;
+  background: #e2e8f0;
+  display: block;
+}
+
+.roi-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.roi-progress-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.roi-label-mini {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.roi-progress-bar {
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ec4899, #be185d);
+    transition: width 1s ease-out;
+  }
+
+  &.collection-bar {
+    background: #f0fdf4;
+
+    .collection-fill {
+      background: linear-gradient(90deg, #10b981, #059669);
+    }
+  }
+}
+
+.roi-footer-grid {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.roi-footer {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0;
+
+  strong {
+    color: var(--pink-dark);
+  }
+}
+
+.text-success {
+  color: #16a34a !important;
+}
+
+.text-warning {
+  color: #d97706 !important;
+}
+
 .dashboard-wrapper {
   position: relative;
   min-height: 100vh;

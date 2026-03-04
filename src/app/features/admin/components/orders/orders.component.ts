@@ -1,17 +1,18 @@
-import { Component, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
 import { WhatsAppService } from '../../../../core/services/whatsapp.service';
-import { OrderSummary, OrderItem, ExcelUploadResult } from '../../../../shared/models/models';
+import { OrderSummary, OrderItem, ExcelUploadResult, SalesPeriod } from '../../../../shared/models/models';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
 import { GoogleAutocompleteDirective } from '../../../../shared/directives/google-autocomplete.directive';
 import { SignalRService } from '../../../../core/services/signalr.service';
 import { Subscription } from 'rxjs';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { OrderCardComponent } from './order-card/order-card.component';
+import { SearchService } from '../../../../core/services/search.service';
 
 @Component({
   selector: 'app-orders',
@@ -48,9 +49,18 @@ export class OrdersComponent implements OnInit {
   // Route Optimizer
   showOptimizer = signal(false);
 
+  // SalesPeriods for order edit
+  salesPeriods = signal<SalesPeriod[]>([]);
+
 
   // ── Modals ──
   orderToEdit = signal<OrderSummary | null>(null);
+
+  // ── Status Move Modal (Canceled / Postponed) ──
+  pendingMoveOrder = signal<OrderSummary | null>(null);
+  pendingMoveStatus = signal<string>('');
+  pendingMoveReason = '';
+  pendingMoveDate = '';
   editData = {
     status: '',
     orderType: '',
@@ -61,7 +71,8 @@ export class OrdersComponent implements OnInit {
     clientPhone: '',
     tags: [] as string[],
     deliveryTime: '',
-    pickupDate: ''
+    pickupDate: '',
+    salesPeriodId: null as number | null
   };
 
   /* WHATSAPP STYLES */
@@ -83,10 +94,39 @@ export class OrdersComponent implements OnInit {
   drawerOpen = signal(false);
   newItem = { productName: '', quantity: 1, unitPrice: 0 };
 
+  commonProducts = signal<any[]>([]);
+  filteredSuggestions = signal<any[]>([]);
+  showSuggestions = signal(false);
+
+  onProductNameChange(): void {
+    const term = this.newItem.productName.toLowerCase().trim();
+    if (term.length < 2) {
+      this.filteredSuggestions.set([]);
+      this.showSuggestions.set(false);
+      return;
+    }
+    const matches = this.commonProducts()
+      .filter(p => p.name.toLowerCase().includes(term))
+      .slice(0, 5);
+    this.filteredSuggestions.set(matches);
+    this.showSuggestions.set(matches.length > 0);
+  }
+
+  selectSuggestion(p: any): void {
+    this.newItem.productName = p.name;
+    this.newItem.unitPrice = p.typicalPrice;
+    this.showSuggestions.set(false);
+  }
+
+  onProductBlur(): void {
+    // delay to allow click on suggestion
+    setTimeout(() => this.showSuggestions.set(false), 200);
+  }
+
   // ── Filters & Pagination ──
   statusFilter = '';
   clientTypeFilter = '';
-  searchTerm = '';
+  searchTerm = this.searchService.searchTerm;
 
   currentPage = signal(1);
   pageSize = signal(24);
@@ -109,6 +149,7 @@ export class OrdersComponent implements OnInit {
   boardConfirmed = signal<OrderSummary[]>([]);
   boardInRoute = signal<OrderSummary[]>([]);
   boardDelivered = signal<OrderSummary[]>([]);
+  boardArchived = signal<OrderSummary[]>([]);
 
 
   private orderSub?: Subscription;
@@ -119,11 +160,20 @@ export class OrdersComponent implements OnInit {
     private confirm: ConfirmationService,
     private whatsapp: WhatsAppService,
     private router: Router,
-    private signalr: SignalRService
-  ) { }
+    private signalr: SignalRService,
+    private searchService: SearchService
+  ) {
+    // Effect to trigger search when global term changes
+    effect(() => {
+      this.searchTerm(); // Track dependency
+      this.applyFilter(true);
+    });
+  }
 
   ngOnInit(): void {
     this.loadOrders();
+    this.api.getSalesPeriods().subscribe(p => this.salesPeriods.set(p));
+    this.api.getCommonProducts().subscribe(p => this.commonProducts.set(p));
 
     // SignalR Notification
     this.orderSub = this.signalr.orderConfirmed$.subscribe(data => {
@@ -158,10 +208,14 @@ export class OrdersComponent implements OnInit {
     this.loading.set(true);
     this.loadOrderStats();
 
+    // En modo kanban cargamos más órdenes para mostrar todas las columnas sin truncar
+    const effectivePageSize = this.viewMode() === 'kanban' ? 500 : this.pageSize();
+    const effectivePage = this.viewMode() === 'kanban' ? 1 : this.currentPage();
+
     this.api.getOrdersPaginated(
-      this.currentPage(),
-      this.pageSize(),
-      this.searchTerm,
+      effectivePage,
+      effectivePageSize,
+      this.searchTerm(),
       this.statusFilter,
       this.clientTypeFilter
     ).subscribe({
@@ -190,6 +244,13 @@ export class OrdersComponent implements OnInit {
     this.searchTimeout = setTimeout(() => {
       this.applyFilter(true);
     }, 400); // 400ms debounce
+  }
+
+  setViewMode(mode: 'list' | 'kanban'): void {
+    if (this.viewMode() === mode) return;
+    this.viewMode.set(mode);
+    this.currentPage.set(1);
+    this.loadOrders();
   }
 
   applyFilter(resetPage = true): void {
@@ -275,7 +336,8 @@ export class OrdersComponent implements OnInit {
       clientPhone: order.clientPhone || '',
       tags: order.tags || [],
       deliveryTime: order.deliveryTime || '',
-      pickupDate: order.pickupDate || ''
+      pickupDate: order.pickupDate || '',
+      salesPeriodId: order.salesPeriodId ?? null
     };
     this.tempGeo = null; // Reset temp geo
   }
@@ -321,7 +383,8 @@ export class OrdersComponent implements OnInit {
       clientPhone: this.editData.clientPhone,
       tags: this.editData.tags,
       deliveryTime: this.editData.deliveryTime,
-      pickupDate: this.editData.pickupDate
+      pickupDate: this.editData.pickupDate,
+      salesPeriodId: this.editData.salesPeriodId
     };
 
     // Use updateOrder for top-level updates (status, type, client info)
@@ -733,13 +796,15 @@ export class OrdersComponent implements OnInit {
     this.boardConfirmed.set(list.filter(o => o.status === 'Confirmed' || o.status === 'Shipped'));
     this.boardInRoute.set(list.filter(o => o.status === 'InRoute'));
     this.boardDelivered.set(list.filter(o => o.status === 'Delivered'));
+    this.boardArchived.set(list.filter(o => o.status === 'Canceled' || o.status === 'Postponed' || o.status === 'NotDelivered'));
   }
 
   kanbanTabs = [
     { key: 'Pending', label: '⏳', title: 'Pendientes' },
     { key: 'Confirmed', label: '✅', title: 'Confirmados' },
     { key: 'InRoute', label: '🚗', title: 'En Ruta' },
-    { key: 'Delivered', label: '💝', title: 'Entregados' }
+    { key: 'Delivered', label: '💝', title: 'Entregados' },
+    { key: 'Archived', label: '📋', title: 'Archivados' }
   ];
 
   /** Quick-move from mobile card button */
@@ -749,6 +814,14 @@ export class OrdersComponent implements OnInit {
 
     if (isDelivered && balance > 0) {
       this.openConfirmPayment(order, 'Delivered');
+      return;
+    }
+
+    if (newStatus === 'Canceled' || newStatus === 'Postponed') {
+      this.pendingMoveOrder.set(order);
+      this.pendingMoveStatus.set(newStatus);
+      this.pendingMoveReason = '';
+      this.pendingMoveDate = '';
       return;
     }
 
@@ -782,6 +855,14 @@ export class OrdersComponent implements OnInit {
       return;
     }
 
+    if (event.previousContainer !== event.container && (newStatus === 'Canceled' || newStatus === 'Postponed')) {
+      this.pendingMoveOrder.set(orderToMove);
+      this.pendingMoveStatus.set(newStatus);
+      this.pendingMoveReason = '';
+      this.pendingMoveDate = '';
+      return;
+    }
+
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
@@ -812,5 +893,55 @@ export class OrdersComponent implements OnInit {
         }
       });
     }
+  }
+
+  // ═══════════════ STATUS MOVE MODAL ═══════════════
+  confirmStatusMove(): void {
+    const order = this.pendingMoveOrder();
+    const newStatus = this.pendingMoveStatus();
+    if (!order || !newStatus) return;
+
+    if (newStatus === 'Canceled' && !this.pendingMoveReason.trim()) {
+      this.showToast('El motivo de cancelación es obligatorio 😿', true);
+      return;
+    }
+    if (newStatus === 'Postponed' && !this.pendingMoveDate) {
+      this.showToast('Selecciona la fecha de reposición 😿', true);
+      return;
+    }
+
+    const oldStatus = order.status;
+    order.status = newStatus;
+    this.rebuildBoards(this.filteredOrders());
+
+    const payload: any = { status: newStatus, postponedNote: this.pendingMoveReason.trim() || null };
+    if (newStatus === 'Postponed' && this.pendingMoveDate) {
+      payload.postponedAt = new Date(this.pendingMoveDate).toISOString();
+    }
+
+    this.api.updateOrderStatus(order.id, payload).subscribe({
+      next: (updated) => {
+        Object.assign(order, updated);
+        this.showToast(`Movido a ${this.statusLabel(newStatus)} ✨`);
+        this.loadOrderStats();
+      },
+      error: () => {
+        order.status = oldStatus;
+        this.rebuildBoards(this.filteredOrders());
+        this.showToast('Error al mover 😿', true);
+      }
+    });
+
+    this.pendingMoveOrder.set(null);
+    this.pendingMoveStatus.set('');
+    this.pendingMoveReason = '';
+    this.pendingMoveDate = '';
+  }
+
+  cancelStatusMove(): void {
+    this.pendingMoveOrder.set(null);
+    this.pendingMoveStatus.set('');
+    this.pendingMoveReason = '';
+    this.pendingMoveDate = '';
   }
 }

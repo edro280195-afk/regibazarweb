@@ -26,6 +26,64 @@
     } @else {
     @if (data(); as d) {
 
+    <!-- ═══ SECCIÓN: ROI DEL CORTE ACTIVO ═══ -->
+    @if (d.activePeriod) {
+    <div class="active-period-roi fade-in">
+      <div class="roi-card glass-card gold-border">
+        <div class="roi-header">
+          <div class="roi-title">
+            <span class="sparkle">✨</span>
+            <h3>Corte Actual: <strong>{{ d.activePeriod.name }}</strong></h3>
+          </div>
+          <a routerLink="/admin/sales-periods" class="roi-link">Ver detalles →</a>
+        </div>
+
+        <div class="roi-stats">
+          <div class="roi-stat">
+            <span class="label">🛍️ Ventas Entregadas</span>
+            <span class="value text-success">${{ d.activePeriod.totalSales | number:'1.0-0' }}</span>
+          </div>
+          <div class="roi-divider"></div>
+          <div class="roi-stat">
+            <span class="label">💸 Inversión en Mercancía</span>
+            <span class="value text-warning">${{ d.activePeriod.totalInvested | number:'1.0-0' }}</span>
+          </div>
+          <div class="roi-divider"></div>
+          <div class="roi-stat">
+            <span class="label">💎 Ganancia Real</span>
+            <span class="value text-pink-600">${{ d.activePeriod.netProfit | number:'1.0-0' }}</span>
+          </div>
+        </div>
+
+        <div class="roi-bars-container">
+          <div class="roi-progress-group">
+            <div class="roi-label-mini">🚀 Retorno de Inversión (Vendido vs Invertido)</div>
+            <div class="roi-progress-bar">
+              <div class="progress-fill"
+                [style.width.%]="(d.activePeriod.totalSales / (d.activePeriod.totalInvested || 1) * 100) > 100 ? 100 : (d.activePeriod.totalSales / (d.activePeriod.totalInvested || 1) * 100)">
+              </div>
+            </div>
+          </div>
+          <div class="roi-progress-group">
+            <div class="roi-label-mini">💸 Termómetro de Cobros (Cobrado vs Vendido)</div>
+            <div class="roi-progress-bar collection-bar">
+              <div class="progress-fill collection-fill"
+                [style.width.%]="(d.totalRevenue / (d.activePeriod.totalSales || 1) * 100) > 100 ? 100 : (d.totalRevenue / (d.activePeriod.totalSales || 1) * 100)">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="roi-footer-grid">
+          <p class="roi-footer">Recuperación de inversión: <strong>{{ (d.activePeriod.totalSales /
+              (d.activePeriod.totalInvested || 1)) | percent }}</strong></p>
+          <p class="roi-footer text-right">Efectividad de cobro: <strong>{{ (d.totalRevenue / (d.activePeriod.totalSales
+              || 1)) | percent }}</strong></p>
+        </div>
+      </div>
+    </div>
+    }
+
     <div class="kpi-row fade-in delay-1">
       <div class="kpi-card glass-card">
         <div class="kpi-icon-wrap bg-pink">🌸</div>
@@ -85,12 +143,13 @@
         </div>
         <div class="flex-row-between mt-2">
           <div class="flex-col truncate-safe">
-            <span class="kpi-label">Clientas</span>
+            <span class="kpi-label">Clientas Totales</span>
             <span class="stat-number text-purple-700">{{ d.totalClients }}</span>
           </div>
           <div class="flex-col text-right truncate-safe">
-            <span class="kpi-label">Inversión (Histórica)</span>
-            <span class="stat-number text-lg text-pink-500">${{ d.totalInvestment | number:'1.0-0' }}</span>
+            <span class="kpi-label">Estatus del Ciclo</span>
+            <span class="stat-number text-lg text-pink-500">{{ d.activePeriod ? 'En Progreso 🚀' : 'Sin Corte 💤'
+              }}</span>
           </div>
         </div>
       </div>
@@ -99,26 +158,26 @@
         <div class="stat-header">
           <div class="title-group">
             <span class="emoji">💳</span>
-            <span class="trend">La Billetera Mágica</span>
+            <span class="trend">Billetera del Ciclo (Corte Activo)</span>
           </div>
         </div>
         <div class="payment-methods-row">
           <div class="pay-method">
-            <span class="kpi-label">💵 Efectivo</span>
+            <span class="kpi-label">💵 Efectivo En Mano</span>
             <span class="pay-amount text-pink-600">${{ d.totalCashAmount | number:'1.0-0' }}</span>
-            <span class="pay-count">({{ d.totalCashOrders }} uds)</span>
+            <span class="pay-count">({{ d.totalCashOrders }} cobranzas)</span>
           </div>
           <div class="pay-divider"></div>
           <div class="pay-method">
-            <span class="kpi-label">📱 Transf.</span>
+            <span class="kpi-label">📱 Transferencias</span>
             <span class="pay-amount text-purple-600">${{ d.totalTransferAmount | number:'1.0-0' }}</span>
-            <span class="pay-count">({{ d.totalTransferOrders }} uds)</span>
+            <span class="pay-count">({{ d.totalTransferOrders }} recibidas)</span>
           </div>
           <div class="pay-divider"></div>
           <div class="pay-method">
-            <span class="kpi-label">🏦 Depósito</span>
+            <span class="kpi-label">🏦 Depósitos</span>
             <span class="pay-amount text-blue-600">${{ d.totalDepositAmount | number:'1.0-0' }}</span>
-            <span class="pay-count">({{ d.totalDepositOrders }} uds)</span>
+            <span class="pay-count">({{ d.totalDepositOrders }} en cuenta)</span>
           </div>
         </div>
       </div>

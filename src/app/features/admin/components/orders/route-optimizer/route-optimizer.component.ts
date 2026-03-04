@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, ViewChild, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { GoogleMapsModule, GoogleMap } from '@angular/google-maps'; // <--- Importante
 import { OrderSummary } from '../../../../../shared/models/models';
@@ -46,6 +46,10 @@ interface GeocodedOrder extends OrderSummary {
 
             @if (!hasGoogleKey) {
               <div class="api-warning">⚠️ Sin API Key de Google</div>
+            }
+
+            @if (geocodedStopCount() > 25) {
+              <div class="api-warning">⚠️ Más de 25 paradas — Google solo trazará las primeras 27. Crea 2 rutas separadas.</div>
             }
 
             @if (geocodeWarnings().length > 0) {
@@ -208,6 +212,9 @@ export class RouteOptimizerComponent implements OnInit {
   showWarnings = signal(false);
   geocodedCount = signal(0);
   geocodeWarnings = signal<{ id: number; clientName: string; address: string; error: string }[]>([]);
+
+  // Computed for template to avoid parser issues
+  geocodedStopCount = computed(() => this.sortedOrders().filter(o => o._geocoded).length);
 
   distances: number[] = [];
   hasGoogleKey = !!GEOCODE_CONFIG.googleApiKey;
@@ -455,20 +462,26 @@ export class RouteOptimizerComponent implements OnInit {
 
     const directionsService = new google.maps.DirectionsService();
 
-    const origin = path[0]; // Tu base
-    const destination = path[path.length - 1]; // Última entrega
+    const origin = path[0];
+    const destination = path[path.length - 1];
 
-    // Todas las entregas de en medio
-    const waypoints = path.slice(1, -1).map(p => ({
+    // Google Directions API permite máximo 25 waypoints (27 paradas en total)
+    const MAX_WAYPOINTS = 25;
+    const allWaypoints = path.slice(1, -1);
+    const waypoints = allWaypoints.slice(0, MAX_WAYPOINTS).map(p => ({
       location: p,
       stopover: true
     }));
+
+    if (allWaypoints.length > MAX_WAYPOINTS) {
+      console.warn(`⚠️ Ruta con ${allWaypoints.length + 2} paradas supera el límite de Google (${MAX_WAYPOINTS + 2}). Solo se trazarán las primeras ${MAX_WAYPOINTS + 2}.`);
+    }
 
     directionsService.route({
       origin: origin,
       destination: destination,
       waypoints: waypoints,
-      travelMode: google.maps.TravelMode.DRIVING, // Manejando en auto/moto
+      travelMode: google.maps.TravelMode.DRIVING,
     }, (response, status) => {
       if (status === google.maps.DirectionsStatus.OK && response && response.routes[0]) {
         // Guardamos el resultado y Angular lo dibuja mágicamente en las calles

@@ -56,12 +56,22 @@ export class OrderCardComponent {
 
     /** Available statuses for the quick-move menu (excludes current) */
     get moveOptions(): { key: string; label: string }[] {
-        const all = [
-            { key: 'Pending', label: '⏳ Pendiente' },
-            { key: 'Confirmed', label: '✅ Confirmado' },
-            { key: 'InRoute', label: '🚗 En Ruta' },
-            { key: 'Delivered', label: '💝 Entregado' }
-        ];
+        const isArchived = ['Canceled', 'Postponed', 'NotDelivered'].includes(this.order.status);
+        const all = isArchived
+            ? [
+                { key: 'Pending', label: '⏳ Pendiente' },
+                { key: 'Confirmed', label: '✅ Confirmado' },
+                { key: 'InRoute', label: '🚗 En Ruta' },
+                { key: 'Delivered', label: '💝 Entregado' }
+              ]
+            : [
+                { key: 'Pending', label: '⏳ Pendiente' },
+                { key: 'Confirmed', label: '✅ Confirmado' },
+                { key: 'InRoute', label: '🚗 En Ruta' },
+                { key: 'Delivered', label: '💝 Entregado' },
+                { key: 'Postponed', label: '📅 Posponer' },
+                { key: 'Canceled', label: '❌ Cancelar' }
+              ];
         return all.filter(o => o.key !== this.order.status);
     }
 

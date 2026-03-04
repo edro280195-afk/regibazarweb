@@ -700,6 +700,133 @@ h3 {
   font-size: 1.1rem;
 }
 
+/* ═══════════════ STICKY ACTIONS BAR ═══════════════ */
+.sticky-actions-bar {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 3rem);
+  max-width: 800px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  padding: 1rem 1.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  animation: barSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes barSlideUp {
+  from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.bar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bar-right {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-delete-main {
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1.5px solid #fecaca;
+  padding: 10px 18px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #ffe4e6;
+    border-color: #fca5a5;
+    transform: scale(1.02);
+  }
+}
+
+.sticky-actions-bar .btn-action {
+  height: 48px;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+  &.save {
+    background: #ec4899;
+    /* Pink-500 */
+    color: white;
+    box-shadow: 0 8px 20px rgba(236, 72, 153, 0.25);
+
+    &:hover {
+      background: #db2777;
+      /* Pink-600 */
+      transform: translateY(-2px) scale(1.02);
+    }
+  }
+
+  &.cancel {
+    background: white;
+    border: 1px solid #eee;
+    color: #666;
+
+    &:hover {
+      background: #f9f9f9;
+      color: #333;
+    }
+  }
+}
+
+/* Redesign spacing in edit mode */
+.input-name {
+  margin-bottom: 12px;
+  border-style: solid !important;
+}
+
+@media (max-width: 600px) {
+  .sticky-actions-bar {
+    bottom: 1rem;
+    width: calc(100% - 1.5rem);
+    padding: 0.8rem;
+  }
+
+  .bar-content {
+    flex-direction: column-reverse;
+    /* Delete at bottom on mobile */
+    gap: 0.8rem;
+  }
+
+  .bar-right {
+    width: 100%;
+
+    .btn-action {
+      flex: 1;
+      min-width: auto;
+    }
+  }
+
+  .btn-delete-main {
+    width: 100%;
+    border: none;
+    background: none;
+    font-size: 0.85rem;
+    padding: 6px;
+  }
+}
+
 .loyalty-actions {
   display: flex;
   gap: 12px;

@@ -6,6 +6,7 @@ import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
 import { Client, OrderSummary } from '../../../../shared/models/models';
+import { SearchService } from '../../../../core/services/search.service';
 
 @Component({
   selector: 'app-clients',
@@ -20,10 +21,6 @@ import { Client, OrderSummary } from '../../../../shared/models/models';
         <div class="header-text">
           <h2>Clientas 👯‍♀️</h2>
           <p class="page-sub">Gestiona tu directorio y consiente a las VIP 🎀</p>
-        </div>
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" placeholder="Buscar por clienta...">
         </div>
       </div>
 
@@ -272,12 +269,13 @@ import { Client, OrderSummary } from '../../../../shared/models/models';
 })
 export class ClientsComponent implements OnInit {
   allClients = signal<Client[]>([]);
-  searchTerm = signal('');
+  searchTerm = this.searchService.searchTerm;
   toastMessage = signal('');
 
   constructor(
     private api: ApiService,
-    private confirm: ConfirmationService
+    private confirm: ConfirmationService,
+    private searchService: SearchService
   ) { }
 
   ngOnInit() {
@@ -395,9 +393,21 @@ export class ClientsComponent implements OnInit {
   }
 
   async deleteClient(client: Client) {
+    const orders = client.orderCount || client.ordersCount || 0;
+    if (orders > 0) {
+      await this.confirm.confirm({
+        title: 'No se puede eliminar',
+        message: `"${client.name}" tiene ${orders} pedido${orders > 1 ? 's' : ''} registrado${orders > 1 ? 's' : ''}. Elimina o reasigna sus pedidos primero.`,
+        confirmText: 'Entendido',
+        type: 'danger',
+        icon: '⚠️'
+      });
+      return;
+    }
+
     const confirmed = await this.confirm.confirm({
       title: '¿Eliminar clienta?',
-      message: `Se eliminará a "${client.name}" y todo su historial de pedidos.`,
+      message: `Se eliminará a "${client.name}" permanentemente.`,
       confirmText: 'Sí, eliminar',
       type: 'danger',
       icon: '🗑️'
@@ -409,7 +419,7 @@ export class ClientsComponent implements OnInit {
           this.allClients.update(clients => clients.filter(c => c.id !== client.id));
           this.showToast(`${client.name} eliminada 🗑️`);
         },
-        error: () => this.showToast('Error al eliminar 😓')
+        error: (err) => this.showToast(err?.error?.message || 'Error al eliminar 😓')
       });
     }
   }

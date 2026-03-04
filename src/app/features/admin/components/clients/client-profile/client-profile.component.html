@@ -37,10 +37,7 @@
       </div>
 
       <div class="header-actions">
-        @if (isEditing()) {
-        <button class="btn-action cancel" (click)="toggleEditClient()">Cancelar</button>
-        <button class="btn-action save" (click)="saveClientChanges()">Guardar</button>
-        } @else {
+        @if (!isEditing()) {
         <button class="btn-action edit" (click)="toggleEditClient()">✏️ Editar Perfil</button>
         }
       </div>
@@ -112,9 +109,6 @@
             <label>Dirección</label>
             <textarea appGoogleAutocomplete (onAddressChange)="handleAddressChange($event)"
               [(ngModel)]="editForm.address" placeholder="Ej. Calle 123..." class="input-field" rows="3"></textarea>
-          </div>
-          <div class="delete-section">
-            <button class="btn-delete" (click)="askDeleteClient()">💀 Eliminar Clienta</button>
           </div>
           } @else {
           <div class="info-row">
@@ -451,6 +445,19 @@
           [disabled]="!paymentForm.amount || paymentForm.amount <= 0">
           ✅ Registrar Pago
         </button>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- ═══════════════ STICKY EDIT ACTIONS BAR ═══════════════ -->
+  @if (isEditing()) {
+  <div class="sticky-actions-bar fade-in">
+    <div class="bar-content">
+      <button class="btn-delete-main" (click)="askDeleteClient()">💀 Eliminar Clienta</button>
+      <div class="bar-right">
+        <button class="btn-action cancel" (click)="toggleEditClient()">Cancelar</button>
+        <button class="btn-action save" (click)="saveClientChanges()">💾 Guardar Cambios</button>
       </div>
     </div>
   </div>

@@ -69,6 +69,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/components/glow-up/glow-up.component')
           .then(m => m.GlowUpComponent)
       },
+      {
+        path: 'sales-periods',
+        loadComponent: () => import('./features/admin/components/sales-periods/sales-periods.component')
+          .then(m => m.SalesPeriodsComponent)
+      },
 
     ]
   },

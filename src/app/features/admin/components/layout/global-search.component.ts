@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { ApiService } from '../../../../core/services/api.service';
+import { SearchService } from '../../../../core/services/search.service';
 import { OrderSummary, Client } from '../../../../shared/models/models';
 
 interface SearchResult {
@@ -198,7 +199,11 @@ export class GlobalSearchComponent implements OnInit {
   private search$ = new Subject<string>();
   private dataLoaded = false;
 
-  constructor(private api: ApiService, private router: Router) { }
+  constructor(
+    private api: ApiService,
+    private router: Router,
+    private searchService: SearchService
+  ) { }
 
   ngOnInit() {
     // Load data cache
@@ -215,11 +220,13 @@ export class GlobalSearchComponent implements OnInit {
   onSearchChange(term: string) {
     if (!term.trim()) {
       this.clearResults();
+      this.searchService.updateSearch('');
       return;
     }
     this.loading.set(true);
     this.showDropdown.set(true);
     this.search$.next(term.trim().toLowerCase());
+    this.searchService.updateSearch(term.trim());
   }
 
   onFocus() {
@@ -328,6 +335,7 @@ export class GlobalSearchComponent implements OnInit {
     this.clientResults.set([]);
     this.showDropdown.set(false);
     this.loading.set(false);
+    this.searchService.clear();
   }
 
   @HostListener('document:click', ['$event'])

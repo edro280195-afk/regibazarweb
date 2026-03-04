@@ -2,9 +2,8 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { NgxEchartsDirective } from 'ngx-echarts';
-import { forkJoin } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
-import { Dashboard, OrderSummary, Client } from '../../../../shared/models/models';
+import { Dashboard } from '../../../../shared/models/models';
 
 @Component({
   selector: 'app-dashboard',
@@ -42,19 +41,10 @@ export class DashboardComponent implements OnInit {
   loadData(): void {
     this.loading.set(true);
 
-    // 🚀 OPTIMIZACIÓN: Solo pedimos las órdenes completas y el dashboard.
-    // Lo ideal a futuro es que TODO esto venga calculado directo del getDashboard() en C#.
-    forkJoin({
-      dashboard: this.api.getDashboard(),
-      orders: this.api.getOrders(),
-      clients: this.api.getClients(),
-      stats: this.api.getOrderStats()
-    }).pipe(
-      // Optional: hide loading when logic starts if needed, but subscribe is fine
-    ).subscribe({
-      next: (res) => {
-        this.data.set(res.dashboard);
-        this.processMetricsAndCharts(res.orders, res.clients, res.stats);
+    this.api.getDashboard().subscribe({
+      next: (dashboard) => {
+        this.data.set(dashboard);
+        this.processMetricsAndCharts(dashboard);
         this.loading.set(false);
       },
       error: (err) => {
@@ -64,141 +54,72 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  processMetricsAndCharts(orders: OrderSummary[], clients: Client[], stats: { total: number, pending: number, pendingAmount: number, collectedToday: number }): void {
-    // ─── FECHAS (Corrección de Zona Horaria) ───
-    const now = new Date();
-
-    // Función para obtener la fecha local en formato YYYY-MM-DD para evitar fallos de Timezone
-    const getLocalYYYYMMDD = (d: Date) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    const todayStr = getLocalYYYYMMDD(now);
-
-    const dayOfWeek = now.getDay();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - dayOfWeek);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    let deliveredCount = 0;
-    let totalSales = 0; // Solo para avg ticket referencial si se desea, o usar dashboard.totalRevenue
-
-    // Obtenemos el Dashboard que se cargó antes de esta función
-    const d = this.data();
-
-    const salesByMonth = new Map<string, number>();
-
-    orders.forEach(o => {
-      if (o.status === 'Canceled') return;
-
-      const createdDate = new Date(o.createdAt);
-      if (isNaN(createdDate.getTime())) return;
-
-      // ─── VENTAS Y ENTREGAS (Para el gráfico) ───
-      if (o.status === 'Delivered') {
-        const deliveredDate = (o as any).deliveredAt ? new Date((o as any).deliveredAt) : createdDate;
-
-        if (!isNaN(deliveredDate.getTime())) {
-          // Datos para Gráfico de Ventas Mensuales (Se mantiene iterando orders por ahora)
-          const monthKey = `${deliveredDate.getFullYear()}-${String(deliveredDate.getMonth() + 1).padStart(2, '0')}`;
-          salesByMonth.set(monthKey, (salesByMonth.get(monthKey) || 0) + o.total);
-        }
-
-        deliveredCount++;
-        totalSales += o.total;
-      }
-    });
-
-    const activeOrders = orders.filter(o => o.status !== 'Canceled').length;
-    const avgTicket = deliveredCount > 0 ? totalSales / deliveredCount : 0;
-    const successRate = activeOrders > 0 ? Math.round((deliveredCount / activeOrders) * 100) : 0;
+  processMetricsAndCharts(dashboard: Dashboard): void {
+    const totalOrders = dashboard.totalOrders || 1;
+    const deliveredCount = dashboard.deliveredOrders || 0;
+    const successRate = Math.round((deliveredCount / totalOrders) * 100);
 
     this.metrics.set({
-      salesToday: d?.revenueToday || 0,
-      salesWeek: 0, // Ignorado
-      salesMonth: d?.revenueMonth || 0,
-      avgTicket,
-      pendingCollection: stats.pendingAmount,
+      salesToday: dashboard.revenueToday || 0,
+      salesWeek: 0,
+      salesMonth: dashboard.revenueMonth || 0,
+      avgTicket: deliveredCount > 0 ? (dashboard.totalRevenue / deliveredCount) : 0,
+      pendingCollection: dashboard.activePeriod
+        ? Math.max(0, dashboard.activePeriod.totalSales - dashboard.totalRevenue)
+        : 0,
       successRate
     });
 
-    // ─── ACTUALIZAR GRÁFICOS ───
-    this.updateSalesChart(salesByMonth);
-    this.updateClientsChart(clients);
-    this.updateDeliveryChart(orders);
+    this.updateSalesChart(dashboard.salesByMonth || []);
+    this.updateClientsChart(dashboard.clientsNueva || 0, dashboard.clientsFrecuente || 0);
+    this.updateDeliveryChart(dashboard.ordersDelivery || 0, dashboard.ordersPickUp || 0);
   }
 
-  private updateSalesChart(salesByMonth: Map<string, number>) {
-    // Ordenar los meses cronológicamente
-    const sortedMonths = Array.from(salesByMonth.keys()).sort();
-    const salesData = sortedMonths.map(m => salesByMonth.get(m) || 0);
-
-    const monthLabels = sortedMonths.map(m => {
-      const [y, month] = m.split('-');
-      const date = new Date(parseInt(y), parseInt(month) - 1, 1);
-      // Capitaliza la primera letra del mes
-      let label = date.toLocaleDateString('es-MX', { month: 'short' });
-      return label.charAt(0).toUpperCase() + label.slice(1);
-    });
-
+  private updateSalesChart(salesByMonth: { month: string; sales: number }[]) {
     this.salesVsInvOptions = {
       ...this.salesVsInvOptions,
-      xAxis: { ...this.salesVsInvOptions.xAxis, data: monthLabels },
-      series: [
-        { ...this.salesVsInvOptions.series[0], data: salesData }
-        // Se quitó la serie de Inversiones temporalmente para evitar la sobrecarga N+1
-      ]
+      xAxis: { ...this.salesVsInvOptions.xAxis, data: salesByMonth.map(s => s.month) },
+      series: [{ ...this.salesVsInvOptions.series[0], data: salesByMonth.map(s => s.sales) }]
     };
   }
 
-  private updateClientsChart(clients: Client[]) {
-    let countNueva = 0;
-    let countFrecuente = 0;
-
-    clients.forEach(c => {
-      const isFrecuente = (c as any).orderCount > 1 || c.type === 'Frecuente';
-      if (isFrecuente) countFrecuente++;
-      else countNueva++;
-    });
-
+  private updateClientsChart(nueva: number, frecuente: number) {
     this.clientTypeOptions = {
       ...this.clientTypeOptions,
       series: [{
         ...this.clientTypeOptions.series[0],
         data: [
-          { name: '🌱 Nueva', value: countNueva },
-          { name: '💎 Frecuente', value: countFrecuente }
+          { name: '🌱 Nueva', value: nueva },
+          { name: '💎 Frecuente', value: frecuente }
         ]
       }]
     };
   }
 
-  private updateDeliveryChart(orders: OrderSummary[]) {
-    const deliveryMethods = orders.reduce((acc, o) => {
-      if (o.status === 'Canceled') return acc;
-      const type = o.orderType === 'Delivery' ? 'Domicilio' : (o.orderType === 'PickUp' ? 'PickUp' : o.orderType);
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const methodData = Object.keys(deliveryMethods).map(key => ({
-      name: key,
-      value: deliveryMethods[key]
-    }));
-
+  private updateDeliveryChart(delivery: number, pickup: number) {
     this.deliveryMethodOptions = {
       ...this.deliveryMethodOptions,
-      series: [{ ...this.deliveryMethodOptions.series[0], data: methodData }]
+      series: [{
+        ...this.deliveryMethodOptions.series[0],
+        data: [
+          { name: '🛵 Domicilio', value: delivery },
+          { name: '🛍️ PickUp', value: pickup }
+        ]
+      }]
     };
   }
 
+  private cssVar(name: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
   initCharts(): void {
-    const colors = ['#FF85B3', '#5CDBD3', '#B37FEB', '#FFC069', '#FF9C6E'];
+    const primary = this.cssVar('--pink-500') || '#FF5C96';
+    const light = this.cssVar('--pink-300') || '#FFA6C9';
+    const muted = this.cssVar('--pink-200') || '#FFC5D9';
+    const success = this.cssVar('--color-success') || '#22c55e';
+    const warning = this.cssVar('--color-warning') || '#f59e0b';
+    const colors = [primary, light, muted, success, warning];
 
     this.salesVsInvOptions = {
       color: colors,
@@ -211,11 +132,11 @@ export class DashboardComponent implements OnInit {
         {
           name: 'Ventas', type: 'line', smooth: true,
           data: [],
-          itemStyle: { color: '#FF5C96' },
+          itemStyle: { color: primary },
           areaStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [{ offset: 0, color: 'rgba(255, 92, 150, 0.3)' }, { offset: 1, color: 'rgba(255, 255, 255, 0)' }]
+              colorStops: [{ offset: 0, color: primary + '4D' }, { offset: 1, color: primary + '00' }]
             }
           }
         }
@@ -223,14 +144,14 @@ export class DashboardComponent implements OnInit {
     };
 
     this.clientTypeOptions = {
-      color: ['#FF9DBF', '#D4C4D4'],
+      color: [primary, muted],
       tooltip: { trigger: 'item', confine: true },
       legend: { bottom: '0%' },
       series: [{ name: 'Tipo Clienta', type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'], data: [] }]
     };
 
     this.deliveryMethodOptions = {
-      color: ['#87E8DE', '#FF85C0'],
+      color: [success, primary],
       tooltip: { trigger: 'item', confine: true },
       legend: { bottom: '0%' },
       series: [{ name: 'Método', type: 'pie', radius: '55%', center: ['50%', '45%'], data: [] }]

@@ -105,6 +105,16 @@
         }
 
         <div class="edit-section">
+          <label class="field-label">✂️ Corte de Venta</label>
+          <select [(ngModel)]="editData.salesPeriodId" class="fancy-input">
+            <option [ngValue]="null">— Sin corte asignado —</option>
+            @for (p of salesPeriods(); track p.id) {
+            <option [ngValue]="p.id">{{ p.isActive ? '🟢 ' : '' }}{{ p.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="edit-section">
           <label class="field-label">📱 Notificaciones WhatsApp</label>
           <div class="whatsapp-actions">
             <button class="btn-wa" (click)="sendWaConfirmation()">✅ Confirmación</button>
@@ -132,6 +142,17 @@
         <button class="btn-close-modal" (click)="selectedOrderForPayment.set(null)">✕</button>
       </div>
       <div class="edit-modal-body" style="display: block;">
+
+        @if ((selectedOrderForPayment()!.payments?.length || 0) > 0) {
+        <div class="prev-payments-warning">
+          <span class="warn-icon">⚠️</span>
+          <div>
+            <strong>Ya tiene {{ selectedOrderForPayment()!.payments!.length }} pago(s) registrado(s)</strong>
+            <span>Total cobrado: ${{ selectedOrderForPayment()!.amountPaid | number:'1.2-2' }}</span>
+          </div>
+        </div>
+        }
+
         <div style="text-align: center; margin-bottom: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
             <span style="font-size: 1.5rem; font-weight: 800; color: var(--pink-600);">$</span>
@@ -168,6 +189,44 @@
   </div>
   }
 
+  <!-- ═══════════════ MODAL: CANCELAR / POSPONER ═══════════════ -->
+  @if (pendingMoveOrder()) {
+  <div class="modal-overlay" (click)="cancelStatusMove()">
+    <div class="modal-card" style="max-width: 400px;" (click)="$event.stopPropagation()">
+      <div class="edit-modal-header">
+        <h3>{{ pendingMoveStatus() === 'Canceled' ? '❌ Cancelar pedido' : '📅 Posponer pedido' }}</h3>
+        <p class="client-title">{{ pendingMoveOrder()!.clientName }}</p>
+        <button class="btn-close-modal" (click)="cancelStatusMove()">✕</button>
+      </div>
+      <div class="edit-modal-body" style="display: block;">
+
+        @if (pendingMoveStatus() === 'Postponed') {
+        <div class="field-row">
+          <label class="mini-label">📅 Nueva fecha de entrega</label>
+          <input type="date" [(ngModel)]="pendingMoveDate" class="fancy-input">
+        </div>
+        }
+
+        <div class="field-row" [style.margin-top]="pendingMoveStatus() === 'Postponed' ? '1rem' : '0'">
+          <label class="mini-label">
+            {{ pendingMoveStatus() === 'Canceled' ? '❓ Motivo de cancelación *' : '📝 Nota (opcional)' }}
+          </label>
+          <textarea [(ngModel)]="pendingMoveReason" class="fancy-input" rows="3"
+            [placeholder]="pendingMoveStatus() === 'Canceled' ? 'Ej: Cliente no recogió, dirección incorrecta...' : 'Ej: Cliente pidió nueva fecha...'"
+            style="resize: none; line-height: 1.5; width: 100%;"></textarea>
+        </div>
+
+        <div class="edit-modal-footer" style="margin-top: 1.5rem; justify-content: center;">
+          <button class="btn-modal-cancel" (click)="cancelStatusMove()">Cancelar</button>
+          <button class="btn-modal-pink" (click)="confirmStatusMove()">
+            {{ pendingMoveStatus() === 'Canceled' ? '✅ Confirmar Cancelación' : '📅 Confirmar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
   <!-- ═══════════════ DRAWER: AGREGAR ARTÍCULO ═══════════════ -->
   @if (drawerOrder()) {
   <div class="drawer-overlay" (click)="closeDrawer()">
@@ -183,8 +242,25 @@
       <div class="drawer-body">
         <div class="drawer-field">
           <label>Producto</label>
-          <input type="text" [(ngModel)]="newItem.productName" placeholder="Ej. Edredón King rosa" class="drawer-input"
-            (keydown.enter)="focusField('qty')">
+          <div class="input-with-suggestions">
+            <input type="text" [(ngModel)]="newItem.productName" (ngModelChange)="onProductNameChange()"
+              placeholder="Ej. Edredón King rosa" class="drawer-input" (keydown.enter)="focusField('qty')"
+              (blur)="onProductBlur()">
+
+            @if (showSuggestions() && filteredSuggestions().length > 0) {
+            <div class="suggestions-list">
+              @for (p of filteredSuggestions(); track p.name) {
+              <div class="suggestion-item" (mousedown)="selectSuggestion(p)">
+                <div class="s-info">
+                  <span class="s-name">{{ p.name }}</span>
+                  <span class="s-count">{{ p.count }} ventas</span>
+                </div>
+                <span class="s-price">${{ p.typicalPrice | number:'1.0-0' }}</span>
+              </div>
+              }
+            </div>
+            }
+          </div>
         </div>
 
         <div class="drawer-row">
@@ -301,9 +377,9 @@
     </div>
     <div class="header-controls">
       <div class="view-toggles">
-        <button class="btn-toggle-view" [class.active]="viewMode() === 'list'" (click)="viewMode.set('list')"
+        <button class="btn-toggle-view" [class.active]="viewMode() === 'list'" (click)="setViewMode('list')"
           title="Vista Lista">📝</button>
-        <button class="btn-toggle-view" [class.active]="viewMode() === 'kanban'" (click)="viewMode.set('kanban')"
+        <button class="btn-toggle-view" [class.active]="viewMode() === 'kanban'" (click)="setViewMode('kanban')"
           title="Tablero Kanban">📌</button>
       </div>
       <button class="btn-toggle-select" [class.active]="selectionMode()" (click)="toggleSelectionMode()">
@@ -335,14 +411,6 @@
         <option value="Frecuente">💎 Frecuente</option>
       </select>
 
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()"
-          placeholder="Buscar cliente o #ID..." class="search-input">
-        @if (searchTerm) {
-        <button class="search-clear" (click)="searchTerm = ''; applyFilter()">✕</button>
-        }
-      </div>
     </div>
   </div>
 
@@ -440,8 +508,7 @@
       <div class="kanban-header">
         ⏳ Pendientes <span class="count-badge">{{ boardPending().length }}</span>
       </div>
-      <div class="kanban-list" id="listPending"
-        [cdkDropListConnectedTo]="['listConfirmed', 'listInRoute', 'listDelivered']" cdkDropList
+      <div class="kanban-list" id="listPending" [cdkDropListConnectedTo]="['listConfirmed']" cdkDropList
         [cdkDropListData]="boardPending()" (cdkDropListDropped)="onOrderDrop($event, 'Pending')">
         @for (order of boardPending(); track order.id) {
         <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
@@ -457,8 +524,7 @@
       <div class="kanban-header">
         ✅ Confirmados/Enviados <span class="count-badge">{{ boardConfirmed().length }}</span>
       </div>
-      <div class="kanban-list" id="listConfirmed"
-        [cdkDropListConnectedTo]="['listPending', 'listInRoute', 'listDelivered']" cdkDropList
+      <div class="kanban-list" id="listConfirmed" [cdkDropListConnectedTo]="['listPending', 'listInRoute']" cdkDropList
         [cdkDropListData]="boardConfirmed()" (cdkDropListDropped)="onOrderDrop($event, 'Confirmed')">
         @for (order of boardConfirmed(); track order.id) {
         <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
@@ -474,9 +540,8 @@
       <div class="kanban-header">
         🚗 En Ruta <span class="count-badge">{{ boardInRoute().length }}</span>
       </div>
-      <div class="kanban-list" id="listInRoute"
-        [cdkDropListConnectedTo]="['listPending', 'listConfirmed', 'listDelivered']" cdkDropList
-        [cdkDropListData]="boardInRoute()" (cdkDropListDropped)="onOrderDrop($event, 'InRoute')">
+      <div class="kanban-list" id="listInRoute" [cdkDropListConnectedTo]="['listConfirmed', 'listDelivered']"
+        cdkDropList [cdkDropListData]="boardInRoute()" (cdkDropListDropped)="onOrderDrop($event, 'InRoute')">
         @for (order of boardInRoute(); track order.id) {
         <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
           [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
@@ -491,14 +556,30 @@
       <div class="kanban-header">
         💝 Entregados <span class="count-badge">{{ boardDelivered().length }}</span>
       </div>
-      <div class="kanban-list" id="listDelivered"
-        [cdkDropListConnectedTo]="['listPending', 'listConfirmed', 'listInRoute']" cdkDropList
+      <div class="kanban-list" id="listDelivered" [cdkDropListConnectedTo]="['listInRoute']" cdkDropList
         [cdkDropListData]="boardDelivered()" (cdkDropListDropped)="onOrderDrop($event, 'Delivered')">
         @for (order of boardDelivered(); track order.id) {
         <app-order-card cdkDrag [order]="order" [viewMode]="'kanban'" [isSelected]="selectedIds().has(order.id)"
           [selectionMode]="selectionMode()" (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)"
           (toggleSelect)="toggleOrder($event)" (goToDetail)="goToOrder($event)"
           (moveToStatus)="quickMoveStatus($event.order, $event.newStatus)" />
+        }
+      </div>
+    </div>
+
+    <!-- Columna: ARCHIVADOS (Cancelados, Pospuestos, No entregados) -->
+    <div class="kanban-column archived-col" [class.mobile-hidden]="activeKanbanTab() !== 'Archived'">
+      <div class="kanban-header">
+        📋 Archivados <span class="count-badge">{{ boardArchived().length }}</span>
+      </div>
+      <div class="kanban-list archived-list">
+        @for (order of boardArchived(); track order.id) {
+        <app-order-card [order]="order" [viewMode]="'kanban'" [isSelected]="false" [selectionMode]="false"
+          (edit)="openEditModal($event)" (delete)="askDeleteOrder($event)" (goToDetail)="goToOrder($event)"
+          (moveToStatus)="quickMoveStatus($event.order, $event.newStatus)" />
+        }
+        @if (boardArchived().length === 0) {
+        <div class="kanban-empty">Todo limpio 🌟</div>
         }
       </div>
     </div>
@@ -533,7 +614,7 @@
   }
 
   <!-- ═══════════════ PAGINATION ═══════════════ -->
-  @if (totalPages() > 1 && !loading()) {
+  @if (totalPages() > 1 && !loading() && viewMode() === 'list') {
   <div class="pagination-controls">
     <button class="btn-page" (click)="changePage(-1)" [disabled]="currentPage() === 1">← Anterior</button>
     <div class="page-info">

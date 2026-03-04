@@ -111,8 +111,14 @@
         </div>
         <div class="card-buttons">
             @if (order.status !== 'Canceled') {
-            <button class="action-btn pay" (click)="$event.stopPropagation(); pay.emit(order)"
-                title="Confirmar Cobro">💰</button>
+            <button class="action-btn pay" [class.has-payment]="(order.amountPaid || 0) > 0"
+                (click)="$event.stopPropagation(); pay.emit(order)"
+                [title]="(order.amountPaid || 0) > 0 ? 'Ya tiene $' + order.amountPaid + ' cobrado — agregar abono' : 'Confirmar Cobro'">
+                💰
+                @if ((order.amountPaid || 0) > 0) {
+                <span class="pay-dot"></span>
+                }
+            </button>
             }
             <button class="action-btn link" (click)="$event.stopPropagation(); copyLink.emit(order.link)"
                 title="Copiar Link">📋</button>

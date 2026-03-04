@@ -21,34 +21,33 @@ export interface OrderSummary {
   id: number;
   clientId?: number;
   clientName: string;
-  clientType?: 'Nueva' | 'Frecuente'; // 'Nueva' | 'Frecuente'
+  clientType?: 'Nueva' | 'Frecuente';
   clientPhone?: string;
   clientAddress?: string;
-  orderType: string;      // 'Delivery' | 'PickUp'
-  deliveryTime?: string;  // [NEW] Hora de entrega estipulada (HH:mm)
-  pickupDate?: string;    // [NEW] Fecha específica para PickUp
-  postponedAt?: string;   // Fecha ISO
-  postponedNote?: string; // Motivo
+  orderType: string;
+  deliveryTime?: string;
+  pickupDate?: string;
+  postponedAt?: string;
+  postponedNote?: string;
   subtotal: number;
   shippingCost: number;
   advancePayment?: number;
   total: number;
-  status: string; // 'Pending', 'InRoute', 'Delivered', 'NotDelivered', 'Canceled', 'Postponed'
+  status: string;
   link: string;
   accessToken: string;
   expiresAt: string;
   items: OrderItem[];
-  createdAt: string; // ISO Date
-
-  // Payments (Libro de Transacciones)
+  createdAt: string;
   payments?: OrderPayment[];
   amountPaid?: number;
   balanceDue?: number;
   amountDue?: number;
-
-  // Tags
   tags?: string[];
-  paymentMethod?: string; // Legacy
+  paymentMethod?: string;
+  // SalesPeriod (Corte)
+  salesPeriodId?: number;
+  salesPeriodName?: string;
 }
 
 export interface OrderPayment {
@@ -178,6 +177,19 @@ export interface Dashboard {
   totalTransferAmount: number;
   totalDepositOrders: number;
   totalDepositAmount: number;
+  salesByMonth: { month: string; sales: number }[];
+  clientsNueva: number;
+  clientsFrecuente: number;
+  ordersDelivery: number;
+  ordersPickUp: number;
+  activePeriod?: {
+    id: number;
+    name: string;
+    totalSales: number;
+    totalInvested: number;
+    netProfit: number;
+    collectedAmount?: number;
+  } | null;
 }
 
 // ── Reports ──
@@ -258,7 +270,10 @@ export interface Investment {
   // Multi-currency
   currency: string; // 'MXN' | 'USD'
   exchangeRate: number;
-  totalInPesos?: number; // Calculated for UI
+  totalInPesos?: number;
+  // SalesPeriod
+  salesPeriodId?: number;
+  salesPeriodName?: string;
 }
 
 export interface DriverExpense {
@@ -320,6 +335,31 @@ export interface AdjustPointsRequest {
   clientId: number;
   points: number; // Can be negative
   reason: string;
+}
+
+// ── SalesPeriods (Cortes de Venta) ──
+export interface SalesPeriod {
+  id: number;
+  name: string;
+  startDate: string; // ISO
+  endDate: string;   // ISO
+  isActive: boolean;
+  createdAt: string; // ISO
+}
+
+export interface PeriodInvestmentBySupplier {
+  supplierName: string;
+  totalInvested: number;
+  investmentCount: number;
+}
+
+export interface PeriodReport {
+  periodId: number;
+  periodName: string;
+  totalSales: number;
+  totalInvestments: number;
+  netProfit: number;
+  investmentsBySupplier: PeriodInvestmentBySupplier[];
 }
 
 

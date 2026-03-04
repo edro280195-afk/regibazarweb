@@ -27,47 +27,61 @@ import { GlobalSearchComponent } from './global-search.component';
         </div>
 
         <nav class="sidebar-nav">
-          <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">🏠</span> Inicio
-          </a>
-          <a routerLink="/admin/upload" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">📄</span> Cargar pedidos
-          </a>
-          <a routerLink="/admin/orders" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">🛒</span> Pedidos
-          </a>
-          <a routerLink="/admin/calendar" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">📅</span> Calendario
-          </a>
-          <a routerLink="/admin/routes" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">🚗</span> Rutas
-          </a>
-          <a routerLink="/admin/clients" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">💁‍♀️</span> Mis clientas
-          </a>
-          <a routerLink="/admin/suppliers" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">📦</span> Proveedores
-          </a>
-          <a routerLink="/admin/financials" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">📈</span> Finanzas
-          </a>
-          <a routerLink="/admin/reports" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">📊</span> Reportes
-          </a>
-          <a routerLink="/admin/glow-up" routerLinkActive="active"
-             (click)="sidebarOpen = false">
-            <span class="nav-icon">✨</span> Glow Up
-          </a>
+          <div class="nav-group">
+            <label class="group-label">Operaciones</label>
+            <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">🏠</span> Inicio
+            </a>
+            <a routerLink="/admin/upload" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">📄</span> Cargar pedidos
+            </a>
+            <a routerLink="/admin/orders" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">🛒</span> Pedidos
+            </a>
+            <a routerLink="/admin/calendar" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">📅</span> Calendario
+            </a>
+          </div>
 
+          <div class="nav-group">
+            <label class="group-label">Logística</label>
+            <a routerLink="/admin/routes" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">🚗</span> Rutas
+            </a>
+            <a routerLink="/admin/clients" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">💁‍♀️</span> Mis clientas
+            </a>
+          </div>
+
+          <div class="nav-group">
+            <label class="group-label">Negocio</label>
+            <a routerLink="/admin/sales-periods" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">✂️</span> Cortes de Venta
+            </a>
+            <a routerLink="/admin/financials" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">📈</span> Finanzas
+            </a>
+            <a routerLink="/admin/reports" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">📊</span> Reportes
+            </a>
+            <a routerLink="/admin/suppliers" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">📦</span> Proveedores
+            </a>
+            <a routerLink="/admin/glow-up" routerLinkActive="active"
+               (click)="sidebarOpen = false">
+              <span class="nav-icon">✨</span> Glow Up
+            </a>
+          </div>
         </nav>
 
         <div class="sidebar-footer">
@@ -167,6 +181,20 @@ import { GlobalSearchComponent } from './global-search.component';
     .sidebar-nav {
       flex: 1; padding: 0.75rem;
       display: flex; flex-direction: column; gap: 0.2rem;
+
+      .nav-group {
+        display: flex; flex-direction: column; gap: 0.1rem;
+        margin-bottom: 0.85rem;
+      }
+
+      .group-label {
+        display: block;
+        padding: 0.4rem 1rem;
+        font-size: 0.68rem; font-weight: 800;
+        color: var(--pink-400);
+        text-transform: uppercase; letter-spacing: 1.2px;
+        opacity: 0.8;
+      }
 
       a {
         display: flex; align-items: center; gap: 0.75rem;

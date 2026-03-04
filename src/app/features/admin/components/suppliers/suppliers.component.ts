@@ -1,9 +1,9 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/services/api.service';
 import { ConfirmationService } from '../../../../core/services/confirmation.service';
-import { Supplier, Investment } from '../../../../shared/models/models';
+import { Supplier, Investment, SalesPeriod } from '../../../../shared/models/models';
 
 @Component({
   selector: 'app-suppliers',
@@ -169,8 +169,18 @@ import { Supplier, Investment } from '../../../../shared/models/models';
                     </div>
                   </div>
                   <div class="field">
+                    <label>Nota</label>
                     <input type="text" [(ngModel)]="newInvestment.notes" placeholder="Nota (opcional)"
                            (keydown.enter)="addInvestment()">
+                  </div>
+                  <div class="field">
+                    <label>✂️ Corte de Venta</label>
+                    <select [(ngModel)]="newInvestment.salesPeriodId">
+                      <option [ngValue]="null">— Sin corte asignado —</option>
+                      @for (p of salesPeriods(); track p.id) {
+                        <option [ngValue]="p.id">{{ p.isActive ? '🟢 ' : '' }}{{ p.name }}</option>
+                      }
+                    </select>
                   </div>
                   <button class="btn-add-inv" (click)="addInvestment()"
                           [disabled]="!newInvestment.amount || newInvestment.amount <= 0 || (newInvestment.currency === 'USD' && !newInvestment.exchangeRate) || savingInvestment()">
@@ -533,7 +543,10 @@ export class SuppliersComponent implements OnInit {
 
   // ── Forms ──
   supplierForm = { name: '', contactName: '', phone: '', notes: '' };
-  newInvestment = { amount: 0, date: this.todayStr(), notes: '', currency: 'MXN', exchangeRate: 1 };
+  newInvestment = { amount: 0, date: this.todayStr(), notes: '', currency: 'MXN', exchangeRate: 1, salesPeriodId: null as number | null };
+
+  // SalesPeriods for Investment form
+  salesPeriods = signal<SalesPeriod[]>([]);
 
   // ── Computed ──
   totalInvested = computed(() =>
@@ -551,6 +564,18 @@ export class SuppliersComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSuppliers();
+    this.loadSalesPeriods();
+  }
+
+  loadSalesPeriods(): void {
+    this.api.getSalesPeriods().subscribe({
+      next: (periods) => {
+        this.salesPeriods.set(periods);
+        // Pre-seleccionar el periodo activo
+        const active = periods.find(p => p.isActive);
+        if (active) this.newInvestment.salesPeriodId = active.id;
+      }
+    });
   }
 
   // ═══════════════════════════════════════════
@@ -745,7 +770,8 @@ export class SuppliersComponent implements OnInit {
   // ═══════════════════════════════════════════
 
   private resetInvestmentForm(): void {
-    this.newInvestment = { amount: 0, date: this.todayStr(), notes: '', currency: 'MXN', exchangeRate: 1 };
+    const activePeriodId = this.salesPeriods().find(p => p.isActive)?.id ?? null;
+    this.newInvestment = { amount: 0, date: this.todayStr(), notes: '', currency: 'MXN', exchangeRate: 1, salesPeriodId: activePeriodId };
   }
 
   onCurrencyChange(): void {

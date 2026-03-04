@@ -355,8 +355,15 @@ export class DeliveryCalendarComponent implements OnInit {
   }
 
   loadOrders() {
-    this.api.getOrders().subscribe(data => {
-      this.orders.set(data);
+    const d = this.currentDate();
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    // Load one week before/after to cover delivery dates that may spill across months
+    const dateFrom = new Date(year, month - 1, 24).toISOString().split('T')[0];
+    const dateTo = new Date(year, month + 1, 7).toISOString().split('T')[0];
+
+    this.api.getOrdersPaginated(1, 300, '', '', '', dateFrom, dateTo).subscribe(res => {
+      this.orders.set(res.items);
     });
   }
 
@@ -364,6 +371,7 @@ export class DeliveryCalendarComponent implements OnInit {
     const current = this.currentDate();
     this.currentDate.set(new Date(current.getFullYear(), current.getMonth() + delta, 1));
     this.selectedDate.set(null);
+    this.loadOrders();
   }
 
   selectDate(date: Date) {

@@ -5,7 +5,8 @@ import { environment } from '../../../environments/environment';
 import {
   LoginRequest, LoginResponse, RegisterRequest,
   OrderSummary, ExcelUploadResult, ManualOrderRequest,
-  DeliveryRoute, ClientOrderView, Dashboard, Client
+  DeliveryRoute, ClientOrderView, Dashboard, Client,
+  SalesPeriod, PeriodReport
 } from '../../shared/models/models';
 
 @Injectable({ providedIn: 'root' })
@@ -36,11 +37,13 @@ export class ApiService {
     return this.http.get<OrderSummary>(`${this.url}/orders/${id}`);
   }
 
-  getOrdersPaginated(page: number, pageSize: number, search: string = '', status: string = '', clientType: string = ''): Observable<{ items: OrderSummary[], totalCount: number }> {
+  getOrdersPaginated(page: number, pageSize: number, search: string = '', status: string = '', clientType: string = '', dateFrom?: string, dateTo?: string): Observable<{ items: OrderSummary[], totalCount: number }> {
     let query = `${this.url}/orders/paged?page=${page}&pageSize=${pageSize}`;
     if (search) query += `&search=${encodeURIComponent(search)}`;
     if (status) query += `&status=${encodeURIComponent(status)}`;
     if (clientType) query += `&clientType=${encodeURIComponent(clientType)}`;
+    if (dateFrom) query += `&dateFrom=${encodeURIComponent(dateFrom)}`;
+    if (dateTo) query += `&dateTo=${encodeURIComponent(dateTo)}`;
     return this.http.get<{ items: OrderSummary[], totalCount: number }>(query);
   }
 
@@ -89,6 +92,10 @@ export class ApiService {
 
   deleteOrderItem(orderId: number, itemId: number): Observable<OrderSummary> {
     return this.http.delete<OrderSummary>(`${this.url}/orders/${orderId}/items/${itemId}`);
+  }
+
+  getCommonProducts(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.url}/orders/common-products`);
   }
 
   // ═══════════════════════════════════════════
@@ -339,6 +346,27 @@ export class ApiService {
   sendDriverClientMessage(driverToken: string, deliveryId: number, text: string): Observable<any> {
     return this.http.post<any>(`${this.url}/driver/${driverToken}/deliver/${deliveryId}/chat`, { text });
   }
+
+  // ═══════════════════════════════════════════
+  //  SALES PERIODS (CORTES)
+  // ═══════════════════════════════════════════
+  getSalesPeriods(): Observable<SalesPeriod[]> {
+    return this.http.get<SalesPeriod[]>(`${this.url}/salesperiods`);
+  }
+
+  createSalesPeriod(data: { name: string; startDate: string; endDate: string }): Observable<SalesPeriod> {
+    return this.http.post<SalesPeriod>(`${this.url}/salesperiods`, data);
+  }
+
+  activateSalesPeriod(id: number): Observable<SalesPeriod> {
+    return this.http.patch<SalesPeriod>(`${this.url}/salesperiods/${id}/activate`, {});
+  }
+
+  getPeriodReport(id: number): Observable<PeriodReport> {
+    return this.http.get<PeriodReport>(`${this.url}/reports/period/${id}`);
+  }
+
+  syncSalesPeriod(id: number, data: any): Observable<{ count: number }> {
+    return this.http.post<{ count: number }>(`${this.url}/salesperiods/${id}/sync`, data);
+  }
 }
-
-
