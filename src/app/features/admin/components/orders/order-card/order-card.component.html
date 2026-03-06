@@ -61,7 +61,7 @@
         </div>
         }
 
-        @if ((order.items?.length ?? 0) > 0) {
+        @if ((order.items.length ?? 0) > 0) {
         <div class="items-summary toggleable" (click)="$event.stopPropagation(); itemsExpanded = !itemsExpanded">
             <span>
                 {{ order.items!.length }} artículo{{ order.items!.length > 1 ? 's' : '' }}

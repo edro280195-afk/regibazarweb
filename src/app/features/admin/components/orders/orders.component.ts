@@ -173,7 +173,10 @@ export class OrdersComponent implements OnInit {
   ngOnInit(): void {
     this.loadOrders();
     this.api.getSalesPeriods().subscribe(p => this.salesPeriods.set(p));
-    this.api.getCommonProducts().subscribe(p => this.commonProducts.set(p));
+    this.api.getCommonProducts().subscribe({
+      next: p => this.commonProducts.set(p),
+      error: () => { } // Silenciar — es solo para autocompletado, no crítico
+    });
 
     // SignalR Notification
     this.orderSub = this.signalr.orderConfirmed$.subscribe(data => {

@@ -47,8 +47,8 @@ import { OrderItem, OrderSummary } from '../../models/models';
               </div>
               <div class="product-actions">
                 <span class="product-price">$ {{ item.lineTotal | number:'1.2-2' }}</span>
-                <button class="btn-icon-mini" (click)="startItemEdit(item)" title="Editar">✏️</button>
-                <button class="btn-icon-mini danger" (click)="askDeleteItem(item)" title="Eliminar">🗑️</button>
+                <button class="btn-icon-mini" (click)="$event.stopPropagation(); startItemEdit(item)" title="Editar">✏️</button>
+                <button class="btn-icon-mini danger" (click)="$event.stopPropagation(); askDeleteItem(item)" title="Eliminar">🗑️</button>
               </div>
             }
           </div>
