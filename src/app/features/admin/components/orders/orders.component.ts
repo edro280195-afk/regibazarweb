@@ -166,10 +166,8 @@ export class OrdersComponent implements OnInit {
     // Effect to trigger search when global term changes
     effect(() => {
       this.searchTerm(); // Track dependency
-      untracked(() => {
-        this.applyFilter(true);
-      });
-    });
+      this.applyFilter(true);
+    }, { allowSignalWrites: true });
   }
 
   ngOnInit(): void {
