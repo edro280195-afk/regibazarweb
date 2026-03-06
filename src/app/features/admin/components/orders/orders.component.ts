@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
+import { Component, OnInit, signal, computed, ElementRef, ViewChild, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -166,7 +166,9 @@ export class OrdersComponent implements OnInit {
     // Effect to trigger search when global term changes
     effect(() => {
       this.searchTerm(); // Track dependency
-      this.applyFilter(true);
+      untracked(() => {
+        this.applyFilter(true);
+      });
     });
   }
 

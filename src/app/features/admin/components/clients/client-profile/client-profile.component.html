@@ -374,7 +374,7 @@
           </div>
           <div class="order-center">
             <span class="status-pill" [attr.data-status]="order.status">{{ statusLabel(order.status) }}</span>
-            <span class="items-count">{{ (order.items?.length ?? 0) }} artículos</span>
+            <span class="items-count">{{ (order.items.length ?? 0) }} artículos</span>
           </div>
           <div class="order-right">
             <span class="order-total">$ {{ order.total | number:'1.0-0' }}</span>

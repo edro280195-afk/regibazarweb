@@ -14,7 +14,6 @@ import { OrderItemsManagerComponent } from '../../../../../shared/components/ord
   selector: 'app-client-profile',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule, GoogleAutocompleteDirective, OrderItemsManagerComponent],
-  providers: [ConfirmationService],
   templateUrl: './client-profile.component.html',
   styleUrl: './client-profile.component.scss'
 })
