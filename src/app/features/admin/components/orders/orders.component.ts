@@ -226,10 +226,15 @@ export class OrdersComponent implements OnInit {
           list = list.filter(o => o.tags?.includes(this.filterTag()));
         }
 
+        // Bug 4 fix: Client-side clientType filter fallback
+        if (this.clientTypeFilter) {
+          list = list.filter(o => o.clientType === this.clientTypeFilter);
+        }
+
         this.orders.set(list);
         this.filteredOrders.set(list);
         this.rebuildBoards(list);
-        this.totalOrdersCount.set(res.totalCount);
+        this.totalOrdersCount.set(this.clientTypeFilter ? list.length : res.totalCount);
         this.loading.set(false);
       },
       error: () => {
@@ -592,12 +597,20 @@ export class OrdersComponent implements OnInit {
     if (confirmed) {
       this.api.deleteOrderItem(order.id, item.id).subscribe({
         next: (updated) => {
-          const current = this.orders();
-          const idx = current.findIndex(o => o.id === order.id);
-          if (idx !== -1) {
-            current[idx] = updated;
-            this.orders.set([...current]);
-            this.applyFilter();
+          // Bug 2 fix: Properly update signal with new reference
+          this.orders.update(current => {
+            const idx = current.findIndex(o => o.id === order.id);
+            if (idx !== -1) {
+              const copy = [...current];
+              copy[idx] = updated;
+              return copy;
+            }
+            return current;
+          });
+          this.applyFilter();
+          // Also update drawer if open
+          if (this.drawerOrder()?.id === order.id) {
+            this.drawerOrder.set(updated);
           }
           this.showToast('Artículo eliminado ✨');
         },
@@ -740,22 +753,25 @@ export class OrdersComponent implements OnInit {
     const order = this.orders().find(o => o.id === id);
     if (!order) return;
 
+    // Bug 5 fix: Pass returnTo=orders so client profile knows where to go back
+    const queryParams: any = { orderId: order.id, returnTo: 'orders' };
+
     if (order.clientId) {
-      this.router.navigate(['/admin/clients', order.clientId], { queryParams: { orderId: order.id } });
+      this.router.navigate(['/admin/clients', order.clientId], { queryParams });
     } else {
       // Find client by name fallback
       this.api.getClients().subscribe({
         next: (clients) => {
           const match = clients.find(c => c.name.trim().toLowerCase() === order.clientName.trim().toLowerCase());
           if (match) {
-            this.router.navigate(['/admin/clients', match.id], { queryParams: { orderId: order.id } });
+            this.router.navigate(['/admin/clients', match.id], { queryParams });
           } else {
             // Orphan Order profile fallback
-            this.router.navigate(['/admin/clients', 0], { queryParams: { orderId: order.id } });
+            this.router.navigate(['/admin/clients', 0], { queryParams });
           }
         },
         error: () => {
-          this.router.navigate(['/admin/clients', 0], { queryParams: { orderId: order.id } });
+          this.router.navigate(['/admin/clients', 0], { queryParams });
         }
       });
     }

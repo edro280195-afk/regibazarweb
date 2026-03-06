@@ -1,8 +1,8 @@
-import { Component, OnInit, signal, computed, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
-import { combineLatest } from 'rxjs';
+import { combineLatest, Subscription } from 'rxjs';
 import { ApiService } from '../../../../../core/services/api.service';
 import { WhatsAppService } from '../../../../../core/services/whatsapp.service';
 import { ConfirmationService } from '../../../../../core/services/confirmation.service';
@@ -18,7 +18,7 @@ import { OrderItemsManagerComponent } from '../../../../../shared/components/ord
   templateUrl: './client-profile.component.html',
   styleUrl: './client-profile.component.scss'
 })
-export class ClientProfileComponent implements OnInit {
+export class ClientProfileComponent implements OnInit, OnDestroy {
   Math = Math;
 
   // States
@@ -41,6 +41,12 @@ export class ClientProfileComponent implements OnInit {
   orders = signal<OrderSummary[]>([]);
   selectedOrderId = signal<number | null>(null);
   savingOrder = signal(false);
+
+  // Navigation context
+  returnUrl = signal('/admin/clients');
+  returnLabel = signal('Regresar a Clientas');
+
+  private routeSub?: Subscription;
 
   // Active Order context
   activeOrder = computed(() => {
@@ -92,9 +98,27 @@ export class ClientProfileComponent implements OnInit {
   ) { }
 
   ngOnInit() {
-    combineLatest([this.route.params, this.route.queryParams]).subscribe(([params, q]) => {
+    this.routeSub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([params, q]) => {
       const clientId = +params['id'];
       const orderId = q['orderId'] ? +q['orderId'] : null;
+
+      // ── Bug 3 fix: Reset ALL state before loading new client ──
+      this.client.set(null);
+      this.orders.set([]);
+      this.loyalty.set(null);
+      this.loyaltyHistory.set([]);
+      this.selectedOrderId.set(null);
+      this.isEditing.set(false);
+      this.activeTab.set('resume');
+
+      // ── Bug 5 fix: Context-aware navigation ──
+      if (q['returnTo'] === 'orders') {
+        this.returnUrl.set('/admin/orders');
+        this.returnLabel.set('Regresar a Pedidos');
+      } else {
+        this.returnUrl.set('/admin/clients');
+        this.returnLabel.set('Regresar a Clientas');
+      }
 
       if (orderId) {
         this.selectedOrderId.set(orderId);
@@ -109,6 +133,10 @@ export class ClientProfileComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  ngOnDestroy() {
+    this.routeSub?.unsubscribe();
   }
 
   loadData(clientId: number, forceOrderId: number | null) {

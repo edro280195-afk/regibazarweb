@@ -20,7 +20,7 @@
             <span class="order-type-tag" [class.pickup]="order.orderType === 'PickUp'">
                 {{ order.orderType === 'PickUp' ? '🛍️ LOCAL' : '🛵 ENVÍO' }}
             </span>
-            @for (tag of order.tags; track tag) {
+            @for (tag of (order.tags ?? []); track tag) {
             <span class="tag-pill">{{ tag }}</span>
             }
         </div>
@@ -61,10 +61,10 @@
         </div>
         }
 
-        @if (order.items.length > 0) {
+        @if ((order.items?.length ?? 0) > 0) {
         <div class="items-summary toggleable" (click)="$event.stopPropagation(); itemsExpanded = !itemsExpanded">
             <span>
-                {{ order.items.length }} artículo{{ order.items.length > 1 ? 's' : '' }}
+                {{ order.items!.length }} artículo{{ order.items!.length > 1 ? 's' : '' }}
                 <span class="chevron" [class.rotated]="itemsExpanded">▼</span>
             </span>
             @if (viewMode === 'list' && itemsExpanded) {

@@ -1,7 +1,7 @@
 <div class="profile-page fade-in">
   <!-- ═══════════════ HEADER ═══════════════ -->
   <div class="page-header glass-header">
-    <button class="btn-back" routerLink="/admin/clients">← Regresar a Clientas</button>
+    <button class="btn-back" [routerLink]="returnUrl()">← {{ returnLabel() }}</button>
     <div class="header-content">
       <div class="avatar-large">
         {{ client()?.name?.charAt(0) }}
@@ -374,7 +374,7 @@
           </div>
           <div class="order-center">
             <span class="status-pill" [attr.data-status]="order.status">{{ statusLabel(order.status) }}</span>
-            <span class="items-count">{{ order.items.length }} artículos</span>
+            <span class="items-count">{{ (order.items?.length ?? 0) }} artículos</span>
           </div>
           <div class="order-right">
             <span class="order-total">$ {{ order.total | number:'1.0-0' }}</span>
