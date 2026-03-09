@@ -5,9 +5,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
-    selector: 'app-login',
-    imports: [FormsModule],
-    template: `
+  selector: 'app-login',
+  imports: [FormsModule],
+  template: `
     <div class="min-h-screen flex items-center justify-center relative overflow-hidden">
       <!-- Animated Background -->
       <div class="absolute inset-0 bg-gradient-to-br from-pink-100 via-rose-50 to-purple-100">
@@ -28,8 +28,8 @@ import { ToastService } from '../../../core/services/toast.service';
         <div class="glass-strong rounded-3xl p-8 shadow-2xl" style="box-shadow: 0 25px 60px rgba(236, 72, 153, 0.15)">
           <!-- Logo & Title -->
           <div class="text-center mb-8 animate-slide-down">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full gradient-pink mb-4 shadow-lg animate-pulse-pink">
-              <span class="text-3xl">🛍️</span>
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white mb-4 shadow-lg animate-pulse-pink overflow-hidden border-2 border-pink-200">
+              <img src="pwa-icon.png" alt="Regi Bazar Logo" class="w-full h-full object-cover">
             </div>
             <h1 class="text-3xl font-bold gradient-text font-[var(--font-script)]" style="font-family: 'Dancing Script', cursive; font-size: 2.5rem;">
               Regi Bazar
@@ -102,35 +102,35 @@ import { ToastService } from '../../../core/services/toast.service';
   `
 })
 export class LoginComponent {
-    private auth = inject(AuthService);
-    private router = inject(Router);
-    private toast = inject(ToastService);
+  private auth = inject(AuthService);
+  private router = inject(Router);
+  private toast = inject(ToastService);
 
-    email = '';
-    password = '';
-    loading = signal(false);
-    errorMsg = signal('');
-    showPassword = signal(false);
+  email = '';
+  password = '';
+  loading = signal(false);
+  errorMsg = signal('');
+  showPassword = signal(false);
 
-    onLogin(): void {
-        if (!this.email || !this.password) {
-            this.errorMsg.set('Por favor llena todos los campos 🌸');
-            return;
-        }
-
-        this.loading.set(true);
-        this.errorMsg.set('');
-
-        this.auth.login({ email: this.email, password: this.password }).subscribe({
-            next: (res) => {
-                this.auth.handleLoginSuccess(res);
-                this.toast.success('¡Bienvenida, ' + res.name + '! 💖');
-                this.router.navigate(['/admin']);
-            },
-            error: (err) => {
-                this.loading.set(false);
-                this.errorMsg.set(err.error?.message || err.error || 'Correo o contraseña incorrectos');
-            }
-        });
+  onLogin(): void {
+    if (!this.email || !this.password) {
+      this.errorMsg.set('Por favor llena todos los campos 🌸');
+      return;
     }
+
+    this.loading.set(true);
+    this.errorMsg.set('');
+
+    this.auth.login({ email: this.email, password: this.password }).subscribe({
+      next: (res) => {
+        this.auth.handleLoginSuccess(res);
+        this.toast.success('¡Bienvenida, ' + res.name + '! 💖');
+        this.router.navigate(['/admin']);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.errorMsg.set(err.error?.message || err.error || 'Correo o contraseña incorrectos');
+      }
+    });
+  }
 }

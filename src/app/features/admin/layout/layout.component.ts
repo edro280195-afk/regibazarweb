@@ -25,8 +25,8 @@ interface NavItem {
 
         <!-- Brand -->
         <div class="sidebar-brand">
-          <div class="brand-logo">
-            <span class="logo-emoji">💖</span>
+          <div class="brand-logo overflow-hidden border border-pink-200/50">
+            <img src="pwa-icon.png" alt="Logo" class="w-full h-full object-cover">
           </div>
           @if (sidebarOpen()) {
             <div class="brand-text">
