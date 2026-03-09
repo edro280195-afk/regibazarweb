@@ -288,7 +288,7 @@ import gsap from 'gsap';
                           }">{{ step.label }}</span>
                     
                     @if (step.date) {
-                      <span class="block text-xs font-mono text-pink-500/70">{{ step.date | date:'shortTime' }}</span>
+                      <span class="block text-xs font-mono text-pink-500/70">{{ step.date | date:'MMM d, h:mm a' }}</span>
                     } @else {
                       <span class="block text-xs font-mono text-gray-400 italic">Pendiente</span>
                     }
@@ -495,7 +495,7 @@ import gsap from 'gsap';
                                 (click)="copyText('4152314496671333')">COPIAR</button>
                       </div>
                     </div>
-                    <p class="text-[10px] text-red-700/80 text-center font-medium relative z-10">A nombre de: Regi Bazar<br>Envía foto del ticket a tu vendedora ✨</p>
+                    <p class="text-[10px] text-red-700/80 text-center font-medium relative z-10">Envía foto del ticket a tu vendedora ✨</p>
                   </div>
                 }
               }
