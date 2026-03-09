@@ -13,7 +13,7 @@ import { ToastService } from '../../../core/services/toast.service';
           style="animation: toastSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards"
           (click)="toastService.dismiss(toast.id)">
           <span class="text-2xl animate-bounce-in">{{ toast.emoji }}</span>
-          <p class="text-sm font-medium flex-1 pt-0.5">{{ toast.message }}</p>
+          <p class="text-sm font-medium flex-1 pt-0.5" (click)="toast.message.includes('actualizar') ? reload() : null">{{ toast.message }}</p>
           <button class="text-current opacity-50 hover:opacity-100 transition-opacity text-lg leading-none"
                   (click)="toastService.dismiss(toast.id); $event.stopPropagation()">×</button>
         </div>
@@ -32,5 +32,9 @@ export class ToastComponent {
       warning: 'bg-gradient-to-r from-pink-50 to-amber-50 border-amber-200 text-amber-800'
     };
     return classes[type] || classes['info'];
+  }
+
+  reload(): void {
+    window.location.reload();
   }
 }

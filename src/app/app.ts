@@ -1,6 +1,8 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ToastComponent } from './shared/components/toast/toast.component';
+
+import { PwaUpdateService } from './core/services/pwa-update.service';
 
 @Component({
   selector: 'app-root',
@@ -17,6 +19,7 @@ import { ToastComponent } from './shared/components/toast/toast.component';
   `]
 })
 export class App {
+  private pwaUpdate = inject(PwaUpdateService);
   private emojis = ['💖', '🌸', '✨', '💕', '🎀'];
 
   @HostListener('document:click', ['$event'])
