@@ -464,15 +464,15 @@ import gsap from 'gsap';
                     
                     <div class="bg-white/60 rounded-xl p-3 border border-blue-200/50 mb-3 relative z-10">
                       <div class="flex justify-between items-center mb-2">
-                        <span class="text-xs text-blue-700/70 font-medium">CLABE Interbancaria:</span>
+                        <span class="text-xs text-blue-700/70 font-medium">Número de Tarjeta:</span>
                       </div>
                       <div class="flex justify-between items-center">
-                        <span class="font-mono font-bold text-blue-900 tracking-wider text-sm">002 813 000 000 000 000</span>
+                        <span class="font-mono font-bold text-blue-900 tracking-wider text-sm">5256 7861 3758 3898</span>
                         <button class="bg-blue-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-600 active:scale-95 transition-all"
-                                (click)="copyText('002813000000000000')">COPIAR</button>
+                                (click)="copyText('5256786137583898')">COPIAR</button>
                       </div>
                     </div>
-                    <p class="text-[10px] text-blue-700/80 text-center font-medium relative z-10">A nombre de: Regi Bazar Automotriz S.A.<br>Envía tu comprobante a tu vendedora ✨</p>
+                    <p class="text-[10px] text-blue-700/80 text-center font-medium relative z-10">A nombre de: Yazmin Vara<br>Envía tu comprobante a tu vendedora ✨</p>
                   </div>
                 }
                 @case ('oxxo') {
@@ -490,9 +490,9 @@ import gsap from 'gsap';
                         <span class="text-xs text-red-700/70 font-medium">Número de Tarjeta:</span>
                       </div>
                       <div class="flex justify-between items-center">
-                        <span class="font-mono font-bold text-red-900 tracking-wider text-sm">4152 3133 0000 0000</span>
+                        <span class="font-mono font-bold text-red-900 tracking-wider text-sm">4152 3144 9667 1333</span>
                         <button class="bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-red-600 active:scale-95 transition-all"
-                                (click)="copyText('4152313300000000')">COPIAR</button>
+                                (click)="copyText('4152314496671333')">COPIAR</button>
                       </div>
                     </div>
                     <p class="text-[10px] text-red-700/80 text-center font-medium relative z-10">A nombre de: Regi Bazar<br>Envía foto del ticket a tu vendedora ✨</p>
