@@ -43,7 +43,8 @@ interface NavItem {
                routerLinkActive="nav-active"
                [routerLinkActiveOptions]="{ exact: item.route === '/admin' }"
                class="nav-link"
-               [class.nav-collapsed]="!sidebarOpen()">
+               [class.nav-collapsed]="!sidebarOpen()"
+               (click)="onNavClick()">
               <span class="nav-icon">{{ item.icon }}</span>
               @if (sidebarOpen()) {
                 <span class="nav-label">{{ item.label }}</span>
@@ -543,6 +544,12 @@ export class LayoutComponent {
   userInitial(): string {
     const name = this.auth.userName();
     return name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  onNavClick(): void {
+    if (this.isMobile()) {
+      this.sidebarOpen.set(false);
+    }
   }
 
   logout(): void {
