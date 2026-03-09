@@ -1,13 +1,17 @@
-import { Directive, ElementRef, EventEmitter, Output, OnInit, NgZone } from '@angular/core';
+import { Directive, ElementRef, EventEmitter, OnInit, Output, OnDestroy } from '@angular/core';
+
+declare var google: any;
 
 @Directive({
     selector: '[appGoogleAutocomplete]',
     standalone: true
 })
-export class GoogleAutocompleteDirective implements OnInit {
-    @Output() onAddressChange = new EventEmitter<any>();
+export class GoogleAutocompleteDirective implements OnInit, OnDestroy {
+    @Output() placeChanged = new EventEmitter<string>();
+    private autocomplete: any;
+    private listener: any;
 
-    constructor(private el: ElementRef, private ngZone: NgZone) { }
+    constructor(private el: ElementRef) { }
 
     ngOnInit() {
         if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
@@ -15,27 +19,29 @@ export class GoogleAutocompleteDirective implements OnInit {
             return;
         }
 
-        const autocomplete = new google.maps.places.Autocomplete(this.el.nativeElement, {
-            componentRestrictions: { country: 'mx' },
-            fields: ['address_components', 'geometry', 'formatted_address']
+        this.autocomplete = new google.maps.places.Autocomplete(this.el.nativeElement, {
+            types: ['address'],
+            componentRestrictions: { country: 'mx' } // Restrict to Mexico since it's Regi Bazar
         });
 
-        autocomplete.addListener('place_changed', () => {
-            this.ngZone.run(() => {
-                const place = autocomplete.getPlace();
-                if (!place.geometry || !place.geometry.location) {
-                    return;
-                }
-
-                const result = {
-                    address: place.formatted_address,
-                    lat: place.geometry.location.lat(),
-                    lng: place.geometry.location.lng(),
-                    components: place.address_components
-                };
-
-                this.onAddressChange.emit(result);
-            });
+        this.listener = this.autocomplete.addListener('place_changed', () => {
+            const place = this.autocomplete.getPlace();
+            if (place && place.formatted_address) {
+                this.placeChanged.emit(place.formatted_address);
+            }
         });
+
+        // Prevent enter from submitting forms when selecting address
+        this.el.nativeElement.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+    }
+
+    ngOnDestroy() {
+        if (this.listener && typeof google !== 'undefined') {
+            google.maps.event.removeListener(this.listener);
+        }
     }
 }

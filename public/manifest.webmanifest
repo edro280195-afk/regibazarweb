@@ -1,0 +1,17 @@
+{
+    "name": "Regi Bazar ✨ Tu Tienda Favorita",
+    "short_name": "Regi Bazar",
+    "description": "Regi Bazar - Tu Tienda Favorita desde 2023. Sistema de gestión de pedidos y entregas con estilo Coquette.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#fff1f2",
+    "theme_color": "#ec4899",
+    "icons": [
+        {
+            "src": "assets/pwa-icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

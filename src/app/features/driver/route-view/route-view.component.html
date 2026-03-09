@@ -1,0 +1,310 @@
+<div class="driver-page">
+
+    @if (loading()) {
+    <div class="loading-screen">
+        <div class="spinner-lg"></div>
+        <p>Cargando tu ruta... 🚗</p>
+    </div>
+    }
+
+    @if (toastMsg()) {
+    <div class="toast-notification">{{ toastMsg() }}</div>
+    }
+
+    @if (route(); as r) {
+
+    <!-- HEADER -->
+    <div class="driver-header">
+        <div class="header-left">
+            <h1>🚗 Ruta #{{ r.id }}</h1>
+            <span class="status-pill" [attr.data-status]="r.status">
+                {{ r.status === 'Pending' ? '⏳ Lista para iniciar' : r.status === 'Active' ? '💨 En ruta' : '✅
+                Completada' }}
+            </span>
+        </div>
+        <div class="delivery-counter">{{ deliveredCount() }}/{{ r.deliveries.length }} 💝</div>
+    </div>
+
+    <!-- KPI MINI STRIP -->
+    <div class="kpi-mini">
+        <div class="kpi-item"><span class="kpi-val">{{ deliveredCount() }}/{{ r.deliveries.length }}</span><span
+                class="kpi-label">Entregas</span></div>
+        <div class="kpi-item kpi-green"><span class="kpi-val">${{ totalCobrado() | number:'1.0-0' }}</span><span
+                class="kpi-label">Cobrado</span></div>
+        <div class="kpi-item kpi-red"><span class="kpi-val">${{ totalGastos() | number:'1.0-0' }}</span><span
+                class="kpi-label">Gastos</span></div>
+    </div>
+
+    <!-- MAP -->
+    <div class="map-wrap">
+        <div class="map-container" #mapContainer></div>
+
+        <!-- TURN-BY-TURN NAVIGATION OVERLAY -->
+        @if (navNextClient() && gpsActive()) {
+        <div class="nav-overlay animate-fade-in-up">
+            <div class="nav-content">
+                <div class="nav-eta-box">
+                    <span class="nav-eta">{{ navEta() || '⏳' }}</span>
+                    <span class="nav-dist">{{ navDistance() }}</span>
+                </div>
+                <div class="nav-dest">
+                    <span class="nav-next-badge">Siguiente Entrega</span>
+                    <strong class="nav-name">{{ navNextClient() }}</strong>
+                    <span class="nav-addr">{{ navNextAddress() }}</span>
+                </div>
+            </div>
+        </div>
+        }
+
+        @if (gpsActive()) {
+        <button class="btn-center-me" (click)="centerOnMe()">📍</button>
+        }
+        <div class="floating-actions">
+            <button class="btn-fab" (click)="openGoogleRoute(r)" title="Google Maps Turn-by-Turn">🗺️</button>
+            <button class="btn-fab" (click)="openExpenseModal()" title="Gastos">⛽</button>
+        </div>
+    </div>
+
+    <!-- BOTTOM SHEET -->
+    <div class="bottom-sheet">
+        <div class="sheet-drag-handle"></div>
+        <div class="sheet-content">
+            <div class="progress-section">
+                <div class="progress-bar">
+                    <div class="progress-fill" [style.width.%]="progressPercent()"></div>
+                </div>
+                <span class="progress-label">{{ deliveredCount() }} de {{ r.deliveries.length }} entregas</span>
+            </div>
+
+            @if (r.status === 'Pending') {
+            <button class="btn-action start" (click)="startRoute()">🚀 ¡Iniciar ruta, vamos!</button>
+            }
+            @if (r.status === 'Active' && !gpsActive()) {
+            <button class="btn-action gps" (click)="startGps()">📍 Activar mi GPS</button>
+            }
+
+            <!-- DELIVERIES -->
+            <div class="deliveries" cdkDropList (cdkDropListDropped)="onDropDelivery($event)">
+                @for (d of r.deliveries; track d.id) {
+                <div class="delivery-card" cdkDrag
+                    [cdkDragDisabled]="d.status === 'Delivered' || d.status === 'NotDelivered'"
+                    [class.expanded]="expandedId() === d.id" [class.is-current]="d.status === 'InTransit'"
+                    [class.is-delivered]="d.status === 'Delivered'" [class.is-failed]="d.status === 'NotDelivered'"
+                    (click)="toggleExpand(d.id)">
+
+                    @if (d.status === 'InTransit') {
+                    <div class="current-badge">🏃 SIGUIENTE ENTREGA</div>
+                    }
+
+                    <div class="delivery-main">
+                        <span class="delivery-num" [attr.data-status]="d.status">{{ d.sortOrder }}</span>
+                        <div class="delivery-info">
+                            <strong>{{ d.clientName }}</strong>
+                            <span class="addr">📍 {{ d.address || d.clientAddress || 'Sin dirección' }}</span>
+                            <span class="total">${{ d.total | number:'1.2-2' }}</span>
+                        </div>
+                        @if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {
+                        <button class="btn-card-chat" (click)="openClientChat(d, $event)"
+                            title="Chat con clienta">💬</button>
+                        <div class="drag-handle" cdkDragHandle>≡</div>
+                        }
+                    </div>
+
+                    @if (expandedId() === d.id && (d.status === 'Pending' || d.status === 'InTransit')) {
+                    <div class="delivery-actions" (click)="$event.stopPropagation()">
+                        <button class="btn-navigate" (click)="navigateTo(d)">🗺️ Navegar a dirección</button>
+
+                        @if (d.clientPhone) {
+                        <div class="contact-btns">
+                            <a [href]="'tel:' + d.clientPhone" class="btn-contact call">📞 Llamar</a>
+                            <a [href]="'https://wa.me/52' + d.clientPhone" target="_blank" class="btn-contact wa">💬
+                                WhatsApp</a>
+                        </div>
+                        }
+
+                        @if (d.status === 'Pending' && r.status === 'Active') {
+                        <button class="btn-transit" (click)="markInTransit(d.id)">🏃 Marcar en camino</button>
+                        }
+
+                        <div class="photo-section">
+                            <label class="photo-btn">📸 Tomar evidencia
+                                <input type="file" accept="image/*" capture="environment"
+                                    (change)="onPhotoCapture($event, d.id)" hidden>
+                            </label>
+                            @if (getPhotos(d.id).length > 0) {
+                            <div class="photo-previews">
+                                @for (p of getPhotos(d.id); track $index) {
+                                <div class="photo-thumb">
+                                    <img [src]="p.preview" alt="Evidencia">
+                                    <button class="remove-photo" (click)="removePhoto(d.id, $index)">×</button>
+                                </div>
+                                }
+                            </div>
+                            }
+                        </div>
+
+                        <textarea [(ngModel)]="deliveryNotes[d.id]" placeholder="Notas de entrega..."
+                            class="notes-input" rows="2"></textarea>
+
+                        @if ((d.balanceDue ?? d.total) > 0 && !(d.payments?.length > 0 && (d.balanceDue ?? 0) <= 0)) {
+                            <div class="payment-selector">
+                            <label>Cobro de ${{ (d.balanceDue ?? d.total) | number:'1.2-2' }}</label>
+                            <div class="payment-cards">
+                                <button class="pay-card" [class.selected]="paymentMethods[d.id] === 'Efectivo'"
+                                    (click)="paymentMethods[d.id] = 'Efectivo'">💵<span>Efectivo</span></button>
+                                <button class="pay-card" [class.selected]="paymentMethods[d.id] === 'Transferencia'"
+                                    (click)="paymentMethods[d.id] = 'Transferencia'">💳<span>Transfer</span></button>
+                                <button class="pay-card" [class.selected]="paymentMethods[d.id] === 'Deposito'"
+                                    (click)="paymentMethods[d.id] = 'Deposito'">🏦<span>Depósito</span></button>
+                            </div>
+                    </div>
+                    } @else if (d.payments?.length > 0) {
+                    <div class="payment-selector paid"><label>✅ Pagado: {{ d.payments.length }} pago(s)</label></div>
+                    }
+
+                    <div class="action-btns">
+                        <button class="btn-deliver" (click)="markDelivered(d.id)"
+                            [disabled]="(d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id]">💝 Entregado</button>
+                        <button class="btn-fail" (click)="showFailModalFn(d.id)">😿 No pude</button>
+                    </div>
+                </div>
+                }
+
+                @if (d.status === 'Delivered') {
+                <div class="done-summary">✅ Entregado {{ d.deliveredAt ? ('- ' + formatTime(d.deliveredAt)) : '' }}
+                </div>
+                }
+                @if (d.status === 'NotDelivered') {
+                <div class="fail-summary">❌ No entregado</div>
+                }
+            </div>
+            }
+        </div>
+    </div>
+</div>
+}
+
+<!-- FAB ADMIN CHAT -->
+<button class="fab-chat-admin" (click)="toggleAdminChat()">
+    👩‍💼
+    @if (unreadAdminCount() > 0) {
+    <span class="unread-dot">{{ unreadAdminCount() }}</span>
+    }
+</button>
+
+<!-- ADMIN CHAT MODAL -->
+@if (showAdminChat()) {
+<div class="modal-overlay" (click)="toggleAdminChat()">
+    <div class="chat-modal" (click)="$event.stopPropagation()">
+        <div class="chat-header admin-header">
+            <div class="chat-header-info"><strong>Base Regi Bazar 🎀</strong><span>Torre de Control</span></div>
+            <button class="close-btn" (click)="toggleAdminChat()">✕</button>
+        </div>
+        <div class="chat-body" #adminChatScroll>
+            @if (adminMessages().length === 0) {
+            <div class="chat-empty"><span>👩‍💼</span>
+                <p>Escribe un mensaje a la base</p>
+            </div>
+            }
+            @for (msg of adminMessages(); track msg.id) {
+            <div class="msg-bubble" [class.me]="msg.sender === 'Driver'" [class.them]="msg.sender !== 'Driver'">
+                <span class="msg-text">{{ msg.text || msg.message }}</span>
+                <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
+            </div>
+            }
+        </div>
+        <div class="chat-input-area">
+            <input type="text" [(ngModel)]="newAdminMessage" (keydown.enter)="sendAdminChat()"
+                placeholder="Hablar con la base..." autocomplete="off">
+            <button class="send-btn" (click)="sendAdminChat()" [disabled]="!newAdminMessage.trim()">➤</button>
+        </div>
+    </div>
+</div>
+}
+
+<!-- CLIENT CHAT MODAL -->
+@if (activeChatDelivery(); as delivery) {
+<div class="modal-overlay" (click)="closeClientChat()">
+    <div class="chat-modal" (click)="$event.stopPropagation()">
+        <div class="chat-header client-header">
+            <div class="chat-header-info"><strong>{{ delivery.clientName }} 🌸</strong><span>Entrega #{{
+                    delivery.sortOrder }}</span></div>
+            <button class="close-btn" (click)="closeClientChat()">✕</button>
+        </div>
+        <div class="chat-body" #clientChatScroll>
+            @if (clientChatMessages().length === 0) {
+            <div class="chat-empty"><span>🌸</span>
+                <p>Envía un mensaje a la clienta</p>
+            </div>
+            }
+            @for (msg of clientChatMessages(); track msg.id) {
+            <div class="msg-bubble" [class.me]="msg.sender === 'Driver'" [class.them]="msg.sender !== 'Driver'">
+                <span class="msg-text">{{ msg.text || msg.message }}</span>
+                <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
+            </div>
+            }
+        </div>
+        <div class="chat-input-area">
+            <input type="text" [(ngModel)]="newClientMessage" (keydown.enter)="sendClientChat()"
+                placeholder="Mensaje para la clienta..." autocomplete="off">
+            <button class="send-btn client" (click)="sendClientChat()" [disabled]="!newClientMessage.trim()">➤</button>
+        </div>
+    </div>
+</div>
+}
+
+<!-- EXPENSE MODAL -->
+@if (showExpenseModal()) {
+<div class="modal-overlay" (click)="closeExpenseModal()">
+    <div class="bottom-modal" (click)="$event.stopPropagation()">
+        <div class="bottom-modal-header"><strong>⛽ Registrar Gasto</strong><button class="close-btn"
+                (click)="closeExpenseModal()">✕</button></div>
+        <div class="bottom-modal-body">
+            <label class="form-label">Tipo de gasto</label>
+            <select [(ngModel)]="expenseForm.type" class="form-select">
+                <option value="Gasolina">⛽ Gasolina</option>
+                <option value="Caseta">🛣️ Caseta</option>
+                <option value="Estacionamiento">🅿️ Estacionamiento</option>
+                <option value="Otro">📝 Otro</option>
+            </select>
+            <label class="form-label">Monto</label>
+            <input type="number" [(ngModel)]="expenseForm.amount" placeholder="$0.00" class="form-input"
+                inputmode="decimal">
+            <label class="form-label">Notas (opcional)</label>
+            <input type="text" [(ngModel)]="expenseForm.notes" placeholder="Descripción breve..." class="form-input">
+            <label class="photo-btn compact">📸 Foto del ticket
+                <input type="file" accept="image/*" capture="environment" (change)="onExpensePhoto($event)" hidden>
+            </label>
+            @if (expenseForm.photo) { <span class="photo-attached">📎 {{ expenseForm.photo.name }}</span> }
+            <button class="btn-action start" (click)="submitExpense()"
+                [disabled]="submittingExpense() || !expenseForm.amount">
+                {{ submittingExpense() ? 'Enviando...' : '💰 Registrar gasto' }}
+            </button>
+        </div>
+    </div>
+</div>
+}
+
+<!-- FAIL MODAL -->
+@if (failModalId()) {
+<div class="modal-overlay" (click)="cancelFail()">
+    <div class="bottom-modal" (click)="$event.stopPropagation()">
+        <div class="bottom-modal-header"><strong>😿 ¿Por qué no pudiste?</strong><button class="close-btn"
+                (click)="cancelFail()">✕</button></div>
+        <div class="bottom-modal-body">
+            <div class="reason-list">
+                @for (reason of failReasons; track reason) {
+                <button class="reason-option" [class.selected]="selectedReason() === reason"
+                    (click)="selectedReason.set(reason)">{{ reason }}</button>
+                }
+            </div>
+            <textarea [(ngModel)]="customReason" placeholder="Otra razón o detalle adicional..." class="notes-input"
+                rows="2"></textarea>
+            <button class="btn-action fail-confirm" (click)="confirmFail()"
+                [disabled]="!selectedReason() && !customReason.trim()">Confirmar ❌</button>
+        </div>
+    </div>
+</div>
+}
+
+</div>

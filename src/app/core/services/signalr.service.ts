@@ -2,129 +2,91 @@ import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
 import { environment } from '../../../environments/environment';
-import { AuthService } from './auth.service';
 
 export interface LocationUpdate {
-  latitude: number;
-  longitude: number;
-  timestamp: string;
+    latitude: number;
+    longitude: number;
+    timestamp: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class SignalRService {
-  private connection: signalR.HubConnection | null = null;
+    private connection: signalR.HubConnection | null = null;
+    private connectionPromise: Promise<void> | null = null;
 
-  locationUpdate$ = new Subject<LocationUpdate>();
-  deliveryUpdate$ = new Subject<any>();
-  routeCompleted$ = new Subject<any>();
-  orderConfirmed$ = new Subject<{ orderId: number, clientName: string, newStatus: string }>();
-  clientChatUpdate$ = new Subject<any>();
-  adminChatUpdate$ = new Subject<any>();
+    locationUpdate$ = new Subject<{ driverToken?: string; latitude: number; longitude: number }>();
+    deliveryUpdate$ = new Subject<any>();
+    routeUpdated$ = new Subject<void>();
+    messageReceived$ = new Subject<{ group: string; data: any }>();
 
-  constructor(private auth: AuthService) { }
+    // Compatibility subjects (keep for now to avoid breaking existing code)
+    adminChatUpdate$ = new Subject<any>();
+    clientChatUpdate$ = new Subject<any>();
 
-  async connect(): Promise<void> {
-    if (this.connection?.state === signalR.HubConnectionState.Connected) return;
+    async connect(): Promise<void> {
+        if (this.connection?.state === signalR.HubConnectionState.Connected) return;
+        if (this.connectionPromise) return this.connectionPromise;
 
-    const token = this.auth.getToken();
+        this.connection = new signalR.HubConnectionBuilder()
+            .withUrl(environment.hubUrl)
+            .withAutomaticReconnect()
+            .build();
 
-    this.connection = new signalR.HubConnectionBuilder()
-      .withUrl(environment.hubUrl, {
-        accessTokenFactory: () => token || ''
-      })
-      .withAutomaticReconnect()
-      .build();
+        // New Unified Events
+        this.connection.on('ReceiveLocation', (driverToken: string, lat: number, lng: number) => {
+            this.locationUpdate$.next({ driverToken, latitude: lat, longitude: lng });
+        });
 
-    this.connection.on('ReceiveLocation', (routeId: number, lat: number, lng: number) => {
-      const locationData: LocationUpdate = {
-        latitude: lat,
-        longitude: lng,
-        timestamp: new Date().toISOString()
-      };
+        this.connection.on('LocationUpdate', (data: any) => {
+            this.locationUpdate$.next(data);
+        });
 
-      this.locationUpdate$.next(locationData);
-    });
+        this.connection.on('ReceiveMessage', (data: any) => {
+            this.messageReceived$.next({ group: '', data }); // group logic if needed
+            // Map to old subjects for compatibility
+            if (data.type === 'admin') this.adminChatUpdate$.next(data);
+            else if (data.type === 'client') this.clientChatUpdate$.next(data);
+        });
 
-    this.connection.on('ReceiveChatMessage', (msg: any) => {
-      this.adminChatUpdate$.next(msg);
-    });
+        this.connection.on('DeliveryUpdate', (data: any) => this.deliveryUpdate$.next(data));
+        this.connection.on('OrderConfirmed', (data: any) => this.deliveryUpdate$.next({ ...data, type: 'Confirmed' }));
+        this.connection.on('RouteUpdated', () => this.routeUpdated$.next());
 
-    this.connection.on('LocationUpdate', (data: LocationUpdate) => {
-      this.locationUpdate$.next(data);
-    });
+        this.connectionPromise = this.connection.start()
+            .then(() => { this.connectionPromise = null; })
+            .catch(err => { this.connectionPromise = null; throw err; });
 
-    this.connection.on('DriverLocation', (data: any) => {
-      this.locationUpdate$.next(data);
-    });
+        return this.connectionPromise;
+    }
 
-    this.connection.on('DeliveryUpdate', (data: any) => {
-      this.deliveryUpdate$.next(data);
-    });
+    async joinRoute(driverToken: string): Promise<void> {
+        await this.ensureConnected();
+        await this.connection?.invoke('JoinRoute', driverToken);
+    }
 
-    this.connection.on('DeliveryCompleted', (data: any) => {
-      this.deliveryUpdate$.next(data);
-    });
+    async joinOrder(accessToken: string): Promise<void> {
+        await this.ensureConnected();
+        await this.connection?.invoke('JoinOrder', accessToken);
+    }
 
-    this.connection.on('DeliveryFailed', (data: any) => {
-      this.deliveryUpdate$.next(data);
-    });
+    async joinAdminGroup(): Promise<void> {
+        await this.ensureConnected();
+        await this.connection?.invoke('JoinAdminGroup');
+    }
 
-    this.connection.on('RouteCompleted', (data: any) => {
-      this.routeCompleted$.next(data);
-    });
+    async reportLocation(driverToken: string, lat: number, lng: number): Promise<void> {
+        await this.ensureConnected();
+        await this.connection?.invoke('ReportLocation', driverToken, lat, lng);
+    }
 
-    this.connection.on('OrderConfirmed', (data: any) => {
-      this.orderConfirmed$.next(data);
-    });
+    private async ensureConnected(): Promise<void> {
+        if (!this.connection || this.connection.state !== signalR.HubConnectionState.Connected) {
+            await this.connect();
+        }
+    }
 
-    this.connection.on('ReceiveClientChatMessage', (msg: any) => {
-      this.clientChatUpdate$.next(msg);
-    });
-
-    await this.connection.start();
-    this.joinAdminGroup();
-  }
-
-  async connectPublic(): Promise<void> {
-    if (this.connection?.state === signalR.HubConnectionState.Connected) return;
-
-    this.connection = new signalR.HubConnectionBuilder()
-      .withUrl(environment.hubUrl)
-      .withAutomaticReconnect()
-      .build();
-
-    this.connection.on('LocationUpdate', (data: LocationUpdate) => {
-      this.locationUpdate$.next(data);
-    });
-
-    this.connection.on('DeliveryUpdate', (data: any) => {
-      this.deliveryUpdate$.next(data);
-    });
-
-    this.connection.on('ReceiveClientChatMessage', (msg: any) => {
-      this.clientChatUpdate$.next(msg);
-    });
-
-    await this.connection.start();
-  }
-
-  async joinOrder(accessToken: string): Promise<void> {
-    await this.connection?.invoke('JoinOrder', accessToken);
-  }
-
-
-  async joinAdminGroup(): Promise<void> {
-    console.log('Joining Admin Group...');
-    await this.connection?.invoke('JoinAdminGroup');
-  }
-
-  async joinRoute(driverToken: string): Promise<void> {
-    await this.connection?.invoke('JoinRoute', driverToken);
-  }
-
-  async disconnect(): Promise<void> {
-    await this.connection?.stop();
-    this.connection = null;
-  }
+    async disconnect(): Promise<void> {
+        await this.connection?.stop();
+        this.connection = null;
+    }
 }
-

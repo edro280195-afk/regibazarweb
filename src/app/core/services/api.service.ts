@@ -1,372 +1,317 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-  LoginRequest, LoginResponse, RegisterRequest,
-  OrderSummary, ExcelUploadResult, ManualOrderRequest,
-  DeliveryRoute, ClientOrderView, Dashboard, Client,
-  SalesPeriod, PeriodReport
-} from '../../shared/models/models';
+    DashboardDto, OrderSummaryDto, PagedResult, ReportDto, ClientDto,
+    RouteDto, SupplierDto, InvestmentDto, SalesPeriodDto, PeriodReportDto,
+    FinancialReportDto, DriverExpenseDto, ManualOrderRequest, OrderStatsDto,
+    AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
+    CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
+    CommonProductDto, GlowUpReportDto, OrderPaymentDto
+} from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private url = environment.apiUrl;
+    private readonly base = environment.apiUrl;
 
-  constructor(private http: HttpClient) { }
+    constructor(private http: HttpClient) { }
 
-  // ═══════════════════════════════════════════
-  //  AUTH
-  // ═══════════════════════════════════════════
-  login(req: LoginRequest): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.url}/auth/login`, req);
-  }
-
-  register(req: RegisterRequest): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.url}/auth/register`, req);
-  }
-
-  // ═══════════════════════════════════════════
-  //  ORDERS (ADMIN)
-  // ═══════════════════════════════════════════
-  getOrders(): Observable<OrderSummary[]> {
-    return this.http.get<OrderSummary[]>(`${this.url}/orders`);
-  }
-
-  getOrder(id: number): Observable<OrderSummary> {
-    return this.http.get<OrderSummary>(`${this.url}/orders/${id}`);
-  }
-
-  getOrdersPaginated(page: number, pageSize: number, search: string = '', status: string = '', clientType: string = '', dateFrom?: string, dateTo?: string): Observable<{ items: OrderSummary[], totalCount: number }> {
-    let query = `${this.url}/orders/paged?page=${page}&pageSize=${pageSize}`;
-    if (search) query += `&search=${encodeURIComponent(search)}`;
-    if (status) query += `&status=${encodeURIComponent(status)}`;
-    if (clientType) query += `&clientType=${encodeURIComponent(clientType)}`;
-    if (dateFrom) query += `&dateFrom=${encodeURIComponent(dateFrom)}`;
-    if (dateTo) query += `&dateTo=${encodeURIComponent(dateTo)}`;
-    return this.http.get<{ items: OrderSummary[], totalCount: number }>(query);
-  }
-
-  getOrderStats(): Observable<{ total: number, pending: number, pendingAmount: number, collectedToday: number }> {
-    return this.http.get<{ total: number, pending: number, pendingAmount: number, collectedToday: number }>(`${this.url}/orders/stats`);
-  }
-
-  uploadExcel(file: File): Observable<ExcelUploadResult> {
-    const fd = new FormData();
-    fd.append('file', file);
-    return this.http.post<ExcelUploadResult>(`${this.url}/orders/upload`, fd);
-  }
-
-  createManualOrder(req: ManualOrderRequest): Observable<OrderSummary> {
-    return this.http.post<OrderSummary>(`${this.url}/orders/manual`, req);
-  }
-
-  deleteOrder(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/orders/${id}`);
-  }
-
-  deleteAllOrders() {
-    return this.http.delete(`${this.url}/orders/wipe`);
-  }
-
-  getDashboard(): Observable<Dashboard> {
-    return this.http.get<Dashboard>(`${this.url}/orders/dashboard`);
-  }
-
-  // Métodos de edición de órdenes
-  updateOrderStatus(id: number, data: any): Observable<OrderSummary> {
-    return this.http.patch<OrderSummary>(`${this.url}/orders/${id}/status`, data);
-  }
-
-  updateOrder(id: number, data: any): Observable<OrderSummary> {
-    return this.http.put<OrderSummary>(`${this.url}/orders/${id}`, data);
-  }
-
-  addOrderItem(orderId: number, item: { productName: string; quantity: number; unitPrice: number }): Observable<OrderSummary> {
-    return this.http.post<OrderSummary>(`${this.url}/orders/${orderId}/items`, item);
-  }
-
-  updateOrderItem(orderId: number, itemId: number, data: any): Observable<OrderSummary> {
-    return this.http.put<OrderSummary>(`${this.url}/orders/${orderId}/items/${itemId}`, data);
-  }
-
-  deleteOrderItem(orderId: number, itemId: number): Observable<OrderSummary> {
-    return this.http.delete<OrderSummary>(`${this.url}/orders/${orderId}/items/${itemId}`);
-  }
-
-  getCommonProducts(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.url}/orders/common-products`);
-  }
-
-  // ═══════════════════════════════════════════
-  //  CLIENTS
-  // ═══════════════════════════════════════════
-  getClients(): Observable<Client[]> {
-    return this.http.get<Client[]>(`${this.url}/clients`);
-  }
-
-  // Mantenemos este método aunque sea redundante porque tu código lo usa
-  getClientsWithStats(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.url}/clients`);
-  }
-
-  updateClient(id: number, data: any): Observable<void> {
-    return this.http.put<void>(`${this.url}/clients/${id}`, data);
-  }
-
-  deleteClient(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/clients/${id}`);
-  }
-
-  deleteAllClients() {
-    return this.http.delete(`${this.url}/clients/wipe`);
-  }
-
-  // ═══════════════════════════════════════════
-  //  ROUTES (ADMIN)
-  // ═══════════════════════════════════════════
-  createRoute(data: any): Observable<DeliveryRoute> {
-    // data can be number[] (old) or { orders: [...] } (new)
-    return this.http.post<DeliveryRoute>(`${this.url}/routes`, data);
-  }
-
-  getRoutes(): Observable<DeliveryRoute[]> {
-    return this.http.get<DeliveryRoute[]>(`${this.url}/routes`);
-  }
-
-  getRoute(id: number): Observable<DeliveryRoute> {
-    return this.http.get<DeliveryRoute>(`${this.url}/routes/${id}`);
-  }
-
-  deleteRoute(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/routes/${id}`);
-  }
-
-  reorderRouteDeliveries(id: number, deliveryIds: number[]): Observable<any> {
-    return this.http.put<any>(`${this.url}/routes/${id}/reorder`, deliveryIds);
-  }
-
-  liquidateRoute(id: number): Observable<any> {
-    return this.http.post<any>(`${this.url}/routes/${id}/liquidate`, {});
-  }
-
-  // --- CHAT ADMIN (NUEVO) ---
-  getRouteChat(routeId: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.url}/routes/${routeId}/chat`);
-  }
-
-  sendAdminMessage(routeId: number, text: string): Observable<any> {
-    return this.http.post<any>(`${this.url}/routes/${routeId}/chat`, { text });
-  }
-
-  // ═══════════════════════════════════════════
-  //  DRIVER (REPARTIDOR)
-  // ═══════════════════════════════════════════
-  getDriverRoute(driverToken: string): Observable<any> {
-    return this.http.get(`${this.url}/driver/${driverToken}`);
-  }
-
-  startRoute(driverToken: string): Observable<any> {
-    return this.http.post(`${this.url}/driver/${driverToken}/start`, {});
-  }
-
-  updateLocation(driverToken: string, lat: number, lng: number): Observable<any> {
-    return this.http.post(`${this.url}/driver/${driverToken}/location`, {
-      latitude: lat, longitude: lng
-    });
-  }
-
-  markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number, method: string, notes?: string }[]): Observable<any> {
-    const fd = new FormData();
-    fd.append('notes', notes || '');
-    if (payments && payments.length > 0) {
-      fd.append('paymentsJson', JSON.stringify(payments));
+    getApiUrl(): string {
+        return this.base;
     }
-    photos.forEach(p => fd.append('photos', p));
-    return this.http.post(`${this.url}/driver/${driverToken}/deliver/${deliveryId}`, fd);
-  }
 
-  // ── Order Payments (Libro de Transacciones) ──
-  addPayment(orderId: number, data: { amount: number, method: string, registeredBy?: string, notes?: string }): Observable<any> {
-    return this.http.post(`${this.url}/orders/${orderId}/payments`, data);
-  }
-
-  deletePayment(orderId: number, paymentId: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/orders/${orderId}/payments/${paymentId}`);
-  }
-
-  markFailed(driverToken: string, deliveryId: number, reason: string, notes: string, photos: File[]): Observable<any> {
-    const fd = new FormData();
-    fd.append('reason', reason);
-    fd.append('notes', notes || '');
-    photos.forEach(p => fd.append('photos', p));
-    return this.http.post(`${this.url}/driver/${driverToken}/fail/${deliveryId}`, fd);
-  }
-
-  markInTransit(driverToken: string, deliveryId: number): Observable<any> {
-    return this.http.post(`${this.url}/driver/${driverToken}/transit/${deliveryId}`, {});
-  }
-
-  // --- CHAT DRIVER (NUEVO) ---
-  getDriverChat(driverToken: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.url}/driver/${driverToken}/chat`);
-  }
-
-  sendDriverMessage(driverToken: string, text: string): Observable<any> {
-    return this.http.post<any>(`${this.url}/driver/${driverToken}/chat`, { text });
-  }
-
-  // ═══════════════════════════════════════════
-  //  DRIVER EXPENSES
-  // ═══════════════════════════════════════════
-  addDriverExpense(driverToken: string, data: any): Observable<any> {
-    const fd = new FormData();
-    fd.append('amount', data.amount?.toString() ?? '0');
-    fd.append('expenseType', data.type || data.expenseType || 'Otro');  // ✅
-    fd.append('notes', data.notes || '');
-    if (data.photo) {
-      fd.append('photo', data.photo);
+    // ── Dashboard ──
+    getDashboard(): Observable<DashboardDto> {
+        return this.http.get<DashboardDto>(`${this.base}/orders/dashboard`);
     }
-    return this.http.post(`${this.url}/driver/${driverToken}/expenses`, fd);
-  }
 
-  getDriverExpenses(period?: string): Observable<import('../../shared/models/models').DriverExpense[]> {
-    let params = '';
-    if (period) params = `?period=${period}`;
-    return this.http.get<import('../../shared/models/models').DriverExpense[]>(`${this.url}/admin/expenses${params}`);
-  }
+    // ── Orders ──
+    getOrders(): Observable<OrderSummaryDto[]> {
+        return this.http.get<OrderSummaryDto[]>(`${this.base}/orders`);
+    }
 
-  createAdminExpense(data: any): Observable<any> {
-    return this.http.post(`${this.url}/admin/expenses`, data);
-  }
+    getOrdersPaged(page: number, size: number, status?: string, search?: string, type?: string, startDate?: string, endDate?: string, clientType?: string): Observable<PagedResult<OrderSummaryDto>> {
+        let params = new HttpParams()
+            .set('page', page.toString())
+            .set('pageSize', size.toString());
+        if (status) params = params.set('status', status);
+        if (search) params = params.set('search', search);
+        if (type) params = params.set('type', type);
+        if (clientType) params = params.set('clientType', clientType);
+        if (startDate) params = params.set('startDate', startDate);
+        if (endDate) params = params.set('endDate', endDate);
+        return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/paged`, { params });
+    }
 
-  updateAdminExpense(id: number, data: any): Observable<any> {
-    return this.http.put(`${this.url}/admin/expenses/${id}`, data);
-  }
+    getOrderStats(): Observable<OrderStatsDto> {
+        return this.http.get<OrderStatsDto>(`${this.base}/orders/stats`);
+    }
 
-  deleteAdminExpense(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/admin/expenses/${id}`);
-  }
+    createManualOrder(order: ManualOrderRequest): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/orders/manual`, order);
+    }
 
-  // ═══════════════════════════════════════════
-  //  PUBLIC CLIENT VIEW
-  // ═══════════════════════════════════════════
-  getClientOrder(accessToken: string): Observable<ClientOrderView> {
-    return this.http.get<ClientOrderView>(`${this.url}/pedido/${accessToken}`);
-  }
+    updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<any> {
+        return this.http.put(`${this.base}/orders/${id}`, data);
+    }
 
-  confirmClientOrder(accessToken: string): Observable<any> {
-    return this.http.post(`${this.url}/pedido/${accessToken}/confirm`, {});
-  }
+    updateOrderStatus(id: number, data: { status?: string; orderType?: string; postponedAt?: string; postponedNote?: string }): Observable<any> {
+        return this.http.patch(`${this.base}/orders/${id}/status`, data);
+    }
 
-  // ═══════════════════════════════════════════
-  //  SUPPLIERS & INVESTMENTS
-  // ═══════════════════════════════════════════
-  getSuppliers(): Observable<import('../../shared/models/models').Supplier[]> {
-    return this.http.get<import('../../shared/models/models').Supplier[]>(`${this.url}/suppliers`);
-  }
+    deleteOrder(id: number): Observable<any> {
+        return this.http.delete(`${this.base}/orders/${id}`);
+    }
 
-  addSupplier(data: any): Observable<import('../../shared/models/models').Supplier> {
-    return this.http.post<import('../../shared/models/models').Supplier>(`${this.url}/suppliers`, data);
-  }
+    addPayment(orderId: number, payment: AddPaymentRequest): Observable<OrderPaymentDto> {
+        return this.http.post<OrderPaymentDto>(`${this.base}/orders/${orderId}/payments`, payment);
+    }
 
-  updateSupplier(id: number, data: any): Observable<import('../../shared/models/models').Supplier> {
-    return this.http.put<import('../../shared/models/models').Supplier>(`${this.url}/suppliers/${id}`, data);
-  }
+    deletePayment(orderId: number, paymentId: number): Observable<any> {
+        return this.http.delete(`${this.base}/orders/${orderId}/payments/${paymentId}`);
+    }
 
-  deleteSupplier(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/suppliers/${id}`);
-  }
+    addOrderItem(orderId: number, item: { productName: string; quantity: number; unitPrice: number }): Observable<any> {
+        return this.http.post(`${this.base}/orders/${orderId}/items`, item);
+    }
 
-  getInvestments(supplierId: number): Observable<import('../../shared/models/models').Investment[]> {
-    return this.http.get<import('../../shared/models/models').Investment[]>(`${this.url}/suppliers/${supplierId}/investments`);
-  }
+    updateOrderItem(orderId: number, itemId: number, item: { productName: string; quantity: number; unitPrice: number }): Observable<any> {
+        return this.http.put(`${this.base}/orders/${orderId}/items/${itemId}`, item);
+    }
 
-  addInvestment(supplierId: number, data: any): Observable<import('../../shared/models/models').Investment> {
-    return this.http.post<import('../../shared/models/models').Investment>(`${this.url}/suppliers/${supplierId}/investments`, data);
-  }
+    removeOrderItem(orderId: number, itemId: number): Observable<any> {
+        return this.http.delete(`${this.base}/orders/${orderId}/items/${itemId}`);
+    }
 
-  deleteInvestment(supplierId: number, investmentId: number): Observable<void> {
-    return this.http.delete<void>(`${this.url}/suppliers/${supplierId}/investments/${investmentId}`);
-  }
+    uploadExcel(file: File): Observable<any> {
+        const fd = new FormData();
+        fd.append('file', file);
+        return this.http.post(`${this.base}/orders/upload-excel`, fd);
+    }
 
-  // ═══════════════════════════════════════════
-  //  FINANCIALS
-  // ═══════════════════════════════════════════
-  getFinancialReport(startDate: string, endDate: string): Observable<import('../../shared/models/models').FinancialReport> {
-    return this.http.get<import('../../shared/models/models').FinancialReport>(
-      `${this.url}/admin/financials?startDate=${startDate}&endDate=${endDate}`
-    );
-  }
+    getCommonProducts(): Observable<CommonProductDto[]> {
+        return this.http.get<CommonProductDto[]>(`${this.base}/orders/common-products`);
+    }
 
-  getReportData(startDate: string, endDate: string): Observable<import('../../shared/models/models').ReportData> {
-    return this.http.get<import('../../shared/models/models').ReportData>(
-      `${this.url}/orders/reports?start=${startDate}&end=${endDate}`
-    );
-  }
+    // ── Reports ──
+    getReports(start: string, end: string): Observable<ReportDto> {
+        return this.http.get<ReportDto>(`${this.base}/orders/reports`, {
+            params: new HttpParams().set('start', start).set('end', end)
+        });
+    }
 
+    getGlowUp(): Observable<GlowUpReportDto> {
+        return this.http.get<GlowUpReportDto>(`${this.base}/reports/glow-up-current-month`);
+    }
 
-  // ═══════════════════════════════════════════
-  //  GLOW UP REPORT
-  // ═══════════════════════════════════════════
-  getGlowUpReport(): Observable<import('../../shared/models/models').GlowUpReportDto> {
-    return this.http.get<import('../../shared/models/models').GlowUpReportDto>(
-      `${this.url}/reports/glow-up-current-month`
-    );
-  }
+    // ── Clients ──
+    getClients(): Observable<ClientDto[]> {
+        return this.http.get<ClientDto[]>(`${this.base}/clients`);
+    }
 
-  // ═══════════════════════════════════════════
-  //  LOYALTY (REGIPUNTOS)
-  // ═══════════════════════════════════════════
-  getLoyaltySummary(clientId: number): Observable<import('../../shared/models/models').LoyaltySummary> {
-    return this.http.get<import('../../shared/models/models').LoyaltySummary>(`${this.url}/loyalty/${clientId}`);
-  }
+    getClient(id: number): Observable<ClientDto> {
+        return this.http.get<ClientDto>(`${this.base}/clients/${id}`);
+    }
 
-  getLoyaltyHistory(clientId: number): Observable<import('../../shared/models/models').LoyaltyTransaction[]> {
-    return this.http.get<import('../../shared/models/models').LoyaltyTransaction[]>(`${this.url}/loyalty/${clientId}/history`);
-  }
+    updateClient(id: number, data: { name: string; phone?: string; address?: string; tag: string; type: string }): Observable<any> {
+        return this.http.put(`${this.base}/clients/${id}`, data);
+    }
 
-  adjustLoyaltyPoints(req: import('../../shared/models/models').AdjustPointsRequest): Observable<any> {
-    return this.http.post<any>(`${this.url}/loyalty/adjust`, req);
-  }
+    deleteClient(id: number): Observable<any> {
+        return this.http.delete(`${this.base}/clients/${id}`);
+    }
 
-  // Chat con clientes
-  getClientChat(accessToken: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.url}/pedido/${accessToken}/chat`);
-  }
+    // ── Routes ──
+    getRoutes(): Observable<RouteDto[]> {
+        return this.http.get<RouteDto[]>(`${this.base}/routes`);
+    }
 
-  sendClientMessage(accessToken: string, text: string): Observable<any> {
-    return this.http.post<any>(`${this.url}/pedido/${accessToken}/chat`, { text });
-  }
+    getRoute(id: number): Observable<RouteDto> {
+        return this.http.get<RouteDto>(`${this.base}/routes/${id}`);
+    }
 
-  getDriverClientChat(driverToken: string, deliveryId: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.url}/driver/${driverToken}/deliver/${deliveryId}/chat`);
-  }
+    createRoute(orderIds: number[]): Observable<RouteDto> {
+        return this.http.post<RouteDto>(`${this.base}/routes`, { orderIds });
+    }
 
-  sendDriverClientMessage(driverToken: string, deliveryId: number, text: string): Observable<any> {
-    return this.http.post<any>(`${this.url}/driver/${driverToken}/deliver/${deliveryId}/chat`, { text });
-  }
+    deleteRoute(id: number): Observable<any> {
+        return this.http.delete(`${this.base}/routes/${id}`);
+    }
 
-  // ═══════════════════════════════════════════
-  //  SALES PERIODS (CORTES)
-  // ═══════════════════════════════════════════
-  getSalesPeriods(): Observable<SalesPeriod[]> {
-    return this.http.get<SalesPeriod[]>(`${this.url}/salesperiods`);
-  }
+    liquidateRoute(id: number): Observable<any> {
+        return this.http.post(`${this.base}/routes/${id}/liquidate`, {});
+    }
 
-  createSalesPeriod(data: { name: string; startDate: string; endDate: string }): Observable<SalesPeriod> {
-    return this.http.post<SalesPeriod>(`${this.url}/salesperiods`, data);
-  }
+    // ── Suppliers ──
+    getSuppliers(): Observable<SupplierDto[]> {
+        return this.http.get<SupplierDto[]>(`${this.base}/suppliers`);
+    }
 
-  activateSalesPeriod(id: number): Observable<SalesPeriod> {
-    return this.http.patch<SalesPeriod>(`${this.url}/salesperiods/${id}/activate`, {});
-  }
+    createSupplier(data: CreateSupplierRequest): Observable<SupplierDto> {
+        return this.http.post<SupplierDto>(`${this.base}/suppliers`, data);
+    }
 
-  getPeriodReport(id: number): Observable<PeriodReport> {
-    return this.http.get<PeriodReport>(`${this.url}/reports/period/${id}`);
-  }
+    updateSupplier(id: number, data: CreateSupplierRequest): Observable<SupplierDto> {
+        return this.http.put<SupplierDto>(`${this.base}/suppliers/${id}`, data);
+    }
 
-  syncSalesPeriod(id: number, data: any): Observable<{ count: number }> {
-    return this.http.post<{ count: number }>(`${this.url}/salesperiods/${id}/sync`, data);
-  }
+    deleteSupplier(id: number): Observable<any> {
+        return this.http.delete(`${this.base}/suppliers/${id}`);
+    }
+
+    getInvestments(supplierId: number): Observable<InvestmentDto[]> {
+        return this.http.get<InvestmentDto[]>(`${this.base}/suppliers/${supplierId}/investments`);
+    }
+
+    addInvestment(supplierId: number, data: CreateInvestmentRequest): Observable<InvestmentDto> {
+        return this.http.post<InvestmentDto>(`${this.base}/suppliers/${supplierId}/investments`, data);
+    }
+
+    deleteInvestment(supplierId: number, investmentId: number): Observable<any> {
+        return this.http.delete(`${this.base}/suppliers/${supplierId}/investments/${investmentId}`);
+    }
+
+    // ── Financials ──
+    getFinancials(startDate: string, endDate: string): Observable<FinancialReportDto> {
+        return this.http.get<FinancialReportDto>(`${this.base}/admin/financials`, {
+            params: new HttpParams().set('startDate', startDate).set('endDate', endDate)
+        });
+    }
+
+    getExpenses(period?: string): Observable<DriverExpenseDto[]> {
+        let params = new HttpParams();
+        if (period) params = params.set('period', period);
+        return this.http.get<DriverExpenseDto[]>(`${this.base}/admin/expenses`, { params });
+    }
+
+    createExpense(data: CreateAdminExpenseRequest): Observable<DriverExpenseDto> {
+        return this.http.post<DriverExpenseDto>(`${this.base}/admin/expenses`, data);
+    }
+
+    deleteExpense(id: number): Observable<any> {
+        return this.http.delete(`${this.base}/admin/expenses/${id}`);
+    }
+
+    // ── Sales Periods ──
+    getSalesPeriods(): Observable<SalesPeriodDto[]> {
+        return this.http.get<SalesPeriodDto[]>(`${this.base}/salesperiods`);
+    }
+
+    createSalesPeriod(data: CreateSalesPeriodRequest): Observable<SalesPeriodDto> {
+        return this.http.post<SalesPeriodDto>(`${this.base}/salesperiods`, data);
+    }
+
+    getPeriodReport(id: number): Observable<PeriodReportDto> {
+        return this.http.get<PeriodReportDto>(`${this.base}/reports/period/${id}`);
+    }
+
+    // ── Loyalty ──
+    getLoyaltySummary(clientId: number): Observable<any> {
+        return this.http.get(`${this.base}/loyalty/${clientId}`);
+    }
+
+    getLoyaltyHistory(clientId: number): Observable<any> {
+        return this.http.get(`${this.base}/loyalty/${clientId}/history`);
+    }
+
+    adjustPoints(data: { clientId: number; points: number; reason: string }): Observable<any> {
+        return this.http.post(`${this.base}/loyalty/adjust`, data);
+    }
+
+    // ── Public Tracking (Client-Facing) ──
+    publicGetOrder(accessToken: string): Observable<any> {
+        return this.http.get(`${this.base}/pedido/${accessToken}`);
+    }
+
+    publicConfirmOrder(accessToken: string): Observable<any> {
+        return this.http.post(`${this.base}/pedido/${accessToken}/confirm`, {});
+    }
+
+    publicGetChat(accessToken: string): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/pedido/${accessToken}/chat`);
+    }
+
+    publicSendChatMessage(accessToken: string, text: string): Observable<any> {
+        return this.http.post(`${this.base}/pedido/${accessToken}/chat`, { text });
+    }
+
+    // ── Driver (Repartidor) ──
+    getDriverRoute(driverToken: string): Observable<any> {
+        return this.http.get(`${this.base}/driver/${driverToken}`);
+    }
+
+    startRoute(driverToken: string): Observable<any> {
+        return this.http.post(`${this.base}/driver/${driverToken}/start`, {});
+    }
+
+    updateLocation(driverToken: string, lat: number, lng: number): Observable<any> {
+        return this.http.post(`${this.base}/driver/${driverToken}/location`, { latitude: lat, longitude: lng });
+    }
+
+    driverReorderRouteDeliveries(driverToken: string, orderedDeliveryIds: number[]): Observable<any> {
+        return this.http.put(`${this.base}/driver/${driverToken}/reorder`, orderedDeliveryIds);
+    }
+
+    markInTransit(driverToken: string, deliveryId: number): Observable<any> {
+        return this.http.post(`${this.base}/driver/${driverToken}/transit/${deliveryId}`, {});
+    }
+
+    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[]): Observable<any> {
+        const fd = new FormData();
+        fd.append('notes', notes);
+        photos.forEach(p => fd.append('photos', p));
+        if (payments) fd.append('payments', JSON.stringify(payments));
+        return this.http.post(`${this.base}/driver/${driverToken}/deliver/${deliveryId}`, fd);
+    }
+
+    markFailed(driverToken: string, deliveryId: number, reason: string, notes: string, photos: File[]): Observable<any> {
+        const fd = new FormData();
+        fd.append('reason', reason);
+        fd.append('notes', notes);
+        photos.forEach(p => fd.append('photos', p));
+        return this.http.post(`${this.base}/driver/${driverToken}/fail/${deliveryId}`, fd);
+    }
+
+    // ── Driver Chat (Admin ↔ Driver) ──
+    getDriverChat(driverToken: string): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/driver/${driverToken}/chat`);
+    }
+
+    sendDriverMessage(driverToken: string, text: string): Observable<any> {
+        return this.http.post<any>(`${this.base}/driver/${driverToken}/chat`, { text });
+    }
+
+    // ── Driver Chat (Driver ↔ Client) ──
+    getDriverClientChat(driverToken: string, deliveryId: number): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/driver/${driverToken}/deliver/${deliveryId}/chat`);
+    }
+
+    sendDriverClientMessage(driverToken: string, deliveryId: number, text: string): Observable<any> {
+        return this.http.post<any>(`${this.base}/driver/${driverToken}/deliver/${deliveryId}/chat`, { text });
+    }
+
+    // ── Driver Expenses ──
+    addDriverExpense(driverToken: string, data: any): Observable<any> {
+        const fd = new FormData();
+        fd.append('expenseType', data.type);
+        fd.append('amount', data.amount.toString());
+        if (data.notes) fd.append('notes', data.notes);
+        if (data.photo) fd.append('photo', data.photo);
+        return this.http.post(`${this.base}/driver/${driverToken}/expenses`, fd);
+    }
+
+    // ── Route Mutation ──
+    addOrderToRoute(routeId: number, orderId: number): Observable<any> {
+        return this.http.post(`${this.base}/routes/${routeId}/add-order`, orderId);
+    }
+
+    removeOrderFromRoute(routeId: number, orderId: number): Observable<any> {
+        return this.http.delete(`${this.base}/routes/${routeId}/remove-order/${orderId}`);
+    }
+
+    // ── Route Reorder ──
+    reorderRouteDeliveries(routeId: number, deliveryIds: number[]): Observable<any> {
+        return this.http.put<any>(`${this.base}/routes/${routeId}/reorder`, deliveryIds);
+    }
 }
