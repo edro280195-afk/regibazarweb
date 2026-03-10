@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS } from '../../../core/models';
+import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto } from '../../../core/models';
 import { gsap } from 'gsap';
+import * as QRCode from 'qrcode';
 
 @Component({
   selector: 'app-orders',
@@ -362,6 +363,51 @@ import { gsap } from 'gsap';
               </div>
             </div>
 
+            <!-- Logística (Bolsas Anti-Pérdidas) -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm mb-5">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🏷️ Logística y Etiquetas</h4>
+                @if (packages().length > 1) {
+                  <button class="bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 hover:from-purple-200 hover:to-indigo-200 border border-purple-200 px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1 shadow-sm transition-all animate-pulse-pink" (click)="printAllLabels()">
+                    Imprimir Todas ({{ packages().length }}) 🖨️✨
+                  </button>
+                }
+              </div>
+              
+              @if (isLoadingPackages()) {
+                <div class="shimmer h-12 rounded-xl w-full"></div>
+              } @else {
+                <div class="space-y-2 mb-4">
+                  @for (pkg of packages(); track pkg.id) {
+                    <div class="flex items-center justify-between p-2.5 bg-white/80 rounded-xl border border-pink-100 shadow-sm transition-all hover:shadow-md hover:border-pink-200">
+                      <div class="flex gap-2 items-center">
+                        <span class="text-xl">🛍️</span>
+                        <div>
+                          <p class="text-xs font-bold text-pink-900">Bolsa {{ pkg.packageNumber }}</p>
+                          <p class="text-[9px] text-pink-400 font-medium font-mono truncate w-24">{{ pkg.qrCodeValue }}...</p>
+                        </div>
+                      </div>
+                      <button class="bg-gradient-to-r from-pink-100 to-rose-100 text-pink-600 hover:from-pink-200 hover:to-rose-200 border border-pink-200 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm transition-all" (click)="printLabel(pkg, selectedOrder()!)">
+                        🖨️ Imprimir
+                      </button>
+                    </div>
+                  }
+                </div>
+
+                <div class="flex items-center gap-2 bg-pink-50/50 p-3 rounded-xl border border-pink-100">
+                  <div class="flex flex-col grow">
+                    <p class="text-[9px] font-black text-pink-400 uppercase mb-1">Deseas agregar más?</p>
+                    <div class="flex gap-2">
+                       <input type="number" class="input-coquette py-1.5 px-3 w-20 text-sm text-center" [(ngModel)]="packagesToGenerate" min="1" />
+                       <button class="btn-coquette btn-pink text-[10px] shadow-sm grow py-2 font-black" (click)="generatePackages(packagesToGenerate)">
+                         {{ packages().length > 0 ? '+ Agregar Bolsas' : 'Generar Bolsas' }}
+                       </button>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+
             <!-- Quick Payments -->
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
               <div class="flex items-center justify-between mb-3">
@@ -468,6 +514,11 @@ export class OrdersComponent implements OnInit {
   showClientEdit = signal(false);
   editClientData = { name: '', phone: '', address: '', type: 'Nueva' };
 
+  // Logistics
+  packages = signal<OrderPackageDto[]>([]);
+  isLoadingPackages = signal(false);
+  packagesToGenerate = 1;
+
   ngOnInit(): void {
     this.loadOrders();
     this.api.getSalesPeriods().subscribe({
@@ -548,6 +599,7 @@ export class OrdersComponent implements OnInit {
   selectOrder(order: OrderSummaryDto): void {
     this.selectedOrder.set(order);
     this.reloadSelectedOrder();
+    this.loadPackages(order.id);
     this.paymentAmount = 0;
     this.drawerOpen.set(true);
     this.resetNewItemForm();
@@ -803,6 +855,251 @@ export class OrdersComponent implements OnInit {
       error: () => this.toast.error('Error al procesar Excel')
     });
   }
+
+  loadPackages(orderId: number) {
+    this.isLoadingPackages.set(true);
+    this.api.getPackages(orderId).subscribe({
+      next: (pkgs) => {
+        this.packages.set(pkgs);
+        this.isLoadingPackages.set(false);
+      },
+      error: () => {
+        this.toast.error('Error al cargar bolsas');
+        this.isLoadingPackages.set(false);
+      }
+    });
+  }
+
+  generatePackages(count: number) {
+    const order = this.selectedOrder();
+    if (!order || count < 1) return;
+    this.isLoadingPackages.set(true);
+    this.api.generatePackages(order.id, { count }).subscribe({
+      next: () => {
+        // Essential: reload the full list of packages for the order
+        // to ensure we have ALL packages and correct total counts.
+        this.loadPackages(order.id);
+        this.toast.success('Bolsas agregadas 🏷️');
+        this.packagesToGenerate = 1; // Reset to default
+      },
+      error: () => {
+        this.toast.error('Error al generar bolsas');
+        this.isLoadingPackages.set(false);
+      }
+    });
+  }
+
+  async printLabel(pkg: OrderPackageDto, orderData: OrderSummaryDto) {
+    const html = await this.generateLabelHtml(pkg, orderData, this.packages().length);
+    this.openPrintWindow(html, `Etiqueta Bolsa ${pkg.packageNumber}`);
+  }
+
+  async printAllLabels() {
+    const order = this.selectedOrder();
+    if (!order || !this.packages().length) return;
+
+    try {
+      let combinedHtml = '';
+      const total = this.packages().length;
+
+      for (const pkg of this.packages()) {
+        const labelHtml = await this.generateLabelHtml(pkg, order, total, true);
+        combinedHtml += labelHtml;
+      }
+
+      const fullHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              @page { margin: 0; size: 100mm 150mm; }
+              body { margin: 0; padding: 0; }
+              .page-break { page-break-after: always; }
+              /* Strict styles from the user template */
+              .label-wrapper { 
+                margin: 0; padding: 4mm; box-sizing: border-box; 
+                width: 100mm; height: 148mm; overflow: hidden;
+                font-family: Arial, sans-serif; display: flex; 
+                flex-direction: column; justify-content: space-between; align-items: center;
+              }
+              .header { text-align: center; width: 100%; }
+              .header h2 { margin: 2px 0; font-size: 16px; font-weight: bold; }
+              .header h3 { margin: 2px 0; font-size: 14px; font-weight: normal; }
+              .info { 
+                text-align: left; width: 100%; font-size: 16px; font-weight: bold; 
+                border-top: 2px dashed #000; border-bottom: 2px dashed #000; 
+                padding: 5px 0; margin: 5px 0;
+              }
+              .info p { margin: 2px 0; }
+              .qr-container { 
+                display: flex; justify-content: center; align-items: center; 
+                flex-grow: 1; width: 100%; overflow: hidden;
+              }
+              .qr-container img { max-width: 75mm; max-height: 75mm; width: auto; height: auto; }
+              .footer { text-align: center; width: 100%; }
+              .footer h1 { margin: 0; font-size: 28px; font-weight: bold; text-transform: uppercase;}
+              .footer p { margin: 2px 0; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            ${combinedHtml}
+            <script>
+              window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 500); }
+            </script>
+          </body>
+        </html>
+      `;
+
+      this.openPrintWindow(fullHtml, `Etiquetas Pedido ${order.id}`);
+    } catch (e) {
+      console.error(e);
+      this.toast.error('Error al generar etiquetas masivas 🖨️');
+    }
+  }
+
+  private async generateLabelHtml(pkg: OrderPackageDto, orderData: OrderSummaryDto, totalPackages: number, isBulk = false): Promise<string> {
+    // Generate QR with High error correction (H) so the logo doesn't break it
+    const qrDataUrl = await QRCode.toDataURL(pkg.qrCodeValue, {
+      errorCorrectionLevel: 'H',
+      width: 400,
+      margin: 1
+    });
+
+    let finalQrUrl = qrDataUrl;
+
+    try {
+      // Create canvas to merge QR + Logo
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d')!;
+
+      // Load QR Image
+      const qrImg = new Image();
+      qrImg.src = qrDataUrl;
+      await new Promise((resolve, reject) => {
+        qrImg.onload = resolve;
+        qrImg.onerror = reject;
+      });
+      ctx.drawImage(qrImg, 0, 0);
+
+      // Load Logo Image
+      const logoUrl = window.location.origin + '/assets/logo-termico.png';
+      const logoImg = new Image();
+      logoImg.crossOrigin = "anonymous"; // Important if served from different origin
+      logoImg.src = logoUrl;
+
+      await new Promise((resolve) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = resolve; // Continue even if logo fails
+      });
+
+      if (logoImg.complete && logoImg.naturalWidth > 0) {
+        // Draw white background for the logo center
+        const logoSize = 100;
+        const center = (400 - logoSize) / 2;
+        ctx.fillStyle = 'white';
+        // Rounded corner effect for the logo pocket
+        this.fillRoundedRect(ctx, center - 2, center - 2, logoSize + 4, logoSize + 4, 10);
+        ctx.drawImage(logoImg, center, center, logoSize, logoSize);
+        finalQrUrl = canvas.toDataURL('image/png');
+      }
+    } catch (e) {
+      console.warn('Could not add logo to QR, falling back to basic QR', e);
+    }
+
+    const content = `
+      <div class="label-wrapper ${isBulk ? 'page-break' : ''}">
+        <div class="header">
+          <h2>REGI BAZAR</h2>
+          <h3>Todo para tu hogar</h3>
+          <h3>¡Gracias por tu compra! 🌸</h3>
+        </div>
+        <div class="info">
+          <p>Para: ${orderData.clientName}</p>
+          <p>Pedido: #${orderData.id}</p>
+        </div>
+        <div class="qr-container">
+          <img src="${finalQrUrl}" alt="QR" />
+        </div>
+        <div class="footer">
+          <h1>Bolsa ${pkg.packageNumber} de ${totalPackages}</h1>
+          <hr style="border: 1px solid black; margin: 5px 0;" />
+          <p>FB: Regi Bazar</p>
+        </div>
+      </div>
+    `;
+
+    if (isBulk) return content;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            @page { margin: 0; size: 100mm 150mm; }
+            body { margin: 0; padding: 0; }
+            .label-wrapper { 
+              margin: 0; padding: 4mm; box-sizing: border-box; 
+              width: 100mm; height: 148mm; overflow: hidden;
+              font-family: Arial, sans-serif; display: flex; 
+              flex-direction: column; justify-content: space-between; align-items: center;
+            }
+            .header { text-align: center; width: 100%; }
+            .header h2 { margin: 2px 0; font-size: 16px; font-weight: bold; }
+            .header h3 { margin: 2px 0; font-size: 14px; font-weight: normal; }
+            .info { 
+              text-align: left; width: 100%; font-size: 16px; font-weight: bold; 
+              border-top: 2px dashed #000; border-bottom: 2px dashed #000; 
+              padding: 5px 0; margin: 5px 0;
+            }
+            .info p { margin: 2px 0; }
+            .qr-container { 
+              display: flex; justify-content: center; align-items: center; 
+              flex-grow: 1; width: 100%; overflow: hidden;
+            }
+            .qr-container img { max-width: 75mm; max-height: 75mm; width: auto; height: auto; }
+            .footer { text-align: center; width: 100%; }
+            .footer h1 { margin: 0; font-size: 28px; font-weight: bold; text-transform: uppercase;}
+            .footer p { margin: 2px 0; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          ${content}
+          <script>
+            window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 300); }
+          </script>
+        </body>
+      </html>
+    `;
+  }
+
+  private fillRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private openPrintWindow(html: string, title: string) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      this.toast.error('Bloqueador de ventanas activo 🚫');
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.title = title;
+    printWindow.document.close();
+  }
+
   private animateList(): void {
     gsap.to('.order-card-anim', {
       opacity: 1,

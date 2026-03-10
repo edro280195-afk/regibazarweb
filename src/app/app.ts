@@ -30,7 +30,7 @@ export class App implements OnInit {
       if (data.url.includes('regibazar.com')) {
         const urlObj = new URL(data.url);
         const path = urlObj.pathname;
-        if (path.startsWith('/driver/')) {
+        if (path.startsWith('/repartidor/')) {
           this.zone.run(() => {
             this.router.navigateByUrl(path);
           });

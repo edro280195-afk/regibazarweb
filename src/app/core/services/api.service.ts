@@ -8,7 +8,7 @@ import {
     FinancialReportDto, DriverExpenseDto, ManualOrderRequest, OrderStatsDto,
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
-    CommonProductDto, GlowUpReportDto, OrderPaymentDto
+    CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -62,6 +62,14 @@ export class ApiService {
 
     deleteOrder(id: number): Observable<any> {
         return this.http.delete(`${this.base}/orders/${id}`);
+    }
+
+    getPackages(orderId: number): Observable<OrderPackageDto[]> {
+        return this.http.get<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages`);
+    }
+
+    generatePackages(orderId: number, data: GeneratePackagesRequest): Observable<OrderPackageDto[]> {
+        return this.http.post<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/generate`, data);
     }
 
     addPayment(orderId: number, payment: AddPaymentRequest): Observable<OrderPaymentDto> {

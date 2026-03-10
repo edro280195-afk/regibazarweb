@@ -479,3 +479,17 @@ export interface GlowUpReportDto {
     topProduct: string;
     newClients: number;
 }
+
+export interface OrderPackageDto {
+    id: string; // Guid
+    packageNumber: number;
+    qrCodeValue: string;
+    status: string;
+    createdAt: string;
+    loadedAt?: string;
+    deliveredAt?: string;
+}
+
+export interface GeneratePackagesRequest {
+    count: number;
+}
