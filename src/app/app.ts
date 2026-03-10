@@ -1,5 +1,6 @@
-import { Component, HostListener, inject } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, HostListener, inject, NgZone, OnInit } from '@angular/core';
+import { RouterOutlet, Router } from '@angular/router';
+import { App as CapacitorApp } from '@capacitor/app';
 import { ToastComponent } from './shared/components/toast/toast.component';
 
 import { PwaUpdateService } from './core/services/pwa-update.service';
@@ -18,9 +19,25 @@ import { PwaUpdateService } from './core/services/pwa-update.service';
     }
   `]
 })
-export class App {
+export class App implements OnInit {
   private pwaUpdate = inject(PwaUpdateService);
+  private router = inject(Router);
+  private zone = inject(NgZone);
   private emojis = ['💖', '🌸', '✨', '💕', '🎀'];
+
+  ngOnInit() {
+    CapacitorApp.addListener('appUrlOpen', data => {
+      if (data.url.includes('regibazar.com')) {
+        const urlObj = new URL(data.url);
+        const path = urlObj.pathname;
+        if (path.startsWith('/driver/')) {
+          this.zone.run(() => {
+            this.router.navigateByUrl(path);
+          });
+        }
+      }
+    });
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
