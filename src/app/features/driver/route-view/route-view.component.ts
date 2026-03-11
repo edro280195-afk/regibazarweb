@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-const BackgroundGeolocation = registerPlugin<any>('BackgroundGeolocation');
+import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
@@ -166,11 +167,16 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
     // ═══ GPS ═══
     startGps(): void {
-        if (!Capacitor.isNativePlatform() && !navigator.geolocation) { this.showToast('Tu navegador no soporta GPS'); return; }
+        const isNative = Capacitor.isNativePlatform();
+        if (!isNative && !navigator.geolocation) { 
+            this.showToast('Tu navegador no soporta GPS'); 
+            return; 
+        }
+        
         this.gpsActive.set(true);
         localStorage.setItem(GPS_KEY, 'true');
 
-        if (!Capacitor.isNativePlatform()) {
+        if (!isNative) {
             this.watchId = navigator.geolocation.watchPosition(
                 pos => {
                     this.lastLat = pos.coords.latitude;
@@ -183,32 +189,42 @@ export class RouteViewComponent implements OnInit, OnDestroy {
                         this.api.updateLocation(this.token, this.lastLat, this.lastLng).subscribe();
                         this.signalr.reportLocation(this.token, this.lastLat, this.lastLng);
                     }
-                    // Update only the route line — no markers, no fitBounds
                     this.updateRouteDirection();
                 },
                 () => this.showToast('Error al obtener GPS 📍'),
                 { enableHighAccuracy: true, maximumAge: 5000 }
             );
         } else {
+            // Specialized logic for Android 14+ Background Persistence
             BackgroundGeolocation.addWatcher(
                 {
-                    backgroundMessage: "Enviando ubicación a la base",
-                    backgroundTitle: "Regi Bazar - Chofer",
+                    backgroundMessage: "Manteniendo la ruta activa para las entregas de Regi Bazar.",
+                    backgroundTitle: "Regi Bazar - Ruta en curso",
                     requestPermissions: true,
                     stale: false,
-                    distanceFilter: 10
+                    distanceFilter: 15 // Optimización de batería y precisión
                 },
-                (location: any, error: any) => {
-                    if (error) { this.showToast('Error GPS Background 📍'); return; }
+                (location, error) => {
+                    if (error) { 
+                        console.error("Error GPS Background:", error);
+                        this.showToast('Error GPS Background 📍'); 
+                        return; 
+                    }
                     if (location) {
                         this.lastLat = location.latitude;
                         this.lastLng = location.longitude;
+                        
+                        // Sincronización inmediata con UI (Markers y Mapa)
                         this.updateDriverMarker(this.lastLat, this.lastLng);
                         if (this.map) this.map.panTo({ lat: this.lastLat, lng: this.lastLng });
+                        
+                        // Sincronización inmediata con Backend y SignalR (Admin/Client Views)
                         const now = Date.now();
                         if (now - this.lastGpsSendTime >= 10000) {
                             this.lastGpsSendTime = now;
-                            this.api.updateLocation(this.token, this.lastLat, this.lastLng).subscribe();
+                            this.api.updateLocation(this.token, this.lastLat, this.lastLng).subscribe({
+                                error: (err) => console.error("Error enviando ubicación al API", err)
+                            });
                             this.signalr.reportLocation(this.token, this.lastLat, this.lastLng);
                         }
                         this.updateRouteDirection();

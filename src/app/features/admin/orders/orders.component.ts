@@ -1,4 +1,5 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -479,12 +480,48 @@ import * as QRCode from 'qrcode';
           </div>
         </div>
       }
+
+      <!-- Print Preview Modal -->
+      @if (showPrintPreview() && printHtml()) {
+        <div class="fixed inset-0 z-[150] bg-pink-900/60 flex items-center justify-center p-2 md:p-4 animate-fade-in">
+          <div class="bg-white rounded-[2rem] md:rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-[0_32px_64px_-12px_rgba(244,114,182,0.3)] border border-pink-100/50 flex flex-col animate-scale-up" style="max-height: 95vh; contain: content;">
+            <!-- Modal Header -->
+            <div class="px-8 py-6 bg-gradient-to-r from-pink-100/40 to-rose-50/40 border-b border-pink-100/40 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-sm border border-pink-100">🖨️</div>
+                <div>
+                  <h3 class="text-xl font-black text-pink-900">Vista Previa</h3>
+                  <p class="text-[10px] text-pink-400 font-bold uppercase tracking-wider">Confirma la etiqueta antes de imprimir</p>
+                </div>
+              </div>
+              <button class="w-10 h-10 rounded-full bg-white text-pink-300 hover:text-pink-600 hover:bg-pink-50 transition-all shadow-sm flex items-center justify-center border border-pink-100" (click)="closePrintPreview()">✕</button>
+            </div>
+
+            <!-- Preview Body -->
+            <div class="flex-1 overflow-auto p-4 md:p-12 bg-pink-50/30 flex justify-center items-start">
+              <div class="bg-white shadow-2xl border-2 border-dashed border-pink-200 p-1 scale-75 md:scale-90 origin-top rounded-sm" 
+                   [innerHTML]="safePrintHtml()" 
+                   style="width: 100mm; min-height: 148mm; background: white;">
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-8 bg-white border-t border-pink-100/40 flex gap-4">
+              <button class="flex-1 btn-coquette btn-outline-pink py-4 font-black text-sm" (click)="closePrintPreview()">Regresar ✨</button>
+              <button class="flex-1 btn-coquette btn-pink py-4 font-black text-sm shadow-xl shadow-pink-200/50 flex items-center justify-center gap-2 group" (click)="executePrint()">
+                <span class="text-xl group-hover:animate-bounce">🖨️</span> Imprimir Etiqueta
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
 export class OrdersComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
+  private sanitizer = inject(DomSanitizer);
 
   orders = signal<OrderSummaryDto[]>([]);
   loading = signal(true);
@@ -518,6 +555,12 @@ export class OrdersComponent implements OnInit {
   packages = signal<OrderPackageDto[]>([]);
   isLoadingPackages = signal(false);
   packagesToGenerate = 1;
+
+  // Printing
+  showPrintPreview = signal(false);
+  printHtml = signal('');
+  safePrintHtml = computed(() => this.sanitizer.bypassSecurityTrustHtml(this.printHtml()));
+  private printIframe?: HTMLIFrameElement;
 
   ngOnInit(): void {
     this.loadOrders();
@@ -1017,7 +1060,6 @@ export class OrdersComponent implements OnInit {
         </div>
         <div class="info">
           <p>Para: ${orderData.clientName}</p>
-          <p>Pedido: #${orderData.id}</p>
         </div>
         <div class="qr-container">
           <img src="${finalQrUrl}" alt="QR" />
@@ -1090,14 +1132,54 @@ export class OrdersComponent implements OnInit {
   }
 
   private openPrintWindow(html: string, title: string) {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      this.toast.error('Bloqueador de ventanas activo 🚫');
-      return;
+    this.printHtml.set(html);
+    this.showPrintPreview.set(true);
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+  }
+
+  closePrintPreview() {
+    this.showPrintPreview.set(false);
+    this.printHtml.set('');
+    if (!this.drawerOpen()) {
+      document.body.style.overflow = '';
     }
-    printWindow.document.write(html);
-    printWindow.document.title = title;
-    printWindow.document.close();
+  }
+
+  executePrint() {
+    const html = this.printHtml();
+    if (!html) return;
+
+    // Use a hidden iframe to print
+    if (this.printIframe) {
+      document.body.removeChild(this.printIframe);
+    }
+
+    this.printIframe = document.createElement('iframe');
+    this.printIframe.id = 'print-iframe';
+    this.printIframe.style.position = 'fixed';
+    this.printIframe.style.right = '0';
+    this.printIframe.style.bottom = '0';
+    this.printIframe.style.width = '1px';
+    this.printIframe.style.height = '1px';
+    this.printIframe.style.opacity = '0.01';
+    this.printIframe.style.border = '0';
+    document.body.appendChild(this.printIframe);
+
+    const doc = this.printIframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      const cleanHtml = html.replace(/<script>[\s\S]*?<\/script>/g, '');
+      doc.write(cleanHtml);
+      doc.close();
+
+      setTimeout(() => {
+        if (this.printIframe?.contentWindow) {
+          this.printIframe.contentWindow.focus();
+          this.printIframe.contentWindow.print();
+        }
+      }, 800);
+    }
   }
 
   private animateList(): void {
