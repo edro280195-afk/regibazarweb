@@ -122,7 +122,7 @@ export class ApiService {
         return this.http.get<ClientDto>(`${this.base}/clients/${id}`);
     }
 
-    updateClient(id: number, data: { name: string; phone?: string; address?: string; tag: string; type: string }): Observable<any> {
+    updateClient(id: number, data: { name: string; phone?: string; address?: string; tag: string; type: string; deliveryInstructions?: string }): Observable<any> {
         return this.http.put(`${this.base}/clients/${id}`, data);
     }
 
@@ -242,6 +242,10 @@ export class ApiService {
 
     publicSendChatMessage(accessToken: string, text: string): Observable<any> {
         return this.http.post(`${this.base}/pedido/${accessToken}/chat`, { text });
+    }
+    
+    publicUpdateInstructions(accessToken: string, instructions: string): Observable<any> {
+        return this.http.patch(`${this.base}/pedido/${accessToken}/instructions`, { instructions });
     }
 
     // ── Driver (Repartidor) ──

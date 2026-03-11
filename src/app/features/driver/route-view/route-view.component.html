@@ -143,6 +143,13 @@
                             }
                         </div>
 
+                        @if (d.deliveryInstructions) {
+                            <div class="instructions-panel">
+                                <strong>📍 Instrucciones:</strong>
+                                <p>{{ d.deliveryInstructions }}</p>
+                            </div>
+                        }
+
                         <textarea [(ngModel)]="deliveryNotes[d.id]" placeholder="Notas de entrega..."
                             class="notes-input" rows="2"></textarea>
 

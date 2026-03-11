@@ -218,6 +218,46 @@ import gsap from 'gsap';
             }
           </div>
 
+          <!-- Delivery Instructions (Editable for Client) -->
+          <div class="mt-4 p-4 rounded-3xl bg-white/80 backdrop-blur-xl border border-pink-100 shadow-sm animate-fade-in-up" style="animation-delay: 75ms">
+            <h4 class="text-xs font-black text-pink-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+              📍 Instrucciones de Entrega
+              @if (savingInstructions()) {
+                <span class="inline-block w-3 h-3 border-2 border-pink-300 border-t-pink-500 rounded-full animate-spin"></span>
+              }
+            </h4>
+            
+            @if (isEditingInstructions()) {
+              <div class="relative">
+                <textarea [(ngModel)]="localInstructions" 
+                          rows="3"
+                          class="w-full bg-pink-50/50 border-2 border-pink-200 rounded-2xl p-3 text-sm focus:outline-none focus:border-pink-400 transition-all font-medium placeholder:text-pink-300"
+                          placeholder="Ej: Portón blanco, dejar con el guardia, timbre no sirve..."></textarea>
+                <div class="flex gap-2 mt-2">
+                  <button (click)="saveInstructions()" 
+                          [disabled]="savingInstructions()"
+                          class="flex-1 bg-pink-500 text-white font-bold py-2 rounded-xl text-xs shadow-md active:scale-95 transition-all disabled:opacity-50">
+                    Guardar ✨
+                  </button>
+                  <button (click)="isEditingInstructions.set(false)" 
+                          class="bg-gray-100 text-gray-500 font-bold py-2 px-4 rounded-xl text-xs active:scale-95 transition-all">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div (click)="startEditingInstructions()" 
+                   class="group cursor-pointer min-h-[50px] flex flex-col justify-center">
+                @if (o.deliveryInstructions) {
+                  <p class="text-sm text-pink-900 font-medium leading-relaxed">{{ o.deliveryInstructions }}</p>
+                  <span class="text-[10px] text-pink-400 font-bold mt-1 group-hover:text-pink-500 transition-colors">Toca para editar ✏️</span>
+                } @else {
+                  <p class="text-sm text-pink-300 italic">No hay instrucciones. Toca para agregar señas particulares o referencias 💕</p>
+                }
+              </div>
+            }
+          </div>
+
           <!-- Pending Confirmation Card -->
           @if (o.status === 'Pending') {
             <div id="confirm-card" class="bg-white/80 backdrop-blur-xl rounded-3xl p-6 mb-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/80 text-center animate-fade-in-up transform transition duration-500">
@@ -655,6 +695,11 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Timeline State
   timelineSteps = signal<{ label: string, date: Date | null, done: boolean, active: boolean, icon: string }[]>([]);
+
+  // Delivery Instructions State
+  isEditingInstructions = signal(false);
+  savingInstructions = signal(false);
+  localInstructions = '';
 
   // --- MAP STEROIDS ---
   private mapInitialized = false;
@@ -1451,6 +1496,30 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   revealSurprise() {
     this.fireConfetti('surprise');
     this.showSurprise.set(true);
+  }
+
+  // --- DELIVERY INSTRUCTIONS LOGIC ---
+  startEditingInstructions() {
+    this.localInstructions = this.order()?.deliveryInstructions || '';
+    this.isEditingInstructions.set(true);
+  }
+
+  saveInstructions() {
+    if (!this.accessToken) return;
+    this.savingInstructions.set(true);
+
+    this.api.publicUpdateInstructions(this.accessToken, this.localInstructions).subscribe({
+      next: (res) => {
+        this.order.update(prev => prev ? { ...prev, deliveryInstructions: this.localInstructions } : null);
+        this.isEditingInstructions.set(false);
+        this.savingInstructions.set(false);
+        this.showToast('Instrucciones guardadas ✨');
+      },
+      error: (err) => {
+        this.savingInstructions.set(false);
+        this.showToast('Error al guardar 💔');
+      }
+    });
   }
 
 }

@@ -43,6 +43,7 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
                   <input class="input-coquette" [(ngModel)]="editData.phone" placeholder="Teléfono" />
                   <input class="input-coquette" [(ngModel)]="editData.address" placeholder="Dirección" 
                          appGoogleAutocomplete (placeChanged)="onAddressSelected($event)" />
+                  <textarea class="input-coquette text-xs py-1.5" [(ngModel)]="editData.deliveryInstructions" placeholder="Instrucciones de entrega predeterminadas" rows="2"></textarea>
                   <div class="flex gap-3">
                     <select class="input-coquette" [(ngModel)]="editData.tag">
                       <option value="None">Normal</option>
@@ -144,7 +145,7 @@ export class ClientProfileComponent implements OnInit {
   loading = signal(true);
   editing = signal(false);
   isSaving = signal(false);
-  editData = { name: '', phone: '', address: '', tag: 'None', type: 'Nueva' };
+  editData = { name: '', phone: '', address: '', tag: 'None', type: 'Nueva', deliveryInstructions: '' };
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -165,7 +166,7 @@ export class ClientProfileComponent implements OnInit {
 
   startEdit(): void {
     const c = this.client()!;
-    this.editData = { name: c.name, phone: c.phone || '', address: c.address || '', tag: c.tag, type: c.type || 'Nueva' };
+    this.editData = { name: c.name, phone: c.phone || '', address: c.address || '', tag: c.tag, type: c.type || 'Nueva', deliveryInstructions: c.deliveryInstructions || '' };
     this.editing.set(true);
   }
 

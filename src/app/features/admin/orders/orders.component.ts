@@ -3,6 +3,8 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { Capacitor } from '@capacitor/core';
+import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto } from '../../../core/models';
@@ -218,6 +220,7 @@ import * as QRCode from 'qrcode';
                     <input class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.name" placeholder="Nombre completo" />
                     <input class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.phone" placeholder="Teléfono" />
                     <input class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.address" placeholder="Dirección" />
+                    <textarea class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.deliveryInstructions" placeholder="Instrucciones de entrega (Clienta)" rows="2"></textarea>
                     <select class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.type">
                       <option value="Nueva">Nueva</option>
                       <option value="Frecuente">Frecuente</option>
@@ -284,6 +287,16 @@ import * as QRCode from 'qrcode';
                   }
                 </select>
               </div>
+            </div>
+
+            <!-- Delivery Instructions (Order Specific) -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
+                <h4 class="text-xs font-black text-pink-600 mb-2 uppercase tracking-widest flex items-center gap-2">📍 Instrucciones de Entrega (Este Pedido)</h4>
+                <textarea class="input-coquette text-xs py-2 w-full" 
+                          [(ngModel)]="selectedOrder()!.deliveryInstructions" 
+                          placeholder="Instrucciones específicas para este pedido..."
+                          rows="2"
+                          (change)="updateOrderInstructions()"></textarea>
             </div>
 
             <!-- Shipping Cost Editor -->
@@ -549,7 +562,7 @@ export class OrdersComponent implements OnInit {
 
   // Quick Client Edit
   showClientEdit = signal(false);
-  editClientData = { name: '', phone: '', address: '', type: 'Nueva' };
+  editClientData = { name: '', phone: '', address: '', type: 'Nueva', deliveryInstructions: '' };
 
   // Logistics
   packages = signal<OrderPackageDto[]>([]);
@@ -739,7 +752,8 @@ export class OrdersComponent implements OnInit {
         name: o.clientName,
         phone: o.clientPhone || '',
         address: o.clientAddress || '',
-        type: o.clientType || 'Nueva'
+        type: o.clientType || 'Nueva',
+        deliveryInstructions: o.deliveryInstructions || ''
       };
     }
     this.showClientEdit.update(v => !v);
@@ -753,7 +767,8 @@ export class OrdersComponent implements OnInit {
       clientName: this.editClientData.name,
       clientPhone: this.editClientData.phone,
       clientAddress: this.editClientData.address,
-      clientType: this.editClientData.type
+      clientType: this.editClientData.type,
+      deliveryInstructions: this.editClientData.deliveryInstructions
     }).subscribe({
       next: () => {
         this.toast.success('Datos de clienta actualizados 👤💖');
@@ -958,7 +973,6 @@ export class OrdersComponent implements OnInit {
               @page { margin: 0; size: 100mm 150mm; }
               body { margin: 0; padding: 0; }
               .page-break { page-break-after: always; }
-              /* Strict styles from the user template */
               .label-wrapper { 
                 margin: 0; padding: 4mm; box-sizing: border-box; 
                 width: 100mm; height: 148mm; overflow: hidden;
@@ -986,9 +1000,6 @@ export class OrdersComponent implements OnInit {
           </head>
           <body>
             ${combinedHtml}
-            <script>
-              window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 500); }
-            </script>
           </body>
         </html>
       `;
@@ -1150,7 +1161,17 @@ export class OrdersComponent implements OnInit {
     const html = this.printHtml();
     if (!html) return;
 
-    // Use a hidden iframe to print
+    if (Capacitor.isNativePlatform()) {
+      Printer.printHtml({ html }).then(() => {
+        this.toast.success('Impresión enviada 🖨️');
+      }).catch((err: any) => {
+        console.error('Error al imprimir nativamente:', err);
+        this.toast.error('Error al conectar con la impresora');
+      });
+      return;
+    }
+
+    // Use a hidden iframe to print on Web
     if (this.printIframe) {
       document.body.removeChild(this.printIframe);
     }
@@ -1190,6 +1211,18 @@ export class OrdersComponent implements OnInit {
       stagger: 0.05,
       ease: 'power2.out',
       overwrite: true
+    });
+  }
+
+  updateOrderInstructions(): void {
+    const order = this.selectedOrder();
+    if (!order) return;
+    this.api.updateOrderDetails(order.id, {
+      deliveryInstructions: order.deliveryInstructions,
+      clientName: order.clientName
+    }).subscribe({
+      next: () => this.toast.success('Instrucciones guardadas ✨'),
+      error: () => this.toast.error('Error al guardar instrucciones')
     });
   }
 }

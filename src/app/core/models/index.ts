@@ -134,6 +134,7 @@ export interface OrderSummaryDto {
     salesPeriodName?: string;
     clientId?: number;
     tags?: string[];
+    deliveryInstructions?: string;
 }
 
 export interface PagedResult<T> {
@@ -167,6 +168,7 @@ export interface ClientDto {
     ordersCount: number;
     totalSpent: number;
     type?: string;
+    deliveryInstructions?: string;
 }
 
 export interface MonthlySalesDto {
@@ -295,6 +297,7 @@ export interface RouteDeliveryDto {
     payments?: OrderPaymentDto[];
     amountPaid: number;
     balanceDue: number;
+    deliveryInstructions?: string;
 }
 
 export interface DriverExpenseDto {
@@ -400,6 +403,7 @@ export interface ManualOrderRequest {
     postponedAt?: string;
     postponedNote?: string;
     status?: string;
+    deliveryInstructions?: string;
 }
 
 export interface LoginRequest {
@@ -463,6 +467,7 @@ export interface UpdateOrderDetailsRequest {
     shippingCost?: number;
     advancePayment?: number;
     salesPeriodId?: number;
+    deliveryInstructions?: string;
 }
 
 export interface CreateAdminExpenseRequest {
