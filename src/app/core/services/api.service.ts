@@ -258,7 +258,7 @@ export class ApiService {
     }
 
     // ── AI Voice Routes ──
-    getAiRouteSelection(voiceCommand: string, availableOrders: Order[]): Observable<{ selectedOrderIds: number[], aiConfirmationMessage: string }> {
+    getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<{ selectedOrderIds: number[], aiConfirmationMessage: string }> {
         return this.http.post<{ selectedOrderIds: number[], aiConfirmationMessage: string }>(`${this.base}/routes/ai-select`, {
             voiceCommand,
             availableOrders

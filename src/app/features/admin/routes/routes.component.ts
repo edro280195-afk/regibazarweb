@@ -59,6 +59,44 @@ interface GeocodedOrder extends OrderSummaryDto {
              [style.transform]="'translateY(' + (scrollY() * 0.08) + 'px)'">🌸</div>
       </div>
 
+      <!-- ═══════════════════════════════════════════════════
+           LOADING OVERLAY INMERSIVO (Gemini Pensando)
+           ═══════════════════════════════════════════════════ -->
+      @if (isListeningVoice() || isProcessingVoice()) {
+        <div class="fixed inset-0 z-[5000] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in">
+           
+           @if (isListeningVoice()) {
+             <!-- Microfono Escuchando -->
+             <div class="relative w-32 h-32 mb-12 flex items-center justify-center">
+                 <div class="absolute inset-0 bg-pink-500 rounded-full blur-[40px] animate-[pulse_1.5s_ease-in-out_infinite] opacity-60"></div>
+                 <div class="absolute w-24 h-24 bg-white/10 border border-white/30 rounded-full animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+                 <div class="absolute flex items-center justify-center text-6xl drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] animate-bounce">🎙️</div>
+             </div>
+             
+             <h3 class="text-sm font-semibold text-white tracking-[0.4em] uppercase mb-4 font-sans animate-pulse">
+                Te estoy escuchando...
+             </h3>
+             <p class="text-pink-200/80 font-light tracking-wide text-xs">Habla ahora (Ej: "Susana, Mary y Ana")</p>
+           } @else {
+             <!-- Glowing AI Core Procesando -->
+             <div class="relative w-32 h-32 mb-12 flex items-center justify-center">
+                 <div class="absolute inset-0 bg-gradient-to-tr from-fuchsia-600 to-indigo-600 rounded-full blur-[30px] animate-[pulse_3s_ease-in-out_infinite] opacity-60"></div>
+                 <div class="absolute w-24 h-24 bg-white/10 border border-white/30 rounded-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+                 <div class="absolute w-12 h-12 bg-gradient-to-br from-white to-pink-100 rounded-full shadow-[0_0_20px_white] z-10 overflow-hidden">
+                     <div class="w-full h-full bg-gradient-to-tr from-purple-500/30 to-pink-500/30 animate-[spin_2s_linear_infinite]"></div>
+                 </div>
+             </div>
+             
+             <h3 class="text-sm font-semibold text-white/80 tracking-[0.4em] uppercase mb-8 font-sans">
+                Analizando Voz
+             </h3>
+             <div class="h-6 relative w-full max-w-md text-center flex justify-center mt-2">
+                <span class="absolute w-full text-pink-200/90 font-light tracking-wide text-sm animate-pulse">Traduciendo nombres a pedidos...</span>
+             </div>
+           }
+        </div>
+      }
+
       <!-- ═══ HEADER ═══ -->
       <div class="relative z-10 flex flex-wrap items-center justify-between gap-4 mb-8 animate-slide-down">
         <div>
@@ -662,6 +700,10 @@ export class RoutesComponent implements OnInit {
   tempAddress = '';
   isSavingAddress = signal(false);
 
+  // AI Voice Selection
+  isListeningVoice = signal(false);
+  isProcessingVoice = signal(false);
+
   // Optimizer V2
   showOptimizerModal = signal(false);
 
@@ -939,6 +981,79 @@ export class RoutesComponent implements OnInit {
       const next = new Set(s);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
+    });
+  }
+
+  // ─── AI VOICE ROUTE SELECTION ───
+  startVoiceSelection(): void {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      this.toast.error('Tu navegador no soporta el reconocimiento de voz. Usa Chrome o Safari.');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.lang = 'es-MX';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      this.isListeningVoice.set(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      this.isListeningVoice.set(false);
+      this.processVoiceCommandWithGemini(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      this.isListeningVoice.set(false);
+      if (event.error !== 'no-speech') {
+        this.toast.error('Ocurrió un error al escuchar. Intenta de nuevo.');
+      }
+    };
+
+    recognition.onend = () => {
+      if (this.isListeningVoice()) {
+        this.isListeningVoice.set(false);
+      }
+    };
+
+    recognition.start();
+  }
+
+  private processVoiceCommandWithGemini(command: string): void {
+    const orders = this.pendingOrders();
+    if (orders.length === 0) {
+      this.toast.error('No hay pedidos pendientes para seleccionar.');
+      return;
+    }
+
+    this.isProcessingVoice.set(true);
+
+    this.api.getAiRouteSelection(command, orders).subscribe({
+      next: (response) => {
+        this.isProcessingVoice.set(false);
+
+        if (response.selectedOrderIds && response.selectedOrderIds.length > 0) {
+          // Add the newly found IDs to the current selection
+          this.selectedOrderIds.update(s => {
+            const next = new Set(s);
+            response.selectedOrderIds.forEach(id => next.add(id));
+            return next;
+          });
+          
+          this.toast.success(`🤖 ${response.aiConfirmationMessage}`);
+        } else {
+          this.toast.info('🤖 Gemini no encontró pedidos que coincidan con lo que dijiste.');
+        }
+      },
+      error: () => {
+        this.isProcessingVoice.set(false);
+        this.toast.error('Error al comunicarse con Gemini. Intenta de nuevo.');
+      }
     });
   }
 
