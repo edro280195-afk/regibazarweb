@@ -33,6 +33,15 @@ interface LiveOrder {
   totalForSort: number;
 }
 
+interface TurboQueueItem {
+  id: string;
+  clientName: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  isExistingClient: boolean;
+}
+
 const NUMBER_WORDS: Record<string, number> = {
   'un': 1, 'una': 1, 'uno': 1, 'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5,
   'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10, 'once': 11, 'doce': 12,
@@ -58,7 +67,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
 
 
-  mode = signal<'manual' | 'live' | 'excel'>('manual');
+  mode = signal<'manual' | 'traditional' | 'live' | 'excel'>('manual');
   uploading = signal(false);
 
   // ═════════════════ SHARING RESULTS ═════════════════
@@ -93,33 +102,73 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   @ViewChild('manualQtyInput') manualQtyInput!: ElementRef<HTMLInputElement>;
   @ViewChild('manualPriceInput') manualPriceInput!: ElementRef<HTMLInputElement>;
 
-  // ═════════════════ LIVE MODE ═════════════════
-  livePhase = signal<'setup' | 'capturing' | 'review'>('setup');
+  // ═════════════════ TURBO MODE ═════════════════
+  turboInput = signal('');
+  turboOrderType = 'Delivery';
+  showTurboSuggestions = signal(false);
+  pinnedProduct = signal<{ name: string; price: number } | null>(null);
+  showPinForm = signal(false);
+  pinProductName = '';
+  pinProductPrice = 0;
+  turboQueue = signal<TurboQueueItem[]>([]);
+  lastAdded = signal<TurboQueueItem | null>(null);
+  turboProgress = signal('');
+  selectedSuggestionIdx = signal(-1);
+
+  turboSearchTerm = computed(() => {
+    const input = this.turboInput().trim();
+    if (!input) return '';
+    if (this.pinnedProduct()) {
+      return input.split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } else {
+      return input.split(',')[0].trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+  });
+
+  turboFilteredClients = computed(() => {
+    const s = this.turboSearchTerm();
+    if (!s || s.length < 1) return [];
+    return this.clients().filter(c => {
+      const cn = c.name?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') || '';
+      return cn.includes(s);
+    }).slice(0, 6);
+  });
+
+  turboTotal = computed(() => this.turboQueue().reduce((sum, i) => sum + (i.unitPrice * i.quantity), 0));
+
+  turboGroupedQueue = computed(() => {
+    const grouped = new Map<string, { clientName: string; items: TurboQueueItem[]; total: number }>();
+    // Iterate in reverse so newest items appear first in each group
+    const queue = [...this.turboQueue()];
+    for (const item of queue) {
+      const key = item.clientName.toLowerCase().trim();
+      if (!grouped.has(key)) {
+        grouped.set(key, { clientName: item.clientName, items: [], total: 0 });
+      }
+      const g = grouped.get(key)!;
+      g.items.push(item);
+      g.total += item.unitPrice * item.quantity;
+    }
+    return Array.from(grouped.values());
+  });
+
+  turboClientCount = computed(() => this.turboGroupedQueue().length);
+
+  // ═════════════════ AI LIVE MODE ═════════════════
   isListening = signal(false);
   recognition: any;
   interimTranscript = signal('');
+  liveTranscript = signal('');
+  isAnalyzing = signal(false);
+
+  // Inline AI results (staggered display)
+  aiResults = signal<{ id: string; clientName: string; productName: string; quantity: number; unitPrice: number; visible: boolean }[]>([]);
+  aiTotal = computed(() => this.aiResults().reduce((s, r) => s + r.unitPrice * r.quantity, 0));
+  aiVisibleCount = computed(() => this.aiResults().filter(r => r.visible).length);
+  aiSubmitting = signal(false);
+  aiProgress = signal('');
 
   textInput = '';
-  parsedPreview = signal<LiveCapture | null>(null);
-  liveCaptures = signal<LiveCapture[]>([]);
-  reviewOrders = signal<LiveOrder[]>([]);
-
-  liveCreating = signal(false);
-  liveCreateProgress = signal('');
-
-  liveTotalAmount = computed(() => {
-    return this.liveCaptures().reduce((sum, cap) => sum + cap.parsed.totalPrice, 0);
-  });
-
-  liveSelectedCount = computed(() => {
-    return this.reviewOrders().filter(o => o.selected).length;
-  });
-
-  liveSelectedTotal = computed(() => {
-    return this.reviewOrders()
-      .filter(o => o.selected)
-      .reduce((sum, o) => sum + o.totalForSort, 0);
-  });
 
   // ═════════════════ INIT & DESTROY ═════════════════
   ngOnInit() {
@@ -301,6 +350,228 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ═════════════════ TURBO METHODS ═════════════════
+  setPin() {
+    if (!this.pinProductName.trim() || this.pinProductPrice <= 0) return;
+    this.pinnedProduct.set({ name: this.pinProductName.trim(), price: this.pinProductPrice });
+    this.showPinForm.set(false);
+    this.pinProductName = '';
+    this.pinProductPrice = 0;
+    setTimeout(() => (document.querySelector('.turbo-input') as HTMLInputElement)?.focus(), 50);
+  }
+
+  clearPin() { this.pinnedProduct.set(null); }
+
+  onTurboType() {
+    this.showTurboSuggestions.set(true);
+    this.lastAdded.set(null);
+    this.selectedSuggestionIdx.set(-1);
+  }
+
+  onTurboKeydown(event: KeyboardEvent) {
+    const suggestions = this.turboFilteredClients();
+    const hasSuggestions = this.showTurboSuggestions() && suggestions.length > 0;
+
+    // Ctrl+Enter = submit queue
+    if (event.ctrlKey && event.key === 'Enter') {
+      event.preventDefault();
+      this.submitTurboQueue();
+      return;
+    }
+
+    // Escape = clear input or close suggestions
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (hasSuggestions) {
+        this.showTurboSuggestions.set(false);
+        this.selectedSuggestionIdx.set(-1);
+      } else {
+        this.turboInput.set('');
+      }
+      return;
+    }
+
+    // Arrow navigation in suggestions
+    if (event.key === 'ArrowDown' && hasSuggestions) {
+      event.preventDefault();
+      this.selectedSuggestionIdx.update(i => (i + 1) % suggestions.length);
+      return;
+    }
+    if (event.key === 'ArrowUp' && hasSuggestions) {
+      event.preventDefault();
+      this.selectedSuggestionIdx.update(i => i <= 0 ? suggestions.length - 1 : i - 1);
+      return;
+    }
+
+    // Enter = select suggestion OR parse input
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const idx = this.selectedSuggestionIdx();
+      if (hasSuggestions && idx >= 0 && idx < suggestions.length) {
+        this.selectTurboClient(suggestions[idx]);
+        this.selectedSuggestionIdx.set(-1);
+      } else {
+        this.onTurboEnter();
+      }
+      return;
+    }
+  }
+
+  hideTurboSuggestionsDelay() {
+    setTimeout(() => { this.showTurboSuggestions.set(false); this.selectedSuggestionIdx.set(-1); }, 200);
+  }
+
+  selectTurboClient(client: ClientDto) {
+    const pin = this.pinnedProduct();
+    if (pin) {
+      // Fill client name into input so user can type variant, then Enter to add
+      this.turboInput.set(client.name + ' ');
+      this.showTurboSuggestions.set(false);
+    } else {
+      const input = this.turboInput().trim();
+      const commaIdx = input.indexOf(',');
+      this.turboInput.set(commaIdx > -1 ? client.name + input.substring(commaIdx) : client.name + ', ');
+      this.showTurboSuggestions.set(false);
+    }
+    setTimeout(() => (document.querySelector('.turbo-input') as HTMLInputElement)?.focus(), 50);
+  }
+
+  onTurboEnter() {
+    const input = this.turboInput().trim();
+    if (!input) return;
+    const pin = this.pinnedProduct();
+
+    if (pin) {
+      const parts = input.split(/\s+/);
+      const matched = this.findBestClientMatch(input);
+      let clientName: string;
+      let variant: string;
+      if (matched) {
+        clientName = matched.name;
+        const nameLen = matched.name.split(/\s+/).length;
+        variant = parts.slice(nameLen).join(' ');
+      } else {
+        clientName = this.capitalizeWords(parts[0]);
+        variant = parts.slice(1).join(' ');
+      }
+      const productName = variant ? `${pin.name} ${variant}` : pin.name;
+      this.addItemToQueue(clientName, productName, 1, pin.price, !!matched);
+    } else {
+      const parsed = this.parseTurboFreeText(input);
+      if (!parsed) { this.toast.warning('Formato: Nombre, Artículo, Precio 💡'); return; }
+      this.addItemToQueue(parsed.clientName, parsed.productName, parsed.quantity, parsed.unitPrice, false);
+    }
+
+    this.turboInput.set('');
+    this.showTurboSuggestions.set(false);
+    setTimeout(() => (document.querySelector('.turbo-input') as HTMLInputElement)?.focus(), 50);
+  }
+
+  private findBestClientMatch(input: string): ClientDto | null {
+    const n = input.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const sorted = [...this.clients()].sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
+    for (const c of sorted) {
+      const cn = c.name?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') || '';
+      if (n.startsWith(cn + ' ') || n === cn) return c;
+    }
+    return null;
+  }
+
+  private parseTurboFreeText(text: string): { clientName: string; productName: string; quantity: number; unitPrice: number } | null {
+    const chunks = text.split(',').map(s => s.trim()).filter(Boolean);
+    if (chunks.length >= 2) {
+      let clientName = chunks[0];
+      let price = 0;
+      let quantity = 1;
+      for (let i = chunks.length - 1; i >= 1; i--) {
+        const nums = chunks[i].replace(/pesos?/gi, '').trim().match(/\d+(\.\d+)?/g);
+        if (nums) {
+          price = parseFloat(nums[nums.length - 1]);
+          if (price > 0) {
+            const qtyMatch = chunks[i].match(/^(\d+)\s+/);
+            if (qtyMatch && parseInt(qtyMatch[1]) <= 20) quantity = parseInt(qtyMatch[1]);
+            chunks.splice(i, 1);
+            break;
+          }
+        }
+      }
+      const productName = chunks.slice(1).join(' ') || 'Artículo';
+      clientName = this.capitalizeWords(clientName);
+      if (price <= 0) return null;
+      return { clientName, productName, quantity, unitPrice: price / quantity };
+    }
+    // Fallback: space-separated
+    const words = text.split(/\s+/);
+    let price = 0; let priceIdx = -1;
+    for (let i = words.length - 1; i >= 0; i--) {
+      const clean = words[i].replace(/pesos?/gi, '').trim();
+      if (!isNaN(Number(clean)) && Number(clean) > 0) { price = Number(clean); priceIdx = i; break; }
+    }
+    if (price <= 0 || priceIdx < 1) return null;
+    return { clientName: this.capitalizeWords(words[0]), productName: words.slice(1, priceIdx).join(' ') || 'Artículo', quantity: 1, unitPrice: price };
+  }
+
+  private capitalizeWords(t: string): string {
+    return t.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  }
+
+  private addItemToQueue(clientName: string, productName: string, quantity: number, unitPrice: number, isExisting: boolean) {
+    const item: TurboQueueItem = { id: crypto.randomUUID(), clientName, productName, quantity, unitPrice, isExistingClient: isExisting };
+    this.turboQueue.update(q => [item, ...q]);
+    this.lastAdded.set(item);
+    this.toast.success(`${clientName} → ${productName} ✨`);
+    setTimeout(() => { if (this.lastAdded()?.id === item.id) this.lastAdded.set(null); }, 3000);
+  }
+
+  removeFromQueue(id: string) {
+    this.turboQueue.update(q => q.filter(i => i.id !== id));
+  }
+
+  submitTurboQueue() {
+    const queue = this.turboQueue();
+    if (queue.length === 0) return;
+
+    const grouped = new Map<string, TurboQueueItem[]>();
+    queue.forEach(item => {
+      const key = item.clientName.toLowerCase().trim();
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(item);
+    });
+
+    const orders = Array.from(grouped.entries()).map(([_, items]) => ({
+      clientName: items[0].clientName,
+      items: items.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
+    }));
+
+    this.uploading.set(true);
+    let successCount = 0;
+    const finalResults: any[] = [];
+
+    const process = (idx: number) => {
+      if (idx >= orders.length) {
+        this.uploading.set(false);
+        this.turboProgress.set('');
+        this.toast.success(`¡${successCount} pedidos creados! 💖`);
+        this.result.set({ ordersCreated: successCount, clientsCreated: 0, warnings: [], orders: finalResults });
+        this.turboQueue.set([]);
+        this.lastAdded.set(null);
+        return;
+      }
+      const o = orders[idx];
+      this.turboProgress.set(`${o.clientName} (${idx + 1}/${orders.length})...`);
+      const req: ManualOrderRequest = { clientName: o.clientName, clientType: 'Nueva', orderType: this.turboOrderType, items: o.items };
+      this.api.createManualOrder(req).subscribe({
+        next: (res) => {
+          successCount++;
+          finalResults.push({ id: res.id, clientName: res.clientName, total: res.total, orderType: res.orderType, link: res.link, items: res.items.map(i => ({ id: i.id, productName: i.productName, quantity: i.quantity })) });
+          process(idx + 1);
+        },
+        error: () => { this.toast.error(`Error con ${o.clientName} 😿`); process(idx + 1); }
+      });
+    };
+    process(0);
+  }
+
   // ═════════════════ LIVE MODE METHODS ═════════════════
   private initSpeechRecognition() {
     const win = window as any;
@@ -351,7 +622,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
     this.recognition.onend = () => {
       // Auto-restart if we think we should still be listening
-      if (this.isListening() && this.livePhase() === 'capturing') {
+      if (this.isListening()) {
         try {
           this.recognition.start();
         } catch (e) { /* might already be started */ }
@@ -362,26 +633,36 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     };
   }
 
-  startLive() {
-    this.livePhase.set('capturing');
-  }
-
-  toggleListening() {
+  startListening() {
     if (!this.recognition) {
       this.toast.error('Tu navegador no soporta captura de voz. Usa el teclado 🥺');
       return;
     }
+    
+    // Prevent default context menu on long press
+    document.oncontextmenu = () => false;
 
-    if (this.isListening()) {
-      this.isListening.set(false);
-      this.recognition.stop();
-    } else {
+    if (!this.isListening()) {
       this.isListening.set(true);
       try {
         this.recognition.start();
-      } catch (e) {
-        // If already started
-      }
+      } catch (e) { }
+    }
+  }
+
+  stopListeningAndAnalyze() {
+    document.oncontextmenu = null; // restore context menu
+    
+    if (this.isListening()) {
+      this.isListening.set(false);
+      this.recognition.stop();
+      
+      // If we have some transcript accumulated, auto analyze
+      setTimeout(() => {
+         if (this.liveTranscript().trim() && !this.isAnalyzing()) {
+           this.analyzeWithAI();
+         }
+      }, 500); // Give the speech recognizer a split second to finish the last phrase
     }
   }
 
@@ -392,25 +673,139 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   }
 
   private processTextChunk(text: string) {
-    // Advanced parsing logic for "Ana, vestido, 200 pesos" or "2 blusas para maria, 300"
-    const parsed = this.parseLiveString(text);
+    // Append to accumulated transcript for AI analysis
+    const current = this.liveTranscript().trim();
+    this.liveTranscript.set(current ? current + '. ' + text : text);
+    this.cdr.detectChanges();
+  }
 
-    // Stop listening temporarily to review if we found something highly probable
-    if (parsed.clientName && parsed.totalPrice > 0) {
-      if (this.isListening()) {
-        // We keep listening but we set the preview
-      }
+  analyzeWithAI() {
+    const text = this.liveTranscript().trim();
+    if (!text) {
+      this.toast.warning('Escribe o dicta algo primero 🎤');
+      return;
     }
 
-    this.parsedPreview.set({
-      id: crypto.randomUUID(),
-      rawText: text,
-      parsed: parsed,
-      isConfirmed: false,
-      timestamp: new Date()
+    if (this.isListening()) {
+      this.isListening.set(false);
+      this.recognition.stop();
+    }
+
+    this.isAnalyzing.set(true);
+
+    // Get current state to pass to API
+    const currentState = this.aiResults().map(r => ({
+      clientName: r.clientName,
+      productName: r.productName,
+      quantity: r.quantity,
+      unitPrice: r.unitPrice
+    }));
+
+    this.api.parseLiveText(text, currentState).subscribe({
+      next: (orders) => {
+        this.isAnalyzing.set(false);
+        if (orders.length === 0) {
+          if (currentState.length > 0) {
+             this.toast.info('Carrito vaciado 🗑️');
+             this.aiResults.set([]);
+          } else {
+             this.toast.warning('No se detectaron pedidos. Intenta con más detalle 💬');
+          }
+          this.liveTranscript.set('');
+          return;
+        }
+
+        const currentResults = this.aiResults();
+
+        // Map to editable results
+        const results = orders.map(o => {
+          const matched = this.findBestClientMatch(o.clientName);
+          const finalClientName = matched ? matched.name : this.capitalizeWords(o.clientName);
+
+          // Find if this item existed in the previous state to prevent re-animating
+          const existing = currentResults.find(r => 
+            r.clientName.toLowerCase() === finalClientName.toLowerCase() && 
+            r.productName.toLowerCase() === o.productName.toLowerCase()
+          );
+
+          return {
+            id: existing ? existing.id : crypto.randomUUID(),
+            clientName: finalClientName,
+            productName: o.productName,
+            quantity: o.quantity,
+            unitPrice: o.unitPrice,
+            visible: existing ? true : false
+          };
+        });
+
+        this.aiResults.set(results);
+
+        // Staggered reveal ONLY for new hidden items
+        const newItems = results.filter(r => !r.visible);
+        newItems.forEach((item, idx) => {
+          setTimeout(() => {
+            this.aiResults.update(arr => arr.map(r => r.id === item.id ? { ...r, visible: true } : r));
+            this.cdr.detectChanges();
+          }, 200 * (idx + 1));
+        });
+
+        if (newItems.length > 0) {
+           this.toast.success(`✨ ${newItems.length} pedidos nuevos agregados`);
+        } else {
+           this.toast.success(`✨ Carrito actualizado con éxito`);
+        }
+        this.liveTranscript.set('');
+      },
+      error: (err) => {
+        console.error('AI parse error', err);
+        this.isAnalyzing.set(false);
+        this.toast.error('Error al analizar con IA 😿');
+      }
+    });
+  }
+
+  removeAiResult(id: string) {
+    this.aiResults.update(arr => arr.filter(r => r.id !== id));
+  }
+
+  submitAiResults() {
+    const results = this.aiResults().filter(r => r.visible);
+    if (results.length === 0) return;
+
+    // Group by client name
+    const grouped = new Map<string, typeof results>();
+    results.forEach(r => {
+      const key = r.clientName.toLowerCase().trim();
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(r);
     });
 
-    this.cdr.detectChanges();
+    this.aiSubmitting.set(true);
+    const entries = Array.from(grouped.entries());
+    let doneCount = 0;
+
+    const process = (idx: number) => {
+      if (idx >= entries.length) {
+        this.aiSubmitting.set(false);
+        this.aiResults.set([]);
+        this.toast.success(`💖 ${doneCount} pedidos creados`);
+        return;
+      }
+
+      const [, items] = entries[idx];
+      const clientName = items[0].clientName;
+      this.aiProgress.set(`Creando ${clientName} (${idx + 1}/${entries.length})...`);
+
+      this.api.createManualOrder({
+        clientName,
+        orderType: 'Delivery',
+        items: items.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
+      }).subscribe({
+        next: () => { doneCount++; process(idx + 1); },
+        error: () => { this.toast.error(`Error con ${clientName} 😿`); process(idx + 1); }
+      });
+    };
+    process(0);
   }
 
   private parseLiveString(text: string) {
@@ -509,132 +904,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     };
   }
 
-  confirmPreview() {
-    if (!this.parsedPreview()) return;
-
-    // Auto-Correct Name capitalization fully
-    let name = this.parsedPreview()!.parsed.clientName.trim();
-    if (name) {
-      name = name.split(' ').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
-      this.parsedPreview()!.parsed.clientName = name;
-    }
-
-    // Add to feed
-    this.liveCaptures.update(c => [this.parsedPreview()!, ...c]);
-    this.toast.success(`Capturado: ${name} ✨`);
-    this.parsedPreview.set(null);
-    this.interimTranscript.set('');
-  }
-
-  discardCapture() {
-    this.parsedPreview.set(null);
-    this.interimTranscript.set('');
-  }
-
-  deleteCapture(id: string) {
-    this.liveCaptures.update(c => c.filter(x => x.id !== id));
-  }
-
-  startReview() {
-    // Transform captures into Review Orders (grouping by client)
-    const grouped = new Map<string, LiveOrder>();
-
-    this.liveCaptures().forEach(cap => {
-      const clientKey = cap.parsed.clientName.toLowerCase().trim();
-      if (!grouped.has(clientKey)) {
-        grouped.set(clientKey, {
-          id: crypto.randomUUID(),
-          clientName: cap.parsed.clientName,
-          items: [],
-          orderType: 'Delivery', // Default
-          selected: true,
-          totalForSort: 0
-        });
-      }
-
-      const order = grouped.get(clientKey)!;
-      order.items.push({
-        productName: cap.parsed.productDescription,
-        quantity: cap.parsed.quantity,
-        unitPrice: cap.parsed.unitPrice
-      });
-      order.totalForSort += cap.parsed.totalPrice;
-    });
-
-    this.reviewOrders.set(Array.from(grouped.values()));
-
-    if (this.isListening()) {
-      this.toggleListening(); // Stop mic
-    }
-    this.livePhase.set('review');
-  }
-
-  backToCapturing() {
-    this.livePhase.set('capturing');
-  }
-
-  submitAllOrders() {
-    const toSubmit = this.reviewOrders().filter(o => o.selected);
-    if (toSubmit.length === 0) return;
-
-    this.liveCreating.set(true);
-    let successCount = 0;
-    const finalResultOrders: any[] = [];
-
-    // Sequential submission to avoid saturating API potentially
-    const processOrder = (index: number) => {
-      if (index >= toSubmit.length) {
-        // Finished
-        this.liveCreating.set(false);
-        this.toast.success(`¡Misión cumplida! ${successCount} pedidos creados 💖`);
-
-        this.result.set({
-          ordersCreated: successCount,
-          clientsCreated: 0, // In backend it might create clients
-          warnings: [],
-          orders: finalResultOrders
-        });
-
-        // Clear captures so we don't re-submit
-        this.liveCaptures.set([]);
-        this.livePhase.set('setup'); // Go back to start
-        return;
-      }
-
-      const liveObj = toSubmit[index];
-      this.liveCreateProgress.set(`Guardando ${liveObj.clientName}(${index + 1} / ${toSubmit.length})...`);
-
-      const req: ManualOrderRequest = {
-        clientName: liveObj.clientName,
-        clientType: 'Nueva', // Fallback, backend can link them
-        orderType: liveObj.orderType,
-        items: liveObj.items
-      };
-
-      this.api.createManualOrder(req).subscribe({
-        next: (res) => {
-          successCount++;
-          finalResultOrders.push({
-            id: res.id,
-            clientName: res.clientName,
-            total: res.total,
-            orderType: res.orderType,
-            link: res.link,
-            items: res.items.map(i => ({ id: i.id, productName: i.productName, quantity: i.quantity }))
-          });
-          processOrder(index + 1);
-        },
-        error: (err) => {
-          console.error('Failed order', err);
-          this.toast.error(`Ignorado error con ${liveObj.clientName}`);
-          // Continue anyway
-          processOrder(index + 1);
-        }
-      });
-    };
-
-    processOrder(0);
-  }
+  // (Legacy manual capture functions removed)
 
   // ═════════════════ RESULTS METHODS ═════════════════
   copyAllLinks() {

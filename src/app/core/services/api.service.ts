@@ -8,7 +8,8 @@ import {
     FinancialReportDto, DriverExpenseDto, ManualOrderRequest, OrderStatsDto,
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
-    CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest
+    CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
+    AiParsedOrder, AiInsight
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -50,6 +51,10 @@ export class ApiService {
 
     createManualOrder(order: ManualOrderRequest): Observable<OrderSummaryDto> {
         return this.http.post<OrderSummaryDto>(`${this.base}/orders/manual`, order);
+    }
+
+    parseLiveText(text: string, currentState: AiParsedOrder[]): Observable<AiParsedOrder[]> {
+        return this.http.post<AiParsedOrder[]>(`${this.base}/orders/parse-live`, { text, currentState });
     }
 
     updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<any> {
@@ -107,6 +112,10 @@ export class ApiService {
         return this.http.get<ReportDto>(`${this.base}/orders/reports`, {
             params: new HttpParams().set('start', start).set('end', end)
         });
+    }
+
+    getReportInsights(report: ReportDto): Observable<AiInsight[]> {
+        return this.http.post<AiInsight[]>(`${this.base}/reports/ai-insights`, report);
     }
 
     getGlowUp(): Observable<GlowUpReportDto> {
@@ -246,6 +255,14 @@ export class ApiService {
     
     publicUpdateInstructions(accessToken: string, instructions: string): Observable<any> {
         return this.http.patch(`${this.base}/pedido/${accessToken}/instructions`, { instructions });
+    }
+
+    // ── AI Voice Routes ──
+    getAiRouteSelection(voiceCommand: string, availableOrders: Order[]): Observable<{ selectedOrderIds: number[], aiConfirmationMessage: string }> {
+        return this.http.post<{ selectedOrderIds: number[], aiConfirmationMessage: string }>(`${this.base}/routes/ai-select`, {
+            voiceCommand,
+            availableOrders
+        });
     }
 
     // ── Driver (Repartidor) ──

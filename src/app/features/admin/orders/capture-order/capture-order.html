@@ -7,8 +7,9 @@
 
     <div class="tab-switch">
         <button [class.active]="mode() === 'excel'" (click)="mode.set('excel')">📄 Excel</button>
-        <button [class.active]="mode() === 'manual'" (click)="mode.set('manual')">✏️ Modo Tablet</button>
-        <button [class.active]="mode() === 'live'" (click)="mode.set('live')" class="live-tab">🔴 Live / Voz</button>
+        <button [class.active]="mode() === 'manual'" (click)="mode.set('manual')">🚀 Turbo</button>
+        <button [class.active]="mode() === 'traditional'" (click)="mode.set('traditional')">✏️ Manual</button>
+        <button [class.active]="mode() === 'live'" (click)="mode.set('live')" class="live-tab">✨ IA Gemini</button>
     </div>
 
     <!-- ═══════════ EXCEL TAB ═══════════ -->
@@ -57,8 +58,166 @@
     </div>
     }
 
-    <!-- ═══════════ MANUAL TAB (TABLET OPTIMIZED) ═══════════ -->
     @if (mode() === 'manual') {
+    <div class="animate-fade-in relative z-20 space-y-4">
+        <!-- ORDER TYPE TOGGLE -->
+        <div class="flex flex-wrap items-center gap-3 justify-between">
+            <div class="flex gap-2">
+                <button class="turbo-type-btn" [class.active]="turboOrderType === 'Delivery'"
+                    (click)="turboOrderType = 'Delivery'">🛵 Domicilio</button>
+                <button class="turbo-type-btn" [class.active]="turboOrderType === 'PickUp'"
+                    (click)="turboOrderType = 'PickUp'">🛍️ Local</button>
+            </div>
+            @if (!pinnedProduct()) {
+            <button class="pin-toggle-btn" (click)="showPinForm.set(!showPinForm())">
+                📌 {{ showPinForm() ? 'Cancelar' : 'Fijar artículo' }}
+            </button>
+            }
+        </div>
+
+        <!-- PIN FORM -->
+        @if (showPinForm() && !pinnedProduct()) {
+        <div class="card-coquette p-4 flex flex-wrap gap-3 items-end animate-scale-in border-2 border-amber-300">
+            <div class="flex-1 min-w-[150px]">
+                <label class="label-coquette text-xs">Artículo base</label>
+                <input type="text" class="input-coquette" [(ngModel)]="pinProductName" placeholder="Ej. Toalla"
+                    (keydown.enter)="setPin()">
+            </div>
+            <div class="w-28">
+                <label class="label-coquette text-xs">Precio $</label>
+                <input type="number" class="input-coquette font-bold" [(ngModel)]="pinProductPrice" placeholder="50"
+                    (keydown.enter)="setPin()">
+            </div>
+            <button class="btn-coquette btn-pink px-5" (click)="setPin()"
+                [disabled]="!pinProductName.trim() || pinProductPrice <= 0">📌 Fijar</button>
+        </div>
+        }
+
+        <!-- PINNED PRODUCT BAR -->
+        @if (pinnedProduct()) {
+        <div class="pin-active-bar">
+            <span>📌 <strong>{{ pinnedProduct()!.name }}</strong> — ${{ pinnedProduct()!.price | number:'1.0-0' }} c/u</span>
+            <button (click)="clearPin()" class="pin-remove-btn">✕ Quitar</button>
+        </div>
+        }
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- LEFT: Turbo Input -->
+            <div class="lg:col-span-7 space-y-3">
+                <div class="turbo-input-wrapper" [class.has-pin]="!!pinnedProduct()">
+                    <span class="turbo-prompt">🚀</span>
+                    <input type="text" class="turbo-input" [(ngModel)]="turboInput" (input)="onTurboType()"
+                        (keydown)="onTurboKeydown($event)" (focus)="showTurboSuggestions.set(true)"
+                        (blur)="hideTurboSuggestionsDelay()"
+                        [placeholder]="pinnedProduct() ? 'Nombre (+ variante)... ej: Pedro azul' : 'Nombre, Artículo, Precio... ej: Lupe, sabana, 100'"
+                        autocomplete="off">
+                </div>
+
+                <!-- KEYBOARD SHORTCUTS GUIDE -->
+                <div class="turbo-shortcuts">
+                    @if (pinnedProduct()) {
+                    <span>💡 Escribe nombre + variante</span>
+                    } @else {
+                    <span>💡 Todo en una línea: <strong>Nombre, Artículo, Precio</strong></span>
+                    }
+                    <div class="turbo-shortcuts-keys">
+                        <span><kbd class="turbo-kbd">Enter</kbd> Agregar</span>
+                        <span><kbd class="turbo-kbd">↑↓</kbd> Navegar</span>
+                        <span><kbd class="turbo-kbd">Esc</kbd> Limpiar</span>
+                        <span><kbd class="turbo-kbd">Ctrl+Enter</kbd> Crear todos</span>
+                    </div>
+                </div>
+
+                <!-- INLINE SUGGESTIONS -->
+                @if (showTurboSuggestions() && turboFilteredClients().length > 0) {
+                <ul class="turbo-suggestions">
+                    @for (client of turboFilteredClients(); track client.id; let i = $index) {
+                    <li (mousedown)="selectTurboClient(client)"
+                        [class.suggestion-selected]="selectedSuggestionIdx() === i">
+                        <span class="font-bold text-pink-900">{{ client.name }}</span>
+                        <div class="flex items-center gap-2">
+                            @if (selectedSuggestionIdx() === i) {
+                            <kbd class="turbo-kbd">Enter</kbd>
+                            }
+                            @if ((client.ordersCount || 0) >= 2) {
+                            <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
+                            } @else {
+                            <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
+                            }
+                        </div>
+                    </li>
+                    }
+                </ul>
+                }
+
+                <!-- LAST ADDED CONFIRMATION -->
+                @if (lastAdded()) {
+                <div class="last-added-bar animate-scale-in">
+                    ✅ <strong>{{ lastAdded()!.clientName }}</strong> — {{ lastAdded()!.productName }} ${{ lastAdded()!.unitPrice * lastAdded()!.quantity | number:'1.0-0' }}
+                </div>
+                }
+            </div>
+
+            <!-- RIGHT: Queue -->
+            <div class="lg:col-span-5 relative z-10">
+                <div class="card-coquette sticky top-[80px] p-0 overflow-hidden flex flex-col h-[520px]">
+                    <div class="bg-gradient-to-r from-pink-400 to-pink-500 p-4 text-white flex justify-between items-center shadow-md z-10">
+                        <h4 class="font-bold text-lg m-0 flex items-center gap-2"><span>🚀</span> Cola Turbo</h4>
+                        <div class="flex gap-2">
+                            <span class="bg-white/20 px-2 py-0.5 rounded-full text-xs font-bold backdrop-blur-sm">{{ turboClientCount() }} clientas</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded-full text-xs font-bold backdrop-blur-sm">{{ turboQueue().length }} arts</span>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-3 space-y-3 bg-pink-50/50">
+                        @if (turboQueue().length === 0) {
+                        <div class="h-full flex flex-col items-center justify-center text-center opacity-60">
+                            <span class="text-4xl mb-2 grayscale">⚡</span>
+                            <p class="text-pink-800 font-bold">Cola vacía</p>
+                            <p class="text-xs text-pink-600">Escribe y presiona Enter.</p>
+                        </div>
+                        }
+
+                        @for (group of turboGroupedQueue(); track group.clientName) {
+                        <div class="queue-group animate-slide-up">
+                            <div class="queue-group-header">
+                                <span class="font-bold text-pink-900 truncate">{{ group.clientName }}</span>
+                                <span class="font-black text-pink-600">${{ group.total | number:'1.0-0' }}</span>
+                            </div>
+                            <div class="queue-group-items">
+                                @for (item of group.items; track item.id) {
+                                <div class="queue-group-item group">
+                                    <span class="text-xs text-pink-700">{{ item.quantity }}x {{ item.productName }}</span>
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-xs font-bold text-pink-500">${{ item.unitPrice * item.quantity | number:'1.0-0' }}</span>
+                                        <button class="queue-remove-sm opacity-0 group-hover:opacity-100" (click)="removeFromQueue(item.id)">✕</button>
+                                    </div>
+                                </div>
+                                }
+                            </div>
+                        </div>
+                        }
+                    </div>
+
+                    <div class="bg-white p-4 border-t border-pink-50 shadow-[0_-4px_15px_rgba(255,107,157,0.05)] z-10">
+                        <div class="flex justify-between items-end mb-4 bg-pink-50/50 p-3 rounded-xl border border-pink-100">
+                            <span class="text-pink-600 font-bold text-sm uppercase tracking-wide">Total</span>
+                            <span class="text-2xl font-black text-pink-600 leading-none">{{ turboTotal() | currency:'MXN':'symbol-narrow' }}</span>
+                        </div>
+                        <button class="btn-coquette btn-pink w-full py-4 text-lg shadow-lg" (click)="submitTurboQueue()"
+                            [disabled]="uploading() || turboQueue().length === 0">
+                            @if (uploading()) { <span class="spinner mr-2"></span> {{ turboProgress() }} }
+                            @else { 💖 Crear {{ turboClientCount() }} Pedidos }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+
+    <!-- ═══════════ TRADITIONAL MANUAL TAB ═══════════ -->
+    @if (mode() === 'traditional') {
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6 animate-fade-in relative z-20">
 
         <!-- DATA ENTRY (Left/Top) -->
@@ -88,7 +247,6 @@
             </div>
 
             <div class="card-coquette p-5 space-y-4">
-                <!-- Auto-complete Search -->
                 <div class="relative">
                     <label class="label-coquette">👩‍💼 Nombre de la clienta</label>
                     <input type="text" class="input-coquette text-lg py-3" [(ngModel)]="manualClient"
@@ -96,20 +254,15 @@
                         (blur)="hideSuggestionsWithDelay()" placeholder="Busca o escribe nombre..." autocomplete="off">
 
                     @if (showSuggestions() && filteredClients().length > 0) {
-                    <ul
-                        class="absolute z-50 top-[100%] left-0 right-0 bg-white/95 backdrop-blur-md border border-pink-200 rounded-xl mt-1 shadow-xl max-h-[250px] overflow-y-auto">
+                    <ul class="absolute z-50 top-[100%] left-0 right-0 bg-white/95 backdrop-blur-md border border-pink-200 rounded-xl mt-1 shadow-xl max-h-[250px] overflow-y-auto">
                         @for (client of filteredClients(); track client.id) {
                         <li class="px-4 py-3 hover:bg-pink-50 cursor-pointer flex justify-between items-center transition-colors border-b border-pink-50 last:border-0"
                             (mousedown)="selectClient(client)">
                             <span class="font-bold text-pink-900">{{ client.name }}</span>
                             @if ((client.ordersCount || 0) >= 2) {
-                            <span
-                                class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑
-                                Frecuente</span>
+                            <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
                             } @else {
-                            <span
-                                class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨
-                                Nueva</span>
+                            <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
                             }
                         </li>
                         }
@@ -129,22 +282,18 @@
                         </select>
                         <span class="absolute right-3 top-[38px] text-pink-400 pointer-events-none text-xs">▼</span>
                     </div>
-                    @if (autoDetected()) { <span
-                        class="text-xs font-bold text-purple-500 mb-3 animate-pulse">¡Detectada!</span> }
+                    @if (autoDetected()) { <span class="text-xs font-bold text-purple-500 mb-3 animate-pulse">¡Detectada!</span> }
                 </div>
             </div>
 
             <div class="card-coquette p-5 bg-gradient-to-br from-white to-pink-50/50">
-                <h4 class="font-bold text-pink-900 mb-4 flex items-center gap-2"><span>🛍️</span> Agregar al carrito
-                </h4>
-
+                <h4 class="font-bold text-pink-900 mb-4 flex items-center gap-2"><span>🛍️</span> Agregar al carrito</h4>
                 <div class="flex flex-col gap-3">
                     <div>
                         <label class="label-coquette text-xs">Descripción</label>
                         <input type="text" class="input-coquette" [(ngModel)]="currentItem.productName"
                             placeholder="Ej. Tapete rosa" (keydown.enter)="focusManualField('qty')">
                     </div>
-
                     <div class="flex gap-3">
                         <div class="w-24">
                             <label class="label-coquette text-xs">Cant.</label>
@@ -158,8 +307,7 @@
                                 (keydown.enter)="focusManualField('add')">
                         </div>
                         <div class="flex items-end self-end pb-1 mb-[2px]">
-                            <button
-                                class="btn-coquette btn-pink p-3 hover:scale-110 active:scale-95 transition-transform"
+                            <button class="btn-coquette btn-pink p-3 hover:scale-110 active:scale-95 transition-transform"
                                 (click)="addCurrentItem()"
                                 [disabled]="!currentItem.productName.trim() || currentItem.unitPrice <= 0 || currentItem.quantity <= 0"
                                 title="Agregar producto">➕</button>
@@ -172,11 +320,9 @@
         <!-- RECEIPT SUMMARY (Right/Bottom) -->
         <div class="md:col-span-5 relative z-10">
             <div class="card-coquette sticky top-[80px] p-0 overflow-hidden flex flex-col h-[520px]">
-                <div
-                    class="bg-gradient-to-r from-pink-400 to-pink-500 p-4 text-white flex justify-between items-center shadow-md z-10">
+                <div class="bg-gradient-to-r from-pink-400 to-pink-500 p-4 text-white flex justify-between items-center shadow-md z-10">
                     <h4 class="font-bold text-lg m-0 flex items-center gap-2"><span>🧾</span> Ticket Exprés</h4>
-                    <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold backdrop-blur-sm">{{
-                        manualItems.length }} arts</span>
+                    <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold backdrop-blur-sm">{{ manualItems.length }} arts</span>
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-pink-50/50">
@@ -189,43 +335,36 @@
                     }
 
                     @for (item of manualItems; track item.id) {
-                    <div
-                        class="bg-white/90 backdrop-blur-sm border border-pink-100/50 p-3 rounded-xl flex items-center gap-3 shadow-sm hover:border-pink-300 transition-colors animate-slide-up group relative focus-within:ring-2 focus-within:ring-pink-300 focus-within:shadow-md">
-                        <div
-                            class="bg-gradient-to-br from-pink-100 to-rose-100 border border-pink-200 text-pink-700 font-black w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0 shadow-inner group-focus-within:from-pink-200 group-focus-within:scale-105 transition-all">
+                    <div class="bg-white/90 backdrop-blur-sm border border-pink-100/50 p-3 rounded-xl flex items-center gap-3 shadow-sm hover:border-pink-300 transition-colors animate-slide-up group relative">
+                        <div class="bg-gradient-to-br from-pink-100 to-rose-100 border border-pink-200 text-pink-700 font-black w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0 shadow-inner">
                             <input type="number" [(ngModel)]="item.quantity" min="1"
                                 class="w-full h-full bg-transparent text-center border-none focus:ring-0 p-0 m-0 text-pink-800 font-black">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col gap-1">
                             <input type="text" [(ngModel)]="item.productName"
-                                class="w-full bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-pink-50/50 transition-all font-bold text-pink-900 text-sm p-0 m-0 focus:ring-0 focus:outline-none placeholder-pink-300"
+                                class="w-full bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 transition-all font-bold text-pink-900 text-sm p-0 m-0 focus:ring-0 focus:outline-none placeholder-pink-300"
                                 placeholder="Descripción...">
                             <div class="flex items-center text-xs text-pink-500">
                                 <span class="mr-1">$</span>
                                 <input type="number" [(ngModel)]="item.unitPrice" step="0.01"
-                                    class="w-16 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-pink-50/50 transition-all text-pink-600 font-bold p-0 m-0 focus:ring-0 focus:outline-none">
+                                    class="w-16 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 transition-all text-pink-600 font-bold p-0 m-0 focus:ring-0 focus:outline-none">
                                 <span> c/u</span>
                             </div>
                         </div>
                         <div class="text-right shrink-0 pr-1 pl-2 border-l border-pink-50">
-                            <p class="font-black text-pink-600 text-lg">{{ (item.quantity * item.unitPrice) |
-                                currency:'MXN':'symbol-narrow' }}</p>
+                            <p class="font-black text-pink-600 text-lg">{{ (item.quantity * item.unitPrice) | currency:'MXN':'symbol-narrow' }}</p>
                         </div>
-                        <button
-                            class="bg-red-50 text-red-400 hover:bg-red-500 hover:text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                        <button class="bg-red-50 text-red-400 hover:bg-red-500 hover:text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shrink-0"
                             (click)="removeItem(item.id)" title="Quitar">×</button>
                     </div>
                     }
                 </div>
 
                 <div class="bg-white p-4 border-t border-pink-50 shadow-[0_-4px_15px_rgba(255,107,157,0.05)] z-10 pb-0">
-                    <div
-                        class="flex justify-between items-end mb-4 bg-pink-50/50 p-3 rounded-xl border border-pink-100">
+                    <div class="flex justify-between items-end mb-4 bg-pink-50/50 p-3 rounded-xl border border-pink-100">
                         <span class="text-pink-600 font-bold text-sm uppercase tracking-wide">Total a Cobrar</span>
-                        <span class="text-2xl font-black text-pink-600 leading-none">{{ getManualTotal() |
-                            currency:'MXN':'symbol-narrow' }}</span>
+                        <span class="text-2xl font-black text-pink-600 leading-none">{{ getManualTotal() | currency:'MXN':'symbol-narrow' }}</span>
                     </div>
-
                     <button class="btn-coquette btn-pink w-full py-4 text-lg shadow-lg mb-4" (click)="createManual()"
                         [disabled]="uploading() || manualItems.length === 0">
                         @if (uploading()) { <span class="spinner mr-2"></span> Guardando... }
@@ -237,262 +376,158 @@
     </div>
     }
 
-    <!-- ═══════════ LIVE TAB (VOICE / FREE TEXT) ═══════════ -->
+    <!-- ═══════════ AI GEMINI TAB ═══════════ -->
     @if (mode() === 'live') {
     <div class="animate-fade-in relative z-20">
-
-        <!-- SETUP PHASE -->
-        @if (livePhase() === 'setup') {
-        <div class="card-coquette p-12 text-center max-w-2xl mx-auto flex flex-col items-center">
-            <div
-                class="w-24 h-24 bg-gradient-to-br from-red-400 to-orange-500 rounded-full flex items-center justify-center text-5xl shadow-[0_10px_25px_rgba(239,68,68,0.4)] mb-6 animate-bounce">
-                🎤</div>
-            <h3 class="text-2xl font-black text-pink-900 mb-2">Modo Captura Libre</h3>
-            <p class="text-pink-600 mb-8 max-w-md">Olvídate del teclado. Dicta los pedidos mientras estás en Live
-                ("Maria, toalla, 200 pesos") y Gegi hará la magia. ✨</p>
-
-            <button
-                class="w-full max-w-xs bg-gradient-to-r from-red-500 to-orange-500 text-white font-black text-lg py-4 px-6 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
-                (click)="startLive()">
-                🔴 INICIAR LIVE
-            </button>
-
-            @if (liveCaptures().length > 0) {
-            <div class="mt-6 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                <p class="text-amber-800 font-bold text-sm">💡 Tienes {{ liveCaptures().length }} pedidos en pausa.</p>
-                <button class="text-amber-600 text-xs underline mt-1 font-bold"
-                    (click)="livePhase.set('capturing')">Continuar captura →</button>
-            </div>
-            }
-        </div>
-        }
-
-        <!-- CAPTURING PHASE -->
-        @if (livePhase() === 'capturing') {
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Voice Panel -->
-            <div class="lg:col-span-7 flex flex-col gap-6">
-                <div
-                    class="card-coquette p-4 lg:p-8 flex flex-col items-center justify-center min-h-[300px] border-t-8 border-t-red-500 shadow-xl overflow-hidden relative">
 
-                    <!-- Pulsing Background if listening -->
+            <!-- LEFT: Input Panel -->
+            <div class="lg:col-span-5 flex flex-col gap-5">
+
+                <!-- Mic Card -->
+                <div class="card-coquette p-5 flex flex-col items-center border-t-4 border-t-purple-500 shadow-xl relative overflow-hidden">
                     @if (isListening()) {
-                    <div class="absolute inset-0 bg-red-50/50 animate-pulse pointer-events-none"></div>
+                    <div class="absolute inset-0 bg-purple-50/50 animate-pulse pointer-events-none"></div>
                     }
 
                     <button
-                        class="w-28 h-28 rounded-full border-4 border-pink-100 flex items-center justify-center text-5xl bg-white shadow-xl transition-all duration-300 relative z-10"
-                        [class.border-red-500]="isListening()" [class.scale-110]="isListening()"
-                        [class.shadow-[0_0_30px_rgba(239,68,68,0.4)]]="isListening()" (click)="toggleListening()">
+                        class="w-20 h-20 rounded-full border-4 border-purple-100 flex items-center justify-center text-4xl bg-white shadow-xl transition-all duration-300 relative z-10"
+                        [class.border-purple-500]="isListening()" [class.scale-110]="isListening()"
+                        (pointerdown)="startListening()"
+                        (pointerup)="stopListeningAndAnalyze()"
+                        (pointerleave)="stopListeningAndAnalyze()">
                         🎙️
                     </button>
 
-                    <div class="mt-6 text-center z-10 h-8">
+                    <div class="mt-3 text-center z-10 h-5">
                         @if (isListening()) {
-                        <span class="text-red-500 font-black tracking-widest uppercase text-sm animate-pulse">● GEGI
-                            ESCUCHANDO ●</span>
+                        <span class="text-purple-600 font-black tracking-widest uppercase text-xs animate-pulse">● ESCUCHANDO ●</span>
                         } @else {
-                        <span class="text-pink-400 font-bold text-sm">Toca el micrófono para hablar</span>
+                        <span class="text-purple-400 font-bold text-xs">Mantén presionado para dictar</span>
                         }
                     </div>
 
-                    <div
-                        class="w-full max-w-md mt-6 h-20 bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center justify-center text-center z-10 overflow-hidden relative">
-                        @if (interimTranscript()) {
-                        <p class="text-pink-800 font-medium italic text-lg leading-tight">{{ interimTranscript() }}</p>
-                        } @else {
-                        <p class="text-gray-400 font-medium italic">"Ana, blusa negra, 200"...</p>
-                        }
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4 px-2">
-                    <div class="h-[1px] bg-pink-200 flex-1"></div>
-                    <span class="text-pink-400 text-xs font-bold uppercase tracking-widest">O escribe rápido</span>
-                    <div class="h-[1px] bg-pink-200 flex-1"></div>
-                </div>
-
-                <div class="flex gap-2 relative z-10">
-                    <input class="input-coquette flex-1 py-4 text-base" type="text" [(ngModel)]="textInput"
-                        placeholder="Ej: Juana, 2 labiales, 300" (keydown.enter)="onTextSubmit()">
-                    <button class="btn-coquette btn-pink px-6" (click)="onTextSubmit()"
-                        [disabled]="!textInput.trim()">➡️</button>
-                </div>
-
-                <!-- PREVIEW BOX -->
-                @if (parsedPreview()) {
-                <div class="card-coquette p-5 border-2 mt-2 shadow-lg animate-scale-in"
-                    [class.border-green-400]="parsedPreview()!.parsed.clientName && parsedPreview()!.parsed.totalPrice > 0"
-                    [class.border-amber-400]="parsedPreview()!.parsed.clientName && parsedPreview()!.parsed.totalPrice === 0"
-                    [class.border-red-400]="!parsedPreview()!.parsed.clientName">
-                    <div class="flex justify-between items-center mb-3">
-                        <h4 class="font-bold text-pink-900">Validar Captura ✨</h4>
-                        @if (parsedPreview()!.parsed.clientName && parsedPreview()!.parsed.totalPrice > 0) {
-                        <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">✅ Confianza
-                            Alta</span>
-                        } @else {
-                        <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded">⚠️ Revisa
-                            esto</span>
-                        }
-                    </div>
-
-                    <div class="bg-white rounded-xl p-3 border border-pink-100 mb-4 divide-y divide-pink-50">
-                        <div class="flex justify-between items-center pb-2">
-                            <input
-                                class="font-black text-pink-900 bg-transparent border-0 border-b border-transparent focus:border-pink-300 focus:ring-0 p-0 text-lg w-2/3"
-                                [(ngModel)]="parsedPreview()!.parsed.clientName" placeholder="Nombre...">
-                            <div class="text-right">
-                                <span class="text-xs text-pink-400 block -mb-1">Total</span>
-                                <span class="font-black text-pink-600 text-lg">${{ parsedPreview()!.parsed.totalPrice |
-                                    number:'1.0-0' }}</span>
-                            </div>
-                        </div>
-                        <div class="pt-2 flex justify-between items-center text-sm text-pink-700">
-                            <span class="font-medium bg-pink-50 px-2 rounded">{{ parsedPreview()!.parsed.quantity
-                                }}x</span>
-                            <span class="truncate ml-2 flex-1">{{ parsedPreview()!.parsed.productDescription }}</span>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-3">
-                        <button
-                            class="flex-1 py-3 bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-red-500 font-bold rounded-xl transition-colors"
-                            (click)="discardCapture()">Descartar ✖</button>
-                        <button
-                            class="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 transition-colors"
-                            (click)="confirmPreview()" [disabled]="!parsedPreview()!.parsed.clientName">Confirmar
-                            ✅</button>
-                    </div>
-                </div>
-                }
-            </div>
-
-            <!-- Feed Right Side -->
-            <div class="lg:col-span-5 h-[650px] relative z-10 flex flex-col pt-2">
-                <div class="flex justify-between items-center mb-3">
-                    <div>
-                        <h4 class="font-bold text-lg text-pink-900 m-0 leading-tight">Feed del Live 📲</h4>
-                        <p class="text-xs text-pink-500 font-bold">{{ liveCaptures().length }} capturas • ${{
-                            liveTotalAmount() | number:'1.0-0' }}</p>
-                    </div>
-                    <button
-                        class="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-black transition-colors"
-                        (click)="startReview()" [disabled]="liveCaptures().length === 0">
-                        🏁 Finalizar Live
-                    </button>
-                </div>
-
-                <div
-                    class="bg-gray-50 flex-1 rounded-2xl border border-gray-200 overflow-y-auto p-3 space-y-3 shadow-inner">
-                    @if (liveCaptures().length === 0) {
-                    <div class="h-full flex flex-col justify-center items-center opacity-40">
-                        <span class="text-4xl mb-3">👻</span>
-                        <p class="font-bold text-gray-500 text-sm">Esperando compras...</p>
-                    </div>
-                    }
-
-                    @for (cap of liveCaptures(); track cap.id) {
-                    <div
-                        class="bg-white rounded-xl p-3 border border-pink-100 shadow-sm animate-slide-up flex gap-3 relative overflow-hidden">
-                        <div class="w-1 bg-gradient-to-b from-pink-400 to-purple-500 absolute left-0 top-0 bottom-0">
-                        </div>
-                        <div class="flex-1 pl-2">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="font-bold text-pink-900">{{ cap.parsed.clientName }}</span>
-                                <span class="font-black text-pink-600 text-sm">${{ cap.parsed.totalPrice |
-                                    number:'1.0-0' }}</span>
-                            </div>
-                            <p class="text-xs text-pink-500 line-clamp-1 opacity-80 mt-1">{{ cap.parsed.quantity }}x {{
-                                cap.parsed.productDescription }}</p>
-                        </div>
-                        <button class="text-gray-300 hover:text-red-500 p-2" (click)="deleteCapture(cap.id)">✕</button>
+                    @if (interimTranscript()) {
+                    <div class="w-full mt-3 bg-amber-50 border border-amber-200 rounded-lg p-2 text-center z-10">
+                        <p class="text-amber-800 font-medium italic text-xs">{{ interimTranscript() }}</p>
                     </div>
                     }
                 </div>
-            </div>
-        </div>
-        }
 
-        <!-- REVIEW PHASE -->
-        @if (livePhase() === 'review') {
-        <div class="card-coquette p-6">
-            <div class="flex items-center justify-between mb-6 border-b border-pink-100 pb-4">
-                <div>
-                    <h3 class="text-xl font-bold text-pink-900 m-0">🏁 Revisión y Métodos de Envío</h3>
-                    <p class="text-sm text-pink-500 font-medium m-0 mt-1">Selecciona cómo entrego a cada quién antes de
-                        crear</p>
+                <!-- Transcript Textarea -->
+                <div class="card-coquette p-4 space-y-2">
+                    <label class="label-coquette flex items-center gap-2 text-sm">📝 Dicta o escribe los pedidos</label>
+                    <textarea
+                        class="input-coquette w-full min-h-[200px] text-sm leading-relaxed resize-y"
+                        [ngModel]="liveTranscript()"
+                        (ngModelChange)="liveTranscript.set($event)"
+                        placeholder="Ejemplo: 'Anota a Lupe dos colchas a 150, a María una toalla azul de 50, y a Pedro tres sábanas a 200 cada una'"
+                    ></textarea>
                 </div>
+
+                <!-- AI Analyze Button -->
                 <button
-                    class="text-pink-400 font-bold text-sm bg-pink-50 px-4 py-2 rounded-full hover:bg-pink-100 transition-colors"
-                    (click)="backToCapturing()">← Volver a Live</button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                @for (order of reviewOrders(); track order.id) {
-                <div class="border-2 rounded-2xl p-4 transition-all" [class.border-pink-300]="order.selected"
-                    [class.bg-white]="order.selected" [class.shadow-md]="order.selected"
-                    [class.border-gray-200]="!order.selected" [class.bg-gray-50]="!order.selected"
-                    [class.opacity-60]="!order.selected">
-
-                    <div class="flex justify-between items-start mb-3">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" class="w-5 h-5 accent-pink-500 cursor-pointer rounded"
-                                [(ngModel)]="order.selected">
-                            <span class="font-bold text-pink-900 text-lg">{{ order.clientName }}</span>
-                        </label>
-                        <span class="font-black text-pink-600">${{ order.totalForSort | number:'1.0-0' }}</span>
-                    </div>
-
-                    <div class="flex flex-wrap gap-1 mb-4 min-h-[40px]">
-                        @for (it of order.items; track $index) {
-                        <span
-                            class="bg-pink-50 text-pink-600 text-[10px] font-bold px-2 py-1 rounded-full border border-pink-100">{{
-                            it.quantity }}x {{ it.productName }}</span>
-                        }
-                    </div>
-
-                    <div class="flex rounded-xl bg-gray-100 p-1">
-                        <button class="flex-1 py-1 px-2 text-xs font-bold rounded-lg transition-colors"
-                            [class.bg-white]="order.orderType === 'PickUp'"
-                            [class.text-pink-600]="order.orderType === 'PickUp'"
-                            [class.shadow-sm]="order.orderType === 'PickUp'"
-                            [class.text-gray-500]="order.orderType !== 'PickUp'"
-                            (click)="order.orderType = 'PickUp'">🛍️ Local</button>
-                        <button class="flex-1 py-1 px-2 text-xs font-bold rounded-lg transition-colors"
-                            [class.bg-white]="order.orderType === 'Delivery'"
-                            [class.text-pink-600]="order.orderType === 'Delivery'"
-                            [class.shadow-sm]="order.orderType === 'Delivery'"
-                            [class.text-gray-500]="order.orderType !== 'Delivery'"
-                            (click)="order.orderType = 'Delivery'">🛵 Domicilio</button>
-                    </div>
-                </div>
-                }
-            </div>
-
-            <div
-                class="bg-pink-900 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4 text-white shadow-xl shadow-pink-900/20">
-                <div>
-                    <span class="block text-pink-300 font-bold uppercase tracking-widest text-xs mb-1">Resumen
-                        Cierre</span>
-                    <span class="text-3xl font-black">${{ liveSelectedTotal() | number:'1.0-0' }}</span>
-                    <span class="text-pink-300 font-medium ml-2">de {{ liveSelectedCount() }} pedidos
-                        seleccionados</span>
-                </div>
-
-                <button
-                    class="w-full md:w-auto bg-white text-pink-900 font-black px-8 py-3 lg:py-4 rounded-xl shadow-lg hover:scale-105 transition-all text-lg flex items-center justify-center min-w-[200px]"
-                    (click)="submitAllOrders()" [disabled]="liveSelectedCount() === 0 || liveCreating()">
-                    @if (liveCreating()) {
-                    <span class="spinner !border-pink-900 !border-t-transparent mr-2"></span>
-                    <span class="text-sm">{{ liveCreateProgress() }}</span>
+                    class="w-full py-4 rounded-2xl text-base font-black shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                    [class.bg-gradient-to-r]="!isAnalyzing()"
+                    [class.from-purple-500]="!isAnalyzing()"
+                    [class.to-indigo-600]="!isAnalyzing()"
+                    [class.text-white]="!isAnalyzing()"
+                    [class.hover:shadow-2xl]="!isAnalyzing()"
+                    [class.hover:scale-[1.01]]="!isAnalyzing()"
+                    [class.bg-gray-200]="isAnalyzing()"
+                    [class.text-gray-500]="isAnalyzing()"
+                    (click)="analyzeWithAI()"
+                    [disabled]="isAnalyzing() || !liveTranscript().trim()">
+                    @if (isAnalyzing()) {
+                    <span class="spinner mr-2"></span> Gemini analizando...
                     } @else {
-                    ✨ CREAR {{ liveSelectedCount() }} PEDIDOS
+                    ✨ Analizar con Gemini AI
                     }
                 </button>
             </div>
-        </div>
-        }
 
+            <!-- RIGHT: AI Results Panel -->
+            <div class="lg:col-span-7 relative z-10">
+                <div class="card-coquette sticky top-[80px] p-0 overflow-hidden flex flex-col h-[560px]">
+                    <div class="bg-gradient-to-r from-purple-500 to-indigo-600 p-4 text-white flex justify-between items-center shadow-md z-10">
+                        <h4 class="font-bold text-lg m-0 flex items-center gap-2"><span>🤖</span> Pedidos detectados</h4>
+                        <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold backdrop-blur-sm">{{ aiVisibleCount() }} pedidos</span>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-purple-50/30">
+                        @if (aiResults().length === 0 && !isAnalyzing()) {
+                        <div class="h-full flex flex-col items-center justify-center text-center opacity-50">
+                            <span class="text-5xl mb-3">✨</span>
+                            <p class="text-purple-800 font-bold">Dicta y presiona "Analizar"</p>
+                            <p class="text-xs text-purple-500 mt-1">Gemini extraerá los pedidos automáticamente</p>
+                        </div>
+                        }
+
+                        @if (isAnalyzing()) {
+                        <div class="h-full flex flex-col items-center justify-center text-center">
+                            <div class="w-16 h-16 rounded-full bg-gradient-to-r from-purple-400 to-indigo-500 flex items-center justify-center text-3xl animate-bounce mb-4">
+                                🧠
+                            </div>
+                            <p class="text-purple-800 font-bold animate-pulse">Gemini está pensando...</p>
+                        </div>
+                        }
+
+                        @for (result of aiResults(); track result.id) {
+                            @if (result.visible) {
+                            <div class="ai-result-row animate-slide-up group">
+                                <div class="w-1 bg-gradient-to-b from-purple-400 to-indigo-500 absolute left-0 top-0 bottom-0 rounded-l-xl"></div>
+                                <div class="flex-1 min-w-0 pl-3 py-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <input type="text" [(ngModel)]="result.clientName"
+                                            class="font-bold text-purple-900 bg-transparent border-b border-transparent hover:border-purple-200 focus:border-purple-400 transition-all text-sm p-0 m-0 focus:ring-0 focus:outline-none flex-1 min-w-0">
+                                    </div>
+                                    <div class="flex items-center gap-3 text-xs">
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-purple-400">Cant:</span>
+                                            <input type="number" [(ngModel)]="result.quantity" min="1"
+                                                class="w-10 bg-transparent border-b border-transparent hover:border-purple-200 focus:border-purple-400 text-purple-700 font-bold p-0 m-0 focus:ring-0 focus:outline-none text-center">
+                                        </div>
+                                        <span class="text-purple-300">×</span>
+                                        <input type="text" [(ngModel)]="result.productName"
+                                            class="flex-1 bg-transparent border-b border-transparent hover:border-purple-200 focus:border-purple-400 text-purple-600 p-0 m-0 focus:ring-0 focus:outline-none min-w-0">
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-purple-400">$</span>
+                                            <input type="number" [(ngModel)]="result.unitPrice" step="0.01"
+                                                class="w-16 bg-transparent border-b border-transparent hover:border-purple-200 focus:border-purple-400 text-purple-700 font-bold p-0 m-0 focus:ring-0 focus:outline-none">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0 px-2 border-l border-purple-100">
+                                    <p class="font-black text-purple-600 text-sm">${{ result.unitPrice * result.quantity | number:'1.0-0' }}</p>
+                                </div>
+                                <button class="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                    (click)="removeAiResult(result.id)">✕</button>
+                            </div>
+                            }
+                        }
+                    </div>
+
+                    <!-- Submit Bar -->
+                    @if (aiVisibleCount() > 0) {
+                    <div class="bg-white p-4 border-t border-purple-100 shadow-[0_-4px_15px_rgba(139,92,246,0.05)] z-10">
+                        <div class="flex justify-between items-end mb-3 bg-purple-50/50 p-3 rounded-xl border border-purple-100">
+                            <span class="text-purple-600 font-bold text-sm uppercase tracking-wide">Total</span>
+                            <span class="text-2xl font-black text-purple-600 leading-none">{{ aiTotal() | currency:'MXN':'symbol-narrow' }}</span>
+                        </div>
+                        <button class="w-full py-4 text-lg font-black rounded-2xl shadow-lg transition-all bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:shadow-2xl"
+                            (click)="submitAiResults()"
+                            [disabled]="aiSubmitting()">
+                            @if (aiSubmitting()) {
+                            <span class="spinner mr-2"></span> {{ aiProgress() }}
+                            } @else {
+                            💖 Crear {{ aiVisibleCount() }} Pedidos
+                            }
+                        </button>
+                    </div>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
     }
 

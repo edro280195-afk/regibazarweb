@@ -498,3 +498,18 @@ export interface OrderPackageDto {
 export interface GeneratePackagesRequest {
     count: number;
 }
+
+export interface AiParsedOrder {
+    clientName: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+}
+
+export interface AiInsight {
+    category: 'Finanzas' | 'Ventas' | 'Clientas' | 'Riesgo' | 'Operación';
+    title: string;
+    description: string;
+    actionableAdvice: string;
+    icon: string;
+}

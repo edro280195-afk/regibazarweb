@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DecimalPipe, DatePipe, CommonModule } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { ReportDto, SalesPeriodDto, PeriodReportDto } from '../../../core/models';
+import { ReportDto, SalesPeriodDto, PeriodReportDto, AiInsight } from '../../../core/models';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsOption } from 'echarts';
 import { gsap } from 'gsap';
@@ -86,6 +86,17 @@ import { gsap } from 'gsap';
           <div class="shimmer h-96 rounded-3xl"></div>
         </div>
       } @else if (data()) {
+        
+        <!-- AI BRAIN BUTTON -->
+        <div class="mb-6 flex justify-end animate-slide-in-right relative z-20">
+             <button (click)="openGeminiModal()" [disabled]="loadingInsights()" 
+                     class="btn-coquette bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl px-6 py-3 shadow-xl shadow-purple-200 hover:-translate-y-1 transition-all flex items-center gap-3 relative overflow-hidden group">
+                 <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                 <span class="text-2xl group-hover:scale-125 transition-transform duration-300">🧠</span>
+                 <span class="font-black italic tracking-widest text-sm relative z-10">CONSULTAR A GEMINI</span>
+                 <div class="absolute top-2 right-2 w-2 h-2 bg-pink-300 rounded-full animate-ping"></div>
+             </button>
+        </div>
         
         <!-- CONTENIDO POR PESTAÑAS -->
         
@@ -470,8 +481,144 @@ import { gsap } from 'gsap';
           </div>
         </div>
       }
+      
+      <!-- ═══════════════════════════════════════════════════
+           LOADING OVERLAY INMERSIVO (Gemini Pensando)
+           ═══════════════════════════════════════════════════ -->
+      @if (loadingInsights()) {
+        <div class="fixed inset-0 z-[4000] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in">
+           <!-- Glowing AI Core -->
+           <div class="relative w-32 h-32 mb-12 flex items-center justify-center">
+               <!-- Pulse rings -->
+               <div class="absolute inset-0 bg-gradient-to-tr from-fuchsia-600 to-indigo-600 rounded-full blur-[30px] animate-[pulse_3s_ease-in-out_infinite] opacity-60"></div>
+               <!-- Inner ripple -->
+               <div class="absolute w-24 h-24 bg-white/10 border border-white/30 rounded-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+               <!-- Sharp Core -->
+               <div class="absolute w-12 h-12 bg-gradient-to-br from-white to-pink-100 rounded-full shadow-[0_0_20px_white] z-10 overflow-hidden">
+                   <div class="w-full h-full bg-gradient-to-tr from-purple-500/30 to-pink-500/30 animate-[spin_2s_linear_infinite]"></div>
+               </div>
+               <!-- Orbiting particle 1 -->
+               <div class="absolute w-28 h-28 animate-[spin_4s_linear_infinite]">
+                   <div class="w-2 h-2 bg-pink-300 rounded-full shadow-[0_0_10px_#f9a8d4] absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+               </div>
+               <!-- Orbiting particle 2 -->
+               <div class="absolute w-32 h-32 animate-[spin_5s_linear_infinite_reverse]">
+                   <div class="w-1.5 h-1.5 bg-indigo-300 rounded-full shadow-[0_0_10px_#a5b4fc] absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2"></div>
+               </div>
+           </div>
+           
+           <h3 class="text-sm font-semibold text-white/80 tracking-[0.4em] uppercase mb-8 font-sans">
+              Analizando Datos
+           </h3>
+           
+           <!-- Textos rotativos smooth -->
+           <div class="h-6 relative w-full max-w-md text-center flex justify-center mt-2">
+              <span class="absolute w-full text-pink-200/90 font-light tracking-wide text-sm animate-cycle-text" style="animation-delay: 0s;">Evaluando rendimiento financiero profundo...</span>
+              <span class="absolute w-full text-purple-200/90 font-light tracking-wide text-sm animate-cycle-text" style="animation-delay: 2.5s;">Identificando patrones en compras de clientas...</span>
+              <span class="absolute w-full text-indigo-200/90 font-light tracking-wide text-sm animate-cycle-text" style="animation-delay: 5s;">Estructurando consejos estratégicos de negocio...</span>
+           </div>
+        </div>
+      }
+
+      <!-- ═══════════════════════════════════════════════════
+           MODAL: RESULTADOS CEREBRO GEMINI
+           ═══════════════════════════════════════════════════ -->
+      @if (showGeminiModal()) {
+        <div class="fixed inset-0 z-[3000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 sm:p-8" 
+             [class.animate-fade-in]="!closingGeminiModal()"
+             [class.animate-fade-out]="closingGeminiModal()"
+             (click)="closeGeminiModal()">
+             
+          <div class="bg-gradient-to-br from-[#f8f5fc] to-[#fce4ec] w-full max-w-6xl rounded-3xl sm:rounded-[3rem] max-h-[95vh] flex flex-col overflow-hidden shadow-[0_0_80px_rgb(236,72,153,0.3)] border border-pink-200" 
+               [class.animate-scale-in]="!closingGeminiModal()"
+               [class.animate-scale-out]="closingGeminiModal()"
+               (click)="$event.stopPropagation()">
+            
+            <!-- Modal Header -->
+            <div class="px-8 py-6 border-b border-pink-100/50 flex justify-between items-center bg-white/40 sticky top-0 z-20 backdrop-blur-xl">
+              <div class="flex items-center gap-4">
+                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-2xl shadow-lg shadow-pink-200/50">
+                   ✨
+                 </div>
+                 <div>
+                   <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-900 to-pink-700 tracking-tight">Resultados Estratégicos</h2>
+                   <p class="text-sm font-bold text-pink-400">Powered by Gemini 1.5 Pro</p>
+                 </div>
+              </div>
+              <button class="w-10 h-10 rounded-full bg-white/80 hover:bg-pink-100 text-pink-500 flex items-center justify-center text-xl shadow-sm transition-colors" (click)="closeGeminiModal()">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 sm:p-8 relative">
+              <div class="absolute -right-20 -top-20 text-[20rem] opacity-[0.03] rotate-12 pointer-events-none">✨</div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+                @for (insight of insights(); track insight.title; let i = $index) {
+                   <div class="animate-slide-up-fade bg-white/95 backdrop-blur-xl rounded-[2rem] p-6 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] hover:shadow-[0_20px_40px_-10px_rgba(236,72,153,0.2)] hover:-translate-y-2 transition-all duration-500 group border-b-4"
+                        [class.border-b-rose-500]="insight.category === 'Riesgo'"
+                        [class.border-b-emerald-500]="insight.category === 'Finanzas'"
+                        [class.border-b-blue-500]="insight.category === 'Operación'"
+                        [class.border-b-pink-500]="insight.category === 'Clientas'"
+                        [class.border-b-amber-500]="insight.category === 'Ventas'"
+                        [style.animation-delay]="(i * 150) + 'ms'">
+                        
+                       <div class="flex items-start gap-4 mb-5">
+                          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6"
+                               [class.bg-rose-50]="insight.category === 'Riesgo'"
+                               [class.bg-emerald-50]="insight.category === 'Finanzas'"
+                               [class.bg-blue-50]="insight.category === 'Operación'"
+                               [class.bg-pink-50]="insight.category === 'Clientas'"
+                               [class.bg-amber-50]="insight.category === 'Ventas'">
+                            {{ insight.icon }}
+                          </div>
+                          <div class="pt-1">
+                             <span class="text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full inline-block mb-2"
+                                   [class.bg-rose-100]="insight.category === 'Riesgo'" [class.text-rose-700]="insight.category === 'Riesgo'"
+                                   [class.bg-emerald-100]="insight.category === 'Finanzas'" [class.text-emerald-700]="insight.category === 'Finanzas'"
+                                   [class.bg-blue-100]="insight.category === 'Operación'" [class.text-blue-700]="insight.category === 'Operación'"
+                                   [class.bg-pink-100]="insight.category === 'Clientas'" [class.text-pink-700]="insight.category === 'Clientas'"
+                                   [class.bg-amber-100]="insight.category === 'Ventas'" [class.text-amber-700]="insight.category === 'Ventas'">
+                               {{ insight.category }}
+                             </span>
+                             <h4 class="font-black text-gray-900 leading-tight text-lg">{{ insight.title }}</h4>
+                          </div>
+                       </div>
+                       <p class="text-gray-600 text-sm mb-6 leading-relaxed font-medium">{{ insight.description }}</p>
+                       
+                       <div class="bg-gradient-to-br from-gray-50 to-gray-100/50 p-5 rounded-2xl border border-gray-100 relative overflow-hidden group-hover:border-pink-200 transition-colors">
+                          <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-purple-400 to-pink-500"></div>
+                          <strong class="text-purple-900 text-[10px] uppercase font-black flex items-center gap-1.5 mb-2">
+                             <span class="text-sm">💡</span> Consejo de Gemini
+                          </strong>
+                          <p class="text-gray-800 text-sm font-bold leading-snug">{{ insight.actionableAdvice }}</p>
+                       </div>
+                   </div>
+                }
+              </div>
+            </div>
+            
+            <div class="px-8 py-5 border-t border-pink-100 bg-white/40 backdrop-blur-md flex justify-end">
+              <button class="px-8 py-3 rounded-2xl bg-white border-2 border-pink-200 text-pink-600 font-bold hover:bg-pink-50 focus:ring-4 focus:ring-pink-100 transition-all" (click)="closeGeminiModal()">
+                 Entendido 👍
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
+  styles: `
+    @keyframes cycleText {
+      0% { opacity: 0; transform: translateY(15px); filter: blur(4px); }
+      5% { opacity: 1; transform: translateY(0); filter: blur(0); }
+      28% { opacity: 1; transform: translateY(0); filter: blur(0); }
+      33% { opacity: 0; transform: translateY(-15px); filter: blur(4px); }
+      100% { opacity: 0; transform: translateY(-15px); filter: blur(4px); }
+    }
+    .animate-cycle-text {
+      animation: cycleText 7.5s infinite;
+      opacity: 0;
+    }
+  `
 })
 export class ReportsComponent implements OnInit {
   private api = inject(ApiService);
@@ -480,6 +627,13 @@ export class ReportsComponent implements OnInit {
   data = signal<ReportDto | null>(null);
   periods = signal<SalesPeriodDto[]>([]);
   loading = signal(false);
+  
+  // AI Insights State
+  insights = signal<AiInsight[] | null>(null);
+  loadingInsights = signal(false);
+  showGeminiModal = signal(false);
+  closingGeminiModal = signal(false);
+
   activeTab = signal<'resumen' | 'financiero' | 'operativo' | 'clientes'>('resumen');
 
   tabs = [
@@ -566,6 +720,7 @@ export class ReportsComponent implements OnInit {
         this.data.set(r);
         this.buildCharts(r);
         this.loading.set(false);
+        this.insights.set(null); // Clear insights when new report loads
         setTimeout(() => this.initAnimations(), 50);
       },
       error: () => {
@@ -702,6 +857,44 @@ export class ReportsComponent implements OnInit {
   exportToExcel(): void {
     this.toast.info('Generando Excel con todos los esteroides... 📁');
     window.open(`${this.api.getApiUrl()}/orders/export?start=${this.startDate}&end=${this.endDate}`, '_blank');
+  }
+
+  openGeminiModal(): void {
+    if (!this.data()) return;
+    // Solo consultar si no hay insights previos o forzar recarga si quisieras
+    if (!this.insights()) {
+       this.askGemini();
+    } else {
+       this.showGeminiModal.set(true);
+    }
+  }
+
+  closeGeminiModal(): void {
+    if (this.closingGeminiModal()) return;
+    this.closingGeminiModal.set(true);
+    setTimeout(() => {
+      this.showGeminiModal.set(false);
+      this.closingGeminiModal.set(false);
+    }, 400); // 400ms matches fade-out duration
+  }
+
+  askGemini(): void {
+    const reportData = this.data();
+    if (!reportData) return;
+    
+    this.loadingInsights.set(true);
+    this.api.getReportInsights(reportData).subscribe({
+      next: (insights) => {
+        this.insights.set(insights);
+        this.loadingInsights.set(false);
+        this.showGeminiModal.set(true);
+        this.toast.success('🧠 Gemini ha terminado su análisis estratégico');
+      },
+      error: () => {
+        this.toast.error('Error al consultar a Gemini 😿');
+        this.loadingInsights.set(false);
+      }
+    });
   }
 
   private initAnimations(): void {
