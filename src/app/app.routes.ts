@@ -50,6 +50,10 @@ export const routes: Routes = [
             {
                 path: 'sales-periods',
                 loadComponent: () => import('./features/admin/sales-periods/sales-periods.component').then(m => m.SalesPeriodsComponent)
+            },
+            {
+                path: 'cami',
+                loadComponent: () => import('./features/admin/cami/cami-panel.component').then(m => m.CamiPanelComponent)
             }
         ]
     },

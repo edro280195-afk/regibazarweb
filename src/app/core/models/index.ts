@@ -513,3 +513,30 @@ export interface AiInsight {
     actionableAdvice: string;
     icon: string;
 }
+
+// ── C.A.M.I. ──
+export interface CamiMessage {
+    role: 'user' | 'model';
+    text: string;
+}
+
+export interface CamiChatRequest {
+    history: CamiMessage[];
+    newMessage: string;
+}
+
+export interface CamiChatResponse {
+    text: string;
+    audioBase64?: string;
+}
+
+export interface AiRouteSelectionRequest {
+    voiceCommand: string;
+    availableOrders: OrderSummaryDto[];
+}
+
+export interface AiRouteSelectionResponse {
+    selectedOrderIds: number[];
+    aiConfirmationMessage: string;
+    audioBase64?: string;
+}

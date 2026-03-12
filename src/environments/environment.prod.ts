@@ -1,6 +1,6 @@
 export const environment = {
     production: true,
-    apiUrl: //'https://localhost:56164/api',//
+    apiUrl: //'https://localhost:56164/api',
         'https://regibazarapi.onrender.com/api',
     hubUrl: //'https://localhost:56164/hubs/delivery',
         'https://regibazarapi.onrender.com/hubs/delivery',

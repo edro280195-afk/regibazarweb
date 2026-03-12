@@ -7,7 +7,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto } from '../../../core/models';
+import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
 
@@ -58,6 +58,72 @@ interface GeocodedOrder extends OrderSummaryDto {
         <div class="absolute text-4xl opacity-[0.04] animate-float" style="animation-delay:4s" [style.top.px]="700" [style.right.%]="15"
              [style.transform]="'translateY(' + (scrollY() * 0.08) + 'px)'">🌸</div>
       </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           MODO COMANDO: ORQUESTACIÓN AI (Command Center)
+           ═══════════════════════════════════════════════════ -->
+      @if (isOrchestrating()) {
+        <div class="fixed inset-0 z-[6000] bg-slate-950/90 backdrop-blur-3xl flex items-center justify-center p-6 animate-fade-in">
+          
+          <!-- Background Cyber-Grid -->
+          <div class="absolute inset-0 opacity-10 pointer-events-none" 
+               style="background-image: radial-gradient(circle at 2px 2px, #ec4899 1px, transparent 0); background-size: 40px 40px;"></div>
+
+          <div class="relative w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            
+            <!-- Left: AI Core & Radar -->
+            <div class="flex flex-col items-center">
+              <div class="relative w-64 h-64 mb-10">
+                <!-- Outer Rings -->
+                <div class="absolute inset-0 border-2 border-pink-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                <div class="absolute inset-4 border border-indigo-500/30 rounded-full animate-[spin_6s_linear_infinite_reverse]"></div>
+                
+                <!-- Pulsing Core -->
+                <div class="absolute inset-16 bg-gradient-to-tr from-fuchsia-600 to-indigo-600 rounded-full blur-2xl animate-pulse opacity-60"></div>
+                <div class="absolute inset-[72px] bg-white/10 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center z-10 overflow-hidden shadow-[0_0_50px_rgba(236,72,153,0.5)]">
+                  <div class="text-5xl animate-bounce">🛰️</div>
+                </div>
+
+                <!-- Orbiting Particles -->
+                <div class="absolute inset-0 animate-[spin_4s_linear_infinite]">
+                  <div class="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-pink-400 rounded-full shadow-[0_0_15px_#f472b6]"></div>
+                </div>
+              </div>
+
+              <h2 class="text-2xl font-black text-white tracking-widest uppercase mb-2">Command Center</h2>
+              <p class="text-indigo-300 font-mono text-xs tracking-[0.3em] uppercase opacity-80">Orquestando Ruta Mágica</p>
+            </div>
+
+            <!-- Right: Activity Feed -->
+            <div class="bg-black/40 border border-white/10 rounded-3xl p-6 backdrop-blur-md min-h-[300px] flex flex-col">
+              <div class="flex items-center gap-2 mb-6 pb-4 border-b border-white/10">
+                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span class="text-[10px] font-black text-emerald-400 uppercase tracking-widest font-mono">Live AI Stream</span>
+              </div>
+
+              <div class="flex-1 space-y-4">
+                @for (entry of orchestrationFeed(); track entry; let i = $index) {
+                  <div class="animate-fade-in-down flex gap-3" [style.animation-delay]="(i * 100) + 'ms'">
+                    <span class="text-pink-500/50 font-mono text-[10px]">{{ i + 1 }}</span>
+                    <p class="text-sm font-medium" [class]="i === 0 ? 'text-white' : 'text-white/40'">{{ entry }}</p>
+                  </div>
+                }
+              </div>
+
+              <!-- Progress Indicator -->
+              <div class="mt-8 pt-4 border-t border-white/10">
+                 <div class="flex justify-between text-[10px] font-mono text-indigo-300 mb-2 uppercase tracking-tighter">
+                   <span>Enlazando Clientas</span>
+                   <span>{{ selectedOrderIds().size }}/{{ orchestrationFeed().length }}</span>
+                 </div>
+                 <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-pink-500 to-indigo-500 animate-[shimmer_2s_infinite_linear]" style="width: 100%"></div>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- ═══════════════════════════════════════════════════
            LOADING OVERLAY INMERSIVO (Gemini Pensando)
@@ -344,7 +410,16 @@ interface GeocodedOrder extends OrderSummaryDto {
             <div class="px-6 pt-6 pb-4 border-b border-pink-50">
               <div class="flex items-center justify-between">
                 <h2 class="text-xl font-black text-pink-900">🗺️ Nueva Ruta</h2>
-                <button class="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center text-pink-400 hover:bg-pink-100 text-lg" (click)="showCreateModal.set(false)">×</button>
+                
+                <div class="flex items-center gap-3">
+                  <!-- AI Voice Button -->
+                  <button class="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold text-sm shadow-md shadow-purple-200 hover:shadow-lg hover:scale-105 active:scale-95 transition-all"
+                          (click)="startVoiceSelection()">
+                    🎙️ <span class="hidden sm:inline">Armar por Voz</span>
+                  </button>
+
+                  <button class="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center text-pink-400 hover:bg-pink-100 text-lg" (click)="showCreateModal.set(false)">×</button>
+                </div>
               </div>
               <p class="text-xs text-pink-400 font-semibold mt-1">Selecciona los pedidos para esta ruta</p>
 
@@ -654,6 +729,13 @@ interface GeocodedOrder extends OrderSummaryDto {
       from { background-position: 200% 0; }
       to { background-position: -200% 0; }
     }
+
+    .orchestration-highlight {
+      border-color: #ec4899 !important;
+      background-color: rgba(236, 72, 153, 0.1) !important;
+      box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
+      transform: scale(1.02) translateX(10px);
+    }
   `]
 })
 export class RoutesComponent implements OnInit {
@@ -703,6 +785,9 @@ export class RoutesComponent implements OnInit {
   // AI Voice Selection
   isListeningVoice = signal(false);
   isProcessingVoice = signal(false);
+  isOrchestrating = signal(false);
+  orchestrationFeed = signal<string[]>([]);
+  activeOrchestrationId = signal<number | null>(null);
 
   // Optimizer V2
   showOptimizerModal = signal(false);
@@ -1038,14 +1123,8 @@ export class RoutesComponent implements OnInit {
         this.isProcessingVoice.set(false);
 
         if (response.selectedOrderIds && response.selectedOrderIds.length > 0) {
-          // Add the newly found IDs to the current selection
-          this.selectedOrderIds.update(s => {
-            const next = new Set(s);
-            response.selectedOrderIds.forEach(id => next.add(id));
-            return next;
-          });
-          
-          this.toast.success(`🤖 ${response.aiConfirmationMessage}`);
+          // Iniciar la orquestación mágica
+          this.runOrchestrationSequence(response);
         } else {
           this.toast.info('🤖 Gemini no encontró pedidos que coincidan con lo que dijiste.');
         }
@@ -1055,6 +1134,52 @@ export class RoutesComponent implements OnInit {
         this.toast.error('Error al comunicarse con Gemini. Intenta de nuevo.');
       }
     });
+  }
+
+  private async runOrchestrationSequence(response: AiRouteSelectionResponse) {
+    this.isOrchestrating.set(true);
+    this.orchestrationFeed.set(["🛰️ Iniciando sistema de orquestación...", "🧠 CAMI analizando coincidencias..."]);
+    
+    // 1. Reproducir audio si existe
+    if (response.audioBase64) {
+      const audio = new Audio(`data:audio/mp3;base64,${response.audioBase64}`);
+      audio.play().catch(e => console.error("Error playing orchestration audio", e));
+    }
+
+    // 2. Procesar cada ID de forma secuencial con delay para el efecto WOW
+    for (const id of response.selectedOrderIds) {
+      const order = this.pendingOrders().find(o => o.id === id);
+      if (!order) continue;
+
+      this.activeOrchestrationId.set(id);
+      this.orchestrationFeed.update(f => [`📍 Localizando a ${order.clientName}...`, ...f.slice(0, 4)]);
+      
+      // Simular tiempo de "búsqueda" y animación
+      await new Promise(r => setTimeout(r, 1200));
+
+      // Marcar checkbox
+      this.selectedOrderIds.update(s => {
+        const next = new Set(s);
+        next.add(id);
+        return next;
+      });
+
+      // Si tiene dirección, mover el mapa (o simular impacto)
+      if (order.clientAddress) {
+        this.orchestrationFeed.update(f => [`✨ ${order.clientName} fijada en el radar`, ...f.slice(0, 4)]);
+      }
+    }
+
+    // 3. Finalizar
+    await new Promise(r => setTimeout(r, 1000));
+    this.orchestrationFeed.update(f => ["✅ Orquestación completada con éxito", ...f]);
+    this.toast.success(`🤖 ${response.aiConfirmationMessage}`);
+    
+    setTimeout(() => {
+      this.isOrchestrating.set(false);
+      this.activeOrchestrationId.set(null);
+      this.orchestrationFeed.set([]);
+    }, 2000);
   }
 
   // ─── LIVE RE-ORDERING (Drag & Drop) ───

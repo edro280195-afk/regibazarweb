@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"C:/Codigos/regibazar-web/src/app\" -type d -name \"admin\" | head -1 | xargs ls -1)",
+      "Bash(find \"C:/Codigos/regibazar-web/src/app/features/admin\" -name \"*.component.ts\" 2>/dev/null | sed 's|.*/||' | sort)",
+      "Bash(cd \"C:/Codigos/api/EntregasApi\" && dotnet build --no-restore 2>&1 | tail -20)",
+      "Bash(cd \"C:/Codigos/api/EntregasApi\" && dotnet build 2>&1)",
+      "Bash(cd \"C:/Codigos/api/EntregasApi\" && dotnet build 2>&1; echo \"EXIT: $?\")",
+      "Bash(powershell -Command \"cd 'C:\\\\Codigos\\\\api\\\\EntregasApi'; dotnet build 2>&1\")",
+      "Bash(powershell -Command \"Set-Location 'C:\\\\Codigos\\\\api\\\\EntregasApi'; $result = dotnet build 2>&1; Write-Output $result\" 2>&1)",
+      "Bash(powershell.exe -NonInteractive -Command \"cd 'C:\\\\Codigos\\\\api\\\\EntregasApi'; dotnet build\" 2>&1 || true)",
+      "Bash(dotnet build:*)",
+      "Bash(which dotnet:*)",
+      "Bash(find \"/c/Codigos/api/EntregasApi/Models\" -name \"*.cs\" -type f 2>/dev/null | grep -v bin | grep -v obj)"
+    ]
+  }
+}

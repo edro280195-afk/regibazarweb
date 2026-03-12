@@ -9,7 +9,9 @@ import {
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
-    AiParsedOrder, AiInsight
+    AiParsedOrder, AiInsight,
+    CamiMessage, CamiChatRequest, CamiChatResponse,
+    AiRouteSelectionRequest, AiRouteSelectionResponse
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -258,11 +260,17 @@ export class ApiService {
     }
 
     // ── AI Voice Routes ──
-    getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<{ selectedOrderIds: number[], aiConfirmationMessage: string }> {
-        return this.http.post<{ selectedOrderIds: number[], aiConfirmationMessage: string }>(`${this.base}/routes/ai-select`, {
+    getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<AiRouteSelectionResponse> {
+        return this.http.post<AiRouteSelectionResponse>(`${this.base}/routes/ai-select`, {
             voiceCommand,
             availableOrders
         });
+    }
+
+    // ── C.A.M.I. ──
+    camiChat(history: CamiMessage[], newMessage: string): Observable<CamiChatResponse> {
+        const body: CamiChatRequest = { history, newMessage };
+        return this.http.post<CamiChatResponse>(`${this.base}/cami/chat`, body);
     }
 
     // ── Driver (Repartidor) ──

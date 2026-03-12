@@ -523,7 +523,8 @@ export class LayoutComponent {
     { label: 'Proveedores', icon: '🏭', route: '/admin/suppliers' },
     { label: 'Finanzas', icon: '💰', route: '/admin/financials' },
     { label: 'Reportes', icon: '📊', route: '/admin/reports' },
-    { label: 'Cortes de Venta', icon: '📋', route: '/admin/sales-periods' }
+    { label: 'Cortes de Venta', icon: '📋', route: '/admin/sales-periods' },
+    { label: 'C.A.M.I.', icon: '✦', route: '/admin/cami' }
   ];
 
   greeting(): string {
