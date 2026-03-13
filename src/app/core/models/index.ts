@@ -40,14 +40,14 @@ export enum DeliveryStatus {
 // ── Helpers ──
 
 export const ORDER_STATUS_LABELS: Record<number, string> = {
-    0: 'Pendiente',
-    1: 'En Ruta',
-    2: 'Entregado',
-    3: 'No Entregado',
-    4: 'Cancelado',
-    5: 'Pospuesto',
-    6: 'Confirmado',
-    7: 'Enviado'
+    0: '⏳ Pendiente',
+    1: '🚗 En Camino',
+    2: '✅ Entregada',
+    3: '❌ No Entregada',
+    4: '🚫 Cancelada',
+    5: '📅 Pospuesta',
+    6: '💖 Confirmada',
+    7: '📦 Enviada'
 };
 
 export const ORDER_STATUS_EMOJI: Record<number, string> = {
@@ -538,5 +538,10 @@ export interface AiRouteSelectionRequest {
 export interface AiRouteSelectionResponse {
     selectedOrderIds: number[];
     aiConfirmationMessage: string;
+    audioBase64?: string;
+}
+
+export interface CamiGreetingResponse {
+    message: string;
     audioBase64?: string;
 }

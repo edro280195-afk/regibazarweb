@@ -9,6 +9,9 @@ const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('Backg
 import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
+import { GpsService } from '../../../core/services/gps.service';
+import { OrderStatus, ORDER_STATUS_LABELS } from '../../../core/models';
+import { effect } from '@angular/core';
 
 declare const google: any;
 
@@ -24,17 +27,17 @@ const GPS_KEY = 'regi_gps_granted';
 })
 export class RouteViewComponent implements OnInit, OnDestroy {
     @ViewChild('mapContainer') mapEl?: ElementRef;
-    @ViewChild('adminChatScroll') adminChatScroll?: ElementRef;
     @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
     private routeParam = inject(ActivatedRoute);
     private api = inject(ApiService);
     private signalr = inject(SignalRService);
     private push = inject(PushNotificationService);
+    public gps = inject(GpsService);
 
     route = signal<any>(null);
     loading = signal(true);
-    gpsActive = signal(false);
+    gpsActive = this.gps.active;
     expandedId = signal(0);
     toastMsg = signal('');
 
@@ -51,14 +54,24 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     });
     totalGastos = computed(() => this.route()?.expenses?.reduce((s: number, e: any) => s + e.amount, 0) || 0);
 
-    showAdminChat = signal(false);
-    adminMessages = signal<any[]>([]);
-    newAdminMessage = '';
-    unreadAdminCount = signal(0);
-
     activeChatDelivery = signal<any>(null);
     clientChatMessages = signal<any[]>([]);
     newClientMessage = '';
+
+    isCamiListening = signal(false);
+    private listeningTimer: any;
+    private isLongPress = false;
+
+    isCardExpanded = signal(true);
+    swipeProgress = signal(0); // 0 to 100
+    private isSwiping = false;
+    private startX = 0;
+
+    nextDelivery = computed(() => {
+        const r = this.route();
+        if (!r || !r.deliveries) return null;
+        return r.deliveries.find((d: any) => d.status === 'Pending' || d.status === 'InTransit');
+    });
 
     showExpenseModal = signal(false);
     submittingExpense = signal(false);
@@ -85,32 +98,26 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     navDistance = signal<string>('');
     navNextAddress = signal<string>('');
     navNextClient = signal<string>('');
-    private navNextNextAddress = signal<string>('');
     private lastRouteCalcLat = 0;
     private lastRouteCalcLng = 0;
     private lastRouteCalcDestId = 0;
     private driverMarker: any;
-    private watchId?: number;
-    private bgWatchId?: string;
-    private lastLat = 0;
-    private lastLng = 0;
-    private lastGpsSendTime = 0;
-    private adminMsgIds = new Set<number | string>();
     private clientMsgIds = new Set<number | string>();
+
+    constructor() {
+        // React to GPS position changes globally from the service
+        effect(() => {
+            const pos = this.gps.lastPosition();
+            if (pos && this.map) {
+                this.updateDriverMarker(pos.lat, pos.lng);
+                this.updateRouteDirection();
+            }
+        });
+    }
 
     ngOnInit(): void {
         this.token = this.routeParam.snapshot.paramMap.get('token') || '';
         this.loadRoute();
-
-        this.signalr.adminChatUpdate$.subscribe(msg => {
-            if (this.adminMsgIds.has(msg.id)) return;
-            this.adminMsgIds.add(msg.id);
-            this.adminMessages.update(msgs => [...msgs, msg]);
-            if (this.showAdminChat()) { this.scrollTo('admin'); } else {
-                this.unreadAdminCount.update(c => c + 1);
-                this.showToast('💬 Mensaje de la Base');
-            }
-        });
 
         this.signalr.clientChatUpdate$.subscribe(msg => {
             if (this.clientMsgIds.has(msg.id)) return;
@@ -138,11 +145,79 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy(): void {
-        if (this.watchId !== undefined) navigator.geolocation.clearWatch(this.watchId);
-        if (Capacitor.isNativePlatform() && this.bgWatchId) {
-            BackgroundGeolocation.removeWatcher({ id: this.bgWatchId });
-        }
         this.signalr.disconnect();
+    }
+
+    // ═══ WALKIE-TALKIE ═══
+    startCamiListening(event: MouseEvent | TouchEvent): void {
+        // Ignorar si el click es en un botón o elemento interactivo
+        const target = event.target as HTMLElement;
+        if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('select') || target.closest('label')) {
+            return;
+        }
+
+        if (this.isCamiListening()) return;
+
+        this.isLongPress = false;
+        this.listeningTimer = setTimeout(() => {
+            this.isLongPress = true;
+            this.isCamiListening.set(true);
+            // Vibración táctil si es posible
+            if ('vibrate' in navigator) navigator.vibrate(50);
+        }, 500); // 500ms para considerar long press
+    }
+
+    stopCamiListening(): void {
+        if (this.listeningTimer) {
+            clearTimeout(this.listeningTimer);
+            this.listeningTimer = null;
+        }
+
+        if (this.isCamiListening()) {
+            this.isCamiListening.set(false);
+            // Aquí iría la lógica para enviar el comando a CAMI
+        }
+        this.isLongPress = false;
+    }
+    
+    onContextMenu(event: MouseEvent): void {
+        // Solo prevenir si estamos en medio de un long press o escuchando
+        if (this.isLongPress || this.isCamiListening()) {
+            event.preventDefault();
+        }
+    }
+
+    // ═══ SWIPE TO DELIVER ═══
+    onSwipeStart(event: MouseEvent | TouchEvent): void {
+        event.stopPropagation(); // Evitar que C.A.M.I. se active al deslizar
+        this.isSwiping = true;
+        this.startX = 'touches' in event ? event.touches[0].clientX : event.clientX;
+    }
+
+    onSwipeMove(event: MouseEvent | TouchEvent): void {
+        if (!this.isSwiping) return;
+        const currentX = 'touches' in event ? event.touches[0].clientX : event.clientX;
+        const deltaX = currentX - this.startX;
+        const buttonWidth = (event.currentTarget as HTMLElement).offsetWidth;
+        
+        let progress = (deltaX / (buttonWidth * 0.8)) * 100;
+        progress = Math.max(0, Math.min(100, progress));
+        this.swipeProgress.set(progress);
+    }
+
+    onSwipeEnd(deliveryId: number): void {
+        if (!this.isSwiping) return;
+        this.isSwiping = false;
+        
+        if (this.swipeProgress() >= 90) {
+            this.markDelivered(deliveryId);
+        }
+        
+        this.swipeProgress.set(0);
+    }
+
+    toggleCard(): void {
+        this.isCardExpanded.update(v => !v);
     }
 
     private loadRoute(): void {
@@ -153,13 +228,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
                 this.loading.set(false);
                 this.signalr.connect().then(() => this.signalr.joinRoute(this.token));
                 setTimeout(() => this.initMap(r), 150);
-                // Auto-start GPS if previously granted
-                if (localStorage.getItem(GPS_KEY) === 'true' && !this.gpsActive()) {
-                    this.startGps();
-                } else if (!this.gpsActive()) {
-                    // First time: request permission automatically
-                    this.startGps();
-                }
+                this.startGps();
             },
             error: () => this.loading.set(false)
         });
@@ -167,77 +236,15 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
     // ═══ GPS ═══
     startGps(): void {
-        const isNative = Capacitor.isNativePlatform();
-        if (!isNative && !navigator.geolocation) { 
-            this.showToast('Tu navegador no soporta GPS'); 
-            return; 
-        }
-        
-        this.gpsActive.set(true);
-        localStorage.setItem(GPS_KEY, 'true');
-
-        if (!isNative) {
-            this.watchId = navigator.geolocation.watchPosition(
-                pos => {
-                    this.lastLat = pos.coords.latitude;
-                    this.lastLng = pos.coords.longitude;
-                    this.updateDriverMarker(this.lastLat, this.lastLng);
-                    if (this.map) this.map.panTo({ lat: this.lastLat, lng: this.lastLng });
-                    const now = Date.now();
-                    if (now - this.lastGpsSendTime >= 10000) {
-                        this.lastGpsSendTime = now;
-                        this.api.updateLocation(this.token, this.lastLat, this.lastLng).subscribe();
-                        this.signalr.reportLocation(this.token, this.lastLat, this.lastLng);
-                    }
-                    this.updateRouteDirection();
-                },
-                () => this.showToast('Error al obtener GPS 📍'),
-                { enableHighAccuracy: true, maximumAge: 5000 }
-            );
-        } else {
-            // Specialized logic for Android 14+ Background Persistence
-            BackgroundGeolocation.addWatcher(
-                {
-                    backgroundMessage: "Manteniendo la ruta activa para las entregas de Regi Bazar.",
-                    backgroundTitle: "Regi Bazar - Ruta en curso",
-                    requestPermissions: true,
-                    stale: false,
-                    distanceFilter: 15 // Optimización de batería y precisión
-                },
-                (location, error) => {
-                    if (error) { 
-                        console.error("Error GPS Background:", error);
-                        this.showToast('Error GPS Background 📍'); 
-                        return; 
-                    }
-                    if (location) {
-                        this.lastLat = location.latitude;
-                        this.lastLng = location.longitude;
-                        
-                        // Sincronización inmediata con UI (Markers y Mapa)
-                        this.updateDriverMarker(this.lastLat, this.lastLng);
-                        if (this.map) this.map.panTo({ lat: this.lastLat, lng: this.lastLng });
-                        
-                        // Sincronización inmediata con Backend y SignalR (Admin/Client Views)
-                        const now = Date.now();
-                        if (now - this.lastGpsSendTime >= 10000) {
-                            this.lastGpsSendTime = now;
-                            this.api.updateLocation(this.token, this.lastLat, this.lastLng).subscribe({
-                                error: (err) => console.error("Error enviando ubicación al API", err)
-                            });
-                            this.signalr.reportLocation(this.token, this.lastLat, this.lastLng);
-                        }
-                        this.updateRouteDirection();
-                    }
-                }
-            ).then((bgId: string) => {
-                this.bgWatchId = bgId;
-            });
-        }
+        this.gps.start(this.token);
     }
 
     centerOnMe(): void {
-        if (this.lastLat && this.map) { this.map.panTo({ lat: this.lastLat, lng: this.lastLng }); this.map.setZoom(16); }
+        const pos = this.gps.lastPosition();
+        if (pos && this.map) { 
+            this.map.panTo({ lat: pos.lat, lng: pos.lng }); 
+            this.map.setZoom(16); 
+        }
     }
 
     private updateDriverMarker(lat: number, lng: number): void {
@@ -265,7 +272,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     // Kept separate from plotRoute so GPS updates don't redraw markers or change viewport.
     private updateRouteDirection(forceCalc = false): void {
         const r = this.route();
-        if (!this.lastLat || !this.map || !r || !this.directionsService) return;
+        const pos = this.gps.lastPosition();
+        if (!pos || !this.map || !r || !this.directionsService) return;
         const pending = r.deliveries.filter((d: any) => d.status !== 'Delivered' && d.status !== 'NotDelivered' && d.latitude);
         if (!pending.length) {
             if (this.directionsRenderer) this.directionsRenderer.setDirections({ routes: [] });
@@ -273,7 +281,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             return;
         }
 
-        const origin = new google.maps.LatLng(this.lastLat, this.lastLng);
+        const origin = new google.maps.LatLng(pos.lat, pos.lng);
         const dest = new google.maps.LatLng(pending[0].latitude, pending[0].longitude);
 
         // Update Overlay UI
@@ -284,12 +292,12 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         // We removed the aggressive fitBounds to ensure the driver stays centered in the view, 
         // as watchPosition already calls map.panTo(driverLocation) every second.
 
-        // Throttle API usage: only calc routes if dest changed, forced, or moved 50+ meters
-        const distMoved = this.getDistance(this.lastLat, this.lastLng, this.lastRouteCalcLat, this.lastRouteCalcLng);
+        // Throttle API usage
+        const distMoved = this.getDistance(pos.lat, pos.lng, this.lastRouteCalcLat, this.lastRouteCalcLng);
         if (!forceCalc && pending[0].id === this.lastRouteCalcDestId && distMoved < 50) return;
 
-        this.lastRouteCalcLat = this.lastLat;
-        this.lastRouteCalcLng = this.lastLng;
+        this.lastRouteCalcLat = pos.lat;
+        this.lastRouteCalcLng = pos.lng;
         this.lastRouteCalcDestId = pending[0].id;
 
         // 1. NEON ROUTE (Next Leg)
@@ -357,8 +365,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         // Geocode any deliveries that lack coordinates (they are not persisted by the backend)
         await this.geocodeDeliveries(route);
         this.plotRoute(route);
-        // If GPS already has a fix (e.g. after reload), draw route immediately
-        if (this.lastLat) this.updateRouteDirection(true);
+        this.updateRouteDirection(true);
     }
 
     // Geocodes delivery addresses that are missing lat/lng using the Google Geocoder API.
@@ -432,7 +439,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         const due = delivery?.balanceDue ?? delivery?.total ?? 0;
         const payments = method && due > 0 ? [{ amount: due, method }] : undefined;
         this.api.markDelivered(this.token, id, notes, photoFiles, payments).subscribe(() => {
-            this.showToast('💝 ¡Entregado!'); this.photos[id] = []; this.deliveryNotes[id] = ''; this.loadRoute();
+            this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
+            this.photos[id] = []; this.deliveryNotes[id] = ''; this.loadRoute();
         });
     }
 
@@ -457,25 +465,6 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         this.api.addDriverExpense(this.token, this.expenseForm).subscribe({
             next: () => { this.showToast('💰 Gasto registrado'); this.closeExpenseModal(); this.submittingExpense.set(false); },
             error: () => { this.showToast('Error al registrar gasto'); this.submittingExpense.set(false); }
-        });
-    }
-
-    // ═══ ADMIN CHAT ═══
-    toggleAdminChat(): void {
-        this.showAdminChat.update(v => !v);
-        if (this.showAdminChat()) {
-            this.unreadAdminCount.set(0);
-            this.api.getDriverChat(this.token).subscribe(msgs => {
-                this.adminMsgIds.clear(); msgs.forEach((m: any) => this.adminMsgIds.add(m.id));
-                this.adminMessages.set(msgs); this.scrollTo('admin');
-            });
-        }
-    }
-    sendAdminChat(): void {
-        const text = this.newAdminMessage.trim(); if (!text) return; this.newAdminMessage = '';
-        this.api.sendDriverMessage(this.token, text).subscribe(msg => {
-            if (!this.adminMsgIds.has(msg.id)) { this.adminMsgIds.add(msg.id); this.adminMessages.update(m => [...m, msg]); }
-            this.scrollTo('admin');
         });
     }
 
@@ -570,9 +559,9 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         });
     }
 
-    private scrollTo(chat: 'admin' | 'client'): void {
+    private scrollTo(chat: 'client'): void {
         setTimeout(() => {
-            const el = chat === 'admin' ? this.adminChatScroll : this.clientChatScroll;
+            const el = this.clientChatScroll;
             if (el?.nativeElement) el.nativeElement.scrollTop = el.nativeElement.scrollHeight;
         }, 60);
     }

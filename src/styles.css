@@ -1063,3 +1063,25 @@ select.input-coquette {
   color: #831843 !important;
   font-family: inherit !important;
 }
+
+/* ── Google Maps Autocomplete Fix ── */
+.pac-container {
+  z-index: 10000 !important;
+  border-radius: 1rem;
+  box-shadow: 0 20px 50px rgba(131, 24, 67, 0.2);
+  border: 1px solid rgba(249, 168, 212, 0.4);
+  font-family: var(--font-body);
+}
+
+.pac-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.pac-item:hover {
+  background: #fdf2f8;
+}
+
+.pac-item-query {
+  color: #831843;
+}

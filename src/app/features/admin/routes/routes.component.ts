@@ -164,17 +164,17 @@ interface GeocodedOrder extends OrderSummaryDto {
       }
 
       <!-- ═══ HEADER ═══ -->
-      <div class="relative z-10 flex flex-wrap items-center justify-between gap-4 mb-8 animate-slide-down">
+      <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 animate-slide-down">
         <div>
-          <h1 class="text-3xl font-black text-pink-900 tracking-tight">🚗 Centro de Entregas</h1>
-          <p class="text-sm text-pink-400 font-semibold mt-1">Monitorea y gestiona tus rutas en tiempo real</p>
+          <h1 class="text-2xl sm:text-3xl font-black text-pink-900 tracking-tight">🚗 Centro de Entregas</h1>
+          <p class="text-xs sm:text-sm text-pink-400 font-semibold mt-1">Monitorea y gestiona tus rutas en tiempo real</p>
         </div>
-        <div class="flex gap-2">
-          <button class="group flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/80 backdrop-blur-lg border border-pink-100 text-pink-600 font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+        <div class="flex gap-2 w-full sm:w-auto">
+          <button class="flex-1 sm:flex-none group flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white/80 backdrop-blur-lg border border-pink-100 text-pink-600 font-bold text-sm shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
                   (click)="loadRoutes()">
             <span class="transition-transform group-active:rotate-180" [class.animate-spin]="loading()">🔄</span> Actualizar
           </button>
-          <button class="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95"
+          <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95"
                   (click)="openCreateModal()">
             ✨ Nueva Ruta
           </button>
@@ -182,7 +182,7 @@ interface GeocodedOrder extends OrderSummaryDto {
       </div>
 
       <!-- ═══ KPI STRIP ═══ -->
-      <div class="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div class="relative z-10 grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <div class="bg-white/70 backdrop-blur-xl rounded-2xl p-4 border border-white shadow-sm animate-slide-up">
           <p class="text-[10px] font-black uppercase tracking-widest text-pink-400 mb-1">Total Rutas</p>
           <p class="text-2xl font-black text-pink-900">{{ routes().length }}</p>
@@ -220,32 +220,40 @@ interface GeocodedOrder extends OrderSummaryDto {
         <!-- ═══ GOD MODE: LIVE RADAR (Phase 38) ═══ -->
         @if (routes().length > 0) {
           <div class="relative z-10 mb-8 bg-white/80 backdrop-blur-xl rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden animate-slide-down">
-             <div class="p-4 border-b border-pink-50 flex justify-between items-center bg-gradient-to-r from-pink-50 to-purple-50">
+             <div class="p-4 border-b border-pink-50 flex justify-between items-center bg-gradient-to-r from-pink-50 to-purple-50 cursor-pointer select-none"
+                  (click)="collapsedRadar.set(!collapsedRadar())">
                <div class="flex items-center gap-3">
                  <span class="text-2xl animate-pulse">📡</span>
                  <div>
                    <h3 class="text-lg font-black text-pink-900 leading-none">Radar Global en Vivo</h3>
-                   <p class="text-xs text-pink-500 font-bold mt-1">Supervisión Inmersiva (God Mode)</p>
+                   <div class="flex items-center gap-2 mt-1">
+                     <p class="text-[10px] text-pink-500 font-bold uppercase tracking-tight">God Mode</p>
+                     <span class="text-[10px] text-pink-300 font-bold">{{ collapsedRadar() ? '➕ Mostrar' : '➖ Ocultar' }}</span>
+                   </div>
                  </div>
                </div>
-               <span class="px-3 py-1.5 rounded-xl bg-blue-100/80 text-blue-700 text-xs font-bold font-mono border border-blue-200 flex items-center gap-1.5 shadow-sm">
-                 <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                 {{ activeDriversCount() }} Choferes Activos
+               <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-blue-100/80 text-blue-700 text-[10px] sm:text-xs font-bold font-mono border border-blue-200 flex items-center gap-1.5 shadow-sm">
+                 <span class="w-1.5 h-1.5 sm:w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                 {{ activeDriversCount() }} <span class="hidden sm:inline">Choferes</span> Activos
                </span>
              </div>
-             <div class="h-[400px] w-full relative bg-gray-100">
-               <div id="god-mode-map" class="absolute inset-0 z-0"></div>
-             </div>
-             <!-- Live Event Feed Preview -->
-             <div class="h-10 bg-gray-900 border-t border-gray-800 flex items-center px-4 overflow-hidden">
-                <span class="text-gray-400 text-xs font-mono font-bold shrink-0 mr-3">📟 EVENT LOG:</span>
-                <div class="flex-1 overflow-hidden" style="white-space: nowrap; text-overflow: ellipsis;">
-                   @if (latestEvent()) {
-                     <span class="text-emerald-400 text-xs font-mono animate-fade-in-down">{{ latestEvent() }}</span>
-                   } @else {
-                     <span class="text-gray-600 text-xs font-mono italic">Escuchando la red (SignalR)...</span>
-                   }
-                </div>
+             
+             <div class="transition-all duration-500 ease-in-out overflow-hidden" 
+                  [style.max-height]="collapsedRadar() ? '0' : '500px'">
+               <div class="h-[250px] sm:h-[400px] w-full relative bg-gray-100">
+                 <div id="god-mode-map" class="absolute inset-0 z-0"></div>
+               </div>
+               <!-- Live Event Feed Preview -->
+               <div class="h-10 bg-gray-900 border-t border-gray-800 flex items-center px-4 overflow-hidden">
+                  <span class="text-gray-400 text-[10px] font-mono font-bold shrink-0 mr-3">📟 EVENT LOG:</span>
+                  <div class="flex-1 overflow-hidden" style="white-space: nowrap; text-overflow: ellipsis;">
+                     @if (latestEvent()) {
+                       <span class="text-emerald-400 text-[10px] font-mono animate-fade-in-down">{{ latestEvent() }}</span>
+                     } @else {
+                       <span class="text-gray-600 text-[10px] font-mono italic">Escuchando la red (SignalR)...</span>
+                     }
+                  </div>
+               </div>
              </div>
           </div>
         }
@@ -257,31 +265,31 @@ interface GeocodedOrder extends OrderSummaryDto {
                  [style.animation-delay]="(i * 70) + 'ms'">
 
               <!-- Card Header -->
-              <div class="p-5 pb-3 cursor-pointer select-none" (click)="toggleRouteExpand(route.id)">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner border border-pink-100 transition-transform duration-500"
+              <div class="p-4 sm:p-5 pb-3 cursor-pointer select-none" (click)="toggleRouteExpand(route.id)">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl shadow-inner border border-pink-100 transition-transform duration-500"
                          [class.rotate-12]="expandedRouteIds().has(route.id)"
                          [class]="route.status === 'Active' ? 'bg-blue-50' : route.status === 'Completed' ? 'bg-emerald-50' : 'bg-pink-50'">
                       {{ route.status === 'Active' ? '🚀' : route.status === 'Completed' ? '✅' : '🏎️' }}
                     </div>
-                    <div>
+                    <div class="flex-1">
                       <div class="flex items-center gap-2">
-                        <h3 class="text-lg font-black text-pink-900">Ruta #{{ route.id }}</h3>
+                        <h3 class="text-base sm:text-lg font-black text-pink-900">Ruta #{{ route.id }}</h3>
                         <span class="text-pink-300 text-xs transition-transform duration-300" 
                               [class.rotate-180]="expandedRouteIds().has(route.id)">▼</span>
                       </div>
-                      <p class="text-xs text-pink-400 font-semibold">{{ route.createdAt | date:'d MMM yyyy, h:mm a' }}</p>
+                      <p class="text-[10px] sm:text-xs text-pink-400 font-semibold">{{ route.createdAt | date:'d MMM yyyy, h:mm a' }}</p>
                     </div>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest"
+                  <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-pink-50">
+                    <span class="px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest"
                           [class]="getStatusClasses(route.status)">
                       {{ getStatusLabel(route.status) }}
                     </span>
                     <div class="text-right">
-                      <p class="text-xs text-pink-400 font-semibold">{{ route.deliveries.length }} entregas</p>
-                      <p class="text-lg font-black text-pink-900">{{ getRouteTotal(route) | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                      <p class="text-[10px] sm:text-xs text-pink-400 font-semibold">{{ route.deliveries.length }} entregas</p>
+                      <p class="text-base sm:text-lg font-black text-pink-900">{{ getRouteTotal(route) | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                     </div>
                   </div>
                 </div>
@@ -300,26 +308,26 @@ interface GeocodedOrder extends OrderSummaryDto {
               </div>
 
               <!-- Action Chips -->
-              <div class="px-5 pb-3 flex flex-wrap gap-2">
-                <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-pink-50 text-pink-600 text-xs font-bold border border-pink-100 hover:bg-pink-100 active:scale-95 transition-all"
+              <div class="px-4 sm:px-5 pb-3 flex flex-wrap gap-2">
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-pink-50 text-pink-600 text-xs font-bold border border-pink-100 hover:bg-pink-100 active:scale-95 transition-all"
                         (click)="openMap(route)">
-                  🗺️ <span>Mapa</span>
+                  🗺️ <span class="hidden sm:inline">Mapa</span>
                 </button>
-                <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100 hover:bg-blue-100 active:scale-95 transition-all"
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100 hover:bg-blue-100 active:scale-95 transition-all"
                         (click)="copyDriverLink(route)">
-                  📋 <span>Link Chofer</span>
+                  📋 <span class="hidden sm:inline">Link</span>
                 </button>
-                <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-50 text-green-600 text-xs font-bold border border-green-100 hover:bg-green-100 active:scale-95 transition-all"
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-green-50 text-green-600 text-xs font-bold border border-green-100 hover:bg-green-100 active:scale-95 transition-all"
                         (click)="shareWhatsApp(route)">
-                  📱 <span>WhatsApp</span>
+                  📱 <span class="hidden sm:inline">WhatsApp</span>
                 </button>
                 @if (route.status !== 'Completed') {
-                  <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
+                  <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
                           (click)="openCorteModal(route)">
-                    💰 <span>Liquidar</span>
+                    💰 <span class="hidden sm:inline">Liquidar</span>
                   </button>
                 }
-                <button class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold border border-red-100 hover:bg-red-100 active:scale-95 transition-all ml-auto"
+                <button class="sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold border border-red-100 hover:bg-red-100 active:scale-95 transition-all sm:ml-auto"
                         (click)="deleteRoute(route.id)">
                   🗑️
                 </button>
@@ -748,6 +756,7 @@ export class RoutesComponent implements OnInit {
   loading = signal(true);
   scrollY = signal(0);
   latestEvent = signal<string>('');
+  collapsedRadar = signal(true);
 
   // ─── GOD MODE MAP STATE ───
   private godModeMapInitialized = false;
@@ -1090,20 +1099,24 @@ export class RoutesComponent implements OnInit {
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       this.isListeningVoice.set(false);
+      this.toast.info(`Escuché: "${transcript}"... Procesando 🧠`);
       this.processVoiceCommandWithGemini(transcript);
     };
 
     recognition.onerror = (event: any) => {
       this.isListeningVoice.set(false);
-      if (event.error !== 'no-speech') {
+      console.error('Speech recognition error', event.error);
+      if (event.error === 'no-speech') {
+        this.toast.warning('No escuché nada. Intenta hablar más fuerte o revisa tu micrófono.');
+      } else if (event.error === 'not-allowed') {
+        this.toast.error('Permiso de micrófono denegado.');
+      } else {
         this.toast.error('Ocurrió un error al escuchar. Intenta de nuevo.');
       }
     };
 
     recognition.onend = () => {
-      if (this.isListeningVoice()) {
-        this.isListeningVoice.set(false);
-      }
+      this.isListeningVoice.set(false);
     };
 
     recognition.start();
@@ -1122,15 +1135,16 @@ export class RoutesComponent implements OnInit {
       next: (response) => {
         this.isProcessingVoice.set(false);
 
-        if (response.selectedOrderIds && response.selectedOrderIds.length > 0) {
-          // Iniciar la orquestación mágica
+        if (response && response.selectedOrderIds && response.selectedOrderIds.length > 0) {
+          this.toast.success(response.aiConfirmationMessage || '¡Ruta armada con éxito!');
           this.runOrchestrationSequence(response);
         } else {
-          this.toast.info('🤖 Gemini no encontró pedidos que coincidan con lo que dijiste.');
+          this.toast.info(response?.aiConfirmationMessage || '🤖 Gemini no encontró pedidos que coincidan con lo que dijiste.');
         }
       },
-      error: () => {
+      error: (err) => {
         this.isProcessingVoice.set(false);
+        console.error('Gemini error', err);
         this.toast.error('Error al comunicarse con Gemini. Intenta de nuevo.');
       }
     });

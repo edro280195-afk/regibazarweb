@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto } from '../../../core/models';
+import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 
@@ -245,22 +245,27 @@ import * as QRCode from 'qrcode';
               <div class="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-hide py-1">
                 <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
                         [class]="selectedOrder()!.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-md shadow-amber-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-amber-50 hover:text-amber-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Pending')">⏳ Pendiente</button>
+                        (click)="updateStatus(selectedOrder()!.id, 'Pending')">{{ getStatusLabel('Pending') }}</button>
                 <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
                 
                 <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
                         [class]="selectedOrder()!.status === 'Confirmed' ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-md shadow-pink-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-pink-50 hover:text-pink-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Confirmed')">💖 Confirmada</button>
+                        (click)="updateStatus(selectedOrder()!.id, 'Confirmed')">{{ getStatusLabel('Confirmed') }}</button>
                 <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
                 
                 <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
                         [class]="selectedOrder()!.status === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-md shadow-blue-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-blue-50 hover:text-blue-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Shipped')">📦 Enviado</button>
+                        (click)="updateStatus(selectedOrder()!.id, 'Shipped')">{{ getStatusLabel('Shipped') }}</button>
+                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
+
+                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
+                        [class]="selectedOrder()!.status === 'InRoute' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-md shadow-indigo-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-indigo-50 hover:text-indigo-600'"
+                        (click)="updateStatus(selectedOrder()!.id, 'InRoute')">{{ getStatusLabel('InRoute') }}</button>
                 <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
                 
                 <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
                         [class]="selectedOrder()!.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-md shadow-emerald-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-emerald-50 hover:text-emerald-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Delivered')">✅ Entregado</button>
+                        (click)="updateStatus(selectedOrder()!.id, 'Delivered')">{{ getStatusLabel('Delivered') }}</button>
               </div>
             </div>
 
@@ -609,12 +614,8 @@ export class OrdersComponent implements OnInit {
   }
 
   getStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
-      'Pending': '⏳ Pendiente', 'InRoute': '🚗 En Ruta', 'Delivered': '✅ Entregado',
-      'NotDelivered': '❌ No Entregado', 'Canceled': '🚫 Cancelado', 'Postponed': '📅 Pospuesto',
-      'Confirmed': '💖 Confirmado', 'Shipped': '📦 Enviado'
-    };
-    return labels[status] || status;
+    const statusEnum = OrderStatus[status as keyof typeof OrderStatus] ?? -1;
+    return ORDER_STATUS_LABELS[statusEnum] || status;
   }
 
   getPaymentPercent(order: OrderSummaryDto): number {
@@ -1012,74 +1013,43 @@ export class OrdersComponent implements OnInit {
   }
 
   private async generateLabelHtml(pkg: OrderPackageDto, orderData: OrderSummaryDto, totalPackages: number, isBulk = false): Promise<string> {
-    // Generate QR with High error correction (H) so the logo doesn't break it
-    const qrDataUrl = await QRCode.toDataURL(pkg.qrCodeValue, {
-      errorCorrectionLevel: 'H',
+    // 1. QR Limpio y rápido. Bajamos la corrección de error a 'M' porque ya no hay logo que lo tape
+    const finalQrUrl = await QRCode.toDataURL(pkg.qrCodeValue, {
+      errorCorrectionLevel: 'M',
       width: 400,
       margin: 1
     });
 
-    let finalQrUrl = qrDataUrl;
-
-    try {
-      // Create canvas to merge QR + Logo
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 400;
-      const ctx = canvas.getContext('2d')!;
-
-      // Load QR Image
-      const qrImg = new Image();
-      qrImg.src = qrDataUrl;
-      await new Promise((resolve, reject) => {
-        qrImg.onload = resolve;
-        qrImg.onerror = reject;
-      });
-      ctx.drawImage(qrImg, 0, 0);
-
-      // Load Logo Image
-      const logoUrl = window.location.origin + '/assets/logo-termico.png';
-      const logoImg = new Image();
-      logoImg.crossOrigin = "anonymous"; // Important if served from different origin
-      logoImg.src = logoUrl;
-
-      await new Promise((resolve) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = resolve; // Continue even if logo fails
-      });
-
-      if (logoImg.complete && logoImg.naturalWidth > 0) {
-        // Draw white background for the logo center
-        const logoSize = 100;
-        const center = (400 - logoSize) / 2;
-        ctx.fillStyle = 'white';
-        // Rounded corner effect for the logo pocket
-        this.fillRoundedRect(ctx, center - 2, center - 2, logoSize + 4, logoSize + 4, 10);
-        ctx.drawImage(logoImg, center, center, logoSize, logoSize);
-        finalQrUrl = canvas.toDataURL('image/png');
-      }
-    } catch (e) {
-      console.warn('Could not add logo to QR, falling back to basic QR', e);
-    }
+    // 2. Opcional: Si quieres poner el logo hasta arriba en lugar de texto
+    const logoUrl = window.location.origin + '/assets/logo-termico.png';
 
     const content = `
       <div class="label-wrapper ${isBulk ? 'page-break' : ''}">
+        
         <div class="header">
           <h2>REGI BAZAR</h2>
-          <h3>Todo para tu hogar</h3>
-          <h3>¡Gracias por tu compra! 🌸</h3>
+          <h3>Lo mejor para tu hogar</h3>
         </div>
-        <div class="info">
-          <p>Para: ${orderData.clientName}</p>
+
+        <div class="info-box">
+          <p class="label-text">ENTREGAR A:</p>
+          <p class="client-name">${orderData.clientName}</p>
         </div>
+
         <div class="qr-container">
-          <img src="${finalQrUrl}" alt="QR" />
+          <img src="${finalQrUrl}" alt="QR Pedido" />
         </div>
+
+        <div class="logistics">
+          <h1>BOLSA ${pkg.packageNumber} DE ${totalPackages}</h1>
+        </div>
+
         <div class="footer">
-          <h1>Bolsa ${pkg.packageNumber} de ${totalPackages}</h1>
-          <hr style="border: 1px solid black; margin: 5px 0;" />
-          <p>FB: Regi Bazar</p>
+          <p class="gracias">¡Gracias por tu compra! 🌸</p>
+          <p class="social">👍 Síguenos en nuestra página de Facebook:</p>
+          <p class="social-bold">Regi Bazar</p>
         </div>
+
       </div>
     `;
 
@@ -1089,38 +1059,83 @@ export class OrdersComponent implements OnInit {
       <!DOCTYPE html>
       <html>
         <head>
+          <meta charset="utf-8">
           <style>
             @page { margin: 0; size: 100mm 150mm; }
-            body { margin: 0; padding: 0; }
+            body { 
+              margin: 0; 
+              padding: 0; 
+              background-color: white; 
+              color: black;
+            }
             .label-wrapper { 
-              margin: 0; padding: 4mm; box-sizing: border-box; 
-              width: 100mm; height: 148mm; overflow: hidden;
-              font-family: Arial, sans-serif; display: flex; 
-              flex-direction: column; justify-content: space-between; align-items: center;
+              margin: 0; 
+              padding: 6mm 4mm; 
+              box-sizing: border-box; 
+              width: 100mm; 
+              height: 148mm; 
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+              display: flex; 
+              flex-direction: column; 
+              justify-content: space-between; 
+              align-items: center;
+              text-align: center;
             }
-            .header { text-align: center; width: 100%; }
-            .header h2 { margin: 2px 0; font-size: 16px; font-weight: bold; }
-            .header h3 { margin: 2px 0; font-size: 14px; font-weight: normal; }
-            .info { 
-              text-align: left; width: 100%; font-size: 16px; font-weight: bold; 
-              border-top: 2px dashed #000; border-bottom: 2px dashed #000; 
-              padding: 5px 0; margin: 5px 0;
+            
+            /* Header */
+            .header { width: 100%; margin-bottom: 5px; }
+            .top-logo { max-width: 60mm; height: auto; margin-bottom: 5px; }
+            .header h2 { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+            .header h3 { margin: 2px 0 0 0; font-size: 16px; font-weight: normal; font-style: italic; }
+            
+            /* Info Box */
+            .info-box { 
+              width: 90%; 
+              border-top: 2px dashed #000; 
+              border-bottom: 2px dashed #000; 
+              padding: 10px 0; 
+              margin: 10px 0; 
             }
-            .info p { margin: 2px 0; }
+            .label-text { margin: 0; font-size: 12px; font-weight: bold; color: #333; }
+            .client-name { margin: 5px 0 0 0; font-size: 22px; font-weight: 900; line-height: 1.1; }
+            
+            /* QR */
             .qr-container { 
-              display: flex; justify-content: center; align-items: center; 
-              flex-grow: 1; width: 100%; overflow: hidden;
+              flex-grow: 1; 
+              display: flex; 
+              justify-content: center; 
+              align-items: center; 
+              width: 100%; 
             }
-            .qr-container img { max-width: 75mm; max-height: 75mm; width: auto; height: auto; }
-            .footer { text-align: center; width: 100%; }
-            .footer h1 { margin: 0; font-size: 28px; font-weight: bold; text-transform: uppercase;}
-            .footer p { margin: 2px 0; font-size: 12px; }
+            .qr-container img { width: 65mm; height: 65mm; object-fit: contain; }
+            
+            /* Logistics */
+            .logistics { 
+              width: 100%; 
+              background-color: #000; 
+              color: #fff; /* Inversión de color para que resalte en térmico */
+              padding: 8px 0; 
+              margin: 5px 0;
+              border-radius: 4px; /* Las impresoras térmicas modernas imprimen bordes curvos sin problema */
+            }
+            .logistics h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+            
+            /* Footer */
+            .footer { width: 100%; margin-top: 5px; }
+            .gracias { margin: 0 0 5px 0; font-size: 18px; font-weight: bold; }
+            .social { margin: 0; font-size: 13px; }
+            .social-bold { margin: 2px 0 0 0; font-size: 16px; font-weight: 900; }
           </style>
         </head>
         <body>
           ${content}
           <script>
-            window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 300); }
+            window.onload = function() { 
+              setTimeout(() => { 
+                window.print(); 
+                window.close(); 
+              }, 300); 
+            }
           </script>
         </body>
       </html>

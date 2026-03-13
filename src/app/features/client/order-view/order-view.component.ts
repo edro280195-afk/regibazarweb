@@ -7,7 +7,7 @@ import { SignalRService } from '../../../core/services/signalr.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { OrderSummaryDto } from '../../../core/models';
+import { OrderSummaryDto, OrderStatus, ORDER_STATUS_LABELS, ORDER_STATUS_EMOJI } from '../../../core/models';
 import confetti from 'canvas-confetti';
 import gsap from 'gsap';
 
@@ -117,6 +117,48 @@ import gsap from 'gsap';
             </p>
           </div>
 
+          @if (!isLoadingCami() && camiMessage()) {
+            <div class="relative bg-white/80 backdrop-blur-2xl rounded-3xl p-5 mb-6 shadow-[0_10px_30px_rgba(244,114,182,0.15)] border border-pink-100 overflow-hidden animate-fade-in-up" style="animation-delay: 200ms">
+              <div class="absolute -right-10 -top-10 w-32 h-32 bg-gradient-to-br from-pink-300 to-purple-300 rounded-full blur-3xl opacity-30 animate-pulse-slow"></div>
+              
+              <div class="flex gap-4 items-start relative z-10">
+                <div class="relative shrink-0">
+                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-100 to-rose-100 border-2 border-white shadow-sm flex items-center justify-center text-2xl">
+                    👩🏻‍💻
+                  </div>
+                  <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full"></div>
+                </div>
+
+                <div class="flex-1">
+                  <div class="flex justify-between items-center mb-1">
+                    <h4 class="font-black text-pink-900 text-sm">C.A.M.I.</h4>
+                    <span class="text-[9px] font-bold text-pink-400 uppercase tracking-widest bg-pink-50 px-2 py-0.5 rounded-full">Asistente Virtual</span>
+                  </div>
+                  
+                  <p class="text-sm text-pink-800/90 font-medium leading-snug mb-3">
+                    "{{ camiMessage() }}"
+                  </p>
+
+                  @if (camiAudioUrl()) {
+                    <button (click)="playCamiAudio()" 
+                            class="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md active:scale-95 transition-all hover:shadow-lg w-full justify-center">
+                      @if (isPlayingCami()) {
+                        <div class="flex gap-1 items-center h-4">
+                          <div class="w-1 bg-white h-full animate-pulse"></div>
+                          <div class="w-1 bg-white h-2/3 animate-pulse" style="animation-delay: 0.1s"></div>
+                          <div class="w-1 bg-white h-full animate-pulse" style="animation-delay: 0.2s"></div>
+                          <div class="w-1 bg-white h-1/2 animate-pulse" style="animation-delay: 0.3s"></div>
+                        </div>
+                        <span>Escuchando...</span>
+                      } @else {
+                        <span class="text-base">▶️</span> Escuchar Mensaje
+                      }
+                    </button>
+                  }
+                </div>
+              </div>
+            </div>
+          }
           <!-- Live Tracking Gamified Map (TOP PRIORITY) -->
           @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.deliveriesAhead === 0 && (o.clientLatitude || clientCoords()?.lat)) {
              <div class="mb-6 rounded-[2.5rem] overflow-hidden border-4 border-white shadow-[0_20px_50px_rgba(236,72,153,0.3)] relative h-[420px] bg-gray-100 animate-fade-in-up" style="animation-delay: 50ms">
@@ -198,23 +240,8 @@ import gsap from 'gsap';
 
           <!-- Status Alert Message -->
           <div class="mt-2 p-3 rounded-2xl bg-white/50 border border-pink-100 border-dashed text-center text-sm font-medium text-pink-800 animate-fade-in-up" style="animation-delay: 50ms">
-            @switch (o.status) {
-              @case ('Pending') { Tu pedido está listo, confirma para prepararlo ✨ }
-              @case ('Confirmed') { ¡Pedido confirmado! Lo estamos preparando con mucho cariño 🎀 }
-              @case ('Shipped') { Tu paquetito está armado y listo para salir ✨ }
-              @case ('InRoute') { 
-                Tu pedido va en camino. 
-                @if ((o.deliveriesAhead ?? 0) > 0) {
-                  El repartidor visita a {{ o.deliveriesAhead }} chicas antes que a ti 💕
-                } @else {
-                  ¡Prepárate, eres la siguiente parada! ✨
-                }
-              }
-              @case ('InTransit') { ¡Prepárate, el auto va directo a tu casa! 🎉 }
-              @case ('Delivered') { Tu pedido fue entregado, muchas gracias por hacernos parte de tu estilo 🌸 }
-              @case ('NotDelivered') { No se logró entregar. Porfa contacta a tu vendedora 💌 }
-              @case ('Canceled') { Este pedido ha sido cancelado. 💔 }
-              @default { Estamos procesando tu pedido, pronto tendrás novedades 💕 }
+            @if (order(); as o) {
+              {{ getStatusDetailMessage(o.status, o.deliveriesAhead || 0) }}
             }
           </div>
 
@@ -363,7 +390,7 @@ import gsap from 'gsap';
             <!-- Items -->
             <div class="space-y-4 mb-6 relative">
               @for (item of o.items; track item.id) {
-                <div class="order-item flex justify-between items-center relative pl-3 group opacity-0">
+                <div class="order-item flex justify-between items-center relative pl-3 group" [style.opacity]="isUnboxed() ? 1 : 0">
                   <!-- Cute bullet -->
                   <div class="absolute left-0 top-1.5 w-1.5 h-1.5 rounded-full bg-pink-300 group-hover:scale-150 transition-transform"></div>
                   <div class="flex flex-col">
@@ -385,7 +412,7 @@ import gsap from 'gsap';
             </div>
 
             <!-- Totals -->
-            <div id="ticket-totals" class="bg-rose-50/70 rounded-2xl p-5 border border-rose-100/50 relative overflow-hidden opacity-0">
+            <div id="ticket-totals" class="bg-rose-50/70 rounded-2xl p-5 border border-rose-100/50 relative overflow-hidden" [style.opacity]="isUnboxed() ? 1 : 0">
               <div class="absolute right-0 bottom-0 opacity-5 text-8xl -mr-6 -mb-6 rotate-12 pointer-events-none">🧾</div>
               
               <div class="flex justify-between text-sm font-medium text-pink-800/80 mb-2.5">
@@ -551,7 +578,7 @@ import gsap from 'gsap';
             <p class="text-indigo-900/80 text-xs font-medium px-4 mb-4 leading-relaxed">Etiquétanos en tus historias de Facebook o Instagram al recibir tu pedido y <strong>gana RegiPuntos extra</strong> en tu siguiente compra ✨</p>
             
             <div class="flex justify-center gap-4 relative z-10">
-              <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#1877f2] to-[#1259b6] text-white flex items-center justify-center text-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all font-serif italic pr-1">
+              <a href="https://www.facebook.com/regi.bazar.852309" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#1877f2] to-[#1259b6] text-white flex items-center justify-center text-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all font-serif italic pr-1">
                 f
               </a>
               <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white flex items-center justify-center text-xl shadow-lg hover:shadow-xl hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all font-bold">
@@ -700,6 +727,12 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   isEditingInstructions = signal(false);
   savingInstructions = signal(false);
   localInstructions = '';
+
+  // Señales para C.A.M.I.
+  camiMessage = signal<string>('');
+  camiAudioUrl = signal<string>('');
+  isPlayingCami = signal(false);
+  isLoadingCami = signal(true);
 
   // --- MAP STEROIDS ---
   private mapInitialized = false;
@@ -862,6 +895,24 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     return '¡Buenas noches';
   }
 
+  getStatusDetailMessage(status: string, deliveriesAhead: number): string {
+    switch (status) {
+      case 'Pending': return 'Tu pedido está listo, confirma para prepararlo ✨';
+      case 'Confirmed': return '¡Pedido confirmado! Lo estamos preparando con mucho cariño 🎀';
+      case 'Shipped': return 'Tu paquetito está armado y listo para salir ✨';
+      case 'InRoute':
+        if (deliveriesAhead > 0) {
+          return `Tu pedido va en camino. El repartidor visita a ${deliveriesAhead} chicas antes que a ti 💕`;
+        }
+        return '¡Prepárate, eres la siguiente parada! ✨';
+      case 'InTransit': return '¡Prepárate, el auto va directo a tu casa! 🎉';
+      case 'Delivered': return 'Tu pedido fue entregado, muchas gracias por hacernos parte de tu estilo 🌸';
+      case 'NotDelivered': return 'No se logró entregar. Porfa contacta a tu vendedora 💌';
+      case 'Canceled': return 'Este pedido ha sido cancelado. 💔';
+      default: return 'Estamos procesando tu pedido, pronto tendrás novedades 💕';
+    }
+  }
+
   ngOnDestroy() {
     if (this.toastTimeout) clearTimeout(this.toastTimeout);
   }
@@ -881,9 +932,11 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           this.isUnboxed.set(true);
         }
 
-        // Trigger confetti ONLY if Delivered on first load and already unboxed
-        if (data.status === 'Delivered' && this.isUnboxed()) {
-          setTimeout(() => this.fireConfetti('unboxing'), 500);
+        if (this.isUnboxed()) {
+          setTimeout(() => {
+            this.animateTicketReveal();
+            if (data.status === 'Delivered') this.fireConfetti('unboxing');
+          }, 500);
         }
 
 
@@ -908,6 +961,15 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           this.notFound.set(true);
         }
       }
+    });
+
+    this.api.publicGetCamiGreeting(this.accessToken).subscribe({
+      next: (res) => {
+        this.camiMessage.set(res.message);
+        this.camiAudioUrl.set('data:audio/mp3;base64,' + res.audioBase64);
+        this.isLoadingCami.set(false);
+      },
+      error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
     });
   }
 
@@ -1010,39 +1072,39 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
     const newSteps = [
       {
-        label: 'Pedido Recibido',
+        label: ORDER_STATUS_LABELS[0],
         date: new Date(o.createdAt),
         done: currentIdx > 0,
         active: currentIdx === 0,
-        icon: '📝'
+        icon: ORDER_STATUS_EMOJI[0]
       },
       {
-        label: 'Confirmado',
+        label: ORDER_STATUS_LABELS[6],
         date: currentIdx >= 1 ? new Date() : null,
         done: currentIdx > 1,
         active: currentIdx === 1,
-        icon: '💖'
+        icon: ORDER_STATUS_EMOJI[6]
       },
       {
-        label: 'Empacado y Enviado',
+        label: ORDER_STATUS_LABELS[7],
         date: currentIdx >= 2 ? new Date() : null,
         done: currentIdx > 2,
         active: currentIdx === 2,
-        icon: '📦'
+        icon: ORDER_STATUS_EMOJI[7]
       },
       {
-        label: 'En Camino',
+        label: ORDER_STATUS_LABELS[1],
         date: currentIdx >= 3 ? new Date() : null,
         done: currentIdx > 3 || status === 'InTransit',
         active: currentIdx === 3 || status === 'InTransit',
-        icon: '🚗'
+        icon: ORDER_STATUS_EMOJI[1]
       },
       {
-        label: 'Entregado',
+        label: ORDER_STATUS_LABELS[2],
         date: currentIdx >= 5 ? new Date() : null,
         done: currentIdx === 5,
         active: currentIdx === 5,
-        icon: '✅'
+        icon: ORDER_STATUS_EMOJI[2]
       }
     ];
 
@@ -1521,5 +1583,18 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
+  playCamiAudio() {
+    if (this.isPlayingCami() || !this.camiAudioUrl()) return;
 
+    const audio = new Audio(this.camiAudioUrl());
+    this.isPlayingCami.set(true);
+
+    audio.onended = () => this.isPlayingCami.set(false);
+    audio.onerror = () => {
+      this.isPlayingCami.set(false);
+      this.showToast('No se pudo reproducir el audio 💔');
+    };
+
+    audio.play();
+  }
 }

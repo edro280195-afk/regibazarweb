@@ -1,317 +1,317 @@
-<div class="driver-page">
+<div class="h-[100dvh] bg-black text-white relative overflow-hidden select-none transition-all duration-500"
+     [class.shadow-[inset_0_0_60px_rgba(236,72,153,0.6)]]="isCamiListening()"
+     (mousedown)="startCamiListening($event)"
+     (mouseup)="stopCamiListening()"
+     (mouseleave)="stopCamiListening()"
+     (touchstart)="startCamiListening($event)"
+     (touchend)="stopCamiListening()"
+     (contextmenu)="onContextMenu($event)">
 
     @if (loading()) {
-    <div class="loading-screen">
-        <div class="spinner-lg"></div>
-        <p>Cargando tu ruta... 🚗</p>
+    <div class="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-xl">
+        <div class="w-12 h-12 border-4 border-pink-500/30 border-t-pink-500 rounded-full animate-spin"></div>
+        <p class="mt-4 font-medium text-pink-200 animate-pulse">Sincronizando HUD... 🚀</p>
     </div>
     }
 
     @if (toastMsg()) {
-    <div class="toast-notification">{{ toastMsg() }}</div>
+    <div class="fixed top-24 left-1/2 -translate-x-1/2 z-[110] px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-sm font-medium animate-bounce-in shadow-2xl">
+        {{ toastMsg() }}
+    </div>
     }
+
+    <!-- MAP BACKGROUND -->
+    <div #mapContainer class="absolute inset-0 z-0"></div>
 
     @if (route(); as r) {
-
-    <!-- HEADER -->
-    <div class="driver-header">
-        <div class="header-left">
-            <h1>🚗 Ruta #{{ r.id }}</h1>
-            <span class="status-pill" [attr.data-status]="r.status">
-                {{ r.status === 'Pending' ? '⏳ Lista para iniciar' : r.status === 'Active' ? '💨 En ruta' : '✅
-                Completada' }}
-            </span>
-        </div>
-        <div class="delivery-counter">{{ deliveredCount() }}/{{ r.deliveries.length }} 💝</div>
-    </div>
-
-    <!-- KPI MINI STRIP -->
-    <div class="kpi-mini">
-        <div class="kpi-item"><span class="kpi-val">{{ deliveredCount() }}/{{ r.deliveries.length }}</span><span
-                class="kpi-label">Entregas</span></div>
-        <div class="kpi-item kpi-green"><span class="kpi-val">${{ totalCobrado() | number:'1.0-0' }}</span><span
-                class="kpi-label">Cobrado</span></div>
-        <div class="kpi-item kpi-red"><span class="kpi-val">${{ totalGastos() | number:'1.0-0' }}</span><span
-                class="kpi-label">Gastos</span></div>
-    </div>
-
-    <!-- MAP -->
-    <div class="map-wrap">
-        <div class="map-container" #mapContainer></div>
-
-        <!-- TURN-BY-TURN NAVIGATION OVERLAY -->
-        @if (navNextClient() && gpsActive()) {
-        <div class="nav-overlay animate-fade-in-up">
-            <div class="nav-content">
-                <div class="nav-eta-box">
-                    <span class="nav-eta">{{ navEta() || '⏳' }}</span>
-                    <span class="nav-dist">{{ navDistance() }}</span>
-                </div>
-                <div class="nav-dest">
-                    <span class="nav-next-badge">Siguiente Entrega</span>
-                    <strong class="nav-name">{{ navNextClient() }}</strong>
-                    <span class="nav-addr">{{ navNextAddress() }}</span>
-                </div>
-            </div>
-        </div>
-        }
-
-        @if (gpsActive()) {
-        <button class="btn-center-me" (click)="centerOnMe()">📍</button>
-        }
-        <div class="floating-actions">
-            <button class="btn-fab" (click)="openGoogleRoute(r)" title="Google Maps Turn-by-Turn">🗺️</button>
-            <button class="btn-fab" (click)="openExpenseModal()" title="Gastos">⛽</button>
-        </div>
-    </div>
-
-    <!-- BOTTOM SHEET -->
-    <div class="bottom-sheet">
-        <div class="sheet-drag-handle"></div>
-        <div class="sheet-content">
-            <div class="progress-section">
-                <div class="progress-bar">
-                    <div class="progress-fill" [style.width.%]="progressPercent()"></div>
-                </div>
-                <span class="progress-label">{{ deliveredCount() }} de {{ r.deliveries.length }} entregas</span>
-            </div>
-
-            @if (r.status === 'Pending') {
-            <button class="btn-action start" (click)="startRoute()">🚀 ¡Iniciar ruta, vamos!</button>
-            }
-            @if (r.status === 'Active' && !gpsActive()) {
-            <button class="btn-action gps" (click)="startGps()">📍 Activar mi GPS</button>
-            }
-
-            <!-- DELIVERIES -->
-            <div class="deliveries" cdkDropList (cdkDropListDropped)="onDropDelivery($event)">
-                @for (d of r.deliveries; track d.id) {
-                <div class="delivery-card" cdkDrag
-                    [cdkDragDisabled]="d.status === 'Delivered' || d.status === 'NotDelivered'"
-                    [class.expanded]="expandedId() === d.id" [class.is-current]="d.status === 'InTransit'"
-                    [class.is-delivered]="d.status === 'Delivered'" [class.is-failed]="d.status === 'NotDelivered'"
-                    (click)="toggleExpand(d.id)">
-
-                    @if (d.status === 'InTransit') {
-                    <div class="current-badge">🏃 SIGUIENTE ENTREGA</div>
-                    }
-
-                    <div class="delivery-main">
-                        <span class="delivery-num" [attr.data-status]="d.status">{{ d.sortOrder }}</span>
-                        <div class="delivery-info">
-                            <strong>{{ d.clientName }}</strong>
-                            <span class="addr">📍 {{ d.address || d.clientAddress || 'Sin dirección' }}</span>
-                            <span class="total">${{ d.total | number:'1.2-2' }}</span>
-                        </div>
-                        @if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {
-                        <button class="btn-card-chat" (click)="openClientChat(d, $event)"
-                            title="Chat con clienta">💬</button>
-                        <div class="drag-handle" cdkDragHandle>≡</div>
-                        }
+        
+    <!-- DYNAMIC ISLAND (KPIs & CAMI) -->
+    <div class="absolute top-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-out flex justify-center"
+         [class.w-full]="isCamiListening()" 
+         [class.w-48]="!isCamiListening()">
+        
+        <div class="bg-black/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] px-4 py-2 flex items-center justify-between shadow-2xl transition-all duration-500"
+             [class.h-16]="isCamiListening()" [class.h-10]="!isCamiListening()"
+             [style.width]="isCamiListening() ? '90%' : 'auto'" 
+             [style.max-width]="isCamiListening() ? '448px' : 'none'">
+            
+            @if (!isCamiListening()) {
+                <div class="flex items-center space-x-3 w-full justify-center">
+                    <span class="text-xs font-bold text-pink-500">{{ deliveredCount() }}/{{ r.deliveries.length }}</span>
+                    <div class="h-1 w-8 bg-white/20 rounded-full overflow-hidden">
+                        <div class="h-full bg-pink-500 transition-all duration-1000" [style.width.%]="progressPercent()"></div>
                     </div>
-
-                    @if (expandedId() === d.id && (d.status === 'Pending' || d.status === 'InTransit')) {
-                    <div class="delivery-actions" (click)="$event.stopPropagation()">
-                        <button class="btn-navigate" (click)="navigateTo(d)">🗺️ Navegar a dirección</button>
-
-                        @if (d.clientPhone) {
-                        <div class="contact-btns">
-                            <a [href]="'tel:' + d.clientPhone" class="btn-contact call">📞 Llamar</a>
-                            <a [href]="'https://wa.me/52' + d.clientPhone" target="_blank" class="btn-contact wa">💬
-                                WhatsApp</a>
-                        </div>
-                        }
-
-                        @if (d.status === 'Pending' && r.status === 'Active') {
-                        <button class="btn-transit" (click)="markInTransit(d.id)">🏃 Marcar en camino</button>
-                        }
-
-                        <div class="photo-section">
-                            <label class="photo-btn">📸 Tomar evidencia
-                                <input type="file" accept="image/*" capture="environment"
-                                    (change)="onPhotoCapture($event, d.id)" hidden>
-                            </label>
-                            @if (getPhotos(d.id).length > 0) {
-                            <div class="photo-previews">
-                                @for (p of getPhotos(d.id); track $index) {
-                                <div class="photo-thumb">
-                                    <img [src]="p.preview" alt="Evidencia">
-                                    <button class="remove-photo" (click)="removePhoto(d.id, $index)">×</button>
-                                </div>
-                                }
-                            </div>
-                            }
-                        </div>
-
-                        @if (d.deliveryInstructions) {
-                            <div class="instructions-panel">
-                                <strong>📍 Instrucciones:</strong>
-                                <p>{{ d.deliveryInstructions }}</p>
-                            </div>
-                        }
-
-                        <textarea [(ngModel)]="deliveryNotes[d.id]" placeholder="Notas de entrega..."
-                            class="notes-input" rows="2"></textarea>
-
-                        @if ((d.balanceDue ?? d.total) > 0 && !(d.payments?.length > 0 && (d.balanceDue ?? 0) <= 0)) {
-                            <div class="payment-selector">
-                            <label>Cobro de ${{ (d.balanceDue ?? d.total) | number:'1.2-2' }}</label>
-                            <div class="payment-cards">
-                                <button class="pay-card" [class.selected]="paymentMethods[d.id] === 'Efectivo'"
-                                    (click)="paymentMethods[d.id] = 'Efectivo'">💵<span>Efectivo</span></button>
-                                <button class="pay-card" [class.selected]="paymentMethods[d.id] === 'Transferencia'"
-                                    (click)="paymentMethods[d.id] = 'Transferencia'">💳<span>Transfer</span></button>
-                                <button class="pay-card" [class.selected]="paymentMethods[d.id] === 'Deposito'"
-                                    (click)="paymentMethods[d.id] = 'Deposito'">🏦<span>Depósito</span></button>
-                            </div>
-                    </div>
-                    } @else if (d.payments?.length > 0) {
-                    <div class="payment-selector paid"><label>✅ Pagado: {{ d.payments.length }} pago(s)</label></div>
-                    }
-
-                    <div class="action-btns">
-                        <button class="btn-deliver" (click)="markDelivered(d.id)"
-                            [disabled]="(d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id]">💝 Entregado</button>
-                        <button class="btn-fail" (click)="showFailModalFn(d.id)">😿 No pude</button>
-                    </div>
+                    <span class="text-xs font-bold text-emerald-400">${{ totalCobrado() | number:'1.0-0' }}</span>
                 </div>
-                }
-
-                @if (d.status === 'Delivered') {
-                <div class="done-summary">✅ Entregado {{ d.deliveredAt ? ('- ' + formatTime(d.deliveredAt)) : '' }}
+            } @else {
+                <div class="flex items-center space-x-4 w-full px-2">
+                    <div class="flex items-end space-x-1 h-6">
+                        <div class="w-1.5 bg-pink-500 animate-[bounce_0.6s_infinite_0.1s] rounded-full" style="height: 60%"></div>
+                        <div class="w-1.5 bg-pink-400 animate-[bounce_0.6s_infinite_0.2s] rounded-full" style="height: 100%"></div>
+                        <div class="w-1.5 bg-pink-600 animate-[bounce_0.6s_infinite_0.3s] rounded-full" style="height: 40%"></div>
+                        <div class="w-1.5 bg-pink-500 animate-[bounce_0.6s_infinite_0.4s] rounded-full" style="height: 80%"></div>
+                        <div class="w-1.5 bg-pink-400 animate-[bounce_0.6s_infinite_0.5s] rounded-full" style="height: 30%"></div>
+                    </div>
+                    <span class="text-sm font-semibold text-pink-100 italic">C.A.M.I. escuchando...</span>
                 </div>
-                }
-                @if (d.status === 'NotDelivered') {
-                <div class="fail-summary">❌ No entregado</div>
-                }
-            </div>
             }
         </div>
     </div>
-</div>
-}
 
-<!-- FAB ADMIN CHAT -->
-<button class="fab-chat-admin" (click)="toggleAdminChat()">
-    👩‍💼
-    @if (unreadAdminCount() > 0) {
-    <span class="unread-dot">{{ unreadAdminCount() }}</span>
+    <!-- HUD OVERLAY (NAV INFO) -->
+    @if (navNextClient() && gpsActive()) {
+        <div class="absolute top-24 left-4 right-4 z-40 pointer-events-none">
+            <div class="bg-gradient-to-r from-black/80 to-pink-900/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-xl flex items-center justify-between animate-slide-down pointer-events-auto">
+                <div>
+                    <span class="block text-[10px] uppercase tracking-widest text-pink-400 font-bold mb-1">Próximo Destino</span>
+                    <h2 class="text-lg font-bold leading-tight uppercase">{{ navNextClient() }}</h2>
+                    <p class="text-xs text-white/60 truncate max-w-[200px]">{{ navNextAddress() }}</p>
+                </div>
+                <div class="text-right">
+                    <span class="block text-2xl font-black text-pink-500 leading-none">{{ navEta() || '--' }}</span>
+                    <span class="text-[10px] font-bold text-white/40 uppercase">{{ navDistance() }}</span>
+                </div>
+            </div>
+        </div>
     }
-</button>
 
-<!-- ADMIN CHAT MODAL -->
-@if (showAdminChat()) {
-<div class="modal-overlay" (click)="toggleAdminChat()">
-    <div class="chat-modal" (click)="$event.stopPropagation()">
-        <div class="chat-header admin-header">
-            <div class="chat-header-info"><strong>Base Regi Bazar 🎀</strong><span>Torre de Control</span></div>
-            <button class="close-btn" (click)="toggleAdminChat()">✕</button>
-        </div>
-        <div class="chat-body" #adminChatScroll>
-            @if (adminMessages().length === 0) {
-            <div class="chat-empty"><span>👩‍💼</span>
-                <p>Escribe un mensaje a la base</p>
+    <!-- NAVIGATION FAB -->
+    <button (click)="openGoogleRoute(r)" 
+            class="absolute bottom-60 right-6 z-40 w-14 h-14 bg-pink-600 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(219,39,119,0.5)] active:scale-90 transition-transform">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+    </button>
+
+    <!-- CENTER ON ME -->
+    @if (gpsActive()) {
+        <button (click)="centerOnMe()" 
+                class="absolute bottom-32 right-6 z-40 w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center text-lg shadow-lg active:scale-95 transition-transform">
+            📍
+        </button>
+    }
+
+    <!-- ACTIVE CARD (BOTTOM SHEET REINVENTED) -->
+    <div class="absolute bottom-0 left-0 w-full z-40 px-4 pb-safe transition-all duration-500 ease-in-out pointer-events-none"
+         [class.translate-y-[70%]]="!isCardExpanded()">
+        
+        @if (nextDelivery(); as d) {
+            <div class="bg-black/60 backdrop-blur-3xl border-t border-x border-white/10 rounded-t-[2.5rem] p-6 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] animate-slide-up pointer-events-auto relative">
+                
+                <!-- HANDLE FOR COLLAPSE -->
+                <div class="w-full h-8 absolute -top-4 left-0 flex items-center justify-center cursor-pointer" 
+                     (click)="toggleCard()" (mousedown)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()">
+                    <div class="w-16 h-1.5 bg-white/30 rounded-full transition-all duration-300 group-hover:bg-white/50"></div>
+                </div>
+                
+                <div class="flex justify-between items-start mb-4 mt-2">
+                    <div class="flex-1 min-w-0">
+                        <span class="inline-block px-2 py-0.5 bg-pink-600 text-[10px] font-bold rounded-md mb-2 uppercase tracking-tight">
+                            #{{ d.sortOrder }} • Entrega Activa
+                        </span>
+                        <h2 class="text-3xl font-black leading-none mb-1 uppercase tracking-tight truncate">{{ d.clientName }}</h2>
+                        <div class="flex items-center text-white/40 text-sm">
+                            <span class="truncate block w-full">{{ d.address || d.clientAddress }}</span>
+                        </div>
+                    </div>
+                    @if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {
+                        <button (click)="openClientChat(d, $event)" 
+                                class="w-12 h-12 bg-white/10 border border-white/20 rounded-2xl flex items-center justify-center text-xl active:scale-90 transition-transform shadow-lg ml-4 flex-shrink-0">
+                            💬
+                        </button>
+                    }
+                </div>
+
+                @if (d.deliveryInstructions) {
+                    <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 mb-6 text-sm text-indigo-200 overflow-hidden">
+                        <strong class="text-xs uppercase text-indigo-400">Instrucciones:</strong>
+                        <p class="leading-relaxed line-clamp-2">{{ d.deliveryInstructions }}</p>
+                    </div>
+                }
+
+                <!-- ACTIONS AREA -->
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <!-- COBRO SELECTORS (Omitted for brevity in collapse mode but keep in full) -->
+                    @if ((d.balanceDue ?? d.total) > 0) {
+                        <div class="col-span-2 grid grid-cols-3 gap-2">
+                            <button class="flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
+                                    [class.bg-emerald-500/20]="paymentMethods[d.id] === 'Efectivo'"
+                                    [class.border-emerald-500/50]="paymentMethods[d.id] === 'Efectivo'"
+                                    [class.text-emerald-400]="paymentMethods[d.id] === 'Efectivo'"
+                                    [class.bg-white/5]="paymentMethods[d.id] !== 'Efectivo'"
+                                    [class.border-white/10]="paymentMethods[d.id] !== 'Efectivo'"
+                                    [class.text-white/40]="paymentMethods[d.id] !== 'Efectivo'"
+                                    (click)="paymentMethods[d.id] = 'Efectivo'">
+                                <span class="text-lg">💵</span>
+                                <span class="text-[10px] font-bold uppercase mt-1">Efectivo</span>
+                            </button>
+                            <button class="flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
+                                    [class.bg-blue-500/20]="paymentMethods[d.id] === 'Transferencia'"
+                                    [class.border-blue-500/50]="paymentMethods[d.id] === 'Transferencia'"
+                                    [class.text-blue-400]="paymentMethods[d.id] === 'Transferencia'"
+                                    [class.bg-white/5]="paymentMethods[d.id] !== 'Transferencia'"
+                                    [class.border-white/10]="paymentMethods[d.id] !== 'Transferencia'"
+                                    [class.text-white/40]="paymentMethods[d.id] !== 'Transferencia'"
+                                    (click)="paymentMethods[d.id] = 'Transferencia'">
+                                <span class="text-lg">💳</span>
+                                <span class="text-[10px] font-bold uppercase mt-1">Transfer</span>
+                            </button>
+                            <button class="flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
+                                    [class.bg-amber-500/20]="paymentMethods[d.id] === 'Deposito'"
+                                    [class.border-amber-500/50]="paymentMethods[d.id] === 'Deposito'"
+                                    [class.text-amber-400]="paymentMethods[d.id] === 'Deposito'"
+                                    [class.bg-white/5]="paymentMethods[d.id] !== 'Deposito'"
+                                    [class.border-white/10]="paymentMethods[d.id] !== 'Deposito'"
+                                    [class.text-white/40]="paymentMethods[d.id] !== 'Deposito'"
+                                    (click)="paymentMethods[d.id] = 'Deposito'">
+                                <span class="text-lg">🏦</span>
+                                <span class="text-[10px] font-bold uppercase mt-1">Depósito</span>
+                            </button>
+                        </div>
+                    }
+
+                    <button (click)="showFailModalFn(d.id)" 
+                            class="py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold uppercase text-white/60 active:bg-white/10 transition-opacity"
+                            [class.opacity-0]="!isCardExpanded()" [class.pointer-events-none]="!isCardExpanded()">
+                        😿 No pude
+                    </button>
+                    
+                    <label class="py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold uppercase text-white/60 flex items-center justify-center active:bg-white/10 transition-opacity"
+                           [class.opacity-0]="!isCardExpanded()" [class.pointer-events-none]="!isCardExpanded()">
+                        📸 Evidencia
+                        <input type="file" accept="image/*" capture="environment" (change)="onPhotoCapture($event, d.id)" hidden>
+                    </label>
+                </div>
+
+                <!-- BIG SWIPE ACTION (REINVENTED) -->
+                <div class="relative w-full h-20 bg-emerald-950/30 border border-emerald-500/20 rounded-[2rem] overflow-hidden flex items-center px-2 group active:scale-[0.98] transition-all"
+                     [class.grayscale]="(d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id]"
+                     [class.opacity-40]="(d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id]"
+                     (mousedown)="onSwipeStart($event)" (touchstart)="onSwipeStart($event)"
+                     (mousemove)="onSwipeMove($event)" (touchmove)="onSwipeMove($event)"
+                     (mouseup)="onSwipeEnd(d.id)" (touchend)="onSwipeEnd(d.id)" (mouseleave)="onSwipeEnd(d.id)">
+                    
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span class="text-xs font-bold uppercase tracking-widest text-emerald-500/50 italic animate-pulse">
+                            {{ (d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id] ? 'Selecciona pago' : 'Desliza para entregar' }}
+                        </span>
+                    </div>
+
+                    <!-- SWIPED BACKGROUND -->
+                    <div class="absolute left-0 top-0 bottom-0 bg-emerald-500 transition-all duration-75"
+                         [style.width.%]="swipeProgress()">
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent to-white/30"></div>
+                    </div>
+
+                    <!-- HANDLE -->
+                    <div class="relative z-10 w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center shadow-xl transition-all duration-75 cursor-grab active:cursor-grabbing"
+                         [style.transform]="'translateX(' + swipeProgress() + '%)'"
+                         [style.left.px]="0">
+                        <span class="text-black text-2xl font-bold">➔</span>
+                    </div>
+                </div>
             </div>
-            }
-            @for (msg of adminMessages(); track msg.id) {
-            <div class="msg-bubble" [class.me]="msg.sender === 'Driver'" [class.them]="msg.sender !== 'Driver'">
-                <span class="msg-text">{{ msg.text || msg.message }}</span>
-                <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
+        } @else {
+            <!-- NO PENDING DELIVERIES -->
+            <div class="bg-black/60 backdrop-blur-3xl border-t border-x border-white/10 rounded-t-[2.5rem] p-10 flex flex-col items-center shadow-2xl animate-slide-up pointer-events-auto">
+                <span class="text-5xl mb-4">🏆</span>
+                <h2 class="text-2xl font-black uppercase italic tracking-tighter mb-2">¡Ruta Completada!</h2>
+                <p class="text-white/40 text-sm mb-6">Todas las entregas han sido procesadas.</p>
+                @if (r.status === 'Pending') {
+                    <button (click)="startRoute()" class="w-full py-4 bg-pink-600 rounded-2xl font-bold uppercase">Iniciar Ruta</button>
+                } @else if (!gpsActive()) {
+                    <button (click)="startGps()" class="w-full py-4 bg-blue-600 rounded-2xl font-bold uppercase">Activar Radar GPS</button>
+                }
             </div>
-            }
-        </div>
-        <div class="chat-input-area">
-            <input type="text" [(ngModel)]="newAdminMessage" (keydown.enter)="sendAdminChat()"
-                placeholder="Hablar con la base..." autocomplete="off">
-            <button class="send-btn" (click)="sendAdminChat()" [disabled]="!newAdminMessage.trim()">➤</button>
-        </div>
+        }
+    </div>
+
+    } <!-- End if route() -->
+
+    <!-- BACKGROUND HUD ELEMENTS (Tesla Style Grid) -->
+    <div class="absolute inset-0 z-[1] pointer-events-none opacity-10">
+        <div class="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:40px_40px]"></div>
     </div>
 </div>
-}
 
-<!-- CLIENT CHAT MODAL -->
+
 @if (activeChatDelivery(); as delivery) {
-<div class="modal-overlay" (click)="closeClientChat()">
-    <div class="chat-modal" (click)="$event.stopPropagation()">
-        <div class="chat-header client-header">
-            <div class="chat-header-info"><strong>{{ delivery.clientName }} 🌸</strong><span>Entrega #{{
-                    delivery.sortOrder }}</span></div>
-            <button class="close-btn" (click)="closeClientChat()">✕</button>
-        </div>
-        <div class="chat-body" #clientChatScroll>
-            @if (clientChatMessages().length === 0) {
-            <div class="chat-empty"><span>🌸</span>
-                <p>Envía un mensaje a la clienta</p>
+    <div class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex flex-col p-4 animate-fade-in" (click)="closeClientChat()">
+        <div class="bg-black/60 border border-white/20 rounded-3xl flex-1 flex flex-col overflow-hidden" (click)="$event.stopPropagation()">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
+                <div>
+                    <h3 class="font-black text-xl uppercase italic">{{ delivery.clientName }}</h3>
+                    <span class="text-[10px] text-indigo-400 uppercase font-bold tracking-widest">Chat Directo</span>
+                </div>
+                <button (click)="closeClientChat()" class="text-2xl">✕</button>
             </div>
-            }
-            @for (msg of clientChatMessages(); track msg.id) {
-            <div class="msg-bubble" [class.me]="msg.sender === 'Driver'" [class.them]="msg.sender !== 'Driver'">
-                <span class="msg-text">{{ msg.text || msg.message }}</span>
-                <span class="msg-time">{{ msg.timestamp | date:'shortTime' }}</span>
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" #clientChatScroll>
+                @for (msg of clientChatMessages(); track msg.id) {
+                    <div class="flex" [class.justify-end]="msg.sender === 'Driver'">
+                        <div class="max-w-[80%] px-4 py-3 rounded-2xl text-sm"
+                             [class.bg-indigo-600]="msg.sender === 'Driver'"
+                             [class.text-white]="msg.sender === 'Driver'"
+                             [class.rounded-tr-none]="msg.sender === 'Driver'"
+                             [class.bg-white/10]="msg.sender !== 'Driver'"
+                             [class.text-white]="msg.sender !== 'Driver'"
+                             [class.rounded-tl-none]="msg.sender !== 'Driver'">
+                            {{ msg.text || msg.message }}
+                        </div>
+                    </div>
+                }
             </div>
-            }
-        </div>
-        <div class="chat-input-area">
-            <input type="text" [(ngModel)]="newClientMessage" (keydown.enter)="sendClientChat()"
-                placeholder="Mensaje para la clienta..." autocomplete="off">
-            <button class="send-btn client" (click)="sendClientChat()" [disabled]="!newClientMessage.trim()">➤</button>
+            <div class="p-4 bg-white/5 border-t border-white/10 flex space-x-2">
+                <input type="text" [(ngModel)]="newClientMessage" (keydown.enter)="sendClientChat()"
+                       class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500"
+                       placeholder="Mensaje para clienta...">
+                <button (click)="sendClientChat()" class="bg-indigo-600 w-12 h-12 rounded-2xl flex items-center justify-center">➤</button>
+            </div>
         </div>
     </div>
-</div>
 }
 
-<!-- EXPENSE MODAL -->
 @if (showExpenseModal()) {
-<div class="modal-overlay" (click)="closeExpenseModal()">
-    <div class="bottom-modal" (click)="$event.stopPropagation()">
-        <div class="bottom-modal-header"><strong>⛽ Registrar Gasto</strong><button class="close-btn"
-                (click)="closeExpenseModal()">✕</button></div>
-        <div class="bottom-modal-body">
-            <label class="form-label">Tipo de gasto</label>
-            <select [(ngModel)]="expenseForm.type" class="form-select">
-                <option value="Gasolina">⛽ Gasolina</option>
-                <option value="Caseta">🛣️ Caseta</option>
-                <option value="Estacionamiento">🅿️ Estacionamiento</option>
-                <option value="Otro">📝 Otro</option>
-            </select>
-            <label class="form-label">Monto</label>
-            <input type="number" [(ngModel)]="expenseForm.amount" placeholder="$0.00" class="form-input"
-                inputmode="decimal">
-            <label class="form-label">Notas (opcional)</label>
-            <input type="text" [(ngModel)]="expenseForm.notes" placeholder="Descripción breve..." class="form-input">
-            <label class="photo-btn compact">📸 Foto del ticket
-                <input type="file" accept="image/*" capture="environment" (change)="onExpensePhoto($event)" hidden>
-            </label>
-            @if (expenseForm.photo) { <span class="photo-attached">📎 {{ expenseForm.photo.name }}</span> }
-            <button class="btn-action start" (click)="submitExpense()"
-                [disabled]="submittingExpense() || !expenseForm.amount">
-                {{ submittingExpense() ? 'Enviando...' : '💰 Registrar gasto' }}
+    <div class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-end animate-fade-in" (click)="closeExpenseModal()">
+        <div class="bg-black/80 border-t border-white/20 rounded-t-[3rem] w-full p-8 animate-slide-up" (click)="$event.stopPropagation()">
+            <h3 class="text-2xl font-black uppercase mb-6 tracking-tighter">⛽ Registrar Gasto</h3>
+            <div class="space-y-4">
+                <select [(ngModel)]="expenseForm.type" class="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-4 focus:outline-none">
+                    <option value="Gasolina">⛽ Gasolina</option>
+                    <option value="Caseta">🛣️ Caseta</option>
+                    <option value="Otro">📝 Otro</option>
+                </select>
+                <input type="number" [(ngModel)]="expenseForm.amount" placeholder="Monto (MXN)" class="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-4 text-xl font-bold">
+                <input type="text" [(ngModel)]="expenseForm.notes" placeholder="Notas..." class="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-4">
+                <button (click)="submitExpense()" 
+                        [disabled]="submittingExpense() || !expenseForm.amount"
+                        class="w-full py-5 bg-pink-600 rounded-3xl font-black uppercase tracking-widest mt-4">
+                    {{ submittingExpense() ? 'Registrando...' : 'Confirmar Gasto' }}
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (failModalId()) {
+    <div class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-end animate-fade-in" (click)="cancelFail()">
+        <div class="bg-black/80 border-t border-white/20 rounded-t-[3rem] w-full p-8 animate-slide-up" (click)="$event.stopPropagation()">
+            <h3 class="text-2xl font-black uppercase mb-6 tracking-tighter">😿 Reportar Error</h3>
+            <div class="grid grid-cols-2 gap-2 mb-6">
+                @for (reason of failReasons; track reason) {
+                    <button class="py-3 px-2 border rounded-xl text-[10px] font-bold uppercase transition-all"
+                            [class.bg-red-500/20]="selectedReason() === reason"
+                            [class.border-red-500]="selectedReason() === reason"
+                            [class.text-red-400]="selectedReason() === reason"
+                            [class.bg-white/5]="selectedReason() !== reason"
+                            [class.border-white/10]="selectedReason() !== reason"
+                            [class.text-white/40]="selectedReason() !== reason"
+                            (click)="selectedReason.set(reason)">{{ reason }}</button>
+                }
+            </div>
+            <textarea [(ngModel)]="customReason" placeholder="Detalles adicionales..." class="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-4 mb-6"></textarea>
+            <button (click)="confirmFail()" 
+                    [disabled]="!selectedReason() && !customReason.trim()"
+                    class="w-full py-5 bg-red-600 rounded-3xl font-black uppercase tracking-widest">
+                Confirmar Falla
             </button>
         </div>
     </div>
-</div>
 }
-
-<!-- FAIL MODAL -->
-@if (failModalId()) {
-<div class="modal-overlay" (click)="cancelFail()">
-    <div class="bottom-modal" (click)="$event.stopPropagation()">
-        <div class="bottom-modal-header"><strong>😿 ¿Por qué no pudiste?</strong><button class="close-btn"
-                (click)="cancelFail()">✕</button></div>
-        <div class="bottom-modal-body">
-            <div class="reason-list">
-                @for (reason of failReasons; track reason) {
-                <button class="reason-option" [class.selected]="selectedReason() === reason"
-                    (click)="selectedReason.set(reason)">{{ reason }}</button>
-                }
-            </div>
-            <textarea [(ngModel)]="customReason" placeholder="Otra razón o detalle adicional..." class="notes-input"
-                rows="2"></textarea>
-            <button class="btn-action fail-confirm" (click)="confirmFail()"
-                [disabled]="!selectedReason() && !customReason.trim()">Confirmar ❌</button>
-        </div>
-    </div>
-</div>
-}
-
-</div>

@@ -11,7 +11,7 @@ import {
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
     AiParsedOrder, AiInsight,
     CamiMessage, CamiChatRequest, CamiChatResponse,
-    AiRouteSelectionRequest, AiRouteSelectionResponse
+    AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -257,6 +257,10 @@ export class ApiService {
     
     publicUpdateInstructions(accessToken: string, instructions: string): Observable<any> {
         return this.http.patch(`${this.base}/pedido/${accessToken}/instructions`, { instructions });
+    }
+
+    publicGetCamiGreeting(accessToken: string): Observable<CamiGreetingResponse> {
+        return this.http.get<CamiGreetingResponse>(`${this.base}/pedido/${accessToken}/cami-greeting`);
     }
 
     // ── AI Voice Routes ──

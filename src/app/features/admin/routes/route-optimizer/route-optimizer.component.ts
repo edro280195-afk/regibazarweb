@@ -29,17 +29,25 @@ interface GeocodedOrder extends OrderSummaryDto {
     imports: [CommonModule, GoogleMapsModule, DragDropModule],
     templateUrl: './route-optimizer.component.html',
     styles: [`
-    .optimizer-modal { position: fixed; inset: 0; z-index: 4000; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .optimizer-modal { position: fixed; inset: 0; z-index: 4000; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 0.5rem; }
+    @media (min-width: 768px) { .optimizer-modal { padding: 2rem; } }
+    
     .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
     @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-    .modal-content { background: white; width: 100%; max-width: 1300px; height: 90vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
-    .modal-header { padding: 1.25rem 2rem; border-bottom: 1px solid #fdf2f8; display: flex; justify-content: space-between; align-items: center; background: white; z-index: 10; }
+    
+    .modal-content { background: white; width: 100%; max-width: 1300px; height: 100%; border-radius: 24px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+    @media (min-width: 768px) { .modal-content { height: 90vh; border-radius: 32px; } }
+    
+    .modal-header { padding: 1rem; border-bottom: 1px solid #fdf2f8; display: flex; justify-content: space-between; align-items: center; background: white; z-index: 10; }
+    @media (min-width: 768px) { .modal-header { padding: 1.25rem 2rem; } }
+    
     .modal-body { display: flex; flex: 1; overflow: hidden; }
     
-    .sidebar { width: 400px; display: flex; flex-direction: column; border-right: 1px solid #fdf2f8; background: #fafafa; z-index: 5; }
+    .sidebar { width: 100%; display: flex; flex-direction: column; border-right: none; border-bottom: 1px solid #fdf2f8; background: #fafafa; z-index: 5; height: 40%; }
+    @media (min-width: 768px) { .sidebar { width: 400px; border-right: 1px solid #fdf2f8; border-bottom: none; height: auto; } }
     
-    .map-wrapper { flex: 1; position: relative; background: #f3f4f6; }
-    .map-overlay-controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; }
+    .map-wrapper { flex: 1; position: relative; background: #f3f4f6; pointer-events: auto; }
+    .map-overlay-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; }
     
     .geo-warning-card { background: #fffbeb; border: 1px solid #fde68a; }
     .geo-warning-card-amber { border-left: 4px solid #f59e0b; }

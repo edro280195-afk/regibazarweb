@@ -1,6 +1,6 @@
 import {
   Component, signal, inject, ElementRef, ViewChild,
-  AfterViewChecked, OnDestroy
+  AfterViewChecked, OnDestroy, OnInit
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -125,8 +125,13 @@ import { CamiMessage } from '../../../core/models';
                 [class.bg-pink-600]="voiceStatus() === 'listening'"
                 [class.bg-indigo-600]="voiceStatus() !== 'listening' && voiceStatus() !== 'speaking'"
                 [class.bg-emerald-600]="voiceStatus() === 'speaking'"
+                [class.ring-4]="isWakeWordActive()"
+                [class.ring-indigo-400/30]="isWakeWordActive()"
                 (click)="onMicClick()"
               >
+                @if (isWakeWordActive() && voiceStatus() === 'idle' && !isLoading()) {
+                  <div class="absolute -top-1 -right-1 w-4 h-4 bg-indigo-400 rounded-full border-2 border-slate-900 animate-pulse"></div>
+                }
                 @if (voiceStatus() === 'listening') {
                   <span class="text-2xl animate-bounce">🎤</span>
                 } @else if (voiceStatus() === 'speaking') {
@@ -175,7 +180,7 @@ import { CamiMessage } from '../../../core/models';
     }
   `]
 })
-export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
+export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
   private api = inject(ApiService);
 
   @ViewChild('messagesContainer') private container!: ElementRef<HTMLElement>;
@@ -183,9 +188,11 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
   messages = signal<CamiMessage[]>([]);
   isLoading = signal(false);
   voiceStatus = signal<'idle' | 'listening' | 'speaking'>('idle');
+  isWakeWordActive = signal(false);
   textInput = '';
 
   private recognition: any = null;
+  private wakeWordRecognition: any = null;
   private audioPlayer = new Audio();
   private needsScroll = false;
 
@@ -196,9 +203,12 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
     '💸 ¿Cuánto llevamos?'
   ];
 
+  ngOnInit() {
+    this.initWakeWordListener();
+  }
+
   onClose() {
-    // Aquí podrías emitir un evento o cambiar un estado global si el panel es un modal
-    // Por ahora, asumimos que se puede cerrar ocultando el componente o navegando atrás
+    this.stopWakeWord();
     this.clearConversation();
     window.history.back();
   }
@@ -211,15 +221,17 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stopWakeWord();
     this.stopListening();
     this.audioPlayer.pause();
     this.audioPlayer.src = '';
   }
 
   onMicClick(): void {
-    if (this.voiceStatus() === 'listening') { this.stopListening(); return; }
-    if (this.voiceStatus() === 'speaking') { this.audioPlayer.pause(); this.audioPlayer.currentTime = 0; this.voiceStatus.set('idle'); return; }
+    if (this.voiceStatus() === 'listening') { this.stopListening(); this.startWakeWord(); return; }
+    if (this.voiceStatus() === 'speaking') { this.audioPlayer.pause(); this.audioPlayer.currentTime = 0; this.voiceStatus.set('idle'); this.startWakeWord(); return; }
     if (this.isLoading()) return;
+    this.stopWakeWord();
     this.startListening();
   }
 
@@ -251,6 +263,80 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
     this.voiceStatus.set('idle');
   }
 
+  // ── WAKE WORD LOGIC ("Hey Cami") ──
+  private initWakeWordListener(): void {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+
+    this.wakeWordRecognition = new SR();
+    this.wakeWordRecognition.lang = 'es-MX';
+    this.wakeWordRecognition.continuous = true;
+    this.wakeWordRecognition.interimResults = true;
+
+    this.wakeWordRecognition.onresult = (e: any) => {
+      const last = e.results[e.results.length - 1];
+      const text = last[0].transcript.toLowerCase();
+      
+      if (text.includes('cami') || text.includes('kamy') || text.includes('cambio')) {
+        console.log('Wake word detected:', text);
+        this.onWakeWordDetected();
+      }
+    };
+
+    this.wakeWordRecognition.onerror = (e: any) => {
+      console.error('Wake word error:', e);
+      if (e.error === 'not-allowed') this.isWakeWordActive.set(false);
+    };
+
+    this.wakeWordRecognition.onend = () => {
+      if (this.isWakeWordActive()) this.wakeWordRecognition.start();
+    };
+
+    this.startWakeWord();
+  }
+
+  private startWakeWord(): void {
+    if (!this.wakeWordRecognition) return;
+    try {
+      this.isWakeWordActive.set(true);
+      this.wakeWordRecognition.start();
+    } catch {}
+  }
+
+  private stopWakeWord(): void {
+    this.isWakeWordActive.set(false);
+    try { this.wakeWordRecognition?.stop(); } catch {}
+  }
+
+  private onWakeWordDetected(): void {
+    // Evitar disparar si ya estamos escuchando o hablando
+    if (this.voiceStatus() !== 'idle' || this.isLoading()) return;
+
+    // Feedback visual y auditivo
+    this.stopWakeWord();
+    this.playActivationSound();
+    
+    // Iniciar escucha de comando
+    setTimeout(() => this.startListening(), 100);
+  }
+
+  private playActivationSound(): void {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch {}
+  }
+
   onSendText(): void {
     const t = this.textInput.trim();
     if (!t || this.isLoading()) return;
@@ -267,18 +353,21 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
 
     // prev = historial ANTES del mensaje del usuario (el backend recibe history separado del newMessage)
     this.api.camiChat(prev, text).subscribe({
-      next: (res) => {
+      next: (res: any) => {
         this.messages.update(m => [...m, { role: 'model', text: res.text }]);
         this.needsScroll = true;
         this.isLoading.set(false);
         if (res.audioBase64) {
           this.playAudio(res.audioBase64);
+        } else {
+          this.startWakeWord();
         }
       },
       error: () => {
         this.messages.update(m => [...m, { role: 'model', text: 'Tuve un problema de conexión. ¿Lo intentamos de nuevo?' }]);
         this.needsScroll = true;
         this.isLoading.set(false);
+        this.startWakeWord();
       }
     });
   }
@@ -287,11 +376,18 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy {
     try {
       this.audioPlayer.src = `data:audio/mp3;base64,${base64}`;
       this.audioPlayer.onplay = () => this.voiceStatus.set('speaking');
-      this.audioPlayer.onended = () => this.voiceStatus.set('idle');
-      this.audioPlayer.onerror = () => this.voiceStatus.set('idle');
+      this.audioPlayer.onended = () => {
+        this.voiceStatus.set('idle');
+        this.startWakeWord();
+      };
+      this.audioPlayer.onerror = () => {
+        this.voiceStatus.set('idle');
+        this.startWakeWord();
+      };
       this.audioPlayer.play().catch(err => {
         console.warn('Auto-play blocked or audio error:', err);
         this.voiceStatus.set('idle');
+        this.startWakeWord();
       });
     } catch {
       this.voiceStatus.set('idle');

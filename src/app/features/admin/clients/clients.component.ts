@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, HostListener } from '@angular/core';
+import { Component, inject, signal, OnInit, HostListener, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe } from '@angular/common';
 import { Router } from '@angular/router';
@@ -62,16 +62,19 @@ import { gsap } from 'gsap';
             <div class="flex-1 min-w-[250px] relative">
               <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
               <input class="w-full bg-white/60 border border-pink-200/50 rounded-2xl py-3 pl-10 pr-4 text-pink-900 placeholder-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all shadow-inner" 
-                     placeholder="Buscar por nombre, teléfono o dirección..." [(ngModel)]="search" />
+                     placeholder="Buscar por nombre, teléfono o dirección..." 
+                     [ngModel]="search()" (ngModelChange)="search.set($event)" />
             </div>
-            <select class="bg-white/60 border border-pink-200/50 rounded-2xl py-3 px-4 text-pink-700 font-medium focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all w-48 shadow-inner" [(ngModel)]="tagFilter">
+            <select class="bg-white/60 border border-pink-200/50 rounded-2xl py-3 px-4 text-pink-700 font-medium focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all w-48 shadow-inner" 
+                    [ngModel]="tagFilter()" (ngModelChange)="tagFilter.set($event)">
               <option value="">🏷️ Todas las etiquetas</option>
               <option value="None">🌸 Normal</option>
               <option value="RisingStar">🚀 En Ascenso</option>
               <option value="Vip">👑 Consentida VIP</option>
               <option value="Blacklist">🚫 Lista Negra</option>
             </select>
-            <select class="bg-white/60 border border-pink-200/50 rounded-2xl py-3 px-4 text-pink-700 font-medium focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all w-44 shadow-inner" [(ngModel)]="typeFilter">
+            <select class="bg-white/60 border border-pink-200/50 rounded-2xl py-3 px-4 text-pink-700 font-medium focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all w-44 shadow-inner" 
+                    [ngModel]="typeFilter()" (ngModelChange)="typeFilter.set($event)">
               <option value="">👥 Todos los tipos</option>
               <option value="Nueva">🌱 Nueva</option>
               <option value="Frecuente">💫 Frecuente</option>
@@ -180,10 +183,51 @@ export class ClientsComponent implements OnInit {
 
   clients = signal<ClientDto[]>([]);
   loading = signal(true);
-  search = '';
-  tagFilter = '';
-  typeFilter = '';
+  
+  // Use signals for filters to make them reactive
+  search = signal('');
+  tagFilter = signal('');
+  typeFilter = signal('');
   scrollY = signal(0);
+
+  // Computed signal for filtered clients
+  filteredClients = computed(() => {
+    const clients = this.clients();
+    const searchTerm = this.search().toLowerCase().trim();
+    const tag = this.tagFilter().trim();
+    const type = this.typeFilter().trim();
+
+    return clients.filter(c => {
+      // 1. Search filter
+      const matchSearch = !searchTerm ||
+        c.name.toLowerCase().includes(searchTerm) ||
+        (c.phone && c.phone.includes(searchTerm)) ||
+        (c.address && c.address.toLowerCase().includes(searchTerm));
+      
+      // 2. Tag filter (Case-insensitive)
+      const matchTag = !tag || (c.tag && c.tag.toLowerCase() === tag.toLowerCase());
+      
+      // 3. Type filter (Case-insensitive + handle 'Nueva' as default)
+      // If the filter is 'Nueva' and the client has no type, we consider it 'Nueva'
+      const clientType = (c.type || (c as any).clientType || '').trim();
+      const matchType = !type || 
+        (clientType.toLowerCase() === type.toLowerCase()) ||
+        (type.toLowerCase() === 'nueva' && !clientType);
+
+      return matchSearch && matchTag && matchType;
+    });
+  });
+
+  constructor() {
+    // Automatically trigger animation when filtered list changes
+    effect(() => {
+      const list = this.filteredClients();
+      if (!this.loading() && list.length > 0) {
+        // Increase timeout slightly to ensure Angular's @for has finished rendering
+        setTimeout(() => this.animateList(), 50);
+      }
+    });
+  }
 
   @HostListener('window:scroll', ['$event'])
   onScroll(event: Event) {
@@ -195,33 +239,25 @@ export class ClientsComponent implements OnInit {
       next: (c) => {
         this.clients.set(c);
         this.loading.set(false);
-        setTimeout(() => this.animateList(), 50);
       },
-      error: () => { this.loading.set(false); this.toast.error('Error al cargar clientas'); }
+      error: () => { 
+        this.loading.set(false); 
+        this.toast.error('Error al cargar clientas'); 
+      }
     });
   }
 
   private animateList(): void {
+    // Reset state before animating
+    gsap.set('.client-card-anim', { opacity: 0, y: 30 });
+    
     gsap.to('.client-card-anim', {
       opacity: 1,
       y: 0,
-      duration: 0.6,
-      stagger: 0.05,
-      ease: 'power2.out',
+      duration: 0.35, // Accelerated from 0.6
+      stagger: 0.02, // Accelerated from 0.05
+      ease: 'back.out(1.2)', 
       overwrite: true
-    });
-  }
-
-  filteredClients(): ClientDto[] {
-    return this.clients().filter(c => {
-      const term = this.search.toLowerCase();
-      const matchSearch = !this.search ||
-        c.name.toLowerCase().includes(term) ||
-        (c.phone && c.phone.includes(term)) ||
-        (c.address && c.address.toLowerCase().includes(term));
-      const matchTag = !this.tagFilter || c.tag === this.tagFilter;
-      const matchType = !this.typeFilter || c.type === this.typeFilter;
-      return matchSearch && matchTag && matchType;
     });
   }
 

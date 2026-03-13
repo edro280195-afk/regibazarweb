@@ -139,7 +139,7 @@
                             @if (selectedSuggestionIdx() === i) {
                             <kbd class="turbo-kbd">Enter</kbd>
                             }
-                            @if ((client.ordersCount || 0) >= 2) {
+                            @if ((client.ordersCount || 0) >= 1) {
                             <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
                             } @else {
                             <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
@@ -259,7 +259,7 @@
                         <li class="px-4 py-3 hover:bg-pink-50 cursor-pointer flex justify-between items-center transition-colors border-b border-pink-50 last:border-0"
                             (mousedown)="selectClient(client)">
                             <span class="font-bold text-pink-900">{{ client.name }}</span>
-                            @if ((client.ordersCount || 0) >= 2) {
+                            @if ((client.ordersCount || 0) >= 1) {
                             <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
                             } @else {
                             <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>

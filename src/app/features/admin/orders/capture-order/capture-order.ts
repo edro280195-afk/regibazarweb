@@ -245,7 +245,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     });
     if (exactMatch) {
       this.autoDetected.set(true);
-      this.manualClientType = (exactMatch.ordersCount && exactMatch.ordersCount >= 2) ? 'Frecuente' : 'Nueva';
+      this.manualClientType = (exactMatch.ordersCount && exactMatch.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
     } else {
       this.autoDetected.set(false);
       this.manualClientType = ''; // Clear type if no exact match
@@ -256,7 +256,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     this.manualClient.set(client.name);
     this.showSuggestions.set(false);
     this.autoDetected.set(true);
-    this.manualClientType = (client.ordersCount && client.ordersCount >= 2) ? 'Frecuente' : 'Nueva';
+    this.manualClientType = (client.ordersCount && client.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
 
     // Auto-focus next field
     setTimeout(() => {
@@ -559,7 +559,17 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       }
       const o = orders[idx];
       this.turboProgress.set(`${o.clientName} (${idx + 1}/${orders.length})...`);
-      const req: ManualOrderRequest = { clientName: o.clientName, clientType: 'Nueva', orderType: this.turboOrderType, items: o.items };
+      
+      // Determine client type dynamically instead of hardcoding 'Nueva'
+      const matched = this.findBestClientMatch(o.clientName);
+      const determinedType = (matched && matched.ordersCount && matched.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
+
+      const req: ManualOrderRequest = { 
+        clientName: o.clientName, 
+        clientType: determinedType, 
+        orderType: this.turboOrderType, 
+        items: o.items 
+      };
       this.api.createManualOrder(req).subscribe({
         next: (res) => {
           successCount++;
@@ -796,8 +806,13 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       const clientName = items[0].clientName;
       this.aiProgress.set(`Creando ${clientName} (${idx + 1}/${entries.length})...`);
 
+      // Determine client type dynamically
+      const matched = this.findBestClientMatch(clientName);
+      const determinedType = (matched && matched.ordersCount && matched.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
+
       this.api.createManualOrder({
         clientName,
+        clientType: determinedType,
         orderType: 'Delivery',
         items: items.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
       }).subscribe({
