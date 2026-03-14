@@ -7,6 +7,13 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { CamiMessage } from '../../../core/models';
 
+interface DisplayMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: Date;
+  isError?: boolean;
+}
+
 @Component({
   selector: 'app-cami-panel',
   standalone: true,
@@ -27,13 +34,21 @@ import { CamiMessage } from '../../../core/models';
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <!-- Voice toggle -->
+          <button class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  [class.text-white/60]="!voiceEnabled()"
+                  [class.text-indigo-400]="voiceEnabled()"
+                  (click)="toggleVoice()"
+                  [title]="voiceEnabled() ? 'Desactivar voz' : 'Activar voz'">
+            <span class="text-sm">{{ voiceEnabled() ? '🔊' : '🔇' }}</span>
+          </button>
           @if (messages().length > 0) {
-            <button class="w-8 h-8 rounded-full bg-white/5 text-white/60 flex items-center justify-center hover:bg-white/10 transition-colors" 
+            <button class="w-8 h-8 rounded-full bg-white/5 text-white/60 flex items-center justify-center hover:bg-white/10 transition-colors"
                     (click)="clearConversation()">
               <span class="text-lg leading-none">↺</span>
             </button>
           }
-          <button class="w-8 h-8 rounded-full bg-white/5 text-white/60 flex items-center justify-center hover:bg-white/10 transition-colors" 
+          <button class="w-8 h-8 rounded-full bg-white/5 text-white/60 flex items-center justify-center hover:bg-white/10 transition-colors"
                   (click)="onClose()">
             <span class="text-lg leading-none">✕</span>
           </button>
@@ -56,26 +71,48 @@ import { CamiMessage } from '../../../core/models';
 
         @for (msg of messages(); track $index) {
           <div class="flex w-full animate-fade-in-up" [class.justify-end]="msg.role === 'user'">
-            <div class="max-w-[85%] px-4 py-3 rounded-2xl shadow-sm text-sm"
-                 [class.bg-indigo-600]="msg.role === 'user'"
-                 [class.text-white]="msg.role === 'user'"
-                 [class.rounded-tr-none]="msg.role === 'user'"
-                 [class.bg-slate-800]="msg.role === 'model'"
-                 [class.text-slate-100]="msg.role === 'model'"
-                 [class.rounded-tl-none]="msg.role === 'model'"
-                 [class.border]="msg.role === 'model'"
-                 [class.border-white/5]="msg.role === 'model'">
-              <p class="whitespace-pre-wrap leading-relaxed">{{ msg.text }}</p>
+            <div class="group max-w-[85%]">
+              <div class="px-4 py-3 rounded-2xl shadow-sm text-sm"
+                   [class.bg-indigo-600]="msg.role === 'user'"
+                   [class.text-white]="msg.role === 'user'"
+                   [class.rounded-tr-none]="msg.role === 'user'"
+                   [class.bg-slate-800]="msg.role === 'model'"
+                   [class.text-slate-100]="msg.role === 'model'"
+                   [class.rounded-tl-none]="msg.role === 'model'"
+                   [class.border]="msg.role === 'model'"
+                   [class.border-white/5]="msg.role === 'model'"
+                   [class.border-red-500/20]="msg.isError">
+                <p class="whitespace-pre-wrap leading-relaxed">{{ msg.text }}</p>
+              </div>
+              <!-- Timestamp + copy/retry row -->
+              <div class="flex items-center gap-2 mt-1 px-1"
+                   [class.justify-end]="msg.role === 'user'"
+                   [class.justify-start]="msg.role === 'model'">
+                <span class="text-[10px] text-slate-500">{{ msg.timestamp | date:'HH:mm' }}</span>
+                @if (msg.role === 'model' && !msg.isError) {
+                  <button class="text-[10px] text-slate-600 hover:text-slate-400 transition-colors opacity-0 group-hover:opacity-100"
+                          (click)="copyMessage(msg.text)" title="Copiar">📋</button>
+                }
+                @if (msg.isError && $last) {
+                  <button class="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                          (click)="retryLast()">↺ Reintentar</button>
+                }
+              </div>
             </div>
           </div>
         }
 
         @if (isLoading()) {
           <div class="flex animate-fade-in">
-            <div class="bg-slate-800 border border-white/5 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-1">
-              <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-              <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-              <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
+            <div class="bg-slate-800 border border-white/5 px-4 py-3 rounded-2xl rounded-tl-none">
+              <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
+                </div>
+                <span class="text-xs text-slate-500">Consultando sistema...</span>
+              </div>
             </div>
           </div>
         }
@@ -83,9 +120,9 @@ import { CamiMessage } from '../../../core/models';
 
       <!-- ══════════ CONTROLS AREA ══════════ -->
       <footer class="flex-shrink-0 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 p-4 pb-safe">
-        
+
         <!-- Suggestion Chips -->
-        <div class="flex gap-2 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
+        <div class="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
           @for (s of suggestions; track s) {
             <button class="shrink-0 px-4 py-1.5 rounded-full bg-slate-800 border border-white/5 text-white/80 text-xs font-medium transition-all hover:bg-slate-700 active:scale-95"
                     (click)="sendText(s)">
@@ -106,7 +143,7 @@ import { CamiMessage } from '../../../core/models';
               (keyup.enter)="onSendText()"
               [disabled]="isLoading() || voiceStatus() === 'listening'"
             />
-            <button class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center transition-all hover:bg-indigo-500 disabled:opacity-30" 
+            <button class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center transition-all hover:bg-indigo-500 disabled:opacity-30"
                     (click)="onSendText()" [disabled]="!textInput.trim() || isLoading()">
               <span class="text-xs">↑</span>
             </button>
@@ -119,7 +156,7 @@ import { CamiMessage } from '../../../core/models';
                 <div class="absolute inset-0 bg-pink-500 rounded-full blur-2xl animate-pulse opacity-40"></div>
                 <div class="absolute -inset-4 bg-pink-500/20 rounded-full animate-ping"></div>
               }
-              
+
               <button
                 class="relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl z-10"
                 [class.bg-pink-600]="voiceStatus() === 'listening'"
@@ -150,34 +187,25 @@ import { CamiMessage } from '../../../core/models';
   `,
   styles: [`
     :host { display: block; height: 100%; position: relative; z-index: 5000; }
-    
+
     .pb-safe {
       padding-bottom: env(safe-area-inset-bottom, 1rem);
     }
 
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
     @keyframes fade-in {
       from { opacity: 0; }
       to { opacity: 1; }
     }
-    .animate-fade-in {
-      animation: fade-in 0.4s ease-out forwards;
-    }
+    .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
 
     @keyframes fade-in-up {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .animate-fade-in-up {
-      animation: fade-in-up 0.3s ease-out forwards;
-    }
+    .animate-fade-in-up { animation: fade-in-up 0.3s ease-out forwards; }
   `]
 })
 export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
@@ -185,39 +213,36 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
 
   @ViewChild('messagesContainer') private container!: ElementRef<HTMLElement>;
 
-  messages = signal<CamiMessage[]>([]);
+  messages = signal<DisplayMessage[]>([]);
   isLoading = signal(false);
   voiceStatus = signal<'idle' | 'listening' | 'speaking'>('idle');
   isWakeWordActive = signal(false);
+  voiceEnabled = signal(localStorage.getItem('cami-voice') !== 'off');
+  lastError = signal(false);
+  lastUserMessage = signal('');
   textInput = '';
 
   private recognition: any = null;
   private wakeWordRecognition: any = null;
   private audioPlayer = new Audio();
   private needsScroll = false;
+  private visibilityHandler = this.onVisibilityChange.bind(this);
 
-  suggestions = [
-    '✨ ¿Resumen de hoy?',
-    '🚗 Rutas activas',
-    '👑 Clientas top',
-    '💸 ¿Cuánto llevamos?'
-  ];
-
-  ngOnInit() {
-    this.initWakeWordListener();
+  get suggestions(): string[] {
+    const h = new Date().getHours();
+    if (h < 12) return ['☀️ ¿Resumen de hoy?', '📦 Pendientes', '🚗 Crear ruta', '💰 ¿Cuánto llevamos?'];
+    if (h < 17) return ['📊 ¿Cómo vamos?', '💸 Cobros del día', '👑 Clientas top', '🚗 Rutas activas'];
+    return ['📋 Resumen del día', '💰 ¿Cuánto cobramos?', '📦 Para mañana', '✨ Semana en números'];
   }
 
-  onClose() {
-    this.stopWakeWord();
-    this.clearConversation();
-    window.history.back();
+  ngOnInit() {
+    this.loadFromStorage();
+    this.initWakeWordListener();
+    document.addEventListener('visibilitychange', this.visibilityHandler);
   }
 
   ngAfterViewChecked(): void {
-    if (this.needsScroll) {
-      this.scrollBottom();
-      this.needsScroll = false;
-    }
+    if (this.needsScroll) { this.scrollBottom(); this.needsScroll = false; }
   }
 
   ngOnDestroy(): void {
@@ -225,6 +250,45 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
     this.stopListening();
     this.audioPlayer.pause();
     this.audioPlayer.src = '';
+    document.removeEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  private loadFromStorage(): void {
+    try {
+      const raw = localStorage.getItem('cami-history');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Array<{ role: string; text: string; timestamp: string; isError?: boolean }>;
+      this.messages.set(
+        parsed.slice(-50).map(m => ({ ...m, role: m.role as 'user' | 'model', timestamp: new Date(m.timestamp) }))
+      );
+    } catch {}
+  }
+
+  private saveToStorage(): void {
+    try {
+      const toSave = this.messages().slice(-50).map(m => ({ ...m, timestamp: m.timestamp.toISOString() }));
+      localStorage.setItem('cami-history', JSON.stringify(toSave));
+    } catch {}
+  }
+
+  private onVisibilityChange(): void {
+    if (document.hidden) {
+      this.stopWakeWord();
+    } else if (!this.isLoading() && this.voiceStatus() === 'idle') {
+      this.startWakeWord();
+    }
+  }
+
+  onClose() {
+    this.stopWakeWord();
+    window.history.back();
+  }
+
+  toggleVoice(): void {
+    const newVal = !this.voiceEnabled();
+    this.voiceEnabled.set(newVal);
+    localStorage.setItem('cami-voice', newVal ? 'on' : 'off');
+    if (!newVal) { this.audioPlayer.pause(); this.voiceStatus.set('idle'); }
   }
 
   onMicClick(): void {
@@ -238,69 +302,42 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
   private startListening(): void {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { alert('Tu navegador no soporta reconocimiento de voz. Usa Chrome.'); return; }
-
     this.recognition = new SR();
     this.recognition.lang = 'es-MX';
     this.recognition.interimResults = false;
     this.recognition.maxAlternatives = 1;
     this.recognition.continuous = false;
-
     this.recognition.onstart  = () => this.voiceStatus.set('listening');
-    this.recognition.onresult = (e: any) => {
-      const t = e.results[0][0].transcript.trim();
-      if (t) this.sendText(t);
-    };
+    this.recognition.onresult = (e: any) => { const t = e.results[0][0].transcript.trim(); if (t) this.sendText(t); };
     this.recognition.onerror = () => this.voiceStatus.set('idle');
-    this.recognition.onend = () => {
-      if (this.voiceStatus() === 'listening') this.voiceStatus.set('idle');
-    };
+    this.recognition.onend = () => { if (this.voiceStatus() === 'listening') this.voiceStatus.set('idle'); };
     this.recognition.start();
   }
 
   private stopListening(): void {
-    this.recognition?.stop();
-    this.recognition = null;
-    this.voiceStatus.set('idle');
+    this.recognition?.stop(); this.recognition = null; this.voiceStatus.set('idle');
   }
 
-  // ── WAKE WORD LOGIC ("Hey Cami") ──
   private initWakeWordListener(): void {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
-
     this.wakeWordRecognition = new SR();
     this.wakeWordRecognition.lang = 'es-MX';
     this.wakeWordRecognition.continuous = true;
     this.wakeWordRecognition.interimResults = true;
-
     this.wakeWordRecognition.onresult = (e: any) => {
       const last = e.results[e.results.length - 1];
       const text = last[0].transcript.toLowerCase();
-      
-      if (text.includes('cami') || text.includes('kamy') || text.includes('cambio')) {
-        console.log('Wake word detected:', text);
-        this.onWakeWordDetected();
-      }
+      if (text.includes('cami') || text.includes('kamy') || text.includes('cambio')) this.onWakeWordDetected();
     };
-
-    this.wakeWordRecognition.onerror = (e: any) => {
-      console.error('Wake word error:', e);
-      if (e.error === 'not-allowed') this.isWakeWordActive.set(false);
-    };
-
-    this.wakeWordRecognition.onend = () => {
-      if (this.isWakeWordActive()) this.wakeWordRecognition.start();
-    };
-
+    this.wakeWordRecognition.onerror = (e: any) => { if (e.error === 'not-allowed') this.isWakeWordActive.set(false); };
+    this.wakeWordRecognition.onend = () => { if (this.isWakeWordActive()) this.wakeWordRecognition.start(); };
     this.startWakeWord();
   }
 
   private startWakeWord(): void {
     if (!this.wakeWordRecognition) return;
-    try {
-      this.isWakeWordActive.set(true);
-      this.wakeWordRecognition.start();
-    } catch {}
+    try { this.isWakeWordActive.set(true); this.wakeWordRecognition.start(); } catch {}
   }
 
   private stopWakeWord(): void {
@@ -309,31 +346,23 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
   }
 
   private onWakeWordDetected(): void {
-    // Evitar disparar si ya estamos escuchando o hablando
     if (this.voiceStatus() !== 'idle' || this.isLoading()) return;
-
-    // Feedback visual y auditivo
     this.stopWakeWord();
     this.playActivationSound();
-    
-    // Iniciar escucha de comando
     setTimeout(() => this.startListening(), 100);
   }
 
   private playActivationSound(): void {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.1);
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
+      osc.start(); osc.stop(ctx.currentTime + 0.2);
     } catch {}
   }
 
@@ -346,57 +375,67 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
 
   sendText(text: string): void {
     this.stopListening();
-    const prev = this.messages();
-    this.messages.set([...prev, { role: 'user', text }]);
+    this.lastError.set(false);
+    this.lastUserMessage.set(text);
+
+    // Convert DisplayMessage[] to CamiMessage[] for API (only keep role + text)
+    const prev: CamiMessage[] = this.messages().map(m => ({ role: m.role, text: m.text }));
+
+    this.messages.update(m => [...m, { role: 'user', text, timestamp: new Date() }]);
     this.needsScroll = true;
     this.isLoading.set(true);
+    this.saveToStorage();
 
-    // prev = historial ANTES del mensaje del usuario (el backend recibe history separado del newMessage)
     this.api.camiChat(prev, text).subscribe({
       next: (res: any) => {
-        this.messages.update(m => [...m, { role: 'model', text: res.text }]);
+        this.messages.update(m => [...m, { role: 'model', text: res.text, timestamp: new Date() }]);
         this.needsScroll = true;
         this.isLoading.set(false);
-        if (res.audioBase64) {
+        this.saveToStorage();
+        if (res.audioBase64 && this.voiceEnabled()) {
           this.playAudio(res.audioBase64);
         } else {
           this.startWakeWord();
         }
       },
       error: () => {
-        this.messages.update(m => [...m, { role: 'model', text: 'Tuve un problema de conexión. ¿Lo intentamos de nuevo?' }]);
+        this.lastError.set(true);
+        this.messages.update(m => [...m, { role: 'model', text: 'Tuve un problema de conexión. ¿Lo intentamos de nuevo?', timestamp: new Date(), isError: true }]);
         this.needsScroll = true;
         this.isLoading.set(false);
+        this.saveToStorage();
         this.startWakeWord();
       }
     });
+  }
+
+  retryLast(): void {
+    const msg = this.lastUserMessage();
+    if (!msg) return;
+    // Remove the last error message
+    this.messages.update(m => m.slice(0, -1));
+    this.sendText(msg);
+  }
+
+  copyMessage(text: string): void {
+    navigator.clipboard.writeText(text).catch(() => {});
   }
 
   private playAudio(base64: string): void {
     try {
       this.audioPlayer.src = `data:audio/mp3;base64,${base64}`;
       this.audioPlayer.onplay = () => this.voiceStatus.set('speaking');
-      this.audioPlayer.onended = () => {
-        this.voiceStatus.set('idle');
-        this.startWakeWord();
-      };
-      this.audioPlayer.onerror = () => {
-        this.voiceStatus.set('idle');
-        this.startWakeWord();
-      };
-      this.audioPlayer.play().catch(err => {
-        console.warn('Auto-play blocked or audio error:', err);
-        this.voiceStatus.set('idle');
-        this.startWakeWord();
-      });
-    } catch {
-      this.voiceStatus.set('idle');
-    }
+      this.audioPlayer.onended = () => { this.voiceStatus.set('idle'); this.startWakeWord(); };
+      this.audioPlayer.onerror = () => { this.voiceStatus.set('idle'); this.startWakeWord(); };
+      this.audioPlayer.play().catch(() => { this.voiceStatus.set('idle'); this.startWakeWord(); });
+    } catch { this.voiceStatus.set('idle'); }
   }
 
   clearConversation(): void {
     this.audioPlayer.pause(); this.stopListening();
     this.messages.set([]); this.isLoading.set(false); this.voiceStatus.set('idle');
+    this.lastError.set(false);
+    localStorage.removeItem('cami-history');
   }
 
   private scrollBottom(): void {

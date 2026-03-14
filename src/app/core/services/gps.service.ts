@@ -1,11 +1,13 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { App } from '@capacitor/app';
 import { ApiService } from './api.service';
 import { SignalRService } from './signalr.service';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 const GPS_KEY = 'regi_gps_granted';
+const TOKEN_KEY = 'regi_driver_token';
 
 @Injectable({
   providedIn: 'root'
@@ -23,22 +25,47 @@ export class GpsService {
   private currentToken: string | null = null;
 
   constructor() {
-    // If it was active before, try to resume
-    if (localStorage.getItem(GPS_KEY) === 'true') {
-      console.log('[GpsService] Resuming GPS based on stored preference');
+    // Escuchar cambios de estado de la app para asegurar que el servicio no se duerma
+    App.addListener('appStateChange', ({ isActive }) => {
+      console.log(`[GpsService] App state changed. IsActive: ${isActive}`);
+      if (this.active() && this.currentToken) {
+        // "Sacudir" el servicio para asegurar que siga corriendo
+        this.pingLocation();
+      }
+    });
+
+    // Restaurar sesión si es posible
+    const savedToken = localStorage.getItem(TOKEN_KEY);
+    const wasActive = localStorage.getItem(GPS_KEY) === 'true';
+    if (savedToken && wasActive) {
+      console.log('[GpsService] Reiniciando GPS automáticamente...');
+      setTimeout(() => this.start(savedToken), 1000);
     }
   }
 
-  start(token: string): void {
+  async start(token: string): Promise<void> {
     this.currentToken = token;
-    const isNative = Capacitor.isNativePlatform();
-    
-    if (this.active()) return;
-    
-    this.active.set(true);
+    localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(GPS_KEY, 'true');
 
-    if (!isNative) {
+    if (this.active()) return;
+    
+    // Solicitar permisos de manera explícita antes de iniciar el watcher nativo
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await BackgroundGeolocation.addWatcher(
+          { requestPermissions: true, stale: true }, 
+          () => {}
+        );
+        BackgroundGeolocation.removeWatcher({ id: perm });
+      } catch (e) {
+        console.error('[GpsService] Error solicitando permisos:', e);
+      }
+    }
+
+    this.active.set(true);
+
+    if (!Capacitor.isNativePlatform()) {
       this.startWebWatch();
     } else {
       this.startNativeWatch();
@@ -53,18 +80,18 @@ export class GpsService {
         this.updatePosition(pos.coords.latitude, pos.coords.longitude);
       },
       err => console.error('[GpsService] Web Geolocation error', err),
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
   }
 
   private startNativeWatch(): void {
     BackgroundGeolocation.addWatcher(
       {
-        backgroundMessage: "Manteniendo la ruta activa para las entregas de Regi Bazar.",
-        backgroundTitle: "Regi Bazar - Ruta en curso",
+        backgroundMessage: "Tu ubicación se comparte para optimizar la ruta de entrega.",
+        backgroundTitle: "Regi Bazar • En Ruta 🚚",
         requestPermissions: true,
         stale: false,
-        distanceFilter: 15
+        distanceFilter: 10 // Más sensible (10 metros)
       },
       (location, error) => {
         if (error) {
@@ -84,10 +111,23 @@ export class GpsService {
     this.lastPosition.set({ lat, lng });
     
     const now = Date.now();
-    if (this.currentToken && (now - this.lastGpsSendTime >= 10000)) {
+    // Enviar cada 15 seg para no saturar, pero ser constante
+    if (this.currentToken && (now - this.lastGpsSendTime >= 15000)) {
       this.lastGpsSendTime = now;
       this.api.updateLocation(this.currentToken, lat, lng).subscribe();
       this.signalr.reportLocation(this.currentToken, lat, lng);
+    }
+  }
+
+  private pingLocation(): void {
+    // Forzar una obtención de posición única para "despertar" el canal
+    if (Capacitor.isNativePlatform()) {
+      // BackgroundGeolocation comercial no suele tener un 'getCurrentPosition' directo sin watcher,
+      // pero el hecho de estar activo ya debería bastar.
+    } else {
+      navigator.geolocation.getCurrentPosition(pos => {
+        this.updatePosition(pos.coords.latitude, pos.coords.longitude);
+      });
     }
   }
 
@@ -95,6 +135,7 @@ export class GpsService {
     this.active.set(false);
     this.currentToken = null;
     localStorage.removeItem(GPS_KEY);
+    localStorage.removeItem(TOKEN_KEY);
 
     if (this.watchId !== undefined) {
       navigator.geolocation.clearWatch(this.watchId);

@@ -74,6 +74,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     });
 
     showExpenseModal = signal(false);
+    showReorderModal = signal(false);
     submittingExpense = signal(false);
     failModalId = signal(0);
     selectedReason = signal('');
@@ -458,6 +459,10 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     // ═══ EXPENSES ═══
     openExpenseModal(): void { this.showExpenseModal.set(true); }
     closeExpenseModal(): void { this.showExpenseModal.set(false); this.expenseForm = { type: 'Gasolina', amount: null, notes: '', photo: null }; }
+    
+    openReorderModal(): void { this.showReorderModal.set(true); }
+    closeReorderModal(): void { this.showReorderModal.set(false); }
+
     onExpensePhoto(e: Event): void { this.expenseForm.photo = (e.target as HTMLInputElement).files?.[0] || null; }
     submitExpense(): void {
         if (!this.expenseForm.amount) return;

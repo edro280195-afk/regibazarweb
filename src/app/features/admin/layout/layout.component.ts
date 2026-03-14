@@ -524,7 +524,8 @@ export class LayoutComponent {
     { label: 'Finanzas', icon: '💰', route: '/admin/financials' },
     { label: 'Reportes', icon: '📊', route: '/admin/reports' },
     { label: 'Cortes de Venta', icon: '📋', route: '/admin/sales-periods' },
-    { label: 'C.A.M.I.', icon: '✦', route: '/admin/cami' }
+    { label: 'C.A.M.I.', icon: '✦', route: '/admin/cami' },
+    { label: 'Glow Up', icon: '✨', route: '/admin/glow-up' }
   ];
 
   greeting(): string {

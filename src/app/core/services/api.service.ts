@@ -277,6 +277,22 @@ export class ApiService {
         return this.http.post<CamiChatResponse>(`${this.base}/cami/chat`, body);
     }
 
+    getDashboardInsight(data: { revenueToday: number; revenueMonth: number; pendingOrders: number; deliveredOrders: number; activeRoutes: number; pendingAmount: number; totalClients: number }): Observable<string> {
+        return this.http.post<string>(`${this.base}/cami/dashboard-insight`, data);
+    }
+
+    getClientInsight(clientId: number): Observable<string> {
+        return this.http.get<string>(`${this.base}/cami/client-insight/${clientId}`);
+    }
+
+    getRouteBriefing(routeId: number): Observable<{ text: string; audioBase64?: string }> {
+        return this.http.get<{ text: string; audioBase64?: string }>(`${this.base}/cami/route-briefing/${routeId}`);
+    }
+
+    getCamiAlerts(): Observable<Array<{ type: string; message: string; icon: string; relatedId?: number }>> {
+        return this.http.get<Array<{ type: string; message: string; icon: string; relatedId?: number }>>(`${this.base}/cami/alerts`);
+    }
+
     // ── Driver (Repartidor) ──
     getDriverRoute(driverToken: string): Observable<any> {
         return this.http.get(`${this.base}/driver/${driverToken}`);

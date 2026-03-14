@@ -11,7 +11,21 @@
       "Bash(powershell.exe -NonInteractive -Command \"cd 'C:\\\\Codigos\\\\api\\\\EntregasApi'; dotnet build\" 2>&1 || true)",
       "Bash(dotnet build:*)",
       "Bash(which dotnet:*)",
-      "Bash(find \"/c/Codigos/api/EntregasApi/Models\" -name \"*.cs\" -type f 2>/dev/null | grep -v bin | grep -v obj)"
+      "Bash(find \"/c/Codigos/api/EntregasApi/Models\" -name \"*.cs\" -type f 2>/dev/null | grep -v bin | grep -v obj)",
+      "Bash(find \"C:\\\\Codigos\\\\regibazar-web\" -name \"*cami*\" -type f 2>/dev/null | head -20)",
+      "WebSearch",
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:syllable.ai)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:topaitech.com)",
+      "WebFetch(domain:bicov.pro)",
+      "Bash(ls -la \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Services\" | grep -E \"\\\\.cs$\")",
+      "Bash(dir /s \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Services\\\\*.cs\" 2>nul | head -30)",
+      "Bash(find /c/Codigos/Api -name \"*.cs\" -type f 2>/dev/null | grep -i service | head -20)",
+      "Bash(find /c/Codigos -path \"*EntregasApi*\" -name \"*.cs\" 2>/dev/null | head -50)",
+      "Bash(find /c/Codigos/regibazar-web -name \"*.ts\" 2>/dev/null | grep -E \"\\(glow|upload|route-manager\\)\" | head -20)",
+      "Bash(find \"C:\\\\Codigos\\\\regibazar-web\\\\src\\\\app\\\\features\\\\admin\" -name \"*.component.ts\" 2>/dev/null | sort)",
+      "Bash(ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Services\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Models\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Controllers\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\DTOs\\\\\")"
     ]
   }
 }

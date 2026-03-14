@@ -54,6 +54,10 @@ export const routes: Routes = [
             {
                 path: 'cami',
                 loadComponent: () => import('./features/admin/cami/cami-panel.component').then(m => m.CamiPanelComponent)
+            },
+            {
+                path: 'glow-up',
+                loadComponent: () => import('./features/admin/glow-up/glow-up.component').then(m => m.GlowUpComponent)
             }
         ]
     },
