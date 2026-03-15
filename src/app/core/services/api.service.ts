@@ -59,6 +59,10 @@ export class ApiService {
         return this.http.post<AiParsedOrder[]>(`${this.base}/orders/parse-live`, { text, currentState });
     }
 
+    applyBirthdayDiscount(id: number): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/orders/${id}/apply-birthday-discount`, {});
+    }
+
     updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<any> {
         return this.http.put(`${this.base}/orders/${id}`, data);
     }

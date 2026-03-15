@@ -1,0 +1,31 @@
+<div id="cupon-cumple" class="coupon-container">
+  <div class="coupon-card">
+    <div class="glow-effect"></div>
+    <div class="coupon-header">
+      <span class="brand">REGI BAZAR</span>
+      <span class="type">VIP GOLD</span>
+    </div>
+    
+    <div class="coupon-content">
+      <div class="decoration balloons">🎈 ✨ 🎁</div>
+      <h1>¡Felicidades, {{ clientName }}!</h1>
+      <p class="subtitle">Tu regalo de cumpleaños ha llegado</p>
+      
+      <div class="value-badge">
+        <span class="currency">$</span>
+        <span class="amount">{{ couponValue }}</span>
+        <span class="suffix">MXN</span>
+      </div>
+      
+      <p class="promo-text">VALE DE DESCUENTO EN TU PRÓXIMO PEDIDO</p>
+    </div>
+    
+    <div class="coupon-footer">
+      <div class="info-row">
+        <span>Emitido: {{ today }}</span>
+        <span>Válido hasta: {{ expirationDate }}</span>
+      </div>
+      <div class="terms">* Válido solo para clientas VIP en compras mayores a $1,000 MXN. No acumulable.</div>
+    </div>
+  </div>
+</div>

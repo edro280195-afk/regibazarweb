@@ -59,13 +59,9 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     newClientMessage = '';
 
     isCamiListening = signal(false);
-    private listeningTimer: any;
-    private isLongPress = false;
+    isDelivering = signal(false);
 
     isCardExpanded = signal(true);
-    swipeProgress = signal(0); // 0 to 100
-    private isSwiping = false;
-    private startX = 0;
 
     nextDelivery = computed(() => {
         const r = this.route();
@@ -146,75 +142,14 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy(): void {
-        this.signalr.disconnect();
+        // No desconectar SignalR aquí — GpsService sigue corriendo en background
+        // y necesita SignalR para reportar ubicación. GpsService.stop() lo maneja.
     }
 
-    // ═══ WALKIE-TALKIE ═══
-    startCamiListening(event: MouseEvent | TouchEvent): void {
-        // Ignorar si el click es en un botón o elemento interactivo
-        const target = event.target as HTMLElement;
-        if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('select') || target.closest('label')) {
-            return;
-        }
-
-        if (this.isCamiListening()) return;
-
-        this.isLongPress = false;
-        this.listeningTimer = setTimeout(() => {
-            this.isLongPress = true;
-            this.isCamiListening.set(true);
-            // Vibración táctil si es posible
-            if ('vibrate' in navigator) navigator.vibrate(50);
-        }, 500); // 500ms para considerar long press
-    }
-
-    stopCamiListening(): void {
-        if (this.listeningTimer) {
-            clearTimeout(this.listeningTimer);
-            this.listeningTimer = null;
-        }
-
-        if (this.isCamiListening()) {
-            this.isCamiListening.set(false);
-            // Aquí iría la lógica para enviar el comando a CAMI
-        }
-        this.isLongPress = false;
-    }
-    
-    onContextMenu(event: MouseEvent): void {
-        // Solo prevenir si estamos en medio de un long press o escuchando
-        if (this.isLongPress || this.isCamiListening()) {
-            event.preventDefault();
-        }
-    }
-
-    // ═══ SWIPE TO DELIVER ═══
-    onSwipeStart(event: MouseEvent | TouchEvent): void {
-        event.stopPropagation(); // Evitar que C.A.M.I. se active al deslizar
-        this.isSwiping = true;
-        this.startX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-    }
-
-    onSwipeMove(event: MouseEvent | TouchEvent): void {
-        if (!this.isSwiping) return;
-        const currentX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-        const deltaX = currentX - this.startX;
-        const buttonWidth = (event.currentTarget as HTMLElement).offsetWidth;
-        
-        let progress = (deltaX / (buttonWidth * 0.8)) * 100;
-        progress = Math.max(0, Math.min(100, progress));
-        this.swipeProgress.set(progress);
-    }
-
-    onSwipeEnd(deliveryId: number): void {
-        if (!this.isSwiping) return;
-        this.isSwiping = false;
-        
-        if (this.swipeProgress() >= 90) {
-            this.markDelivered(deliveryId);
-        }
-        
-        this.swipeProgress.set(0);
+    // ═══ CAMI ═══
+    toggleCami(): void {
+        this.isCamiListening.update(v => !v);
+        if (this.isCamiListening() && 'vibrate' in navigator) navigator.vibrate(50);
     }
 
     toggleCard(): void {
@@ -433,15 +368,22 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         this.api.markInTransit(this.token, id).subscribe(() => { this.showToast('🏃 En camino'); this.loadRoute(); });
     }
     markDelivered(id: number): void {
+        if (this.isDelivering()) return;
+        this.isDelivering.set(true);
         const notes = this.deliveryNotes[id] || '';
         const photoFiles = (this.photos[id] || []).map(p => p.file);
         const method = this.paymentMethods[id];
         const delivery = this.route()?.deliveries?.find((d: any) => d.id === id);
         const due = delivery?.balanceDue ?? delivery?.total ?? 0;
         const payments = method && due > 0 ? [{ amount: due, method }] : undefined;
-        this.api.markDelivered(this.token, id, notes, photoFiles, payments).subscribe(() => {
-            this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
-            this.photos[id] = []; this.deliveryNotes[id] = ''; this.loadRoute();
+        this.api.markDelivered(this.token, id, notes, photoFiles, payments).subscribe({
+            next: () => {
+                this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
+                this.photos[id] = []; this.deliveryNotes[id] = '';
+                this.isDelivering.set(false);
+                this.loadRoute();
+            },
+            error: () => { this.isDelivering.set(false); }
         });
     }
 

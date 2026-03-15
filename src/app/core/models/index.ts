@@ -135,6 +135,7 @@ export interface OrderSummaryDto {
     clientId?: number;
     tags?: string[];
     deliveryInstructions?: string;
+    discountAmount?: number;
 }
 
 export interface PagedResult<T> {

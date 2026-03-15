@@ -10,11 +10,13 @@ import { ToastService } from '../../../core/services/toast.service';
 import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
+import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
+import { CouponService } from '../../../core/services/coupon.service';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink],
+  imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink, BirthdayCouponComponent],
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -494,10 +496,18 @@ import * as QRCode from 'qrcode';
               </button>
               <button class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-blue-100/50" title="En Camino" (click)="sendWaOnRoute()">🚗</button>
               <button class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-rose-100/50" title="Cobrar" (click)="sendWaPaymentRequest()">💸</button>
+              <button class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 hover:bg-amber-100 hover:text-amber-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-amber-100/50" title="Regalo Cumpleaños 🎂" (click)="applyBirthdayGift()">🎁</button>
             </div>
           </div>
         </div>
       }
+
+      <!-- Hidden Coupon for Capture -->
+      <div style="position: fixed; left: -9999px; top: 0; z-index: -1;">
+        @if (selectedOrder()) {
+          <app-birthday-coupon #birthdayCoupon [clientName]="selectedOrder()!.clientName"></app-birthday-coupon>
+        }
+      </div>
 
       <!-- Print Preview Modal -->
       @if (showPrintPreview() && printHtml()) {
@@ -540,6 +550,7 @@ export class OrdersComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
+  private couponService = inject(CouponService);
 
   orders = signal<OrderSummaryDto[]>([]);
   loading = signal(true);
@@ -837,8 +848,29 @@ export class OrdersComponent implements OnInit {
       },
       error: () => {
         this.toast.error('Error al eliminar producto');
-        this.isProcessingItem.set(false);
+    this.isProcessingItem.set(false);
       }
+    });
+  }
+
+  applyBirthdayGift(): void {
+    const order = this.selectedOrder();
+    if (!order) return;
+
+    if (!confirm(`¿Aplicar descuento de $200 por cumpleaños a ${order.clientName} y generar cupón?`)) return;
+
+    this.api.applyBirthdayDiscount(order.id).subscribe({
+      next: (updatedOrder) => {
+        this.selectedOrder.set(updatedOrder);
+        this.orders.update(list => list.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+        this.toast.success('¡Descuento de Cumpleaños aplicado! 🎂💖');
+        
+        // Dar un pequeño delay para que el componente se renderice si no estaba
+        setTimeout(() => {
+          this.couponService.downloadCoupon('cupon-cumple', order.clientName);
+        }, 300);
+      },
+      error: () => this.toast.error('Error al aplicar el descuento')
     });
   }
 
