@@ -46,7 +46,7 @@
                         <div class="w-1.5 bg-pink-500 animate-[bounce_0.6s_infinite_0.4s] rounded-full" style="height: 80%"></div>
                         <div class="w-1.5 bg-pink-400 animate-[bounce_0.6s_infinite_0.5s] rounded-full" style="height: 30%"></div>
                     </div>
-                    <span class="text-sm font-semibold text-pink-100 italic">C.A.M.I. escuchando...</span>
+                    <span class="text-sm font-semibold text-pink-100 italic">Habla ahora...</span>
                 </div>
             }
         </div>
@@ -68,32 +68,47 @@
         </div>
     }
 
-    <!-- NAVIGATION FAB -->
-    <button (click)="openGoogleRoute(r)" 
-            class="absolute bottom-60 right-6 z-40 w-14 h-14 bg-pink-600 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(219,39,119,0.5)] active:scale-90 transition-transform">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-    </button>
+    <!-- FABs — columna derecha, anclada al centro del mapa (z-50 siempre sobre el card) -->
+    <div class="absolute top-[140px] right-4 z-50 flex flex-col items-center gap-3">
 
-    <!-- CAMI FAB -->
-    <button (click)="toggleCami()"
-            class="absolute bottom-56 right-6 z-40 w-10 h-10 backdrop-blur-xl border rounded-full flex items-center justify-center text-base shadow-lg active:scale-95 transition-all"
-            [class.bg-pink-600]="isCamiListening()"
-            [class.border-pink-500]="isCamiListening()"
-            [class.bg-white/10]="!isCamiListening()"
-            [class.border-white/20]="!isCamiListening()">
-        ✦
-    </button>
+        <!-- Navegación (principal, más grande) -->
+        <button (click)="openGoogleRoute(r)"
+                class="w-14 h-14 bg-pink-600 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(219,39,119,0.5)] active:scale-90 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        </button>
 
-    <!-- CENTER ON ME -->
-    @if (gpsActive()) {
-        <button (click)="openReorderModal()"
-                class="absolute bottom-44 right-6 z-40 w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center text-lg shadow-lg active:scale-95 transition-transform">
-            🔃
+        <!-- CAMI -->
+        <button (click)="toggleCami()"
+                class="w-10 h-10 backdrop-blur-xl border rounded-full flex items-center justify-center text-base shadow-lg active:scale-95 transition-all"
+                [class.bg-pink-600]="isCamiListening()"
+                [class.border-pink-500]="isCamiListening()"
+                [class.animate-pulse]="isCamiListening()"
+                [class.bg-white/10]="!isCamiListening()"
+                [class.border-white/20]="!isCamiListening()">
+            ✦
         </button>
-        <button (click)="centerOnMe()"
-                class="absolute bottom-32 right-6 z-40 w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center text-lg shadow-lg active:scale-95 transition-transform">
-            📍
-        </button>
+
+        @if (gpsActive()) {
+            <!-- Reordenar -->
+            <button (click)="openReorderModal()"
+                    class="w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center text-lg shadow-lg active:scale-95 transition-transform">
+                🔃
+            </button>
+            <!-- Centrar GPS -->
+            <button (click)="centerOnMe()"
+                    class="w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center text-lg shadow-lg active:scale-95 transition-transform">
+                📍
+            </button>
+        }
+
+    </div>
+
+    <!-- Burbuja de respuesta CAMI (sale a la izquierda del grupo) -->
+    @if (camiResponse()) {
+        <div class="absolute top-[188px] right-16 z-50 max-w-[200px] bg-black/80 border border-pink-500/40 backdrop-blur-xl rounded-2xl rounded-tr-none p-3 shadow-xl animate-slide-up">
+            <p class="text-[11px] text-pink-100 leading-relaxed">{{ camiResponse() }}</p>
+            <button (click)="camiResponse.set('')" class="absolute -top-2 -right-2 w-5 h-5 bg-white/20 rounded-full text-[9px] flex items-center justify-center">✕</button>
+        </div>
     }
 
     <!-- ACTIVE CARD (BOTTOM SHEET REINVENTED) -->
@@ -128,9 +143,34 @@
                 </div>
 
                 @if (d.deliveryInstructions) {
-                    <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 mb-6 text-sm text-indigo-200 overflow-hidden">
+                    <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 mb-3 text-sm text-indigo-200 overflow-hidden">
                         <strong class="text-xs uppercase text-indigo-400">Instrucciones:</strong>
                         <p class="leading-relaxed line-clamp-2">{{ d.deliveryInstructions }}</p>
+                    </div>
+                }
+
+                <!-- ARTÍCULOS DEL PEDIDO -->
+                @if (d.items && d.items.length) {
+                    <div class="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4">
+                        <span class="block text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2">📦 Artículos</span>
+                        <div class="space-y-1">
+                            @for (item of d.items; track item.id) {
+                                <div class="flex justify-between items-center text-sm">
+                                    <span class="text-white/80 truncate flex-1 mr-2">{{ item.quantity }}× {{ item.productName }}</span>
+                                    <span class="text-white/50 shrink-0">${{ item.lineTotal | number:'1.0-0' }}</span>
+                                </div>
+                            }
+                        </div>
+                        <div class="border-t border-white/10 mt-2 pt-2 flex justify-between items-center">
+                            <span class="text-xs font-bold text-white/50 uppercase">Total</span>
+                            <span class="font-black text-emerald-400">${{ d.total | number:'1.0-0' }}</span>
+                        </div>
+                    </div>
+                } @else {
+                    <!-- Total sin items detallados -->
+                    <div class="flex justify-between items-center mb-4 px-1">
+                        <span class="text-xs font-bold text-white/40 uppercase">Total del pedido</span>
+                        <span class="font-black text-emerald-400 text-lg">${{ d.total | number:'1.0-0' }}</span>
                     </div>
                 }
 
@@ -221,37 +261,48 @@
                 <div class="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
                     <div>
                         <h3 class="font-black text-xl uppercase italic tracking-tighter">🔃 Reordenar Ruta</h3>
-                        <p class="text-[10px] text-pink-400 uppercase font-bold tracking-widest">Arrastra para cambiar el orden</p>
+                        <p class="text-[10px] text-pink-400 uppercase font-bold tracking-widest">Usa ↑↓ para mover paradas</p>
                     </div>
                     <button (click)="closeReorderModal()" class="w-10 h-10 flex items-center justify-center bg-white/10 rounded-full">✕</button>
                 </div>
 
-                <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar" cdkDropList (cdkDropListDropped)="onDropDelivery($event)">
-                    @for (d of r.deliveries; track d.id) {
-                        <div class="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center space-x-4 active:scale-[0.98] transition-all cursor-move" 
-                             [class.opacity-40]="d.status === 'Delivered' || d.status === 'NotDelivered'"
-                             cdkDrag [cdkDragDisabled]="d.status === 'Delivered' || d.status === 'NotDelivered'">
-                            
-                            <div class="w-8 h-8 bg-pink-600 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
+                <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                    @for (d of r.deliveries; track d.id; let i = $index) {
+                        <div class="flex items-center gap-3"
+                             [class.opacity-40]="d.status === 'Delivered' || d.status === 'NotDelivered'">
+                            <!-- Posición -->
+                            <div class="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0"
+                                 [class.bg-pink-600]="d.status !== 'Delivered' && d.status !== 'NotDelivered'"
+                                 [class.bg-emerald-700]="d.status === 'Delivered'"
+                                 [class.bg-red-800]="d.status === 'NotDelivered'">
                                 {{ d.sortOrder }}
                             </div>
-                            
+                            <!-- Info -->
                             <div class="flex-1 min-w-0">
                                 <h4 class="font-bold text-sm uppercase truncate">{{ d.clientName }}</h4>
                                 <p class="text-[10px] text-white/40 truncate">{{ d.address || d.clientAddress }}</p>
                             </div>
-
-                            <div class="text-white/20">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                            </div>
+                            <!-- Botones ↑/↓ -->
+                            @if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {
+                                <div class="flex flex-col gap-1 shrink-0">
+                                    <button (click)="moveDelivery(i, -1)" [disabled]="i === 0"
+                                            class="w-9 h-9 bg-white/10 border border-white/20 rounded-xl flex items-center justify-center text-lg active:bg-white/20 transition-all disabled:opacity-20">
+                                        ↑
+                                    </button>
+                                    <button (click)="moveDelivery(i, 1)" [disabled]="i === r.deliveries.length - 1"
+                                            class="w-9 h-9 bg-white/10 border border-white/20 rounded-xl flex items-center justify-center text-lg active:bg-white/20 transition-all disabled:opacity-20">
+                                        ↓
+                                    </button>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
 
                 <div class="p-6 bg-white/5 border-t border-white/10">
-                    <button (click)="closeReorderModal()" 
+                    <button (click)="saveReorder()"
                             class="w-full py-4 bg-pink-600 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-pink-600/20 active:scale-95 transition-transform">
-                        Confirmar Orden
+                        Guardar Orden
                     </button>
                 </div>
             </div>

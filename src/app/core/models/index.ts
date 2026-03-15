@@ -299,6 +299,7 @@ export interface RouteDeliveryDto {
     amountPaid: number;
     balanceDue: number;
     deliveryInstructions?: string;
+    items?: OrderItemDto[];
 }
 
 export interface DriverExpenseDto {

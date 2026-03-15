@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, signal, computed, ElementRef, ViewChild, 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { moveItemInArray } from '@angular/cdk/drag-drop';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
@@ -10,7 +10,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { GpsService } from '../../../core/services/gps.service';
-import { OrderStatus, ORDER_STATUS_LABELS } from '../../../core/models';
+import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage } from '../../../core/models';
 import { effect } from '@angular/core';
 
 declare const google: any;
@@ -21,7 +21,7 @@ const GPS_KEY = 'regi_gps_granted';
 @Component({
     selector: 'app-route-view',
     standalone: true,
-    imports: [CommonModule, FormsModule, DragDropModule],
+    imports: [CommonModule, FormsModule],
     templateUrl: './route-view.component.html',
     styleUrl: './route-view.component.css'
 })
@@ -60,6 +60,9 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
     isCamiListening = signal(false);
     isDelivering = signal(false);
+    camiResponse = signal('');
+    camiHistory: CamiMessage[] = [];
+    private speechRecognition: any = null;
 
     isCardExpanded = signal(true);
 
@@ -148,8 +151,87 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
     // ═══ CAMI ═══
     toggleCami(): void {
-        this.isCamiListening.update(v => !v);
-        if (this.isCamiListening() && 'vibrate' in navigator) navigator.vibrate(50);
+        if (this.isCamiListening()) {
+            this.stopListening();
+        } else {
+            this.startListening();
+        }
+    }
+
+    private startListening(): void {
+        const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SR) {
+            this.showToast('Micrófono no disponible en este dispositivo');
+            return;
+        }
+        if ('vibrate' in navigator) navigator.vibrate(50);
+        this.isCamiListening.set(true);
+        this.camiResponse.set('');
+
+        const recognition = new SR();
+        recognition.lang = 'es-MX';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        this.speechRecognition = recognition;
+
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            this.isCamiListening.set(false);
+            this.sendCamiVoice(transcript);
+        };
+        recognition.onerror = (event: any) => {
+            this.isCamiListening.set(false);
+            if (event.error !== 'aborted') this.showToast('No te escuché 😿 Intenta de nuevo');
+        };
+        recognition.onend = () => {
+            this.isCamiListening.set(false);
+        };
+        recognition.start();
+    }
+
+    private stopListening(): void {
+        this.speechRecognition?.stop();
+        this.speechRecognition = null;
+        this.isCamiListening.set(false);
+    }
+
+    private sendCamiVoice(transcript: string): void {
+        this.showToast(`"${transcript}"`);
+        const d = this.nextDelivery();
+        const context = d ? `[Repartidor en ruta. Entrega activa: ${d.clientName}, ${d.address || d.clientAddress}. Total: $${d.total}] ` : '';
+        this.api.camiChat(this.camiHistory, context + transcript).subscribe({
+            next: res => {
+                this.camiResponse.set(res.text);
+                this.camiHistory = [...this.camiHistory, { role: 'user' as const, text: transcript }, { role: 'model' as const, text: res.text }].slice(-10);
+                if (res.audioBase64) {
+                    const audio = new Audio(`data:audio/mp3;base64,${res.audioBase64}`);
+                    audio.play().catch(() => {});
+                }
+            },
+            error: () => this.showToast('C.A.M.I. no está disponible ahora')
+        });
+    }
+
+    // ═══ REORDER (↑/↓ buttons — mobile friendly) ═══
+    moveDelivery(index: number, dir: 1 | -1): void {
+        const r = this.route();
+        if (!r) return;
+        const newIndex = index + dir;
+        if (newIndex < 0 || newIndex >= r.deliveries.length) return;
+        moveItemInArray(r.deliveries, index, newIndex);
+        r.deliveries.forEach((d: any, i: number) => d.sortOrder = i + 1);
+        this.route.set({ ...r });
+    }
+
+    saveReorder(): void {
+        const r = this.route();
+        if (!r) return;
+        const ids = r.deliveries.map((d: any) => d.id);
+        this.api.driverReorderRouteDeliveries(this.token, ids).subscribe({
+            next: () => { this.showToast('✅ Orden guardado'); this.closeReorderModal(); this.loadRoute(); },
+            error: () => { this.showToast('Error al guardar 😿'); this.loadRoute(); }
+        });
     }
 
     toggleCard(): void {
@@ -489,22 +571,6 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         }
     }
 
-    onDropDelivery(event: CdkDragDrop<any[]>): void {
-        const route = this.route(); if (!route) return;
-        moveItemInArray(route.deliveries, event.previousIndex, event.currentIndex);
-        route.deliveries.forEach((del: any, i: number) => del.sortOrder = i + 1);
-        const ids = route.deliveries.map((d: any) => d.id);
-        this.route.set({ ...route });
-        this.plotRoute(route);
-        this.updateRouteDirection(); // Re-draw route line to new next stop
-        this.api.driverReorderRouteDeliveries(this.token, ids).subscribe({
-            next: () => {
-                this.showToast('✅ Nuevo orden guardado. Recalculando...');
-                this.loadRoute(); // Auto-Transition & Trigger Backend SignalR events globally
-            },
-            error: () => { this.showToast('Error al guardar 😿'); this.loadRoute(); }
-        });
-    }
 
     private scrollTo(chat: 'client'): void {
         setTimeout(() => {

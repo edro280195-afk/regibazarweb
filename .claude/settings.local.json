@@ -25,7 +25,21 @@
       "Bash(find /c/Codigos -path \"*EntregasApi*\" -name \"*.cs\" 2>/dev/null | head -50)",
       "Bash(find /c/Codigos/regibazar-web -name \"*.ts\" 2>/dev/null | grep -E \"\\(glow|upload|route-manager\\)\" | head -20)",
       "Bash(find \"C:\\\\Codigos\\\\regibazar-web\\\\src\\\\app\\\\features\\\\admin\" -name \"*.component.ts\" 2>/dev/null | sort)",
-      "Bash(ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Services\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Models\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Controllers\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\DTOs\\\\\")"
+      "Bash(ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Services\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Models\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\Controllers\\\\\" && ls \"C:\\\\Codigos\\\\Api\\\\EntregasApi\\\\DTOs\\\\\")",
+      "Bash(find:*)",
+      "Read(//c/Codigos//**)",
+      "Read(//c//**)",
+      "Bash(cmd.exe /c \"dir C:\\\\Codigos\\\\\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem 'C:\\\\Codigos\\\\' | Select-Object Name\")",
+      "Bash(find /c /d /e 2)",
+      "Bash(/dev/null -name Dtos.cs -maxdepth 8)",
+      "Read(//c/Users/admin/Desktop/**)",
+      "Read(//c/Users/admin/Documents/**)",
+      "Bash(TaskOutput b9ru9qgrq:*)",
+      "Read(//mnt/c/**)",
+      "Read(//c/Users/admin//**)",
+      "Read(//proc/**)",
+      "Bash(env)"
     ]
   }
 }

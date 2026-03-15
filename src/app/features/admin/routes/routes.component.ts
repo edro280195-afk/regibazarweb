@@ -357,16 +357,10 @@ interface GeocodedOrder extends OrderSummaryDto {
               <!-- Deliveries List (Collapsible) -->
               @if (expandedRouteIds().has(route.id)) {
                 <div class="border-t border-pink-50 animate-fade-in-down overflow-hidden">
-                  <div class="divide-y divide-pink-50/80" 
-                       cdkDropList 
-                       [cdkDropListData]="route.deliveries" 
-                       (cdkDropListDropped)="dropDelivery($event, route)">
+                  <div class="divide-y divide-pink-50/80">
                     @for (d of route.deliveries; track d.deliveryId; let di = $index) {
-                      <div class="flex items-center gap-3 px-5 py-3 hover:bg-pink-50/30 transition-colors stagger-item cursor-move"
-                           cdkDrag
-                           [cdkDragDisabled]="route.status === 'Completed'"
+                      <div class="flex items-center gap-3 px-4 py-3 hover:bg-pink-50/30 transition-colors stagger-item"
                            [style.animation-delay]="(di * 30) + 'ms'">
-                        <div class="cdk-drag-placeholder opacity-50 border-2 border-dashed border-pink-300 rounded-xl bg-pink-50/50" *cdkDragPlaceholder></div>
                         <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 border-2 border-white shadow-sm"
                              [class]="d.status === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : d.status === 'NotDelivered' ? 'bg-red-100 text-red-600' : d.status === 'InTransit' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-700'">
                           {{ d.sortOrder }}
@@ -377,13 +371,22 @@ interface GeocodedOrder extends OrderSummaryDto {
                             <p class="text-[11px] text-gray-400 truncate">📍 {{ d.clientAddress }}</p>
                           }
                         </div>
-                        <div class="text-right shrink-0 flex items-center gap-3">
+                        <div class="text-right shrink-0 flex items-center gap-2">
                           <div class="flex flex-col items-end">
                             <p class="text-sm font-black text-pink-600">{{ d.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                             <span class="text-xs">{{ d.status === 'Delivered' ? '✅' : d.status === 'NotDelivered' ? '❌' : d.status === 'InTransit' ? '🏃' : '⏳' }}</span>
                           </div>
                           @if (route.status !== 'Completed') {
-                            <button class="w-8 h-8 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            <!-- ↑/↓ buttons -->
+                            <div class="flex flex-col gap-0.5">
+                              <button (click)="moveDelivery(route, di, -1)" [disabled]="di === 0"
+                                      class="w-7 h-7 rounded-lg bg-pink-50 text-pink-400 hover:bg-pink-100 flex items-center justify-center text-xs font-bold active:scale-90 transition-all disabled:opacity-20"
+                                      title="Mover arriba">↑</button>
+                              <button (click)="moveDelivery(route, di, 1)" [disabled]="di === route.deliveries.length - 1"
+                                      class="w-7 h-7 rounded-lg bg-pink-50 text-pink-400 hover:bg-pink-100 flex items-center justify-center text-xs font-bold active:scale-90 transition-all disabled:opacity-20"
+                                      title="Mover abajo">↓</button>
+                            </div>
+                            <button class="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                                     (click)="$event.stopPropagation(); removeOrderFromRoute(route, d.orderId)"
                                     title="Quitar de ruta">
                               🗑️
@@ -1242,22 +1245,26 @@ export class RoutesComponent implements OnInit {
   // ─── LIVE RE-ORDERING (Drag & Drop) ───
   dropDelivery(event: CdkDragDrop<RouteDeliveryDto[]>, route: RouteDto) {
     if (event.previousIndex === event.currentIndex) return;
-
-    // Actualiza UI localmente para dar sensación de instantaneidad
     moveItemInArray(route.deliveries, event.previousIndex, event.currentIndex);
-
-    // Reasigna los SortOrder visualmente
     route.deliveries.forEach((d, index) => d.sortOrder = index + 1);
-
-    // Manda el nuevo arreglo de IDs a la API en el orden correcto
     const newOrderIds = route.deliveries.map(d => d.deliveryId);
-
     this.api.reorderRouteDeliveries(route.id, newOrderIds).subscribe({
       next: () => this.toast.success('Ruta reordenada ✨🚗'),
-      error: () => {
-        this.toast.error('Error al guardar el nuevo orden');
-        this.loadRoutes(); // Revierte si falla
-      }
+      error: () => { this.toast.error('Error al guardar el nuevo orden'); this.loadRoutes(); }
+    });
+  }
+
+  moveDelivery(route: RouteDto, index: number, dir: 1 | -1): void {
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= route.deliveries.length) return;
+    moveItemInArray(route.deliveries, index, newIndex);
+    route.deliveries.forEach((d, i) => d.sortOrder = i + 1);
+    // Optimistic update — signal Angular that the array changed
+    this.routes.update(rs => [...rs]);
+    const newOrderIds = route.deliveries.map(d => d.deliveryId);
+    this.api.reorderRouteDeliveries(route.id, newOrderIds).subscribe({
+      next: () => this.toast.success('Ruta reordenada ✨'),
+      error: () => { this.toast.error('Error al guardar'); this.loadRoutes(); }
     });
   }
 
