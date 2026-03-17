@@ -115,7 +115,7 @@ export interface OrderSummaryDto {
     itemsCount: number;
     orderType: string;
     createdAt: string;
-    clientType: string;
+    type: string;
     clientPhone?: string;
     clientAddress?: string;
     postponedAt?: string;
@@ -399,7 +399,7 @@ export interface ManualOrderRequest {
     clientName: string;
     clientPhone?: string;
     clientAddress?: string;
-    clientType?: string;
+    type?: string;
     orderType: string;
     items: { productName: string; quantity: number; unitPrice: number }[];
     postponedAt?: string;
@@ -462,7 +462,7 @@ export interface UpdateOrderDetailsRequest {
     clientName?: string;
     clientAddress?: string;
     clientPhone?: string;
-    clientType?: string;
+    type?: string;
     tags?: string[];
     deliveryTime?: string;
     pickupDate?: string;

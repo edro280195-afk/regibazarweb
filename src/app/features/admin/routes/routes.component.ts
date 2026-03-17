@@ -999,7 +999,7 @@ export class RoutesComponent implements OnInit {
       name: order.clientName,
       address: this.tempAddress,
       tag: order.tags?.[0] || 'None',
-      type: order.clientType || 'Nueva'
+      type: order.type || 'Nueva'
     }).subscribe({
       next: () => {
         this.toast.success('Dirección actualizada ✨');

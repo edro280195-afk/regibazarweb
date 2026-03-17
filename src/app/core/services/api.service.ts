@@ -34,19 +34,18 @@ export class ApiService {
         return this.http.get<OrderSummaryDto[]>(`${this.base}/orders`);
     }
 
-    getOrdersPaged(page: number, size: number, status?: string, search?: string, type?: string, startDate?: string, endDate?: string, clientType?: string): Observable<PagedResult<OrderSummaryDto>> {
+    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string): Observable<PagedResult<OrderSummaryDto>> {
         let params = new HttpParams()
             .set('page', page.toString())
             .set('pageSize', size.toString());
         if (status) params = params.set('status', status);
         if (search) params = params.set('search', search);
+        if (orderType) params = params.set('type', orderType);
         if (type) params = params.set('type', type);
-        if (clientType) params = params.set('clientType', clientType);
         if (startDate) params = params.set('startDate', startDate);
         if (endDate) params = params.set('endDate', endDate);
         return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/paged`, { params });
     }
-
     getOrderStats(): Observable<OrderStatsDto> {
         return this.http.get<OrderStatsDto>(`${this.base}/orders/stats`);
     }

@@ -245,6 +245,38 @@ import gsap from 'gsap';
             }
           </div>
 
+          <!-- Delivery Countdown Card -->
+          @if (o.status !== 'Delivered' && o.status !== 'Canceled' && o.expiresAt) {
+            <div class="relative bg-gradient-to-br from-pink-500 to-rose-600 rounded-[2.5rem] p-6 mt-6 mb-2 shadow-[0_20px_40px_rgba(225,29,72,0.3)] border-4 border-white overflow-hidden animate-fade-in-up" style="animation-delay: 100ms">
+              <!-- Decorative elements -->
+              <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+              <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-pink-300/20 rounded-full blur-3xl"></div>
+              
+              <div class="relative z-10 flex flex-col items-center text-center text-white">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-2xl animate-bounce-subtle">📅</span>
+                  <h3 class="text-[10px] font-black uppercase tracking-[0.2em] opacity-90">Día de tu Entrega</h3>
+                </div>
+                
+                <h2 class="text-2xl font-black font-display mb-1 drop-shadow-md">
+                  {{ o.scheduledDeliveryDate | date:'EEEE, d MMMM' | titlecase }} 🎀
+                </h2>
+                
+                <div class="w-full h-px bg-white/20 my-4"></div>
+                
+                <div class="flex flex-col items-center">
+                  <p class="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-2">Tiempo Restante</p>
+                  <div class="bg-white/15 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20 shadow-inner flex items-center gap-3">
+                    <span class="text-2xl animate-pulse">⏰</span>
+                    <span class="text-3xl font-black font-mono tracking-wider tabular-nums">
+                      {{ countdownText() || '--:--:--' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+
           <!-- Delivery Instructions (Editable for Client) -->
           <div class="mt-4 p-4 rounded-3xl bg-white/80 backdrop-blur-xl border border-pink-100 shadow-sm animate-fade-in-up" style="animation-delay: 75ms">
             <h4 class="text-xs font-black text-pink-500 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -451,12 +483,12 @@ import gsap from 'gsap';
 
 
           <!-- Gamification: VIP Reveal (Only when delivered) -->
-          @if (o.status === 'Delivered' && (o.clientType === 'Frecuente' || o.clientType === 'VIP')) {
+          @if (o.status === 'Delivered' && (o.type === 'Frecuente' || o.type === 'VIP')) {
             <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgba(216,180,254,0.4)] border border-purple-200/50 animate-fade-in-up transition-all duration-500" style="animation-delay: 400ms">
               @if (!showSurprise()) {
                 <div class="text-center cursor-pointer group" (click)="revealSurprise()">
                   <div class="text-5xl drop-shadow-[0_0_15px_rgba(216,180,254,0.8)] animate-pulse mb-3 group-hover:scale-110 transition-transform">💎</div>
-                  <h3 class="text-lg font-black text-purple-900 font-display">¡Eres una Chica {{ o.clientType }}!</h3>
+                  <h3 class="text-lg font-black text-purple-900 font-display">¡Eres una Chica {{ o.type }}!</h3>
                   <p class="text-xs font-bold text-purple-700/80 mb-3">Te hemos preparado una sorpresita...</p>
                   <button class="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold px-6 py-2 rounded-full shadow-md animate-bounce-subtle">
                     Toca para revelar 🎁
@@ -473,7 +505,7 @@ import gsap from 'gsap';
                 </div>
               }
             </div>
-          } @else if (o.clientType === 'Frecuente' || o.clientType === 'VIP') {
+          } @else if (o.type === 'Frecuente' || o.type === 'VIP') {
             <!-- Original Loyalty Banner (SHIMMER EFFECT) for non-delivered -->
             <div class="relative overflow-hidden bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgba(216,180,254,0.4)] border border-purple-200/50 flex items-center gap-4 animate-fade-in-up isolate hover:scale-[1.02] transition-transform" style="animation-delay: 400ms">
               <!-- Holographic Shimmer -->
@@ -482,7 +514,7 @@ import gsap from 'gsap';
               <div class="text-5xl drop-shadow-[0_0_15px_rgba(216,180,254,0.8)] animate-pulse-slow">💎</div>
               <div>
                 <span class="inline-block px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-1.5 shadow-md">
-                  Chica {{ o.clientType }}
+                  Chica {{ o.type }}
                 </span>
                 <p class="text-xs font-bold text-purple-900/90 leading-snug">¡Eres lo máximo! ✨ Tienes <span class="bg-purple-200 text-purple-900 px-1 rounded">{{ o.clientPoints }} RegiPuntos</span> acumulados para canjear pronto.</p>
               </div>
@@ -733,6 +765,10 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   camiAudioUrl = signal<string>('');
   isPlayingCami = signal(false);
   isLoadingCami = signal(true);
+  
+  // Countdown State
+  countdownText = signal<string>('');
+  private countdownInterval: any;
 
   // --- MAP STEROIDS ---
   private mapInitialized = false;
@@ -915,6 +951,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy() {
     if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
   }
 
   loadOrder() {
@@ -937,6 +974,16 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
             this.animateTicketReveal();
             if (data.status === 'Delivered') this.fireConfetti('unboxing');
           }, 500);
+        }
+
+        if (data.expiresAt) {
+          // Fallback if API hasn't updated its DTO yet or sync Issues
+          if (!data.scheduledDeliveryDate) {
+            const date = new Date(data.expiresAt);
+            date.setDate(date.getDate() - 1);
+            data.scheduledDeliveryDate = date.toISOString();
+          }
+          this.startCountdown(data.expiresAt);
         }
 
 
@@ -1596,5 +1643,36 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     };
 
     audio.play();
+  }
+
+  private startCountdown(expiresAt: string) {
+    if (this.countdownInterval) clearInterval(this.countdownInterval);
+    
+    const targetDate = new Date(expiresAt).getTime();
+    
+    const update = () => {
+      const now = new Date().getTime();
+      const distance = targetDate - now;
+      
+      if (distance < 0) {
+        this.countdownText.set('¡Llegó el gran día! 🎀');
+        clearInterval(this.countdownInterval);
+        return;
+      }
+      
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      
+      let text = '';
+      if (days > 0) text += `${days}d `;
+      text += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      this.countdownText.set(text);
+    };
+    
+    update();
+    this.countdownInterval = setInterval(update, 1000);
   }
 }

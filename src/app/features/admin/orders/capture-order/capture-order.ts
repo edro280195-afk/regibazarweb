@@ -82,7 +82,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   // ═════════════════ MANUAL MODE ═════════════════
   manualOrderType = 'Delivery';
   manualClient = signal('');
-  manualClientType = '';
+  manualType = '';
   manualItems: { id: string; productName: string; quantity: number; unitPrice: number }[] = [];
   currentItem = { productName: '', quantity: 1, unitPrice: 0 };
 
@@ -245,10 +245,10 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     });
     if (exactMatch) {
       this.autoDetected.set(true);
-      this.manualClientType = (exactMatch.ordersCount && exactMatch.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
+      this.manualType = (exactMatch.ordersCount && exactMatch.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
     } else {
       this.autoDetected.set(false);
-      this.manualClientType = ''; // Clear type if no exact match
+      this.manualType = ''; // Clear type if no exact match
     }
   }
 
@@ -256,7 +256,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     this.manualClient.set(client.name);
     this.showSuggestions.set(false);
     this.autoDetected.set(true);
-    this.manualClientType = (client.ordersCount && client.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
+    this.manualType = (client.ordersCount && client.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
 
     // Auto-focus next field
     setTimeout(() => {
@@ -304,7 +304,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       this.toast.warning('¿A quién le vendemos? Falta la clienta 💁‍♀️');
       return;
     }
-    if (!this.manualClientType) {
+    if (!this.manualType) {
       this.toast.warning('¿Es nueva o frecuente? Selecciona su tipo 🎀');
       return;
     }
@@ -318,7 +318,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
     const req: ManualOrderRequest = {
       clientName: this.manualClient().trim(),
-      clientType: this.manualClientType || 'Nueva',
+      type: this.manualType || 'Nueva',
       orderType: this.manualOrderType,
       items: this.manualItems.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
     };
@@ -330,7 +330,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
         // Reset manual form securely
         this.manualClient.set('');
-        this.manualClientType = '';
+        this.manualType = '';
         this.autoDetected.set(false);
         this.manualItems = [];
         this.currentItem = { productName: '', quantity: 1, unitPrice: 0 };
@@ -339,7 +339,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
         // Set single result format if needed, but not strictly required by user flow
         // The original logic just showed a toast. If we want link preview:
         this.result.set({
-          ordersCreated: 1, clientsCreated: req.clientType === 'Nueva' ? 1 : 0, warnings: [],
+          ordersCreated: 1, clientsCreated: req.type === 'Nueva' ? 1 : 0, warnings: [],
           orders: [{ id: res.id, clientName: res.clientName, total: res.total, orderType: res.orderType, link: res.link, items: res.items.map(i => ({ id: i.id, productName: i.productName, quantity: i.quantity })) }]
         });
       },
@@ -442,24 +442,42 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     const pin = this.pinnedProduct();
 
     if (pin) {
-      const parts = input.split(/\s+/);
-      const matched = this.findBestClientMatch(input);
       let clientName: string;
-      let variant: string;
-      if (matched) {
-        clientName = matched.name;
-        const nameLen = matched.name.split(/\s+/).length;
-        variant = parts.slice(nameLen).join(' ');
+      let variant = '';
+      let isExisting = false;
+
+      const commaIdx = input.indexOf(',');
+      if (commaIdx > -1) {
+        // Formato: Client Name, Variant
+        clientName = this.capitalizeWords(input.substring(0, commaIdx).trim());
+        variant = input.substring(commaIdx + 1).trim();
+        const matched = this.findBestClientMatch(clientName);
+        if (matched) {
+          clientName = matched.name;
+          isExisting = true;
+        }
       } else {
-        clientName = this.capitalizeWords(parts[0]);
-        variant = parts.slice(1).join(' ');
+        // No comma: try to match existing client
+        const matched = this.findBestClientMatch(input);
+        if (matched) {
+          clientName = matched.name;
+          variant = input.substring(matched.name.length).trim();
+          isExisting = true;
+        } else {
+          // No match and no comma: take whole input as client name
+          clientName = this.capitalizeWords(input);
+          variant = '';
+          isExisting = false;
+        }
       }
+
       const productName = variant ? `${pin.name} ${variant}` : pin.name;
-      this.addItemToQueue(clientName, productName, 1, pin.price, !!matched);
+      this.addItemToQueue(clientName, productName, 1, pin.price, isExisting);
     } else {
       const parsed = this.parseTurboFreeText(input);
       if (!parsed) { this.toast.warning('Formato: Nombre, Artículo, Precio 💡'); return; }
-      this.addItemToQueue(parsed.clientName, parsed.productName, parsed.quantity, parsed.unitPrice, false);
+      const matched = this.findBestClientMatch(parsed.clientName);
+      this.addItemToQueue(matched ? matched.name : parsed.clientName, parsed.productName, parsed.quantity, parsed.unitPrice, !!matched);
     }
 
     this.turboInput.set('');
@@ -527,6 +545,35 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     this.turboQueue.update(q => q.filter(i => i.id !== id));
   }
 
+  updateQueueItem(id: string, updates: Partial<TurboQueueItem>) {
+    this.turboQueue.update(q => q.map(i => {
+      if (i.id === id) {
+        const updated = { ...i, ...updates };
+        // If client name changed, re-check if it's an existing client
+        if (updates.clientName) {
+          const matched = this.findBestClientMatch(updates.clientName);
+          updated.isExistingClient = !!matched;
+          if (matched) updated.clientName = matched.name;
+        }
+        return updated;
+      }
+      return i;
+    }));
+  }
+
+  updateGroupClientName(oldName: string, newName: string) {
+    if (!newName.trim() || oldName === newName) return;
+    const capitalized = this.capitalizeWords(newName);
+    const matched = this.findBestClientMatch(capitalized);
+    const finalName = matched ? matched.name : capitalized;
+    
+    this.turboQueue.update(q => q.map(i => 
+      i.clientName.toLowerCase().trim() === oldName.toLowerCase().trim() 
+        ? { ...i, clientName: finalName, isExistingClient: !!matched } 
+        : i
+    ));
+  }
+
   submitTurboQueue() {
     const queue = this.turboQueue();
     if (queue.length === 0) return;
@@ -566,7 +613,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
       const req: ManualOrderRequest = { 
         clientName: o.clientName, 
-        clientType: determinedType, 
+        type: determinedType, 
         orderType: this.turboOrderType, 
         items: o.items 
       };
@@ -812,7 +859,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
       this.api.createManualOrder({
         clientName,
-        clientType: determinedType,
+        type: determinedType,
         orderType: 'Delivery',
         items: items.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
       }).subscribe({

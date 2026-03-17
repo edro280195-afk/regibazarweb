@@ -53,7 +53,7 @@ import { CouponService } from '../../../core/services/coupon.service';
           </div>
           <div>
             <label class="label-coquette">🚗 Tipo</label>
-            <select class="input-coquette" [(ngModel)]="typeFilter" (change)="loadOrders()">
+            <select class="input-coquette" [(ngModel)]="orderTypeFilter" (change)="loadOrders()">
               <option value="">Todos</option>
               <option value="Delivery">Domicilio</option>
               <option value="PickUp">Recoger</option>
@@ -61,7 +61,7 @@ import { CouponService } from '../../../core/services/coupon.service';
           </div>
           <div>
             <label class="label-coquette">🎀 Clienta</label>
-            <select class="input-coquette" [(ngModel)]="clientTypeFilter" (change)="loadOrders()">
+            <select class="input-coquette" [(ngModel)]="typeFilter" (change)="loadOrders()">
               <option value="">Todas</option>
               <option value="Nueva">Nueva</option>
               <option value="Frecuente">Frecuente</option>
@@ -108,8 +108,8 @@ import { CouponService } from '../../../core/services/coupon.service';
                   <p class="text-lg font-black text-pink-900 leading-tight">
                     {{ order.clientName }}
                     <span class="ml-2 px-2.5 py-0.5 text-[9px] rounded-full font-black uppercase tracking-wider shadow-sm border"
-                          [class]="order.clientType === 'Frecuente' ? 'bg-gradient-to-r from-purple-50 to-violet-50 text-purple-600 border-purple-200' : 'bg-gradient-to-r from-sky-50 to-blue-50 text-blue-600 border-blue-200'">
-                      {{ order.clientType === 'Frecuente' ? 'Frecuente' : 'Nueva' }}
+                          [class]="order.type === 'Frecuente' ? 'bg-gradient-to-r from-purple-50 to-violet-50 text-purple-600 border-purple-200' : 'bg-gradient-to-r from-sky-50 to-blue-50 text-blue-600 border-blue-200'">
+                      {{ order.type === 'Frecuente' ? 'Frecuente' : 'Nueva' }}
                     </span>
                   </p>
                   @if (order.clientAddress) {
@@ -560,8 +560,8 @@ export class OrdersComponent implements OnInit {
 
   search = '';
   statusFilter = '';
+  orderTypeFilter = '';
   typeFilter = '';
-  clientTypeFilter = '';
   selectedOrder = signal<OrderSummaryDto | null>(null);
 
   paymentAmount = 0;
@@ -600,7 +600,7 @@ export class OrdersComponent implements OnInit {
 
   loadOrders(): void {
     this.loading.set(true);
-    this.api.getOrdersPaged(this.currentPage(), this.pageSize, this.statusFilter, this.search, this.typeFilter, undefined, undefined, this.clientTypeFilter).subscribe({
+    this.api.getOrdersPaged(this.currentPage(), this.pageSize, this.statusFilter, this.search, this.orderTypeFilter, undefined, undefined, this.typeFilter).subscribe({
       next: (res) => {
         this.orders.set(res.items);
         this.totalCount.set(res.totalCount);
@@ -764,7 +764,7 @@ export class OrdersComponent implements OnInit {
         name: o.clientName,
         phone: o.clientPhone || '',
         address: o.clientAddress || '',
-        type: o.clientType || 'Nueva',
+        type: o.type || 'Nueva',
         deliveryInstructions: o.deliveryInstructions || ''
       };
     }
@@ -779,7 +779,7 @@ export class OrdersComponent implements OnInit {
       clientName: this.editClientData.name,
       clientPhone: this.editClientData.phone,
       clientAddress: this.editClientData.address,
-      clientType: this.editClientData.type,
+      type: this.editClientData.type,
       deliveryInstructions: this.editClientData.deliveryInstructions
     }).subscribe({
       next: () => {

@@ -286,6 +286,32 @@
 }
 .queue-remove-sm:hover { color: #ef4444; background: #fee2e2; }
 
+/* ═══ Editable Queue ═══ */
+.queue-group-header input:focus {
+    background: white;
+    box-shadow: 0 0 0 2px #f9a8d4;
+    border-radius: 0.4rem;
+    padding: 0 0.5rem;
+}
+
+.queue-group-item input:focus {
+    background: white;
+    box-shadow: 0 0 0 1px #f9a8d4;
+    border-radius: 0.25rem;
+}
+
+.queue-group-item input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.queue-group-item input::-webkit-outer-spin-button,
+.queue-group-item input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
 /* ═══ Animations ═══ */
 @keyframes shake {
     0%, 100% { transform: translateX(0); }

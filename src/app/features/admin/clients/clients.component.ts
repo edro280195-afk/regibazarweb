@@ -209,7 +209,7 @@ export class ClientsComponent implements OnInit {
       
       // 3. Type filter (Case-insensitive + handle 'Nueva' as default)
       // If the filter is 'Nueva' and the client has no type, we consider it 'Nueva'
-      const clientType = (c.type || (c as any).clientType || '').trim();
+      const clientType = (c.type || '').trim();
       const matchType = !type || 
         (clientType.toLowerCase() === type.toLowerCase()) ||
         (type.toLowerCase() === 'nueva' && !clientType);
