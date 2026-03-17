@@ -401,16 +401,13 @@ interface GeocodedOrder extends OrderSummaryDto {
                   @if (route.status !== 'Completed' && pendingOrders().length > 0) {
                     <div class="p-4 bg-pink-50/50 border-t border-pink-50">
                       <p class="text-[10px] font-black uppercase tracking-widest text-pink-400 mb-2">➕ Agregar Pedido a esta Ruta</p>
-                      <div class="flex flex-wrap gap-2">
-                        @for (po of pendingOrders().slice(0, 5); track po.id) {
+                      <div class="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
+                        @for (po of pendingOrders(); track po.id) {
                           <button class="px-3 py-1.5 rounded-xl bg-white border border-pink-100 text-[10px] font-bold text-pink-900 shadow-sm hover:border-pink-300 transition-all flex items-center gap-1"
                                   (click)="addOrderToRoute(route, po.id)">
                             <span>#{{ po.id }} · {{ po.clientName }}</span>
                             <span class="text-pink-400">➕</span>
                           </button>
-                        }
-                        @if (pendingOrders().length > 5) {
-                          <span class="text-[9px] text-pink-300 self-center">... y {{ pendingOrders().length - 5 }} más</span>
                         }
                       </div>
                     </div>
@@ -455,6 +452,26 @@ interface GeocodedOrder extends OrderSummaryDto {
               </div>
               <p class="text-xs text-pink-400 font-semibold mt-1">Selecciona los pedidos para esta ruta</p>
 
+              <!-- Search and Filters Bar -->
+              <div class="mt-4 flex gap-2">
+                <div class="relative flex-1">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-300">🔍</span>
+                  <input type="text" 
+                         [ngModel]="searchQuery()" 
+                         (ngModelChange)="searchQuery.set($event)"
+                         placeholder="Buscar por nombre o teléfono..." 
+                         class="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-pink-50/50 border border-pink-100 text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all" />
+                </div>
+                <button class="px-4 py-2.5 rounded-2xl bg-white border border-pink-100 text-pink-600 font-bold text-xs hover:bg-pink-50 transition-all"
+                        (click)="selectAllFiltered()">
+                  Todo
+                </button>
+                <button class="px-3 py-2.5 rounded-2xl bg-white border border-pink-100 text-gray-400 font-bold text-xs hover:bg-gray-50 transition-all"
+                        (click)="deselectAll()" title="Deseleccionar todos">
+                  ✕
+                </button>
+              </div>
+
               <!-- Address Coverage Stats -->
               @if (pendingOrders().length > 0) {
                 <div class="flex gap-2 mt-3">
@@ -482,7 +499,7 @@ interface GeocodedOrder extends OrderSummaryDto {
                 </div>
               } @else {
                 <div class="space-y-2">
-                  @for (order of pendingOrders(); track order.id) {
+                  @for (order of filteredPendingOrders(); track order.id) {
                     <div class="group/order relative flex flex-col p-3 rounded-2xl border transition-all"
                            [class]="selectedOrderIds().has(order.id)
                               ? 'border-pink-300 bg-pink-50/80 shadow-md translate-x-1'
@@ -825,6 +842,18 @@ export class RoutesComponent implements OnInit {
   // Optimizer V2
   showOptimizerModal = signal(false);
 
+  // Search & Filtering
+  searchQuery = signal('');
+  filteredPendingOrders = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    if (!query) return this.pendingOrders();
+    return this.pendingOrders().filter(o => 
+      o.clientName.toLowerCase().includes(query) || 
+      (o.id.toString() === query) ||
+      (o.clientPhone && o.clientPhone.includes(query))
+    );
+  });
+
   // Map Modal
   showMapModal = signal(false);
   mapRoute = signal<RouteDto | null>(null);
@@ -1111,6 +1140,7 @@ export class RoutesComponent implements OnInit {
 
   // ═══ CREATE ROUTE ═══
   openCreateModal(): void {
+    this.searchQuery.set('');
     this.showCreateModal.set(true);
     this.selectedOrderIds.set(new Set());
     this.loadPendingOrders();
@@ -1122,6 +1152,20 @@ export class RoutesComponent implements OnInit {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  }
+
+  selectAllFiltered(): void {
+    const filtered = this.filteredPendingOrders();
+    this.selectedOrderIds.update(s => {
+      const next = new Set(s);
+      filtered.forEach(o => next.add(o.id));
+      return next;
+    });
+    this.toast.info(`Seleccionados ${filtered.length} pedidos ✨`);
+  }
+
+  deselectAll(): void {
+    this.selectedOrderIds.set(new Set());
   }
 
   // ─── AI VOICE ROUTE SELECTION ───
