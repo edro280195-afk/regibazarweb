@@ -16,6 +16,7 @@ export class SignalRService {
 
     locationUpdate$ = new Subject<{ driverToken?: string; latitude: number; longitude: number }>();
     deliveryUpdate$ = new Subject<any>();
+    expenseAdded$ = new Subject<any>();
     routeUpdated$ = new Subject<void>();
     messageReceived$ = new Subject<{ group: string; data: any }>();
 
@@ -49,6 +50,7 @@ export class SignalRService {
         });
 
         this.connection.on('DeliveryUpdate', (data: any) => this.deliveryUpdate$.next(data));
+        this.connection.on('ExpenseAdded', (data: any) => this.expenseAdded$.next(data));
         this.connection.on('OrderConfirmed', (data: any) => this.deliveryUpdate$.next({ ...data, type: 'Confirmed' }));
         this.connection.on('RouteUpdated', () => this.routeUpdated$.next());
 

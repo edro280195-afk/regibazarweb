@@ -979,6 +979,12 @@ export class RoutesComponent implements OnInit {
       // Refresh routes if something changed (status updated by driver)
       this.loadRoutes();
     });
+
+    this.signalr.expenseAdded$.subscribe((data: any) => {
+      const time = new Date().toLocaleTimeString('es-MX', { hour12: false });
+      this.latestEvent.set(`[${time}] GASTO REGISTRADO: $${data.amount} (${data.type}) 💸`);
+      this.loadRoutes();
+    });
   }
 
   toggleRouteExpand(id: number): void {

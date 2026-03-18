@@ -12,6 +12,7 @@ import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
 import { CouponService } from '../../../core/services/coupon.service';
+import { SignalRService } from '../../../core/services/signalr.service';
 
 @Component({
   selector: 'app-orders',
@@ -374,7 +375,7 @@ import { CouponService } from '../../../core/services/coupon.service';
                     <div class="flex gap-2">
                       <div class="flex-1 relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-400 font-bold">$</span>
-                        <input type="number" class="input-coquette py-2 pl-7 pr-2 text-sm w-full" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
+                        <input type="number" class="input-coquette py-2 pl-10 pr-2 text-sm w-full" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
                       </div>
                       <input type="number" class="input-coquette py-2 px-3 text-sm w-20 text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
                       <button class="btn-coquette btn-pink px-4 shadow-md hover:shadow-lg transition-all" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">OK</button>
@@ -442,7 +443,7 @@ import { CouponService } from '../../../core/services/coupon.service';
               <div class="flex gap-2">
                 <div class="relative flex-1">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-400 font-bold text-lg">$</span>
-                  <input type="number" class="input-coquette w-full py-2.5 pl-8 pr-3 font-bold text-pink-800 bg-white/80 border-pink-200/50 focus:border-pink-400 focus:ring-pink-100" 
+                  <input type="number" class="input-coquette w-full py-2.5 pl-11 pr-3 font-bold text-pink-800 bg-white/80 border-pink-200/50 focus:border-pink-400 focus:ring-pink-100" 
                          [(ngModel)]="paymentAmount" placeholder="Ej. 150" min="1" step="0.5">
                 </div>
               </div>
@@ -551,6 +552,7 @@ export class OrdersComponent implements OnInit {
   private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
   private couponService = inject(CouponService);
+  private signalr = inject(SignalRService);
 
   orders = signal<OrderSummaryDto[]>([]);
   loading = signal(true);
@@ -593,8 +595,23 @@ export class OrdersComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadOrders();
+    this.initSignalR();
     this.api.getSalesPeriods().subscribe({
       next: (periods) => this.salesPeriods.set(periods)
+    });
+  }
+
+  initSignalR(): void {
+    this.signalr.joinAdminGroup();
+    this.signalr.deliveryUpdate$.subscribe({
+      next: (data) => {
+        // ✨ Sincronización Magistral recibida
+        this.loadOrders();
+        if (this.selectedOrder()?.id === data.orderId) {
+          this.reloadSelectedOrder();
+          this.loadPackages(data.orderId);
+        }
+      }
     });
   }
 
