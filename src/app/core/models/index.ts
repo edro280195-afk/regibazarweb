@@ -274,6 +274,7 @@ export interface ReportDto {
     supplierSummaries: SupplierSummaryDto[];
     avgDeliveryTimeMinutes: number;
     avgRouteTimeMinutes: number;
+    avgDoorTimeMinutes: number;
     // Comparativa
     prevPeriodRevenue: number;
     prevPeriodOrders: number;
@@ -300,6 +301,7 @@ export interface RouteDeliveryDto {
     balanceDue: number;
     deliveryInstructions?: string;
     items?: OrderItemDto[];
+    arrivedAt?: string;
 }
 
 export interface DriverExpenseDto {

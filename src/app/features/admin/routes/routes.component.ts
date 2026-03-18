@@ -370,6 +370,12 @@ interface GeocodedOrder extends OrderSummaryDto {
                           @if (d.clientAddress) {
                             <p class="text-[11px] text-gray-400 truncate">📍 {{ d.clientAddress }}</p>
                           }
+                          @if (d.arrivedAt && d.status === 'InTransit') {
+                            <p class="text-[10px] text-blue-500 font-bold animate-pulse">🚪 En puerta: {{ getDoorTimeMinutes(d) }} min</p>
+                          }
+                          @if (d.arrivedAt && d.status === 'Delivered' && d.deliveredAt) {
+                            <p class="text-[10px] text-emerald-500 font-bold">🚪 {{ getDoorTimeMinutes(d) }} min en puerta</p>
+                          }
                         </div>
                         <div class="text-right shrink-0 flex items-center gap-2">
                           <div class="flex flex-col items-end">
@@ -1736,5 +1742,12 @@ export class RoutesComponent implements OnInit {
       }, 100);
 
     } catch (e) { }
+  }
+
+  getDoorTimeMinutes(d: RouteDeliveryDto): number {
+    if (!d.arrivedAt) return 0;
+    const arrived = new Date(d.arrivedAt).getTime();
+    const end = d.deliveredAt ? new Date(d.deliveredAt).getTime() : Date.now();
+    return Math.max(0, Math.round((end - arrived) / 60000));
   }
 }

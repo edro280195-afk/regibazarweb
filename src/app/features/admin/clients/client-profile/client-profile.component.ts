@@ -222,7 +222,7 @@ export class ClientProfileComponent implements OnInit {
     if (this.loadingInsight()) return;
     this.loadingInsight.set(true);
     this.api.getClientInsight(this.client()!.id).subscribe({
-      next: (text) => { this.clientInsight.set(text); this.loadingInsight.set(false); },
+      next: (res) => { this.clientInsight.set(res.text); this.loadingInsight.set(false); },
       error: () => { this.clientInsight.set('No pude generar el análisis en este momento.'); this.loadingInsight.set(false); }
     });
   }

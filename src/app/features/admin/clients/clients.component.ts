@@ -11,10 +11,10 @@ import { gsap } from 'gsap';
   selector: 'app-clients',
   imports: [FormsModule, CurrencyPipe],
   template: `
-    <div class="relative min-h-[80vh] overflow-hidden -m-4 lg:-m-8 p-4 lg:p-8 isolate">
+    <div class="relative min-h-[80vh] overflow-hidden -m-4 lg:-m-8 p-4 lg:p-8">
       <!-- Parallax Background Elements -->
-      <div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-br from-pink-50/50 via-purple-50/50 to-rose-50/50 backdrop-blur-[2px]"></div>
+      <div class="absolute inset-0 pointer-events-none z-[-1] overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-pink-50/50 via-purple-50/50 to-rose-50/50"></div>
         
         <!-- Slowest Layer -->
         <div class="absolute inset-0 opacity-40 transition-transform duration-75 ease-out"

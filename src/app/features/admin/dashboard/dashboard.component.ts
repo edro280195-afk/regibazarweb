@@ -352,7 +352,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       pendingAmount: d.pendingAmount,
       totalClients: d.totalClients
     }).subscribe({
-      next: (text) => { this.aiInsight.set(text); this.loadingInsight.set(false); },
+      next: (res) => { this.aiInsight.set(res.text); this.loadingInsight.set(false); },
       error: () => { this.aiInsight.set(null); this.loadingInsight.set(false); }
     });
   }

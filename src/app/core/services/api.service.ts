@@ -280,12 +280,12 @@ export class ApiService {
         return this.http.post<CamiChatResponse>(`${this.base}/cami/chat`, body);
     }
 
-    getDashboardInsight(data: { revenueToday: number; revenueMonth: number; pendingOrders: number; deliveredOrders: number; activeRoutes: number; pendingAmount: number; totalClients: number }): Observable<string> {
-        return this.http.post<string>(`${this.base}/cami/dashboard-insight`, data);
+    getDashboardInsight(data: { revenueToday: number; revenueMonth: number; pendingOrders: number; deliveredOrders: number; activeRoutes: number; pendingAmount: number; totalClients: number }): Observable<CamiChatResponse> {
+        return this.http.post<CamiChatResponse>(`${this.base}/cami/dashboard-insight`, data);
     }
 
-    getClientInsight(clientId: number): Observable<string> {
-        return this.http.get<string>(`${this.base}/cami/client-insight/${clientId}`);
+    getClientInsight(clientId: number): Observable<CamiChatResponse> {
+        return this.http.get<CamiChatResponse>(`${this.base}/cami/client-insight/${clientId}`);
     }
 
     getRouteBriefing(routeId: number): Observable<{ text: string; audioBase64?: string }> {

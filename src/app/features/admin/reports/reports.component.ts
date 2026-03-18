@@ -385,6 +385,15 @@ import { gsap } from 'gsap';
                      </div>
                      <div class="text-5xl opacity-40">🛣️</div>
                   </div>
+
+                   <div class="card-coquette p-8 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-100 flex items-center justify-between">
+                      <div>
+                        <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">🚪 Tiempo en Puerta</p>
+                        <h4 class="text-4xl font-black text-amber-800 tracking-tighter">{{ (data()!.avgDoorTimeMinutes || 0) | number:'1.0-0' }} <span class="text-base">min</span></h4>
+                        <p class="text-[10px] font-bold text-amber-500 mt-2 italic">Promedio desde llegada a cobro</p>
+                      </div>
+                      <div class="text-5xl opacity-40">🚪</div>
+                   </div>
                   
                   <div class="card-coquette p-6 bg-white/50 border-pink-100 text-center">
                      <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">Eficiencia Logística 🌸</p>
