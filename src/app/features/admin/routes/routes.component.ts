@@ -367,8 +367,8 @@ interface GeocodedOrder extends OrderSummaryDto {
                         </div>
                         <div class="flex-1 min-w-0">
                           <p class="text-sm font-bold text-gray-800 truncate">{{ d.clientName }}</p>
-                          @if (d.clientAddress) {
-                            <p class="text-[11px] text-gray-400 truncate">📍 {{ d.clientAddress }}</p>
+                          @if (d.alternativeAddress || d.clientAddress) {
+                            <p class="text-[11px] text-gray-400 truncate">📍 {{ d.alternativeAddress || d.clientAddress }}</p>
                           }
                           @if (d.arrivedAt && d.status === 'InTransit') {
                             <p class="text-[10px] text-blue-500 font-bold animate-pulse">🚪 En puerta: {{ getDoorTimeMinutes(d) }} min</p>
@@ -537,7 +537,7 @@ interface GeocodedOrder extends OrderSummaryDto {
                           } @else {
                             @if (order.clientAddress) {
                               <p class="text-xs text-gray-400 truncate mt-0.5 flex justify-between group/addr">
-                                <span>📍 {{ order.clientAddress }}</span>
+                                <span>📍 {{ order.alternativeAddress || order.clientAddress }}</span>
                                 <button (click)="startEditAddress(order)" class="text-[10px] text-pink-400 opacity-0 group-hover/addr:opacity-100 font-bold hover:underline transition-opacity">Editar</button>
                               </p>
                             } @else {
@@ -1348,6 +1348,7 @@ export class RoutesComponent implements OnInit {
         this.loadRoutes();
       },
       error: (err) => {
+        console.error('SERVER ERROR:', err.error);
         this.toast.error(err.error?.message || 'Error al crear la ruta mágica');
       }
     });

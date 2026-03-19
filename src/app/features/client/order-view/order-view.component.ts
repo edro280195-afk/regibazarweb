@@ -290,7 +290,7 @@ import gsap from 'gsap';
               <div class="relative">
                 <textarea [(ngModel)]="localInstructions" 
                           rows="3"
-                          class="w-full bg-pink-50/50 border-2 border-pink-200 rounded-2xl p-3 text-sm focus:outline-none focus:border-pink-400 transition-all font-medium placeholder:text-pink-300"
+                          class="w-full bg-pink-50/50 border-2 border-pink-200 rounded-2xl p-4 text-base focus:outline-none focus:border-pink-400 transition-all font-medium placeholder:text-pink-300"
                           placeholder="Ej: Portón blanco, dejar con el guardia, timbre no sirve..."></textarea>
                 <div class="flex gap-2 mt-2">
                   <button (click)="saveInstructions()" 

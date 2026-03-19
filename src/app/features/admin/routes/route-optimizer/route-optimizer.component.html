@@ -94,10 +94,10 @@
                                 <p class="text-[11px] md:text-sm font-bold text-gray-800 truncate">{{ order.clientName }}</p>
 
                                 @if (order._isGoogleResolved) {
-                                <p class="text-[9px] md:text-[10px] text-gray-400 truncate mt-0.5">📍 {{ order.clientAddress }}</p>
+                                <p class="text-[9px] md:text-[10px] text-gray-400 truncate mt-0.5">📍 {{ order.alternativeAddress || order.clientAddress }}</p>
                                 } @else {
                                 <p class="text-[9px] md:text-[10px] font-bold text-amber-600 truncate mt-0.5"
-                                    title="{{ order.clientAddress }}">
+                                    title="{{ order.alternativeAddress || order.clientAddress }}">
                                     ⚠️ {{ order._geocodeError }}
                                 </p>
                                 }

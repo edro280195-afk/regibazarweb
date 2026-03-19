@@ -199,7 +199,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     private sendCamiVoice(transcript: string): void {
         this.showToast(`"${transcript}"`);
         const d = this.nextDelivery();
-        const context = d ? `[Repartidor en ruta. Entrega activa: ${d.clientName}, ${d.address || d.clientAddress}. Total: $${d.total}] ` : '';
+        const address = d ? (d.alternativeAddress || d.address || d.clientAddress) : '';
+        const context = d ? `[Repartidor en ruta. Entrega activa: ${d.clientName}, ${address}. Total: $${d.total}] ` : '';
         this.api.camiChat(this.camiHistory, context + transcript).subscribe({
             next: res => {
                 this.camiResponse.set(res.text);
@@ -303,7 +304,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         const dest = new google.maps.LatLng(pending[0].latitude, pending[0].longitude);
 
         // Update Overlay UI
-        this.navNextAddress.set(pending[0].address || pending[0].clientAddress || 'Sin dirección');
+        this.navNextAddress.set(pending[0].alternativeAddress || pending[0].address || pending[0].clientAddress || 'Sin dirección');
         this.navNextClient.set(pending[0].clientName);
 
         // SMART AUTO-CENTERING
@@ -565,7 +566,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             window.open(`https://www.google.com/maps/dir/?api=1&destination=${nextDelivery.latitude},${nextDelivery.longitude}&travelmode=driving`, '_blank');
         } else {
             // Fallback por texto si no hay coords precisas
-            const addr = nextDelivery.address || nextDelivery.clientAddress;
+            const addr = nextDelivery.alternativeAddress || nextDelivery.address || nextDelivery.clientAddress;
             if (addr) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
             else this.showToast('La siguiente entrega no tiene dirección válida');
         }

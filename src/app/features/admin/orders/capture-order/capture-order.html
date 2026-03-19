@@ -260,27 +260,35 @@
             </div>
 
             <div class="card-coquette p-5 space-y-4">
-                <div class="relative">
-                    <label class="label-coquette">👩‍💼 Nombre de la clienta</label>
-                    <input type="text" class="input-coquette text-lg py-3" [(ngModel)]="manualClient"
-                        (input)="onSearchClient()" (focus)="showSuggestions.set(true)"
-                        (blur)="hideSuggestionsWithDelay()" placeholder="Busca o escribe nombre..." autocomplete="off">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="relative">
+                        <label class="label-coquette">👩‍💼 Nombre de la clienta</label>
+                        <input type="text" class="input-coquette text-lg py-3" [(ngModel)]="manualClient"
+                            (input)="onSearchClient()" (focus)="showSuggestions.set(true)"
+                            (blur)="hideSuggestionsWithDelay()" placeholder="Busca o escribe nombre..." autocomplete="off">
 
-                    @if (showSuggestions() && filteredClients().length > 0) {
-                    <ul class="absolute z-50 top-[100%] left-0 right-0 bg-white/95 backdrop-blur-md border border-pink-200 rounded-xl mt-1 shadow-xl max-h-[250px] overflow-y-auto">
-                        @for (client of filteredClients(); track client.id) {
-                        <li class="px-4 py-3 hover:bg-pink-50 cursor-pointer flex justify-between items-center transition-colors border-b border-pink-50 last:border-0"
-                            (mousedown)="selectClient(client)">
-                            <span class="font-bold text-pink-900">{{ client.name }}</span>
-                            @if ((client.ordersCount || 0) >= 1) {
-                            <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
-                            } @else {
-                            <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
+                        @if (showSuggestions() && filteredClients().length > 0) {
+                        <ul class="absolute z-50 top-[100%] left-0 right-0 bg-white/95 backdrop-blur-md border border-pink-200 rounded-xl mt-1 shadow-xl max-h-[250px] overflow-y-auto">
+                            @for (client of filteredClients(); track client.id) {
+                            <li class="px-4 py-3 hover:bg-pink-50 cursor-pointer flex justify-between items-center transition-colors border-b border-pink-50 last:border-0"
+                                (mousedown)="selectClient(client)">
+                                <span class="font-bold text-pink-900">{{ client.name }}</span>
+                                @if ((client.ordersCount || 0) >= 1) {
+                                <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
+                                } @else {
+                                <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
+                                }
+                            </li>
                             }
-                        </li>
+                        </ul>
                         }
-                    </ul>
-                    }
+                    </div>
+
+                    <div>
+                        <label class="label-coquette">📍 Dirección Alternativa (Opcional)</label>
+                        <input type="text" class="input-coquette text-lg py-3" [(ngModel)]="manualAlternativeAddress"
+                            placeholder="Ej. Casa de su mamá / Oficina">
+                    </div>
                 </div>
 
                 <div class="flex items-end gap-3 w-1/2">

@@ -82,6 +82,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   // ═════════════════ MANUAL MODE ═════════════════
   manualOrderType = 'Delivery';
   manualClient = signal('');
+  manualAlternativeAddress = signal('');
   manualType = '';
   manualItems: { id: string; productName: string; quantity: number; unitPrice: number }[] = [];
   currentItem = { productName: '', quantity: 1, unitPrice: 0 };
@@ -318,6 +319,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
     const req: ManualOrderRequest = {
       clientName: this.manualClient().trim(),
+      alternativeAddress: this.manualAlternativeAddress().trim(),
       type: this.manualType || 'Nueva',
       orderType: this.manualOrderType,
       items: this.manualItems.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
@@ -330,6 +332,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
         // Reset manual form securely
         this.manualClient.set('');
+        this.manualAlternativeAddress.set('');
         this.manualType = '';
         this.autoDetected.set(false);
         this.manualItems = [];

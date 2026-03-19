@@ -41,10 +41,10 @@ import { GoogleAutocompleteDirective } from '../../../../shared/directives/googl
                 <div class="space-y-3">
                   <input class="input-coquette" [(ngModel)]="editData.name" placeholder="Nombre" />
                   <input class="input-coquette" [(ngModel)]="editData.phone" placeholder="Teléfono" />
-                  <input class="input-coquette" [(ngModel)]="editData.address" placeholder="Dirección" 
-                         appGoogleAutocomplete (placeChanged)="onAddressSelected($event)" />
-                  <textarea class="input-coquette text-xs py-1.5" [(ngModel)]="editData.deliveryInstructions" placeholder="Instrucciones de entrega predeterminadas" rows="2"></textarea>
-                  <div class="flex gap-3">
+                  <textarea class="input-coquette" [(ngModel)]="editData.address" placeholder="Dirección" rows="2"
+                            appGoogleAutocomplete (placeChanged)="onAddressSelected($event)"></textarea>
+                  <textarea class="input-coquette" [(ngModel)]="editData.deliveryInstructions" placeholder="Instrucciones de entrega predeterminadas" rows="2"></textarea>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select class="input-coquette" [(ngModel)]="editData.tag">
                       <option value="None">Normal</option>
                       <option value="RisingStar">🚀 En Ascenso</option>

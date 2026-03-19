@@ -13,11 +13,12 @@ import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
 import { CouponService } from '../../../core/services/coupon.service';
 import { SignalRService } from '../../../core/services/signalr.service';
+import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink, BirthdayCouponComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink, BirthdayCouponComponent, GoogleAutocompleteDirective],
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -220,11 +221,14 @@ import { SignalRService } from '../../../core/services/signalr.service';
                 
                 @if (showClientEdit()) {
                   <div class="mt-2 space-y-2 bg-white/70 backdrop-blur-sm p-4 rounded-2xl border border-pink-100 shadow-sm animate-slide-down">
-                    <input class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.name" placeholder="Nombre completo" />
-                    <input class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.phone" placeholder="Teléfono" />
-                    <input class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.address" placeholder="Dirección" />
-                    <textarea class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.deliveryInstructions" placeholder="Instrucciones de entrega (Clienta)" rows="2"></textarea>
-                    <select class="input-coquette text-xs py-1.5" [(ngModel)]="editClientData.type">
+                    <input class="input-coquette" [(ngModel)]="editClientData.name" placeholder="Nombre completo" />
+                    <input class="input-coquette" [(ngModel)]="editClientData.phone" placeholder="Teléfono" />
+                    <textarea class="input-coquette" [(ngModel)]="editClientData.address" placeholder="Dirección" rows="2"
+                              appGoogleAutocomplete (placeChanged)="onAddressSelected($event)"></textarea>
+                    <textarea class="input-coquette" [(ngModel)]="editClientData.alternativeAddress" placeholder="Dirección Alternativa" rows="2"
+                              appGoogleAutocomplete (placeChanged)="onAltAddressSelected($event)"></textarea>
+                    <textarea class="input-coquette" [(ngModel)]="editClientData.deliveryInstructions" placeholder="Instrucciones de entrega (Clienta)" rows="2"></textarea>
+                    <select class="input-coquette" [(ngModel)]="editClientData.type">
                       <option value="Nueva">Nueva</option>
                       <option value="Frecuente">Frecuente</option>
                     </select>
@@ -297,14 +301,24 @@ import { SignalRService } from '../../../core/services/signalr.service';
               </div>
             </div>
 
-            <!-- Delivery Instructions (Order Specific) -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
-                <h4 class="text-xs font-black text-pink-600 mb-2 uppercase tracking-widest flex items-center gap-2">📍 Instrucciones de Entrega (Este Pedido)</h4>
-                <textarea class="input-coquette text-xs py-2 w-full" 
-                          [(ngModel)]="selectedOrder()!.deliveryInstructions" 
-                          placeholder="Instrucciones específicas para este pedido..."
-                          rows="2"
-                          (change)="updateOrderInstructions()"></textarea>
+            <!-- Delivery Instructions & Alternative Address -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm space-y-4">
+                <div>
+                  <h4 class="text-xs font-black text-pink-600 mb-2 uppercase tracking-widest flex items-center gap-2">📍 Instrucciones de Entrega (Este Pedido)</h4>
+                  <textarea class="input-coquette text-xs py-2 w-full" 
+                            [(ngModel)]="selectedOrder()!.deliveryInstructions" 
+                            placeholder="Instrucciones específicas para este pedido..."
+                            rows="2"
+                            (change)="updateOrderInstructions()"></textarea>
+                </div>
+
+                <div>
+                  <h4 class="text-xs font-black text-pink-600 mb-2 uppercase tracking-widest flex items-center gap-2">🏠 Dirección Alternativa</h4>
+                  <input class="input-coquette text-xs py-2 w-full" 
+                            [(ngModel)]="selectedOrder()!.alternativeAddress" 
+                            placeholder="Ej. Casa de su mamá / Oficina..."
+                            (change)="updateOrderInstructions()">
+                </div>
             </div>
 
             <!-- Shipping Cost Editor -->
@@ -580,7 +594,7 @@ export class OrdersComponent implements OnInit {
 
   // Quick Client Edit
   showClientEdit = signal(false);
-  editClientData = { name: '', phone: '', address: '', type: 'Nueva', deliveryInstructions: '' };
+  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '' };
 
   // Logistics
   packages = signal<OrderPackageDto[]>([]);
@@ -774,18 +788,29 @@ export class OrdersComponent implements OnInit {
     }
   }
 
-  toggleClientEdit(): void {
+  toggleClientEdit() {
     if (!this.showClientEdit()) {
-      const o = this.selectedOrder()!;
-      this.editClientData = {
-        name: o.clientName,
-        phone: o.clientPhone || '',
-        address: o.clientAddress || '',
-        type: o.type || 'Nueva',
-        deliveryInstructions: o.deliveryInstructions || ''
-      };
+      const ord = this.selectedOrder();
+      if (ord) {
+        this.editClientData = {
+          name: ord.clientName || '',
+          phone: ord.clientPhone || '',
+          address: ord.clientAddress || '',
+          alternativeAddress: ord.alternativeAddress || '',
+          deliveryInstructions: ord.deliveryInstructions || '',
+          type: ord.type || 'Nueva'
+        };
+      }
     }
     this.showClientEdit.update(v => !v);
+  }
+
+  onAddressSelected(address: string) {
+    this.editClientData.address = address;
+  }
+
+  onAltAddressSelected(address: string) {
+    this.editClientData.alternativeAddress = address;
   }
 
   saveQuickClientEdit(): void {
@@ -796,6 +821,7 @@ export class OrdersComponent implements OnInit {
       clientName: this.editClientData.name,
       clientPhone: this.editClientData.phone,
       clientAddress: this.editClientData.address,
+      alternativeAddress: this.editClientData.alternativeAddress,
       type: this.editClientData.type,
       deliveryInstructions: this.editClientData.deliveryInstructions
     }).subscribe({
@@ -1283,10 +1309,11 @@ export class OrdersComponent implements OnInit {
     if (!order) return;
     this.api.updateOrderDetails(order.id, {
       deliveryInstructions: order.deliveryInstructions,
+      alternativeAddress: order.alternativeAddress,
       clientName: order.clientName
     }).subscribe({
-      next: () => this.toast.success('Instrucciones guardadas ✨'),
-      error: () => this.toast.error('Error al guardar instrucciones')
+      next: () => this.toast.success('Cambios guardados ✨'),
+      error: () => this.toast.error('Error al guardar cambios')
     });
   }
 }

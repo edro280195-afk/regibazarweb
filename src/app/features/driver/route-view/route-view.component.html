@@ -131,7 +131,7 @@
                         </span>
                         <h2 class="text-3xl font-black leading-none mb-1 uppercase tracking-tight truncate">{{ d.clientName }}</h2>
                         <div class="flex items-center text-white/40 text-sm">
-                            <span class="truncate block w-full">{{ d.address || d.clientAddress }}</span>
+                            <span class="truncate block w-full">{{ d.alternativeAddress || d.address || d.clientAddress }}</span>
                         </div>
                     </div>
                     @if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {

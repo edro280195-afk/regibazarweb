@@ -136,6 +136,7 @@ export interface OrderSummaryDto {
     tags?: string[];
     deliveryInstructions?: string;
     discountAmount?: number;
+    alternativeAddress?: string;
 }
 
 export interface PagedResult<T> {
@@ -302,6 +303,7 @@ export interface RouteDeliveryDto {
     deliveryInstructions?: string;
     items?: OrderItemDto[];
     arrivedAt?: string;
+    alternativeAddress?: string;
 }
 
 export interface DriverExpenseDto {
@@ -408,6 +410,7 @@ export interface ManualOrderRequest {
     postponedNote?: string;
     status?: string;
     deliveryInstructions?: string;
+    alternativeAddress?: string;
 }
 
 export interface LoginRequest {
@@ -472,6 +475,7 @@ export interface UpdateOrderDetailsRequest {
     advancePayment?: number;
     salesPeriodId?: number;
     deliveryInstructions?: string;
+    alternativeAddress?: string;
 }
 
 export interface CreateAdminExpenseRequest {
@@ -497,6 +501,7 @@ export interface OrderPackageDto {
     createdAt: string;
     loadedAt?: string;
     deliveredAt?: string;
+    returnedAt?: string;
 }
 
 export interface GeneratePackagesRequest {

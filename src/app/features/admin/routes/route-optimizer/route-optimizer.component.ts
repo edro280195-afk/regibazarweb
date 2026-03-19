@@ -138,7 +138,7 @@ export class RouteOptimizerComponent implements OnInit {
         // 1. Geocode all addresses
         const geocoded: GeocodedOrder[] = await Promise.all(
             this.orders.map(async (o) => {
-                const address = o.clientAddress?.trim();
+                const address = (o.alternativeAddress || o.clientAddress)?.trim();
                 if (!address || address.length < 5) {
                     return { ...o, _geocoded: false, _geocodeError: 'Sin dirección' } as GeocodedOrder;
                 }
