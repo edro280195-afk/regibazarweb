@@ -435,6 +435,8 @@ export interface AddPaymentRequest {
     method: string;
     registeredBy?: string;
     notes?: string;
+    /** Fecha real del pago (ISO string). Si no se manda, la API usa la fecha actual. */
+    paymentDate?: string;
 }
 
 export interface CreateSupplierRequest {

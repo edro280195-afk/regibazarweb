@@ -38,7 +38,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
         <div class="flex flex-wrap gap-3 items-end">
           <div class="flex-1 min-w-[200px]">
             <label class="label-coquette">🔍 Buscar</label>
-            <input class="input-coquette" placeholder="Nombre de clienta..." [(ngModel)]="search" (input)="loadOrders()" />
+            <input class="input-coquette" placeholder="Clienta, artículo o #123..." [(ngModel)]="search" (input)="loadOrders()" />
           </div>
           <div>
             <label class="label-coquette">📋 Estado</label>
@@ -152,6 +152,24 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                       <div class="h-full rounded-full transition-all duration-700 ease-out"
                            [style.width]="getPaymentPercent(order) + '%'"
                            [class]="getPaymentPercent(order) >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-300 shadow-sm shadow-emerald-200' : 'bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 shadow-sm shadow-pink-200'"></div>
+                    </div>
+                  }
+
+                  @if (search && getMatchingItems(order).length > 0) {
+                    <div class="mt-3 pt-2 border-t border-pink-100/40">
+                      <p class="text-[9px] font-black text-pink-400 uppercase tracking-wider mb-1.5">🎯 Artículos encontrados</p>
+                      <div class="flex flex-wrap gap-1">
+                        @for (item of getMatchingItems(order).slice(0, 3); track item.id) {
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-50 to-orange-50 text-orange-700 border border-orange-200/60 shadow-sm">
+                            🛍️ {{ item.productName }}
+                          </span>
+                        }
+                        @if (getMatchingItems(order).length > 3) {
+                          <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-pink-50 text-pink-500 border border-pink-200/60">
+                            +{{ getMatchingItems(order).length - 3 }} más
+                          </span>
+                        }
+                      </div>
                     </div>
                   }
                 </div>
@@ -460,7 +478,12 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                   <input type="number" class="input-coquette w-full py-2.5 pl-11 pr-3 font-bold text-pink-800 bg-white/80 border-pink-200/50 focus:border-pink-400 focus:ring-pink-100" 
                          [(ngModel)]="paymentAmount" placeholder="Ej. 150" min="1" step="0.5">
                 </div>
+                <div class="relative">
+                  <input type="date" class="input-coquette py-2.5 px-3 text-sm text-pink-800 bg-white/80 border-pink-200/50 focus:border-pink-400" 
+                         [(ngModel)]="paymentDate" title="Fecha real del pago">
+                </div>
               </div>
+              <p class="text-[9px] text-pink-400 mt-1">📅 Cambia la fecha si el pago fue en otro día</p>
               
               <div class="grid grid-cols-3 gap-2 mt-3">
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
@@ -486,7 +509,10 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                   <p class="text-[9px] font-black text-pink-400 uppercase tracking-widest">💕 Historial de Pagos</p>
                   @for (p of selectedOrder()!.payments; track p.id) {
                     <div class="flex justify-between items-center text-sm bg-white/50 rounded-xl px-3 py-1.5">
-                      <span class="text-pink-700 font-medium">{{ p.method }} <span class="text-pink-400 text-xs">({{ p.date | date:'shortDate' }})</span></span>
+                      <div class="flex flex-col">
+                        <span class="text-pink-700 font-medium">{{ p.method }}</span>
+                        <span class="text-pink-400 text-[10px]">📅 {{ p.date | date:'dd MMM yyyy' }}</span>
+                      </div>
                       <span class="font-black text-pink-800">{{ p.amount | currency:'MXN':'symbol-narrow' }}</span>
                     </div>
                   }
@@ -582,6 +608,15 @@ export class OrdersComponent implements OnInit {
 
   paymentAmount = 0;
   paymentMethod = 'Efectivo';
+  paymentDate = '';  // Fecha real del pago (YYYY-MM-DD)
+
+  /** Retorna la fecha de hoy como string YYYY-MM-DD en hora local */
+  private getTodayLocal(): string {
+    const now = new Date();
+    return now.getFullYear() + '-'
+      + String(now.getMonth() + 1).padStart(2, '0') + '-'
+      + String(now.getDate()).padStart(2, '0');
+  }
 
   // Drawer State
   drawerOpen = signal(false);
@@ -665,6 +700,13 @@ export class OrdersComponent implements OnInit {
     return Math.min(100, (order.amountPaid / order.total) * 100);
   }
 
+  /** Devuelve los artículos del pedido que coinciden con el término de búsqueda actual */
+  getMatchingItems(order: OrderSummaryDto): typeof order.items {
+    if (!this.search || !order.items?.length) return [];
+    const term = this.search.toLowerCase().trim();
+    return order.items.filter(i => i.productName.toLowerCase().includes(term));
+  }
+
   updateStatus(id: number, status: string): void {
     // Status Morph Animation Start
     const badge = document.querySelector(`.status-badge[data-id="${id}"]`);
@@ -700,6 +742,7 @@ export class OrdersComponent implements OnInit {
     this.reloadSelectedOrder();
     this.loadPackages(order.id);
     this.paymentAmount = 0;
+    this.paymentDate = this.getTodayLocal(); // Pre-llenar con hoy
     this.drawerOpen.set(true);
     this.resetNewItemForm();
     // Lock body scroll for mobile
@@ -934,14 +977,28 @@ export class OrdersComponent implements OnInit {
   addPayment(): void {
     const order = this.selectedOrder();
     if (!order || !this.paymentAmount) return;
+
+    // Convertir la fecha local YYYY-MM-DD a ISO UTC para la API.
+    // Si está vacía usamos undefined y la API aplica DateTime.UtcNow.
+    let paymentDateIso: string | undefined;
+    if (this.paymentDate) {
+      // Al parsear 'YYYY-MM-DD' JS lo trata como UTC; sumamos el offset local
+      // para que la fecha sea la del día seleccionado en México.
+      const [y, m, d] = this.paymentDate.split('-').map(Number);
+      const local = new Date(y, m - 1, d, 12, 0, 0); // mediodía local
+      paymentDateIso = local.toISOString();
+    }
+
     this.api.addPayment(order.id, {
       amount: this.paymentAmount,
       method: this.paymentMethod,
-      registeredBy: 'Admin'
+      registeredBy: 'Admin',
+      paymentDate: paymentDateIso
     }).subscribe({
       next: () => {
         this.toast.success('Pago registrado 💰');
         this.paymentAmount = 0;
+        this.paymentDate = this.getTodayLocal(); // Resetear a hoy
         this.reloadSelectedOrder();
         this.loadOrders();
       },

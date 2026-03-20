@@ -524,21 +524,31 @@ interface GeocodedOrder extends OrderSummaryDto {
                           </div>
 
                           @if (editingOrderId() === order.id) {
-                            <div class="mt-2 flex gap-2 animate-fade-in" (click)="$event.stopPropagation()">
-                              <input [id]="'addr-input-' + order.id" type="text" [(ngModel)]="tempAddress" 
-                                     placeholder="Busca la dirección..."
-                                     class="flex-1 px-3 py-1.5 text-xs rounded-xl border border-pink-200 focus:ring-2 focus:ring-pink-500 outline-none shadow-inner" />
-                              <button class="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[10px] font-bold shadow-sm"
-                                      [disabled]="isSavingAddress()" (click)="saveAddress(order)">
-                                {{ isSavingAddress() ? '⏳' : '✅' }}
-                              </button>
-                              <button class="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-400 text-[10px] font-bold" (click)="cancelEditAddress()">✕</button>
+                            <div class="mt-2 flex flex-col gap-2 animate-fade-in" (click)="$event.stopPropagation()">
+                              <div class="flex gap-2">
+                                <input [id]="'addr-input-' + order.id" type="text" [(ngModel)]="tempAddress" 
+                                       placeholder="Busca la dirección..."
+                                       class="flex-1 px-3 py-1.5 text-xs rounded-xl border border-pink-200 focus:ring-2 focus:ring-pink-500 outline-none shadow-inner bg-white" />
+                                <button class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white text-[10px] font-bold shadow-sm flex items-center gap-1 transition-all"
+                                        [disabled]="isSavingAddress()" (click)="saveAddress(order)">
+                                  {{ isSavingAddress() ? '⏳' : '✅ Guardar' }}
+                                </button>
+                                <button class="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 text-[10px] font-bold transition-all" (click)="cancelEditAddress()">✕</button>
+                              </div>
+                              <div class="relative w-full h-[180px] rounded-xl overflow-hidden shadow-inner border border-pink-100 bg-gray-50">
+                                <div [id]="'addr-map-' + order.id" class="absolute inset-0"></div>
+                                <div class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md text-[9px] font-bold text-pink-600 border border-pink-100 flex items-center gap-1.5 pointer-events-none">
+                                  <span>📍</span> Haz clic en el mapa para ajustar el pin
+                                </div>
+                              </div>
                             </div>
                           } @else {
                             @if (order.clientAddress) {
-                              <p class="text-xs text-gray-400 truncate mt-0.5 flex justify-between group/addr">
-                                <span>📍 {{ order.alternativeAddress || order.clientAddress }}</span>
-                                <button (click)="startEditAddress(order)" class="text-[10px] text-pink-400 opacity-0 group-hover/addr:opacity-100 font-bold hover:underline transition-opacity">Editar</button>
+                              <p class="text-[11px] text-gray-500 font-medium truncate mt-0.5 flex items-center justify-between group/addr">
+                                <span class="truncate">📍 {{ order.alternativeAddress || order.clientAddress }}</span>
+                                <button (click)="startEditAddress(order)" class="shrink-0 ml-2 px-2 py-1 rounded bg-pink-50 text-pink-500 text-[10px] font-bold hover:bg-pink-100 transition-colors flex items-center gap-1">
+                                  ✏️ Editar
+                                </button>
                               </p>
                             } @else {
                               <div class="flex items-center justify-between mt-0.5">
@@ -837,6 +847,8 @@ export class RoutesComponent implements OnInit {
   editingOrderId = signal<number | null>(null);
   tempAddress = '';
   isSavingAddress = signal(false);
+  addrPreviewMap: google.maps.Map | null = null;
+  addrPreviewMarker: google.maps.Marker | null = null;
 
   // AI Voice Selection
   isListeningVoice = signal(false);
@@ -1004,31 +1016,116 @@ export class RoutesComponent implements OnInit {
   // ─── INLINE ADDRESS EDITING ───
   startEditAddress(order: any): void {
     this.editingOrderId.set(order.id);
-    this.tempAddress = order.clientAddress || '';
+    this.tempAddress = order.alternativeAddress || order.clientAddress || '';
 
-    // Initialize Autocomplete after a short delay to ensure the input is in DOM
     setTimeout(() => {
       const input = document.getElementById(`addr-input-${order.id}`) as HTMLInputElement;
-      if (input) {
-        const autocomplete = new google.maps.places.Autocomplete(input, {
-          componentRestrictions: { country: 'mx' },
-          fields: ['formatted_address', 'geometry'],
-          types: ['address']
-        });
+      const mapContainer = document.getElementById(`addr-map-${order.id}`) as HTMLElement;
 
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (place.formatted_address) {
-            this.tempAddress = place.formatted_address;
+      if (!input || !mapContainer || typeof google === 'undefined') return;
+
+      // 1. Init Mini Map
+      this.addrPreviewMap = new google.maps.Map(mapContainer, {
+        center: { lat: GEO_CONFIG.defaultLat, lng: GEO_CONFIG.defaultLng },
+        zoom: 14,
+        disableDefaultUI: true,
+        zoomControl: true,
+        gestureHandling: 'greedy'
+      });
+
+      // Marker con estilo de la app
+      this.addrPreviewMarker = new google.maps.Marker({
+        map: this.addrPreviewMap,
+        draggable: true,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#ec4899', // pink-500
+          fillOpacity: 1,
+          strokeWeight: 2,
+          strokeColor: '#ffffff'
+        }
+      });
+
+      // 2. Geocode initial address if it exists
+      if (this.tempAddress) {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: this.tempAddress + `, ${GEO_CONFIG.city}, ${GEO_CONFIG.state}` }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            const loc = results[0].geometry.location;
+            this.addrPreviewMap?.setCenter(loc);
+            this.addrPreviewMap?.setZoom(16);
+            this.addrPreviewMarker?.setPosition(loc);
           }
         });
       }
-    }, 100);
+
+      // 3. Init Autocomplete
+      const autocomplete = new google.maps.places.Autocomplete(input, {
+        componentRestrictions: { country: 'mx' },
+        fields: ['formatted_address', 'geometry', 'name'],
+        types: ['address']
+      });
+
+      // Binding: Autocomplete -> Map
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.formatted_address) {
+          this.tempAddress = place.formatted_address;
+        } else if (place.name) {
+          this.tempAddress = place.name;
+        }
+
+        if (place.geometry && place.geometry.location) {
+          this.addrPreviewMap?.panTo(place.geometry.location);
+          this.addrPreviewMap?.setZoom(17);
+          this.addrPreviewMarker?.setPosition(place.geometry.location);
+        }
+      });
+
+      // Binding: Map Click -> Reverse Geocode -> Input
+      const geocoder = new google.maps.Geocoder();
+      this.addrPreviewMap.addListener('click', (event: google.maps.MapMouseEvent) => {
+        if (!event.latLng) return;
+        
+        // Move pin instantly
+        this.addrPreviewMarker?.setPosition(event.latLng);
+        this.addrPreviewMap?.panTo(event.latLng);
+
+        // Reverse geocode
+        geocoder.geocode({ location: event.latLng }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            // Usa force update de Angular zone
+            this.tempAddress = results[0].formatted_address;
+            input.value = this.tempAddress;
+            // Despacha evento input para que ngModel se entere si quedó desincronizado
+            input.dispatchEvent(new Event('input'));
+          } else {
+            this.toast.error('No se pudo obtener la dirección de ese punto');
+          }
+        });
+      });
+
+      // Drag marker binding
+      this.addrPreviewMarker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+        if (!event.latLng) return;
+        geocoder.geocode({ location: event.latLng }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            this.tempAddress = results[0].formatted_address;
+            input.value = this.tempAddress;
+            input.dispatchEvent(new Event('input'));
+          }
+        });
+      });
+
+    }, 150);
   }
 
   cancelEditAddress(): void {
     this.editingOrderId.set(null);
     this.tempAddress = '';
+    this.addrPreviewMap = null;
+    this.addrPreviewMarker = null;
   }
 
   saveAddress(order: any): void {
