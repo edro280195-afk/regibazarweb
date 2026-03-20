@@ -11,6 +11,9 @@ import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPay
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
 
+// Base del backend (sin /api) para construir URLs absolutas de imágenes
+const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
+
 // ─── CONFIG ────────────────────────────────────────────────────
 const GEO_CONFIG = {
   googleApiKey: environment.googleMapsApiKey || '',
@@ -201,6 +204,25 @@ interface GeocodedOrder extends OrderSummaryDto {
         </div>
       </div>
 
+      <!-- ═══ FILTRO DE RUTAS + AUTO-REFRESH ═══ -->
+      <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 animate-slide-up" style="animation-delay:200ms">
+        <div class="flex flex-wrap gap-2">
+          <button class="px-3 py-1.5 rounded-xl text-xs font-black border transition-all"
+                  [class]="routeStatusFilter()==='All' ? 'bg-pink-500 text-white border-pink-500 shadow-md' : 'bg-white/70 text-gray-500 border-gray-100 hover:border-pink-200'"
+                  (click)="routeStatusFilter.set('All')">Todas</button>
+          <button class="px-3 py-1.5 rounded-xl text-xs font-black border transition-all"
+                  [class]="routeStatusFilter()==='Active' ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-white/70 text-gray-500 border-gray-100 hover:border-blue-200'"
+                  (click)="routeStatusFilter.set('Active')">En Camino ({{ routesByStatus('Active') }})</button>
+          <button class="px-3 py-1.5 rounded-xl text-xs font-black border transition-all"
+                  [class]="routeStatusFilter()==='Pending' ? 'bg-amber-400 text-white border-amber-400 shadow-md' : 'bg-white/70 text-gray-500 border-gray-100 hover:border-amber-200'"
+                  (click)="routeStatusFilter.set('Pending')">Pendientes ({{ routesByStatus('Pending') }})</button>
+          <button class="px-3 py-1.5 rounded-xl text-xs font-black border transition-all"
+                  [class]="routeStatusFilter()==='Completed' ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white/70 text-gray-500 border-gray-100 hover:border-emerald-200'"
+                  (click)="routeStatusFilter.set('Completed')">Finalizadas ({{ routesByStatus('Completed') }})</button>
+        </div>
+        <span class="text-[10px] text-pink-300 font-mono">⟳ Actualizado {{ refreshAgo() || 'ahora' }}</span>
+      </div>
+
       <!-- ═══ LOADING ═══ -->
       @if (loading()) {
         <div class="relative z-10 space-y-4">
@@ -260,7 +282,7 @@ interface GeocodedOrder extends OrderSummaryDto {
 
         <!-- ═══ ROUTE CARDS ═══ -->
         <div class="relative z-10 space-y-5">
-          @for (route of routes(); track route.id; let i = $index) {
+          @for (route of filteredRoutes(); track route.id; let i = $index) {
             <div class="group bg-white/80 backdrop-blur-xl rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden hover:shadow-[0_15px_40px_rgb(244,114,182,0.12)] transition-all duration-300 animate-slide-up"
                  [style.animation-delay]="(i * 70) + 'ms'">
 
@@ -376,6 +398,19 @@ interface GeocodedOrder extends OrderSummaryDto {
                           @if (d.arrivedAt && d.status === 'Delivered' && d.deliveredAt) {
                             <p class="text-[10px] text-emerald-500 font-bold">🚪 {{ getDoorTimeMinutes(d) }} min en puerta</p>
                           }
+                          @if (d.notes) {
+                            <p class="text-[10px] text-gray-400 italic mt-0.5">💬 {{ d.notes }}</p>
+                          }
+                          @if (d.evidenceUrls && d.evidenceUrls.length > 0) {
+                            <div class="flex gap-1 mt-1 flex-wrap">
+                              @for (url of d.evidenceUrls; track url) {
+                                <img [src]="resolveImageUrl(url)" alt="Evidencia"
+                                     class="w-10 h-10 rounded-lg object-cover border border-emerald-200 cursor-pointer hover:scale-110 transition-transform shadow-sm"
+                                     (click)="$event.stopPropagation(); lightboxUrl.set(resolveImageUrl(url))"
+                                     title="Ver foto de evidencia" />
+                              }
+                            </div>
+                          }
                         </div>
                         <div class="text-right shrink-0 flex items-center gap-2">
                           <div class="flex flex-col items-end">
@@ -426,6 +461,58 @@ interface GeocodedOrder extends OrderSummaryDto {
                       @for (d of getFailedDeliveries(route); track d.deliveryId) {
                         <p class="text-xs text-red-600"><strong>{{ d.clientName }}:</strong> {{ d.failureReason }}</p>
                       }
+                    </div>
+                  }
+
+                  <!-- ═══ RESUMEN POST-RUTA (solo cuando Completed) ═══ -->
+                  @if (route.status === 'Completed') {
+                    <div class="mx-4 mb-4 mt-2 rounded-2xl bg-gradient-to-br from-slate-50 to-pink-50 border border-pink-100 overflow-hidden animate-fade-in-down">
+                      <div class="px-4 pt-4 pb-2 border-b border-pink-100/60">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-2">
+                            <span class="text-lg">📋</span>
+                            <span class="text-sm font-black text-pink-900">Resumen de Ruta</span>
+                          </div>
+                          <div class="flex gap-3 text-[10px] font-mono text-pink-400">
+                            <span>⏱ {{ getRouteDuration(route) }}</span>
+                            <span>✅ {{ getDelivered(route) }}/{{ route.deliveries.length }}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Timeline de eventos -->
+                      <div class="px-4 py-3 space-y-2.5 max-h-64 overflow-y-auto">
+                        @for (ev of getRouteSummaryEvents(route); track $index) {
+                          <div class="flex gap-2.5 items-start">
+                            <span class="text-sm shrink-0 mt-0.5">{{ ev.emoji }}</span>
+                            <div class="flex-1 min-w-0">
+                              <p class="text-[11px] font-semibold text-gray-700 leading-tight">{{ ev.text }}</p>
+                              @if (ev.time) {
+                                <p class="text-[9px] text-gray-400 font-mono mt-0.5">{{ ev.time | date:'h:mm a' }}</p>
+                              }
+                            </div>
+                          </div>
+                        }
+                        @if (getRouteSummaryEvents(route).length === 0) {
+                          <p class="text-xs text-pink-300 italic text-center py-2">Sin eventos registrados</p>
+                        }
+                      </div>
+
+                      <!-- Totales -->
+                      <div class="px-4 pb-4 pt-2 border-t border-pink-100/60 flex gap-3 flex-wrap">
+                        <div class="flex-1 bg-white rounded-xl p-2.5 border border-emerald-100 text-center">
+                          <p class="text-[9px] font-black uppercase tracking-wider text-emerald-400">Cobrado</p>
+                          <p class="text-base font-black text-emerald-600">{{ getRouteTotals(route).cobrado | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                        </div>
+                        <div class="flex-1 bg-white rounded-xl p-2.5 border border-amber-100 text-center">
+                          <p class="text-[9px] font-black uppercase tracking-wider text-amber-400">Gastos</p>
+                          <p class="text-base font-black text-amber-600">{{ getRouteTotals(route).gastos | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                        </div>
+                        <div class="flex-1 bg-white rounded-xl p-2.5 border border-pink-100 text-center">
+                          <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Neto</p>
+                          <p class="text-base font-black text-pink-600">{{ getRouteTotals(route).neto | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                        </div>
+                      </div>
                     </div>
                   }
                 </div>
@@ -715,6 +802,18 @@ interface GeocodedOrder extends OrderSummaryDto {
           </div>
         </div>
       }
+
+      <!-- ═══ LIGHTBOX DE EVIDENCIA ═══ -->
+      @if (lightboxUrl()) {
+        <div class="fixed inset-0 z-[9000] bg-black/90 flex items-center justify-center p-4 animate-fade-in"
+             (click)="lightboxUrl.set(null)">
+          <img [src]="lightboxUrl()!" alt="Evidencia de entrega"
+               class="max-w-full max-h-full rounded-2xl shadow-2xl border-2 border-white/20 object-contain animate-scale-in" />
+          <button class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-xl flex items-center justify-center hover:bg-white/20 transition-all"
+                  (click)="lightboxUrl.set(null)">✕</button>
+          <p class="absolute bottom-4 text-white/50 text-xs font-mono">Toca en cualquier lugar para cerrar</p>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -803,7 +902,7 @@ interface GeocodedOrder extends OrderSummaryDto {
     }
   `]
 })
-export class RoutesComponent implements OnInit {
+export class RoutesComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private signalr = inject(SignalRService);
@@ -814,6 +913,23 @@ export class RoutesComponent implements OnInit {
   scrollY = signal(0);
   latestEvent = signal<string>('');
   collapsedRadar = signal(true);
+
+  // ─── FILTRO DE RUTAS ───
+  routeStatusFilter = signal<string>('All');
+  filteredRoutes = computed(() => {
+    const f = this.routeStatusFilter();
+    if (f === 'All') return this.routes();
+    return this.routes().filter(r => r.status === f);
+  });
+
+  // ─── AUTO-REFRESH ───
+  private refreshInterval: any = null;
+  private counterInterval: any = null;
+  lastRefreshedAt = signal<Date>(new Date());
+  refreshAgo = signal<string>('');
+
+  // ─── LIGHTBOX DE FOTOS ───
+  lightboxUrl = signal<string | null>(null);
 
   // ─── GOD MODE MAP STATE ───
   private godModeMapInitialized = false;
@@ -865,8 +981,8 @@ export class RoutesComponent implements OnInit {
   filteredPendingOrders = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     if (!query) return this.pendingOrders();
-    return this.pendingOrders().filter(o => 
-      o.clientName.toLowerCase().includes(query) || 
+    return this.pendingOrders().filter(o =>
+      o.clientName.toLowerCase().includes(query) ||
       (o.id.toString() === query) ||
       (o.clientPhone && o.clientPhone.includes(query))
     );
@@ -921,7 +1037,7 @@ export class RoutesComponent implements OnInit {
   liquidating = signal(false);
 
   // Route Briefing (C.A.M.I.)
-  routeBriefing = signal<{text: string, audioBase64?: string} | null>(null);
+  routeBriefing = signal<{ text: string, audioBase64?: string } | null>(null);
   loadingBriefing = signal<number | null>(null);
   private briefingAudio = new Audio();
 
@@ -935,6 +1051,259 @@ export class RoutesComponent implements OnInit {
     this.loadRoutes();
     this.initSignalR();
     this.initPush();
+    this.startAutoRefresh();
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshInterval) clearInterval(this.refreshInterval);
+    if (this.counterInterval) clearInterval(this.counterInterval);
+  }
+
+  private startAutoRefresh(): void {
+    // Refresca cada 45s solo si hay rutas activas
+    this.refreshInterval = setInterval(() => {
+      if (this.routes().some(r => r.status === 'Active')) {
+        this.loadRoutes();
+      }
+    }, 45_000);
+
+    // Contador visual "hace X seg/min"
+    this.counterInterval = setInterval(() => {
+      const diff = Math.floor((Date.now() - this.lastRefreshedAt().getTime()) / 1000);
+      if (diff < 60) {
+        this.refreshAgo.set(`hace ${diff}s`);
+      } else {
+        this.refreshAgo.set(`hace ${Math.floor(diff / 60)}min`);
+      }
+    }, 5_000);
+  }
+
+  // ─── ZONE-BASED VOICE COMMAND ───
+  // Colonias de Nuevo Laredo por zona. Editar según las zonas reales del negocio.
+  private readonly ZONES: Record<string, string[]> = {
+
+    // ─────────────────────────────────────────────────────────────────
+    // PONIENTE — Al oeste del Blvd. Josefa Ortiz de Domínguez
+    // Zona de crecimiento urbano moderno, fraccionamientos nuevos,
+    // industria y colonias populares del suroeste.
+    // ─────────────────────────────────────────────────────────────────
+    poniente: [
+      'el campanario', 'campanario',
+      'los toboganes', 'toboganes',
+      'los fresnos', 'ciruelos',
+      'francisco villa', 'villa gonzalez', 'francisco villa gonzalez',
+      '1ro de mayo', '1° de mayo', 'primero de mayo',
+      'blanca navidad',
+      // Las Torres / Blvd. Las Torres
+      'las torres', 'torres',
+      'longoria', 'hacienda longoria', 'hacienda j. longoria', 'hacienda j longoria',
+      'los virreyes', 'virreyes', 'fracc los virreyes',
+      'altavista',
+      'c.n.o.p', 'c.n.o.p.',
+      'buenavista', 'buena vista',
+      'nueva era',
+      'unión del recuerdo', 'union del recuerdo',
+      'los álamos', 'los alamos',
+      'las torres',
+      'la fe',
+      // Colonias clásicas poniente
+      'azteca',
+      'del maestro',
+      'los pinos', 'pinos',
+      'morelos',
+      'moctezuma',
+      'popular',
+      'bugambilias',
+      'campestre',
+      'bellavista', 'bella vista',
+      'primavera',
+      'pedregal',
+
+      // Voluntad y Trabajo / Arturo Cortez
+      'voluntad y trabajo', 'voluntad',
+      'arturo cortez villada', 'arturo cortes villada',
+      'nuevo amanecer', 'amanecer',
+
+      // Cuauhtémoc y Satélite
+      'cuauhtémoc', 'cuauhtemoc',
+      'satélite', 'satelite',
+      'ampliación cuauhtémoc', 'ampliacion cuauhtemoc',
+
+      // Zona industrial / FINSA
+      'industrial', 'ciudad industrial', 'cd industrial',
+      'finsa',
+      'central de carga',
+      'santiago m beldén', 'santiago m. belden', 'santiago belden',
+      'vicente mendoza',
+
+      // Jardines
+      'jardines del sur', 'jardines',
+      'jardín juvencia', 'jardin juvencia',
+
+      // Miguel Alemán
+      'miguel alemán', 'miguel aleman',
+
+      // Lomas (poniente)
+      'lomas del popo',
+      'lomas del pte', 'lomas del poniente',
+      'lomas del rey',
+      'lomas del río', 'lomas del rio',
+      'lomas del rosario',
+      'fracc las lomas', 'las lomas',
+
+      // Solidaridad / Maclovio / Daniel Hernández
+      'solidaridad', 'solidaridad 1', 'solidaridad 2',
+      'maclovio herrera', 'maclovio',
+      'daniel hernández isais', 'daniel hernandez isais',
+      'lic. daniel hernández', 'lic daniel hernandez',
+
+      // Las Alazanas (poniente, no confundir con arroyo Las Alazanas al oriente)
+      'fovissste las alazanas', 'las alazanas', 'alazanas',
+      'fracc las alazanas',
+
+      // Colosio / Américo Villarreal
+      'luis donaldo colosio', 'colosio',
+      'américo villarreal guerra', 'americo villarreal',
+      'unidad nacional',
+      '20 de noviembre',
+
+      // Fraccionamientos nuevos poniente (sureste/suroeste Blvd. Colosio)
+      'las cumbres', 'cumbres',
+      'guerreros del sol',
+      'los arcos', 'arcos',
+      'pavorreales',
+      'villas de san francisco',
+      'villas del progreso',
+      'villas de la fe',
+      'nueva españa', 'nueva espana',
+      'colinas del sur',
+      'los presidentes', 'presidentes',
+      'valles del paraíso', 'valles del paraiso',
+      'villas de san miguel',
+      'villas del sol',
+      'vista hermosa',
+
+      // Otros poniente
+      'la joya',
+      'sistema merlín', 'sistema merlin',
+      'colorines', 'los colorines',
+      'el caracol', 'caracol',
+      'peña benavides', 'pena benavides',
+      'san andrés', 'san andres',
+      'los garza',
+      'granjas treviño', 'granjas trevino',
+      'granjas económicas', 'granjas economicas',
+      'ampl granjas', 'ampliación granjas', 'ampliacion granjas',
+      'alianza para la producción', 'alianza para la produccion',
+      'loma bonita',
+      'el capulin', 'capulín',
+      'los encinos', 'encinos',
+      'claudette',
+      'ayuntamiento 77',
+    ],
+
+    // ─────────────────────────────────────────────────────────────────
+    // ORIENTE — Al este del Blvd. Josefa Ortiz de Domínguez
+    // Centro histórico, colonias junto al Río Bravo, zona norte
+    // y colonias tradicionales de la ciudad.
+    // ─────────────────────────────────────────────────────────────────
+    oriente: [
+      // Centro
+      'centro', 'nuevo laredo centro',
+      'postal',
+
+      // Colonias históricas oriente
+      'independencia',
+      'victoria', 'la victoria',
+      'guerrero',
+      'obrera',
+      'hidalgo',
+      'mirador',              // ← divisoria, se clasifica como oriente
+      'zaragoza',
+      'ojo caliente',
+      'matamoros',
+      'mier y terán', 'mier y teran',
+      'madero',
+      'reforma', 'reforma urbana',
+
+      // Zona norte (junto al Río Bravo)
+      'viveros', 'viveros ii',
+      'ribera de bravo', 'ribera del bravo', 'ribera',
+      'río bravo', 'rio bravo',
+      'el remolino', 'remolino',
+      'el caporal', 'caporal',
+      'el nogal', 'nogal',
+      'buenos aires',
+      'bertha de avellano', 'bertha del avellano',
+
+      // Jardín / Doctores / Niños Héroes
+      'jardín', 'jardin',
+      'doctores',
+      'niños héroes', 'niños heroes', 'ninos heroes',
+      'apolo',
+
+      // Benito Juárez
+      'benito juárez', 'benito juarez',
+      'benito juarez fovissste',
+      'juárez', 'juarez',
+
+      // Del Valle / Longoria / Virreyes
+      'del valle',
+      'moderna',
+      'balcones',
+      'tamaulipas',
+
+      // Ferrocarrilera / Patios
+      'ferrocarrilera', 'ferrocarrilera i', 'ferrocarrilera ii',
+      'ferrocarril',
+      'patios del ffcc', 'patios ffcc',
+      'electricistas suterm', 'suterm ii',
+
+      // Anáhuac
+      'anáhuac', 'anahuac',
+      'anáhuac sur', 'anahuac sur',
+      // Lázaro Cárdenas / Alianza
+      'lázaro cárdenas', 'lazaro cardenas',
+      'alianza',
+
+      // Roma / Naciones / Concordia
+      'roma', 'roma ii',
+      'naciones unidas',
+      'concordia', 'ampl concordia', 'ampliación concordia', 'ampliacion concordia',
+      'la concordia', 'ejido la concordia',
+      'villas de la concordia',
+      'constitucional', 'constitucionalista',
+
+      // Otros oriente
+      'lucio blanco',
+      'emiliano zapata',
+      'san rafael',
+      'san josé', 'san jose',
+      'herreras',
+      'burócratas', 'burocrata',
+      'la paz',
+      'rosita',
+      'palacios',
+      'militar', 'cuartel militar',
+      'junta federal', 'junta federal de mejoras',
+      'enrique cárdenas', 'enrique cardenas gonzalez',
+      'fracc america', 'america', 'america 11',
+    ],
+  };
+
+  detectZoneFromCommand(command: string): string | null {
+    const lower = command.toLowerCase();
+    if (lower.includes('poniente') || lower.includes('oeste') || lower.includes('occidente')) return 'poniente';
+    if (lower.includes('oriente') || lower.includes('este') || lower.includes('centro')) return 'oriente';
+    return null;
+  }
+
+  filterOrdersByZone(orders: OrderSummaryDto[], zone: string): OrderSummaryDto[] {
+    const keywords = this.ZONES[zone] || [];
+    return orders.filter(o => {
+      const addr = ((o.clientAddress || '') + ' ' + (o.alternativeAddress || '')).toLowerCase();
+      return keywords.some(kw => addr.includes(kw));
+    });
   }
 
   loadRouteBriefing(routeId: number): void {
@@ -947,7 +1316,7 @@ export class RoutesComponent implements OnInit {
         this.loadingBriefing.set(null);
         if (res.audioBase64) {
           this.briefingAudio.src = `data:audio/mp3;base64,${res.audioBase64}`;
-          this.briefingAudio.play().catch(() => {});
+          this.briefingAudio.play().catch(() => { });
         }
       },
       error: () => { this.loadingBriefing.set(null); }
@@ -1087,7 +1456,7 @@ export class RoutesComponent implements OnInit {
       const geocoder = new google.maps.Geocoder();
       this.addrPreviewMap.addListener('click', (event: google.maps.MapMouseEvent) => {
         if (!event.latLng) return;
-        
+
         // Move pin instantly
         this.addrPreviewMarker?.setPosition(event.latLng);
         this.addrPreviewMap?.panTo(event.latLng);
@@ -1203,6 +1572,8 @@ export class RoutesComponent implements OnInit {
         r.sort((a, b) => b.id - a.id);
         this.routes.set(r);
         this.loading.set(false);
+        this.lastRefreshedAt.set(new Date());
+        this.refreshAgo.set('ahora');
         // Phase 38: Initialize God Mode Map after DOM is rendered
         if (r.length > 0) {
           setTimeout(() => this.initGodModeMap(), 300);
@@ -1286,7 +1657,7 @@ export class RoutesComponent implements OnInit {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    
+
     recognition.lang = 'es-MX';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -1328,6 +1699,22 @@ export class RoutesComponent implements OnInit {
       return;
     }
 
+    // Detección de zona antes de enviar a C.A.M.I.
+    const zone = this.detectZoneFromCommand(command);
+    if (zone) {
+      const zoneOrders = this.filterOrdersByZone(orders, zone);
+      if (zoneOrders.length === 0) {
+        this.toast.warning(`No encontré pedidos en zona ${zone}. Revisa que las direcciones estén capturadas.`);
+        return;
+      }
+      const response = {
+        selectedOrderIds: zoneOrders.map(o => o.id),
+        aiConfirmationMessage: `Encontré ${zoneOrders.length} pedidos en la zona ${zone} ✨`
+      } as any;
+      this.runOrchestrationSequence(response);
+      return;
+    }
+
     this.isProcessingVoice.set(true);
 
     this.api.getAiRouteSelection(command, orders).subscribe({
@@ -1352,7 +1739,7 @@ export class RoutesComponent implements OnInit {
   private async runOrchestrationSequence(response: AiRouteSelectionResponse) {
     this.isOrchestrating.set(true);
     this.orchestrationFeed.set(["🛰️ Iniciando sistema de orquestación...", "🧠 CAMI analizando coincidencias..."]);
-    
+
     // 1. Reproducir audio si existe
     if (response.audioBase64) {
       const audio = new Audio(`data:audio/mp3;base64,${response.audioBase64}`);
@@ -1366,7 +1753,7 @@ export class RoutesComponent implements OnInit {
 
       this.activeOrchestrationId.set(id);
       this.orchestrationFeed.update(f => [`📍 Localizando a ${order.clientName}...`, ...f.slice(0, 4)]);
-      
+
       // Simular tiempo de "búsqueda" y animación
       await new Promise(r => setTimeout(r, 1200));
 
@@ -1387,7 +1774,7 @@ export class RoutesComponent implements OnInit {
     await new Promise(r => setTimeout(r, 1000));
     this.orchestrationFeed.update(f => ["✅ Orquestación completada con éxito", ...f]);
     this.toast.success(`🤖 ${response.aiConfirmationMessage}`);
-    
+
     setTimeout(() => {
       this.isOrchestrating.set(false);
       this.activeOrchestrationId.set(null);
@@ -1840,6 +2227,56 @@ export class RoutesComponent implements OnInit {
       }, 100);
 
     } catch (e) { }
+  }
+
+  // ─── IMAGEN URL HELPER ───
+  // Si el backend devuelve una ruta relativa (/uploads/...) la convierte a absoluta
+  resolveImageUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+
+  // ─── ROUTE TOTALS (para resumen post-ruta) ───
+  getRouteTotals(route: RouteDto): { cobrado: number; gastos: number; neto: number } {
+    let cobrado = 0;
+    route.deliveries.forEach(d => {
+      if (d.payments?.length) d.payments.forEach(p => cobrado += p.amount);
+      else if (d.status === 'Delivered') cobrado += d.amountPaid || 0;
+    });
+    const gastos = route.expenses?.reduce((s, e) => s + e.amount, 0) || 0;
+    return { cobrado, gastos, neto: cobrado - gastos };
+  }
+
+  // ─── ROUTE SUMMARY (post-completada) ───
+  getRouteDuration(route: RouteDto): string {
+    if (!route.startedAt) return '—';
+    const last = [...route.deliveries].filter(d => d.deliveredAt || d.status === 'NotDelivered').sort((a, b) =>
+      new Date(b.deliveredAt || '').getTime() - new Date(a.deliveredAt || '').getTime()
+    )[0];
+    const end = last?.deliveredAt ? new Date(last.deliveredAt) : new Date();
+    const diffMin = Math.round((end.getTime() - new Date(route.startedAt).getTime()) / 60_000);
+    if (diffMin < 60) return `${diffMin} min`;
+    return `${Math.floor(diffMin / 60)}h ${diffMin % 60}min`;
+  }
+
+  getRouteSummaryEvents(route: RouteDto): { emoji: string; text: string; time?: string; color: string }[] {
+    const events: { emoji: string; text: string; time?: string; color: string }[] = [];
+    const sorted = [...route.deliveries].sort((a, b) => a.sortOrder - b.sortOrder);
+    for (const d of sorted) {
+      if (d.status === 'Delivered') {
+        const method = d.payments?.length ? d.payments.map(p => `${p.method} $${p.amount}`).join(', ') : d.paymentMethod || '—';
+        events.push({ emoji: '✅', text: `${d.clientName} — $${d.total.toLocaleString('es-MX')} (${method})${d.notes ? ' · ' + d.notes : ''}`, time: d.deliveredAt, color: 'emerald' });
+      } else if (d.status === 'NotDelivered') {
+        events.push({ emoji: '❌', text: `${d.clientName} — No entregado: ${d.failureReason || 'Sin motivo'}`, time: d.deliveredAt, color: 'red' });
+      }
+    }
+    if (route.expenses?.length) {
+      for (const e of route.expenses) {
+        events.push({ emoji: '💸', text: `Gasto ${e.expenseType}: $${e.amount}${e.notes ? ' · ' + e.notes : ''}`, time: e.date, color: 'amber' });
+      }
+    }
+    return events;
   }
 
   getDoorTimeMinutes(d: RouteDeliveryDto): number {

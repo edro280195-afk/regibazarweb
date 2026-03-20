@@ -39,7 +39,16 @@
       "Read(//mnt/c/**)",
       "Read(//c/Users/admin//**)",
       "Read(//proc/**)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(dir \"C:\\\\Codigos\\\\regibazar-web\\\\src\\\\app\\\\features\\\\admin\")",
+      "Bash(dir \"C:\\\\Codigos\")",
+      "Bash(npx ng:*)",
+      "Bash(cmd /c \"npx ng build --configuration development 2>&1\")",
+      "Bash(powershell -Command \"Set-Location 'C:\\\\Codigos\\\\regibazar-web'; npx ng build --configuration development 2>&1 | Select-Object -Last 40\")",
+      "Bash(grep -r \"EntregasApi\\\\|api/Services\\\\|Controllers\" /c/Codigos/regibazar-web --include=*.ts --include=*.md --include=*.json)",
+      "Bash(dotnet restore:*)",
+      "Bash(powershell -Command \"cd 'C:\\\\Codigos\\\\api\\\\EntregasApi'; dotnet restore; dotnet build 2>&1 | Select-Object -Last 25\")",
+      "Bash(cmd /c \"cd /d C:\\\\Codigos\\\\api\\\\EntregasApi && dotnet restore 2>&1 && dotnet build 2>&1\")"
     ]
   }
 }

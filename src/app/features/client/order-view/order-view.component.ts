@@ -8,8 +8,11 @@ import { ToastService } from '../../../core/services/toast.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { OrderSummaryDto, OrderStatus, ORDER_STATUS_LABELS, ORDER_STATUS_EMOJI } from '../../../core/models';
+import { environment } from '../../../../environments/environment';
 import confetti from 'canvas-confetti';
 import gsap from 'gsap';
+
+const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
 
 
 @Component({
@@ -482,6 +485,23 @@ import gsap from 'gsap';
           </div>
 
 
+          <!-- ═══ FOTO DE EVIDENCIA (cuando entregado) ═══ -->
+          @if (o.status === 'Delivered' && o['evidenceUrls']?.length > 0) {
+            <div class="bg-white/80 backdrop-blur-xl rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgb(0,0,0,0.04)] border border-emerald-100 animate-fade-in-up" style="animation-delay: 350ms">
+              <h3 class="text-sm font-black text-emerald-700 mb-3 flex items-center gap-2">
+                📸 Foto de tu entrega
+              </h3>
+              <div class="grid grid-cols-2 gap-2">
+                @for (url of o['evidenceUrls']; track url) {
+                  <img [src]="resolveImageUrl(url)" alt="Foto de entrega"
+                       class="w-full aspect-square object-cover rounded-2xl border border-emerald-100 shadow-sm"
+                       (click)="evidenceLightbox.set(resolveImageUrl(url))" />
+                }
+              </div>
+              <p class="text-[10px] text-emerald-500 font-medium text-center mt-2">Evidencia de entrega capturada por el repartidor ✨</p>
+            </div>
+          }
+
           <!-- Gamification: VIP Reveal (Only when delivered) -->
           @if (o.status === 'Delivered' && (o.type === 'Frecuente' || o.type === 'VIP')) {
             <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgba(216,180,254,0.4)] border border-purple-200/50 animate-fade-in-up transition-all duration-500" style="animation-delay: 400ms">
@@ -637,6 +657,17 @@ import gsap from 'gsap';
         </div>
       }
 
+      <!-- Lightbox de foto de evidencia -->
+      @if (evidenceLightbox()) {
+        <div class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+             (click)="evidenceLightbox.set(null)">
+          <img [src]="evidenceLightbox()!" alt="Foto de entrega"
+               class="max-w-full max-h-full rounded-3xl shadow-2xl object-contain border-2 border-white/10" />
+          <button class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white text-xl flex items-center justify-center"
+                  (click)="evidenceLightbox.set(null)">✕</button>
+        </div>
+      }
+
       <!-- WhatsApp FAB (Z-30) -->
       @if (order() && isUnboxed()) {
         <a href="https://wa.me/?text=Hola,%20tengo%20una%20duda%20sobre%20mi%20pedido%20de%20Regi%20Bazar%20%E2%9C%A8" 
@@ -751,6 +782,14 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   toastVisible = signal(false);
   toastMessage = signal('');
   private toastTimeout: any;
+
+  evidenceLightbox = signal<string | null>(null);
+
+  resolveImageUrl(url: string): string {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
 
   // Timeline State
   timelineSteps = signal<{ label: string, date: Date | null, done: boolean, active: boolean, icon: string }[]>([]);
