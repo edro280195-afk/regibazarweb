@@ -347,7 +347,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-pink-400 font-bold">$</span>
-                <input type="number" class="input-coquette py-1.5 px-2 text-sm w-20 text-center" 
+                <input type="number" class="input-coquette py-1.5 px-2 text-sm w-24 text-center" 
                        [ngModel]="selectedOrder()!.shippingCost" 
                        #shippingCostInput>
                 <button class="btn-coquette btn-pink px-3 py-1.5 text-xs shadow-md hover:shadow-lg transition-all"
@@ -382,7 +382,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                     <div class="flex items-center justify-between relative z-10 bg-pink-50/30 p-2 rounded-xl">
                       <div class="flex items-center bg-white rounded-xl border border-pink-100/50 shadow-sm hover:shadow-md transition-shadow">
                         <button class="w-8 h-8 text-pink-500 hover:bg-pink-100 rounded-l-xl font-black transition-colors flex justify-center items-center active:bg-pink-200" (click)="updateItemQty(item.id, item.quantity - 1, item.productName, item.unitPrice)">−</button>
-                        <span class="w-8 h-full font-black text-pink-900 flex justify-center items-center text-sm border-x border-pink-50 bg-pink-50/30">{{ item.quantity }}</span>
+                        <span class="w-10 h-full font-black text-pink-900 flex justify-center items-center text-sm border-x border-pink-50 bg-pink-50/30">{{ item.quantity }}</span>
                         <button class="w-8 h-8 text-pink-500 hover:bg-pink-100 rounded-r-xl font-black transition-colors flex justify-center items-center active:bg-pink-200" (click)="updateItemQty(item.id, item.quantity + 1, item.productName, item.unitPrice)">+</button>
                       </div>
                       
@@ -390,7 +390,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                         <div class="flex items-center justify-end gap-1 mb-0.5">
                           <input type="number" [(ngModel)]="item.unitPrice" step="0.5"
                                  (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
-                                 class="w-16 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-white transition-all text-[10px] text-pink-500 font-bold text-right outline-none ring-0 p-0 m-0">
+                                 class="w-20 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-white transition-all text-xs text-pink-500 font-bold text-right outline-none ring-0 p-0 m-0">
                           <span class="text-[10px] text-pink-400 font-medium">c/u</span>
                         </div>
                         <p class="font-black text-pink-700 text-base leading-none">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</p>
@@ -404,13 +404,13 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                   <p class="text-xs font-black text-pink-500 mb-3 flex items-center gap-1">✨ Agregar artículo</p>
                   <div class="flex flex-col gap-2">
                     <input type="text" class="input-coquette py-2 text-sm" placeholder="Nombre completo del producto" [(ngModel)]="newItemName">
-                    <div class="flex gap-2">
-                      <div class="flex-1 relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-400 font-bold">$</span>
-                        <input type="number" class="input-coquette py-2 pl-10 pr-2 text-sm w-full" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
+                    <div class="grid grid-cols-[1fr_70px_60px] gap-2 items-center">
+                      <div class="relative min-w-0">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-pink-400 font-bold">$</span>
+                        <input type="number" class="input-coquette py-2 pl-8 pr-2 text-sm w-full" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
                       </div>
-                      <input type="number" class="input-coquette py-2 px-3 text-sm w-20 text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
-                      <button class="btn-coquette btn-pink px-4 shadow-md hover:shadow-lg transition-all" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">OK</button>
+                      <input type="number" class="input-coquette py-2 px-1 text-sm w-full text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
+                      <button class="btn-coquette btn-pink px-0 text-center shadow-md hover:shadow-lg transition-all" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">OK</button>
                     </div>
                   </div>
                 </div>

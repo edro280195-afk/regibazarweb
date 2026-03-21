@@ -428,7 +428,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     const pin = this.pinnedProduct();
     if (pin) {
       // Fill client name into input so user can type variant, then Enter to add
-      this.turboInput.set(client.name + ' ');
+      this.turboInput.set(client.name + ', ');
       this.showTurboSuggestions.set(false);
     } else {
       const input = this.turboInput().trim();
@@ -460,18 +460,16 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
           isExisting = true;
         }
       } else {
-        // No comma: try to match existing client
-        const matched = this.findBestClientMatch(input);
+        // No comma: take whole input as client name
+        clientName = this.capitalizeWords(input);
+        const matched = this.findBestClientMatch(clientName, true); // Strict match
         if (matched) {
           clientName = matched.name;
-          variant = input.substring(matched.name.length).trim();
           isExisting = true;
         } else {
-          // No match and no comma: take whole input as client name
-          clientName = this.capitalizeWords(input);
-          variant = '';
           isExisting = false;
         }
+        variant = '';
       }
 
       const productName = variant ? `${pin.name} ${variant}` : pin.name;
@@ -488,12 +486,16 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     setTimeout(() => (document.querySelector('.turbo-input') as HTMLInputElement)?.focus(), 50);
   }
 
-  private findBestClientMatch(input: string): ClientDto | null {
+  private findBestClientMatch(input: string, exactOnly = false): ClientDto | null {
     const n = input.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const sorted = [...this.clients()].sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
     for (const c of sorted) {
       const cn = c.name?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') || '';
-      if (n.startsWith(cn + ' ') || n === cn) return c;
+      if (exactOnly) {
+        if (n === cn) return c;
+      } else {
+        if (n.startsWith(cn + ' ') || n === cn) return c;
+      }
     }
     return null;
   }

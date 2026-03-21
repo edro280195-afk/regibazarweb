@@ -24,6 +24,9 @@ export class SignalRService {
     adminChatUpdate$ = new Subject<any>();
     clientChatUpdate$ = new Subject<any>();
 
+    // Feature #9 — CAMI greeting for client on InTransit
+    camiGreeting$ = new Subject<{ message: string; audioBase64?: string }>();
+
     async connect(): Promise<void> {
         if (this.connection?.state === signalR.HubConnectionState.Connected) return;
         if (this.connectionPromise) return this.connectionPromise;
@@ -53,6 +56,10 @@ export class SignalRService {
         this.connection.on('ExpenseAdded', (data: any) => this.expenseAdded$.next(data));
         this.connection.on('OrderConfirmed', (data: any) => this.deliveryUpdate$.next({ ...data, type: 'Confirmed' }));
         this.connection.on('RouteUpdated', () => this.routeUpdated$.next());
+        // Feature #9 — CAMI greeting pushed when driver marks InTransit
+        this.connection.on('CamiGreeting', (data: { message: string; audioBase64?: string }) => {
+            this.camiGreeting$.next(data);
+        });
 
         this.connectionPromise = this.connection.start()
             .then(() => { this.connectionPromise = null; })

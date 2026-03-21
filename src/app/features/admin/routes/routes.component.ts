@@ -527,7 +527,7 @@ interface GeocodedOrder extends OrderSummaryDto {
            ═══════════════════════════════════════════════════ -->
       @if (showCreateModal()) {
         <div class="fixed inset-0 z-[3000] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" (click)="showCreateModal.set(false)">
-          <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in shadow-2xl" (click)="$event.stopPropagation()">
+          <div class="bg-white w-full max-w-xl rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in shadow-2xl" (click)="$event.stopPropagation()">
 
             <div class="px-6 pt-6 pb-4 border-b border-pink-50">
               <div class="flex items-center justify-between">
@@ -615,7 +615,7 @@ interface GeocodedOrder extends OrderSummaryDto {
                               <div class="flex gap-2">
                                 <input [id]="'addr-input-' + order.id" type="text" [(ngModel)]="tempAddress" 
                                        placeholder="Busca la dirección..."
-                                       class="flex-1 px-3 py-1.5 text-xs rounded-xl border border-pink-200 focus:ring-2 focus:ring-pink-500 outline-none shadow-inner bg-white" />
+                                       class="flex-1 px-3 py-1.5 text-sm rounded-xl border border-pink-200 focus:ring-2 focus:ring-pink-500 outline-none shadow-inner bg-white" />
                                 <button class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white text-[10px] font-bold shadow-sm flex items-center gap-1 transition-all"
                                         [disabled]="isSavingAddress()" (click)="saveAddress(order)">
                                   {{ isSavingAddress() ? '⏳' : '✅ Guardar' }}

@@ -12,6 +12,7 @@ import { environment } from '../../../../environments/environment';
 import confetti from 'canvas-confetti';
 import gsap from 'gsap';
 
+
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
 
 
@@ -104,7 +105,7 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
         @if (order(); as o) {
           
           <!-- Header -->
-          <div class="text-center mb-8 animate-slide-down">
+          <div id="view-header" class="text-center mb-8 animate-slide-down relative">
             <div class="text-5xl mb-2 animate-wiggle inline-block drop-shadow-[0_0_15px_rgba(244,114,182,0.5)]">🎀</div>
             <h1 class="text-2xl sm:text-3xl font-black text-pink-600 tracking-tight font-display drop-shadow-sm">
               {{ greeting() }}, {{ o.clientName }}! 💖
@@ -118,565 +119,441 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
                 Aquí está el detalle de tu compra ✨
               }
             </p>
+            
+            <!-- RegiPuntos (Gamification) -->
+            <div class="mt-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-100 to-pink-100 px-4 py-1.5 rounded-full border border-pink-200 shadow-sm animate-fade-in-up group cursor-pointer hover:scale-105 transition-transform" title="¡Gana más puntos compartiendo tu foto!">
+              <span class="text-lg animate-pulse-slow">💎</span>
+              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} Puntos VIP</span>
+            </div>
           </div>
 
-          @if (!isLoadingCami() && camiMessage()) {
-            <div class="relative bg-white/80 backdrop-blur-2xl rounded-3xl p-5 mb-6 shadow-[0_10px_30px_rgba(244,114,182,0.15)] border border-pink-100 overflow-hidden animate-fade-in-up" style="animation-delay: 200ms">
-              <div class="absolute -right-10 -top-10 w-32 h-32 bg-gradient-to-br from-pink-300 to-purple-300 rounded-full blur-3xl opacity-30 animate-pulse-slow"></div>
-              
-              <div class="flex gap-4 items-start relative z-10">
-                <div class="relative shrink-0">
-                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-100 to-rose-100 border-2 border-white shadow-sm flex items-center justify-center text-2xl">
-                    👩🏻‍💻
-                  </div>
-                  <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full"></div>
-                </div>
-
-                <div class="flex-1">
-                  <div class="flex justify-between items-center mb-1">
-                    <h4 class="font-black text-pink-900 text-sm">C.A.M.I.</h4>
-                    <span class="text-[9px] font-bold text-pink-400 uppercase tracking-widest bg-pink-50 px-2 py-0.5 rounded-full">Asistente Virtual</span>
-                  </div>
-                  
-                  <p class="text-sm text-pink-800/90 font-medium leading-snug mb-3">
-                    "{{ camiMessage() }}"
-                  </p>
-
-                  @if (camiAudioUrl()) {
-                    <button (click)="playCamiAudio()" 
-                            class="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md active:scale-95 transition-all hover:shadow-lg w-full justify-center">
-                      @if (isPlayingCami()) {
-                        <div class="flex gap-1 items-center h-4">
-                          <div class="w-1 bg-white h-full animate-pulse"></div>
-                          <div class="w-1 bg-white h-2/3 animate-pulse" style="animation-delay: 0.1s"></div>
-                          <div class="w-1 bg-white h-full animate-pulse" style="animation-delay: 0.2s"></div>
-                          <div class="w-1 bg-white h-1/2 animate-pulse" style="animation-delay: 0.3s"></div>
-                        </div>
-                        <span>Escuchando...</span>
-                      } @else {
-                        <span class="text-base">▶️</span> Escuchar Mensaje
-                      }
-                    </button>
-                  }
+          <!-- Smart Dashboard Top Bar (Sticky) -->
+          <div id="balance-summary" class="sticky top-2 z-30 px-2 -mx-2 mb-6" [style.opacity]="isUnboxed() ? 1 : 0">
+            <div class="bg-white/95 backdrop-blur-2xl rounded-3xl p-3 shadow-md border border-pink-100 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-pink-100 flex items-center justify-center text-xl">💰</div>
+                <div>
+                  <p class="text-[9px] text-pink-500 font-black uppercase tracking-widest leading-none mb-1">Balance</p>
+                  <p class="text-xl font-black font-display text-pink-900 leading-none Irish Grover">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</p>
                 </div>
               </div>
+              @if (activeTab() !== 'payment' && (o.balanceDue > 0)) {
+                <button (click)="activeTab.set('payment')" class="bg-pink-500 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg">Pagar ✨</button>
+              }
             </div>
-          }
-          <!-- Live Tracking Gamified Map (TOP PRIORITY) -->
-          @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.deliveriesAhead === 0 && (o.clientLatitude || clientCoords()?.lat)) {
-             <div class="mb-6 rounded-[2.5rem] overflow-hidden border-4 border-white shadow-[0_20px_50px_rgba(236,72,153,0.3)] relative h-[420px] bg-gray-100 animate-fade-in-up" style="animation-delay: 50ms">
-               <!-- Map Container -->
-               <div id="client-live-map" class="absolute inset-0 z-0"></div>
-               
-               <!-- Smart Floating Header (Glassmorphism) -->
-               <div class="absolute top-4 inset-x-4 z-10 flex flex-col gap-2">
-                 <!-- Arrival Status Pill -->
-                 <div class="bg-blue-600/90 backdrop-blur-md text-white px-4 py-2.5 rounded-full font-bold text-xs shadow-lg flex items-center justify-center gap-2 animate-bounce-subtle border border-white/20">
-                    <div class="w-1.5 h-1.5 bg-white rounded-full animate-ping"></div>
-                    ¡TU PEDIDO ESTÁ LLEGANDO!
-                 </div>
+          </div>
 
-                 <!-- ETA Pill -->
-                 <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-3 shadow-xl border border-pink-100 flex items-center justify-between transition-all hover:scale-[1.02]">
-                   <div class="flex items-center gap-3">
-                     <div class="text-2xl animate-pulse">⏳</div>
-                     <div class="text-left">
-                       <p class="text-[9px] text-pink-500 font-black uppercase tracking-widest leading-none mb-1">Llega en aprox.</p>
-                       @if (etaText()) {
-                         <p class="text-xl font-black font-display text-pink-900 leading-none">{{ etaText() }}</p>
-                       } @else {
-                         <p class="text-lg font-black font-display text-gray-400 leading-none Irish Grover">Calculando...</p>
-                       }
-                     </div>
-                   </div>
-                   
-                   <!-- Custom Zoom Controls -->
-                   <div class="flex gap-1">
-                     <button (click)="mapZoom(1)" class="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-pink-600 font-black text-lg shadow-sm border border-pink-100 active:scale-90 transition-transform">+</button>
-                     <button (click)="mapZoom(-1)" class="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-pink-600 font-black text-lg shadow-sm border border-pink-100 active:scale-90 transition-transform">-</button>
-                   </div>
-                 </div>
-               </div>
-             </div>
-          }
+          <!-- Quick Action Tabs -->
+          <div id="nav-tabs" class="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-[2rem] mb-6 border border-white sticky top-24 z-20" [style.opacity]="isUnboxed() ? 1 : 0">
+            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'status' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('status')">
+              <span class="text-xl">🏠</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Estado</span>
+            </button>
+            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'payment' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('payment')">
+              <span class="text-xl">💸</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Pagar</span>
+            </button>
+            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'details' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('details')">
+              <span class="text-xl">🛍️</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Pedido</span>
+            </button>
+          </div>
 
-          <!-- Queue Alert & Progress (If InRoute/InTransit) -->
-          @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.queuePosition && o.totalDeliveries) {
-            <div class="bg-blue-50/80 backdrop-blur-xl rounded-3xl p-5 mb-6 shadow-[0_8px_30px_rgb(59,130,246,0.1)] border border-blue-100 text-center animate-fade-in-up" style="animation-delay: 100ms">
-              @if ((o.deliveriesAhead ?? 0) === 0) {
-                <div class="text-4xl mb-2 animate-bounce">🚗💨</div>
-                <div class="text-lg font-black text-blue-600 mb-1">¡Eres la siguiente!</div>
-                <p class="text-sm text-blue-800/70 font-medium">El repartidor se dirige a tu ubicación.</p>
-              } @else {
-                <div class="text-5xl font-black text-blue-500 font-display leading-none mb-1">{{ o.deliveriesAhead }}</div>
-                <div class="text-sm font-bold text-blue-400 uppercase tracking-widest mb-3">Entregas Antes</div>
-                
-                <!-- Queue Visualizer -->
-                <div class="flex justify-center gap-1.5 mb-2 h-8 items-center">
-                  @for (i of getQueueDots(o); track $index) {
-                    <div class="rounded-full flex items-center justify-center font-black text-white text-[8px] transition-all"
-                         [ngClass]="{
-                           'w-4 h-4 bg-emerald-400': i.done,
-                           'w-5 h-5 bg-blue-500 animate-pulse': i.current,
-                           'w-7 h-7 bg-pink-500 border-2 border-white shadow-[0_0_10px_rgba(236,72,153,0.5)] z-10': i.you,
-                           'w-3 h-3 bg-gray-300': !i.done && !i.current && !i.you
-                         }">
-                      @if (i.you) { 💖 }
+          @if (activeTab() === 'status') {
+            <!-- ════════════ TAB: ESTADO ════════════ -->
+            <div class="animate-fade-in-up space-y-6">
+              
+              <!-- C.A.M.I. AI Greeting (Movida a Widget Flotante) -->
+
+              <!-- Map View (Only if InRoute) -->
+              @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.deliveriesAhead === 0 && (o.clientLatitude || clientCoords()?.lat)) {
+                <div class="rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl relative h-[420px] bg-gray-100 group">
+                  <div id="client-live-map" class="absolute inset-0 z-0"></div>
+                  <div class="absolute top-4 inset-x-4 z-10 flex flex-col gap-2">
+                    <div class="bg-blue-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full font-black text-[10px] text-center shadow-xl border border-white/20 animate-bounce-subtle tracking-[0.2em]">
+                       ¡TU PAQUETE ESTÁ LLEGANDO! 🚗💨
+                    </div>
+                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-3 shadow-xl border border-pink-50 flex items-center justify-between">
+                       <div class="flex items-center gap-3">
+                         <span class="text-2xl animate-pulse">⏳</span>
+                         <span class="text-lg font-black text-pink-950 font-display">Llega en {{ etaText() || '...' }}</span>
+                       </div>
+                       <div class="flex gap-1">
+                         <button (click)="mapZoom(1)" class="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 font-black shadow-sm">+</button>
+                         <button (click)="mapZoom(-1)" class="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 font-black shadow-sm">-</button>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- Queue Info -->
+              @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.queuePosition) {
+                <div id="queue-info" class="bg-blue-50/80 rounded-[2rem] p-6 border border-blue-100 text-center shadow-inner">
+                  <div class="text-5xl font-black text-blue-500 font-display mb-2">{{ o.deliveriesAhead }}</div>
+                  <p class="text-[10px] font-black uppercase text-blue-400 tracking-[0.2em] mb-4">Entregas antes que la tuya</p>
+                  <div class="flex justify-center gap-2 mb-4 h-8 items-center">
+                    @for (i of getQueueDots(o); track $index) {
+                      <div class="rounded-full transition-all duration-500"
+                           [ngClass]="{
+                             'w-4 h-4 bg-emerald-400': i.done,
+                             'w-5 h-5 bg-blue-500 animate-pulse': i.current,
+                             'w-10 h-10 bg-pink-500 border-4 border-white shadow-lg flex items-center justify-center text-xs': i.you,
+                             'w-3 h-3 bg-gray-200': !i.done && !i.current && !i.you
+                           }">
+                        @if(i.you){💖}
+                      </div>
+                    }
+                  </div>
+                  <p class="text-xs text-blue-800/60 font-medium">Eres la parada #{{ o.queuePosition }} de hoy 📍</p>
+                </div>
+              }
+
+              <!-- Main Status Text -->
+              <div class="p-5 rounded-[2rem] bg-gradient-to-br from-pink-50 to-white border border-pink-100 border-dashed text-center">
+                 <p class="text-sm font-bold text-pink-900 leading-relaxed">{{ getStatusDetailMessage(o.status, o.deliveriesAhead || 0) }}</p>
+              </div>
+
+              <!-- Tracking Timeline -->
+              <div id="tracking-timeline" class="bg-white/80 rounded-[2.5rem] p-8 shadow-sm border border-white/50">
+                <h3 class="text-xs font-black text-pink-300 uppercase tracking-[0.3em] mb-8 text-center">Historial del Pedido</h3>
+                <div class="space-y-6">
+                  @for (step of timelineSteps(); track $index) {
+                    <div class="flex gap-6 relative" [class.opacity-40]="!step.done && !step.active">
+                      <div class="flex flex-col items-center w-12">
+                        <div class="w-12 h-12 rounded-[1.2rem] flex items-center justify-center text-2xl bg-white border-2 transition-all duration-500 shadow-sm"
+                             [ngClass]="{
+                               'border-pink-300 bg-pink-50': step.done,
+                               'border-pink-600 bg-pink-50 scale-110 shadow-lg shadow-pink-100': step.active,
+                               'border-gray-100': !step.done && !step.active
+                             }">
+                          {{ step.icon }}
+                        </div>
+                        @if (!$last) {
+                          <div class="w-1 flex-grow bg-gray-100 rounded-full my-2" [class.bg-pink-300]="step.done"></div>
+                        }
+                      </div>
+                      <div class="flex-1 pt-1.5">
+                        <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                      </div>
                     </div>
                   }
                 </div>
-                <p class="text-xs text-blue-400/80 font-medium mb-3">Eres la parada #{{ o.queuePosition }} de {{ o.totalDeliveries }} en la ruta de hoy 📍</p>
-                
-                <!-- Driver Mini Profile -->
-                <div class="bg-white/90 rounded-2xl p-3 flex items-center gap-3 shadow-inner border border-blue-100 text-left">
-                  <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-xl shrink-0 border border-blue-200 shadow-sm animate-bounce-subtle">
-                    👨🏻‍✈️
-                  </div>
-                  <div>
-                    <h4 class="font-bold text-blue-900 text-sm leading-none">Repartidor en Camino</h4>
-                    <p class="text-[10px] text-blue-600 font-medium">Conduciendo seguro hacia ti 🚗💨</p>
-                  </div>
-                </div>
-              }
+              </div>
             </div>
           }
 
-          <!-- Status Alert Message -->
-          <div class="mt-2 p-3 rounded-2xl bg-white/50 border border-pink-100 border-dashed text-center text-sm font-medium text-pink-800 animate-fade-in-up" style="animation-delay: 50ms">
-            @if (order(); as o) {
-              {{ getStatusDetailMessage(o.status, o.deliveriesAhead || 0) }}
-            }
-          </div>
-
-          <!-- Delivery Countdown Card -->
-          @if (o.status !== 'Delivered' && o.status !== 'Canceled' && o.expiresAt) {
-            <div class="relative bg-gradient-to-br from-pink-500 to-rose-600 rounded-[2.5rem] p-6 mt-6 mb-2 shadow-[0_20px_40px_rgba(225,29,72,0.3)] border-4 border-white overflow-hidden animate-fade-in-up" style="animation-delay: 100ms">
-              <!-- Decorative elements -->
-              <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-              <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-pink-300/20 rounded-full blur-3xl"></div>
+          @if (activeTab() === 'payment') {
+            <!-- ════════════ TAB: PAGAR ════════════ -->
+            <div class="animate-fade-in-up space-y-6">
               
-              <div class="relative z-10 flex flex-col items-center text-center text-white">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-2xl animate-bounce-subtle">📅</span>
-                  <h3 class="text-[10px] font-black uppercase tracking-[0.2em] opacity-90">Día de tu Entrega</h3>
+              <!-- Financial Summary (Small Inline) -->
+              <div class="bg-white/90 rounded-[2.5rem] p-8 border border-pink-100/50 shadow-sm text-center">
+                <div class="flex justify-between items-end mb-2 max-w-[200px] mx-auto">
+                    <span class="font-black text-pink-950 uppercase text-[10px] tracking-widest">Saldo Restante</span>
+                    <span class="text-4xl font-black text-pink-600 font-display leading-none">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</span>
                 </div>
-                
-                <h2 class="text-2xl font-black font-display mb-1 drop-shadow-md">
-                  {{ o.scheduledDeliveryDate | date:'EEEE, d MMMM' | titlecase }} 🎀
-                </h2>
-                
-                <div class="w-full h-px bg-white/20 my-4"></div>
-                
-                <div class="flex flex-col items-center">
-                  <p class="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-2">Tiempo Restante</p>
-                  <div class="bg-white/15 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20 shadow-inner flex items-center gap-3">
-                    <span class="text-2xl animate-pulse">⏰</span>
-                    <span class="text-3xl font-black font-mono tracking-wider tabular-nums">
-                      {{ countdownText() || '--:--:--' }}
-                    </span>
-                  </div>
+              </div>
+
+              <!-- Pending Confirmation Card -->
+              @if (o.status === 'Pending') {
+                <div id="confirm-card" class="bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl group">
+                  <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡Confirma tu Pedido! 🎀</h3>
+                  <p class="text-[10px] font-medium opacity-80 mb-6">Toca el botón para empezar a prepararlo cuidando cada detalle.</p>
+                  <button id="confirm-btn" (click)="confirmOrder($event)" 
+                          class="w-full py-5 rounded-2xl bg-white text-pink-600 font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-all text-sm">
+                     ✨ SÍ, CONFIRMAR PEDIDO
+                  </button>
+                </div>
+              }
+              
+              <!-- Payment Methods -->
+              <div id="payment-methods" class="relative z-10">
+                <h3 class="text-center text-pink-900 font-black text-lg font-display mb-1">Formas de Pago 💸</h3>
+                <p class="text-center text-xs text-pink-700/70 font-medium mb-4">Elige cómo quieres pagar tu saldo restante</p>
+
+                <!-- Custom Tabs -->
+                <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white">
+                  <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                          (click)="paymentTab.set('cash')">💵 Efectivo</button>
+                  <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                          (click)="paymentTab.set('transfer')">🏦 Transfer</button>
+                  <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                          (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="min-h-[140px]">
+                  @switch (paymentTab()) {
+                    @case ('cash') {
+                      <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-5 border border-emerald-100 shadow-sm animate-fade-in text-center relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">💵</div>
+                        <div class="text-4xl mb-2 relative z-10">💵</div>
+                        <h4 class="font-bold text-emerald-900 text-sm relative z-10">Pago al Entregar</h4>
+                        <p class="text-xs text-emerald-700 mt-2 relative z-10">Por favor ten el monto exacto listo para agilizar tu entrega 💕</p>
+                      </div>
+                    }
+                    @case ('transfer') {
+                      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-5 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏦</div>
+                        <div class="flex items-center gap-3 mb-4 relative z-10">
+                          <div class="text-3xl">🏦</div>
+                          <div>
+                            <h4 class="font-bold text-blue-900 text-sm leading-tight">Transferencia</h4>
+                            <span class="text-xs font-bold text-blue-600 uppercase">Citibanamex</span>
+                          </div>
+                        </div>
+                        <div class="bg-white/60 rounded-xl p-3 border border-blue-200/50 mb-3 relative z-10">
+                          <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] text-blue-700/70 font-bold uppercase tracking-widest">Número de Tarjeta</span>
+                          </div>
+                          <div class="flex justify-between items-center">
+                            <span class="font-mono font-bold text-blue-900 tracking-wider text-sm">5256 7861 3758 3898</span>
+                            <button class="bg-blue-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all" (click)="copyText('5256786137583898')">COPIAR</button>
+                          </div>
+                        </div>
+                        <p class="text-[10px] text-blue-700/80 text-center font-bold">A nombre de: Yazmin Vara ✨</p>
+                      </div>
+                    }
+                    @case ('oxxo') {
+                      <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-3xl p-5 border border-red-100 shadow-sm animate-fade-in relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏪</div>
+                        <div class="flex items-center gap-3 mb-4 relative z-10">
+                          <div class="text-3xl">🏪</div>
+                          <div>
+                            <h4 class="font-bold text-red-900 text-sm leading-tight">Depósito OXXO</h4>
+                            <span class="text-xs font-bold text-red-600 uppercase">BBVA</span>
+                          </div>
+                        </div>
+                        <div class="bg-white/60 rounded-xl p-3 border border-red-200/50 relative z-10 mb-3">
+                          <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] text-red-700/70 font-bold uppercase tracking-widest">Número de Tarjeta</span>
+                          </div>
+                          <div class="flex justify-between items-center">
+                            <span class="font-mono font-bold text-red-900 tracking-wider text-sm">4152 3144 9667 1333</span>
+                            <button class="bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all" (click)="copyText('4152314496671333')">COPIAR</button>
+                          </div>
+                        </div>
+                        <p class="text-[10px] text-red-700/80 text-center font-bold">Envía foto del ticket a tu vendedora ✨</p>
+                      </div>
+                    }
+                  }
                 </div>
               </div>
             </div>
           }
 
-          <!-- Delivery Instructions (Editable for Client) -->
-          <div class="mt-4 p-4 rounded-3xl bg-white/80 backdrop-blur-xl border border-pink-100 shadow-sm animate-fade-in-up" style="animation-delay: 75ms">
-            <h4 class="text-xs font-black text-pink-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-              📍 Instrucciones de Entrega
-              @if (savingInstructions()) {
-                <span class="inline-block w-3 h-3 border-2 border-pink-300 border-t-pink-500 rounded-full animate-spin"></span>
-              }
-            </h4>
-            
-            @if (isEditingInstructions()) {
-              <div class="relative">
-                <textarea [(ngModel)]="localInstructions" 
-                          rows="3"
-                          class="w-full bg-pink-50/50 border-2 border-pink-200 rounded-2xl p-4 text-base focus:outline-none focus:border-pink-400 transition-all font-medium placeholder:text-pink-300"
-                          placeholder="Ej: Portón blanco, dejar con el guardia, timbre no sirve..."></textarea>
-                <div class="flex gap-2 mt-2">
-                  <button (click)="saveInstructions()" 
-                          [disabled]="savingInstructions()"
-                          class="flex-1 bg-pink-500 text-white font-bold py-2 rounded-xl text-xs shadow-md active:scale-95 transition-all disabled:opacity-50">
-                    Guardar ✨
-                  </button>
-                  <button (click)="isEditingInstructions.set(false)" 
-                          class="bg-gray-100 text-gray-500 font-bold py-2 px-4 rounded-xl text-xs active:scale-95 transition-all">
-                    Cancelar
-                  </button>
+          @if (activeTab() === 'details') {
+            <!-- ════════════ TAB: DETALLE ════════════ -->
+            <div class="animate-fade-in-up space-y-6">
+              
+              <!-- Ticket (Order Items) -->
+              <div id="ticket-content" class="bg-white/90 rounded-[2.5rem] p-8 border border-white shadow-sm relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-pink-50 rounded-full blur-3xl opacity-50"></div>
+                <h3 class="text-lg font-black text-pink-900 font-display mb-6 text-center">Tu Ticket 🧾</h3>
+                
+                <div class="space-y-4 mb-8">
+                  @for (item of o.items; track item.id) {
+                    <div class="flex justify-between items-center group order-item">
+                      <div class="flex flex-col">
+                        <span class="font-bold text-pink-950 text-sm leading-tight group-hover:text-pink-600 transition-colors">{{ item.productName }}</span>
+                        <span class="text-[10px] font-black text-pink-400 uppercase tracking-widest">x{{ item.quantity }}</span>
+                      </div>
+                      <span class="font-black text-pink-600">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
+                    </div>
+                  }
                 </div>
+
+                <div id="ticket-line" class="w-full border-t-2 border-dashed border-pink-100 my-6"></div>
+
+                <div id="ticket-totals" class="space-y-3">
+                  <div class="flex justify-between text-xs font-bold text-pink-800/60 uppercase tracking-widest">
+                    <span>Subtotal</span>
+                    <span>{{ o.subtotal | currency:'MXN':'symbol-narrow' }}</span>
+                  </div>
+                  @if (o.shippingCost > 0) {
+                    <div class="flex justify-between text-xs font-bold text-pink-800/60 uppercase tracking-widest">
+                      <span>Envío 🛵</span>
+                      <span>{{ o.shippingCost | currency:'MXN':'symbol-narrow' }}</span>
+                    </div>
+                  }
+                  <div class="flex justify-between text-xl font-black text-pink-950 pt-3 border-t border-pink-50">
+                    <span class="font-display">Total</span>
+                    <span class="font-display">{{ o.total | currency:'MXN':'symbol-narrow' }}</span>
+                  </div>
+                </div>
+
+
               </div>
-            } @else {
-              <div (click)="startEditingInstructions()" 
-                   class="group cursor-pointer min-h-[50px] flex flex-col justify-center">
-                @if (o.deliveryInstructions) {
-                  <p class="text-sm text-pink-900 font-medium leading-relaxed">{{ o.deliveryInstructions }}</p>
-                  <span class="text-[10px] text-pink-400 font-bold mt-1 group-hover:text-pink-500 transition-colors">Toca para editar ✏️</span>
+
+              <!-- Delivery Instructions -->
+              <div class="bg-white/90 rounded-[2rem] p-6 border border-pink-100 shadow-sm relative overflow-hidden group">
+                <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                  📍 Instrucciones
+                  @if (savingInstructions()) { <span class="w-2 h-2 bg-pink-400 rounded-full animate-ping"></span> }
+                </h4>
+                
+                @if (isEditingInstructions()) {
+                  <textarea [(ngModel)]="localInstructions" rows="3" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-sm focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
+                  <div class="flex gap-2 mt-3">
+                    <button (click)="saveInstructions()" class="flex-1 bg-pink-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg">Guardar✨</button>
+                    <button (click)="isEditingInstructions.set(false)" class="px-4 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest">Cerrar</button>
+                  </div>
                 } @else {
-                  <p class="text-sm text-pink-300 italic">No hay instrucciones. Toca para agregar señas particulares o referencias 💕</p>
+                  <div (click)="startEditingInstructions()" class="cursor-pointer min-h-[60px] flex flex-col justify-center">
+                    <p class="text-sm text-pink-900 font-medium italic">{{ o.deliveryInstructions || 'Toca para agregar referencias de tu domicilio 💕' }}</p>
+                    <span class="text-[9px] font-black text-pink-400 mt-2 uppercase tracking-widest group-hover:text-pink-600 transition-all">Editar Instrucciones ✏️</span>
+                  </div>
                 }
               </div>
-            }
-          </div>
 
-          <!-- Pending Confirmation Card -->
-          @if (o.status === 'Pending') {
-            <div id="confirm-card" class="bg-white/80 backdrop-blur-xl rounded-3xl p-6 mb-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/80 text-center animate-fade-in-up transform transition duration-500">
-              <div class="mx-auto w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mb-3 shadow-inner">
-                <span id="confirm-card-icon" class="text-3xl">✨</span>
+              <!-- Social Invite -->
+              <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2.5rem] p-8 text-white text-center shadow-xl relative overflow-hidden group">
+                <div class="absolute -right-10 -bottom-10 text-9xl opacity-10 group-hover:scale-125 transition-transform duration-1000">📸</div>
+                <h3 class="text-xl font-black font-display mb-2 drop-shadow-md">¡Presume tu estilo! 📸</h3>
+                <p class="text-[10px] font-bold opacity-80 mb-6 tracking-wide">Etiquétanos en tus historias de Facebook o IG al recibir tu pedido y gana <strong>RegiPuntos extra</strong> ✨</p>
+                <div class="flex justify-center gap-4 relative z-10">
+                  <a href="https://www.facebook.com/regi.bazar.852309" target="_blank" class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-xl hover:scale-110 transition-transform">f</a>
+                  <a href="https://www.instagram.com/" target="_blank" class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-xl hover:scale-110 transition-transform">IG</a>
+                </div>
               </div>
-              <h3 class="text-xl font-bold text-pink-900 mb-2 font-display">¡Tu pedido te espera!</h3>
-              <p class="text-sm text-pink-700/80 mb-5 px-2">Ya verificamos todo. Confirma aquí abajo para empezar a prepararlo cuidando cada detalle.</p>
+            </div>
+          }
+
+          <p class="text-center mt-12 mb-8 font-script text-rose-300 text-xl opacity-60">
+            Hecho con 🎀 para ti
+          </p>
+
+          <!-- Action Toast Notification -->
+          @if (toastVisible()) {
+            <div class="fixed bottom-6 left-0 right-0 z-[100] flex justify-center pointer-events-none">
+              <div class="animate-bounce-up-y-only pointer-events-auto">
+                <div class="bg-gray-900/90 backdrop-blur-md text-white text-sm font-medium px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30">
+                  <span class="text-xl">✨</span>
+                  <span class="whitespace-nowrap font-bold">{{ toastMessage() }}</span>
+                </div>
+              </div>
+            </div>
+          }
+
+
+
+          <!-- Lightbox de foto de evidencia -->
+          @if (evidenceLightbox()) {
+            <div class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+                 (click)="evidenceLightbox.set(null)">
+              <img [src]="evidenceLightbox()!" alt="Foto de entrega"
+                   class="max-w-full max-h-full rounded-3xl shadow-2xl object-contain border-2 border-white/10" />
+              <button class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white text-xl flex items-center justify-center"
+                      (click)="evidenceLightbox.set(null)">✕</button>
+            </div>
+          }
+
+          <!-- ✦ C.A.M.I. Floating Assistant Widget (Z-40) ✦ -->
+          @if (order() && isUnboxed()) {
+            <div id="cami-fab" class="fixed bottom-6 right-6 z-40 flex items-end justify-end gap-3 pointer-events-none">
               
-              <button id="confirm-btn" 
-                      class="relative w-full py-5 rounded-full bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 text-white font-black uppercase tracking-widest overflow-hidden shadow-[0_10px_30px_rgba(244,114,182,0.4)] active:scale-95 transition-transform"
-                      (click)="confirmOrder($event)"
-                      (touchstart)="btnTouchStart()"
-                      (touchend)="btnTouchEnd()"
-                      (mousemove)="btnMouseMove($event)"
-                      (mouseleave)="btnMouseLeave()">
+              <!-- Chat Speech Bubble -->
+              @if (!isLoadingCami() && camiMessage() && showCamiBubble()) {
+                <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[250px] pointer-events-auto animate-fade-in-up origin-bottom-right relative transition-all">
+                  <!-- Close Button -->
+                  <button (click)="showCamiBubble.set(false)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-xs transition-colors z-20" title="Cerrar mensaje">✕</button>
+
+                  <!-- Tail of the speech bubble -->
+                  <div class="absolute -right-1 bottom-4 w-4 h-4 bg-white border-b border-r border-pink-100 rotate-[-45deg] transform origin-center"></div>
+                  
+                  <div class="flex items-center gap-2 mb-1.5 relative z-10">
+                    <span class="text-[9px] font-black text-pink-500 uppercase tracking-widest leading-none">C.A.M.I. AI</span>
+                    <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                  </div>
+                  <p class="text-xs text-pink-900 font-medium leading-relaxed italic relative z-10 pr-6">"{{ camiMessage() }}"</p>
+                  
+                  @if (camiAudioUrl()) {
+                    <button (click)="playCamiAudio()" class="mt-3 bg-pink-50 hover:bg-pink-100 text-pink-600 w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
+                       {{ isPlayingCami() ? '🔊 Escuchando...' : '▶️ Escuchar' }}
+                    </button>
+                  }
+                </div>
+              }
+
+              <!-- The Avatar Interactive Button -->
+              <button (click)="startTour()" class="shrink-0 w-16 h-16 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-4xl shadow-[0_15px_30px_rgba(244,114,182,0.4)] border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all relative animate-bounce-subtle z-20 group">
+                👩🏻‍💻
+                <!-- Status Dots -->
+                @if (isLoadingCami()) {
+                  <span class="absolute -top-1 -right-1 w-4 h-4 bg-pink-400 rounded-full border-2 border-white animate-pulse"></span>
+                } @else if (camiMessage()) {
+                  <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-sm"></span>
+                }
                 
-                <!-- Holographic Shine Layer -->
-                <div id="btn-hologram" class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent opacity-0 pointer-events-none transform -skew-x-12 translate-x-[-100%]"></div>
-                
-                <span class="relative z-10 flex items-center justify-center gap-3">
-                  ¡Sí, Confirmar Pedido! <span id="btn-heart-icon" class="text-xl">💖</span>
+                <!-- Hover Tooltip -->
+                <span class="absolute -top-8 right-0 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                  Ver Tour ✨
                 </span>
               </button>
             </div>
           }
 
+          <!-- ✦ C.A.M.I. TOUR OVERLAY ✦ -->
+          @if (tourActive()) {
+            <div class="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
+              <svg class="w-full h-full pointer-events-auto">
+                <defs>
+                  <mask id="tour-mask">
+                    <rect width="100%" height="100%" fill="white" />
+                    <rect [attr.x]="tourHole().left - 10" 
+                          [attr.y]="tourHole().top - 10" 
+                          [attr.width]="tourHole().width + 20" 
+                          [attr.height]="tourHole().height + 20" 
+                          [attr.rx]="tourHole().radius" 
+                          fill="black" 
+                          class="transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
+                  </mask>
+                </defs>
+                <rect width="100%" height="100%" fill="rgba(80, 7, 36, 0.75)" mask="url(#tour-mask)" class="backdrop-blur-[2px]" />
+              </svg>
 
-          <!-- Tracking Timeline (Amazon Style) -->
-          <div class="bg-white/70 backdrop-blur-xl rounded-3xl p-5 mb-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 animate-fade-in-up" style="animation-delay: 150ms">
-            <h3 class="text-lg font-black text-pink-900 mb-4 font-display text-center">Historial de tu pedido</h3>
-            
-            <div class="flex flex-col pl-2">
-              @for (step of timelineSteps(); track $index) {
-                <div class="flex gap-4 relative min-h-[70px] transition-opacity duration-300"
-                     [class.opacity-50]="!step.done && !step.active"
-                     [class.opacity-100]="step.done || step.active">
-                  
-                  <!-- Indicator -->
-                  <div class="flex flex-col items-center z-10 w-10">
-                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-white border-2 shadow-sm transition-all duration-500"
-                         [ngClass]="{
-                           'border-pink-400 bg-pink-50 scale-105': step.done,
-                           'border-rose-500 bg-rose-50 shadow-[0_0_15px_rgba(244,63,94,0.3)] scale-110 animate-bounce-subtle': step.active && step.icon !== '❌',
-                           'border-red-500 bg-red-50 scale-110': step.icon === '❌',
-                           'border-gray-200': !step.done && !step.active
-                         }">
-                      {{ step.icon }}
-                    </div>
-                    @if (!$last) {
-                      <div class="w-[3px] flex-grow my-1 rounded-full transition-all duration-1000 origin-top"
-                           [ngClass]="{
-                             'bg-pink-400': step.done,
-                             'bg-[length:100%_200%] bg-gradient-to-b from-pink-400 via-pink-200 to-pink-500 animate-shimmer scale-y-100': step.active && step.icon !== '❌',
-                             'bg-gray-200': !step.done && !step.active
-                           }"></div>
-                    }
-                  </div>
-                  
-                  <!-- Content -->
-                  <div class="flex-1 pt-2 pb-6">
-                    <span class="block font-bold text-sm mb-0.5"
-                          [ngClass]="{
-                            'text-pink-900': step.done || step.active,
-                            'text-rose-600 text-base': step.active && step.icon !== '❌',
-                            'text-red-600 text-base': step.icon === '❌',
-                            'text-gray-500': !step.done && !step.active
-                          }">{{ step.label }}</span>
-                    
-                    @if (step.date) {
-                      <span class="block text-xs font-mono text-pink-500/70">{{ step.date | date:'MMM d, h:mm a' }}</span>
-                    } @else {
-                      <span class="block text-xs font-mono text-gray-400 italic">Pendiente</span>
-                    }
-                  </div>
+              <div class="fixed left-0 right-0 z-[101] pointer-events-auto flex justify-center px-4 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-bounce-up-y-only" 
+                   [class.top-28]="tourPlacement() === 'top'"
+                   [class.bottom-8]="tourPlacement() === 'bottom'"
+                   [class.translate-y-0]="true">
+                <div class="w-full max-w-[380px] bg-white rounded-[2.5rem] p-6 shadow-[0_20px_50px_rgba(244,114,182,0.4)] border-4 border-pink-300 relative">
+                   
+                   <div class="flex items-center gap-4 mb-4">
+                     <div class="w-16 h-16 rounded-full bg-gradient-to-br from-pink-100 to-rose-200 flex items-center justify-center text-4xl border-4 border-white shadow-md animate-bounce-subtle shrink-0">👩🏻‍💻</div>
+                     <div>
+                       <div class="flex items-center gap-2 mb-1">
+                         <span class="text-[10px] font-black text-pink-500 uppercase tracking-[0.2em] leading-none">C.A.M.I. Guía</span>
+                         <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                       </div>
+                       <p class="font-black text-pink-950 leading-none font-display text-lg">Paso {{ currentTourStep() + 1 }} de {{ dynamicTourSteps().length }}</p>
+                     </div>
+                   </div>
+                   
+                   <p class="text-[15px] text-pink-900 font-medium leading-relaxed mb-6">
+                     {{ dynamicTourSteps()[currentTourStep()].msg }}
+                   </p>
+
+                   <div class="flex gap-2">
+                     <button (click)="closeTour()" class="px-5 py-3 bg-gray-50 hover:bg-gray-100 text-gray-500 text-xs font-black rounded-2xl uppercase tracking-widest transition-colors">Omitir</button>
+                     <div class="flex-grow"></div>
+                     @if (currentTourStep() > 0) {
+                       <button (click)="prevStep()" class="px-5 py-3 bg-pink-50 hover:bg-pink-100 text-pink-600 text-xs font-black rounded-2xl uppercase tracking-widest transition-colors">Atrás</button>
+                     }
+                     <button (click)="nextStep()" class="px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-black rounded-2xl uppercase tracking-widest shadow-xl shadow-pink-200 active:scale-95 transition-all outline-none focus:ring-4 focus:ring-pink-200">
+                       {{ currentTourStep() === dynamicTourSteps().length - 1 ? '¡Listo! ✨' : 'Siguiente ✨' }}
+                     </button>
+                   </div>
                 </div>
-              }
-            </div>
-            
-            <!-- Driver Nearby Alert (Timeline context backup) -->
-            @if (isNearby() && o.deliveriesAhead !== 0) {
-              <div class="mb-4 p-4 rounded-3xl bg-blue-50 border-2 border-blue-200 border-dashed animate-bounce-slow flex items-center gap-3">
-                <div class="text-3xl animate-wiggle">🚗</div>
-                <div class="flex-1">
-                  <p class="font-bold text-blue-900 leading-tight">¡El repartidor está cerca!</p>
-                  <p class="text-xs text-blue-700">Ten tu pago listo y mantente atenta ✨</p>
-                </div>
-                <div class="animate-ping w-3 h-3 bg-blue-500 rounded-full"></div>
-              </div>
-            }
-          </div>
-
-          <!-- Order Items & Totals (TICKET STYLE) -->
-          <div id="order-ticket" class="relative items-ticket bg-white/90 backdrop-blur-2xl rounded-3xl p-6 mb-6 shadow-[0_15px_40px_rgb(0,0,0,0.05)] border border-white isolate animate-fade-in-up" style="animation-delay: 300ms">
-            <!-- Jagged Top & Bottom Edges (Pseudo elements in CSS handle this) -->
-            <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-6 bg-pink-100/50 rounded-full blur-xl -z-10"></div>
-            
-            <h3 class="text-xl font-black text-pink-900 mb-5 font-display text-center relative">
-              <span class="bg-gradient-to-r from-transparent via-pink-100 to-transparent px-4 py-1 rounded-full absolute -ml-4 -mt-1 opacity-50 inset-0 -z-10 blur-sm"></span>
-              Tu Ticket de Compra 🛍️
-            </h3>
-            
-            <!-- Items -->
-            <div class="space-y-4 mb-6 relative">
-              @for (item of o.items; track item.id) {
-                <div class="order-item flex justify-between items-center relative pl-3 group" [style.opacity]="isUnboxed() ? 1 : 0">
-                  <!-- Cute bullet -->
-                  <div class="absolute left-0 top-1.5 w-1.5 h-1.5 rounded-full bg-pink-300 group-hover:scale-150 transition-transform"></div>
-                  <div class="flex flex-col">
-                    <span class="font-bold text-pink-900 text-sm leading-tight">{{ item.productName }}</span>
-                    <span class="text-xs text-pink-500/70 font-medium mt-0.5">x{{ item.quantity }} @if(item.quantity>1){<span class="opacity-50 text-[10px]">({{ item.unitPrice | currency:'MXN':'symbol-narrow' }})</span>}</span>
-                  </div>
-                  @if (item.unitPrice > 0) {
-                    <span class="font-black text-pink-600 whitespace-nowrap ml-2">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
-                  }
-                </div>
-              }
-            </div>
-
-            <!-- Ticket Perforation Line -->
-            <div id="ticket-line" class="w-full border-t-[3px] border-dotted border-pink-200 my-5 relative">
-              <!-- Side cutouts -->
-              <div class="absolute -left-8 -top-[14px] w-6 h-6 bg-gradient-to-r from-pink-50 to-transparent rounded-full border-r border-white/60 shadow-inner"></div>
-              <div class="absolute -right-8 -top-[14px] w-6 h-6 bg-gradient-to-l from-pink-50 to-transparent rounded-full border-l border-white/60 shadow-inner"></div>
-            </div>
-
-            <!-- Totals -->
-            <div id="ticket-totals" class="bg-rose-50/70 rounded-2xl p-5 border border-rose-100/50 relative overflow-hidden" [style.opacity]="isUnboxed() ? 1 : 0">
-              <div class="absolute right-0 bottom-0 opacity-5 text-8xl -mr-6 -mb-6 rotate-12 pointer-events-none">🧾</div>
-              
-              <div class="flex justify-between text-sm font-medium text-pink-800/80 mb-2.5">
-                <span>Subtotal</span>
-                <span>{{ o.subtotal | currency:'MXN':'symbol-narrow' }}</span>
-              </div>
-              
-              @if (o.shippingCost > 0) {
-                <div class="flex justify-between text-sm font-medium text-pink-800/80 mb-2.5">
-                  <span class="flex items-center gap-1">Envío <span class="text-xs">🛵</span></span>
-                  <span>{{ o.shippingCost | currency:'MXN':'symbol-narrow' }}</span>
-                </div>
-              }
-
-              <div class="flex justify-between text-base font-black text-pink-900 border-t border-pink-200/50 mt-3 pt-3 mb-3">
-                <span>Total Final</span>
-                <span class="drop-shadow-sm">{{ o.total | currency:'MXN':'symbol-narrow' }}</span>
-              </div>
-
-              @if (totalAbonado() > 0) {
-                <div class="flex justify-between text-sm font-bold text-emerald-700 bg-emerald-100/60 shadow-inner -mx-3 px-3 py-2 rounded-xl mb-3 border border-emerald-200/50">
-                  <span class="flex items-center gap-1">Abonado @if((o.payments?.length ?? 0) > 1) { <small class="opacity-70 bg-emerald-200/50 px-1.5 rounded-md text-[10px]">x{{o.payments?.length}}</small> }</span>
-                  <span>- {{ totalAbonado() | currency:'MXN':'symbol-narrow' }}</span>
-                </div>
-              }
-
-              <div class="flex justify-between items-end mt-4 pt-4 border-t-2 border-pink-200/80 relative"
-                   [ngClass]="(o.balanceDue || 0) <= 0 ? 'text-emerald-500' : 'text-rose-600'">
-                <span class="font-black text-xs uppercase tracking-wider">{{ (o.balanceDue || 0) <= 0 ? '¡Liquidado! ✅' : 'Restante a Pagar' }}</span>
-                @if ((o.balanceDue || 0) > 0) {
-                  <span class="font-black text-3xl font-display leading-none drop-shadow-md">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</span>
-                }
-              </div>
-            </div>
-          </div>
-
-
-          <!-- ═══ FOTO DE EVIDENCIA (cuando entregado) ═══ -->
-          @if (o.status === 'Delivered' && o['evidenceUrls']?.length > 0) {
-            <div class="bg-white/80 backdrop-blur-xl rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgb(0,0,0,0.04)] border border-emerald-100 animate-fade-in-up" style="animation-delay: 350ms">
-              <h3 class="text-sm font-black text-emerald-700 mb-3 flex items-center gap-2">
-                📸 Foto de tu entrega
-              </h3>
-              <div class="grid grid-cols-2 gap-2">
-                @for (url of o['evidenceUrls']; track url) {
-                  <img [src]="resolveImageUrl(url)" alt="Foto de entrega"
-                       class="w-full aspect-square object-cover rounded-2xl border border-emerald-100 shadow-sm"
-                       (click)="evidenceLightbox.set(resolveImageUrl(url))" />
-                }
-              </div>
-              <p class="text-[10px] text-emerald-500 font-medium text-center mt-2">Evidencia de entrega capturada por el repartidor ✨</p>
-            </div>
-          }
-
-          <!-- Gamification: VIP Reveal (Only when delivered) -->
-          @if (o.status === 'Delivered' && (o.type === 'Frecuente' || o.type === 'VIP')) {
-            <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgba(216,180,254,0.4)] border border-purple-200/50 animate-fade-in-up transition-all duration-500" style="animation-delay: 400ms">
-              @if (!showSurprise()) {
-                <div class="text-center cursor-pointer group" (click)="revealSurprise()">
-                  <div class="text-5xl drop-shadow-[0_0_15px_rgba(216,180,254,0.8)] animate-pulse mb-3 group-hover:scale-110 transition-transform">💎</div>
-                  <h3 class="text-lg font-black text-purple-900 font-display">¡Eres una Chica {{ o.type }}!</h3>
-                  <p class="text-xs font-bold text-purple-700/80 mb-3">Te hemos preparado una sorpresita...</p>
-                  <button class="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold px-6 py-2 rounded-full shadow-md animate-bounce-subtle">
-                    Toca para revelar 🎁
-                  </button>
-                </div>
-              } @else {
-                <div class="text-center animate-bounce-in-up">
-                  <div class="text-5xl mb-3">✨🎉</div>
-                  <h3 class="text-xl font-black text-pink-600 font-display">¡Acumulaste {{ o.clientPoints }} RegiPuntos!</h3>
-                  <p class="text-sm font-bold text-purple-900/90 leading-snug my-2">En tu próxima compra, indícale a tu vendedora que ya tienes tus puntos para canjear increíbles premios.</p>
-                  <div class="inline-block px-4 py-2 bg-white/60 rounded-xl border border-pink-200 border-dashed text-pink-800 font-mono font-bold mt-2 shadow-sm">
-                    CÓDIGO: VIP-{{ o.clientName.substring(0,3).toUpperCase() }}{{ o.clientPoints }} ✨
-                  </div>
-                </div>
-              }
-            </div>
-          } @else if (o.type === 'Frecuente' || o.type === 'VIP') {
-            <!-- Original Loyalty Banner (SHIMMER EFFECT) for non-delivered -->
-            <div class="relative overflow-hidden bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl p-5 mb-6 shadow-[0_8px_25px_rgba(216,180,254,0.4)] border border-purple-200/50 flex items-center gap-4 animate-fade-in-up isolate hover:scale-[1.02] transition-transform" style="animation-delay: 400ms">
-              <!-- Holographic Shimmer -->
-              <div class="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent -z-10 skew-x-12"></div>
-              
-              <div class="text-5xl drop-shadow-[0_0_15px_rgba(216,180,254,0.8)] animate-pulse-slow">💎</div>
-              <div>
-                <span class="inline-block px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-1.5 shadow-md">
-                  Chica {{ o.type }}
-                </span>
-                <p class="text-xs font-bold text-purple-900/90 leading-snug">¡Eres lo máximo! ✨ Tienes <span class="bg-purple-200 text-purple-900 px-1 rounded">{{ o.clientPoints }} RegiPuntos</span> acumulados para canjear pronto.</p>
               </div>
             </div>
           }
-
-          <!-- Payment Methods -->
-          <div class="relative z-10 animate-fade-in-up" style="animation-delay: 500ms">
-            <h3 class="text-center text-pink-900 font-black text-lg font-display mb-1">Formas de Pago 💸</h3>
-            <p class="text-center text-xs text-pink-700/70 font-medium mb-4">Elige cómo quieres pagar tu saldo restante</p>
-
-            <!-- Custom Tabs -->
-            <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white">
-              <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
-                      [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                      (click)="paymentTab.set('cash')">💵 Efectivo</button>
-              <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
-                      [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                      (click)="paymentTab.set('transfer')">🏦 Transfer</button>
-              <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
-                      [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                      (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
-            </div>
-
-            <!-- Tab Content -->
-            <div class="min-h-[140px]">
-              @switch (paymentTab()) {
-                @case ('cash') {
-                  <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-5 border border-emerald-100 shadow-sm animate-fade-in text-center relative overflow-hidden">
-                    <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">💵</div>
-                    <div class="text-4xl mb-2 relative z-10">💵</div>
-                    <h4 class="font-bold text-emerald-900 text-sm relative z-10">Pago al Entregar</h4>
-                    <p class="text-xs text-emerald-700 mt-2 relative z-10">Por favor ten el monto exacto listo para agilizar tu entrega 💕</p>
-                  </div>
-                }
-                @case ('transfer') {
-                  <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-5 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
-                    <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏦</div>
-                    <div class="flex items-center gap-3 mb-4 relative z-10">
-                      <div class="text-3xl">🏦</div>
-                      <div>
-                        <h4 class="font-bold text-blue-900 text-sm leading-tight">Transferencia</h4>
-                        <span class="text-xs font-bold text-blue-600 uppercase">Citibanamex</span>
-                      </div>
-                    </div>
-                    
-                    <div class="bg-white/60 rounded-xl p-3 border border-blue-200/50 mb-3 relative z-10">
-                      <div class="flex justify-between items-center mb-2">
-                        <span class="text-xs text-blue-700/70 font-medium">Número de Tarjeta:</span>
-                      </div>
-                      <div class="flex justify-between items-center">
-                        <span class="font-mono font-bold text-blue-900 tracking-wider text-sm">5256 7861 3758 3898</span>
-                        <button class="bg-blue-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-600 active:scale-95 transition-all"
-                                (click)="copyText('5256786137583898')">COPIAR</button>
-                      </div>
-                    </div>
-                    <p class="text-[10px] text-blue-700/80 text-center font-medium relative z-10">A nombre de: Yazmin Vara<br>Envía tu comprobante a tu vendedora ✨</p>
-                  </div>
-                }
-                @case ('oxxo') {
-                  <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-3xl p-5 border border-red-100 shadow-sm animate-fade-in relative overflow-hidden">
-                    <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏪</div>
-                    <div class="flex items-center gap-3 mb-4 relative z-10">
-                      <div class="text-3xl">🏪</div>
-                      <div>
-                        <h4 class="font-bold text-red-900 text-sm leading-tight">Depósito en Efectivo</h4>
-                        <span class="text-xs font-bold text-red-600 uppercase">OXXO (BBVA)</span>
-                      </div>
-                    </div>
-                    <div class="bg-white/60 rounded-xl p-3 border border-red-200/50 relative z-10 mb-3">
-                      <div class="flex justify-between items-center mb-2">
-                        <span class="text-xs text-red-700/70 font-medium">Número de Tarjeta:</span>
-                      </div>
-                      <div class="flex justify-between items-center">
-                        <span class="font-mono font-bold text-red-900 tracking-wider text-sm">4152 3144 9667 1333</span>
-                        <button class="bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-red-600 active:scale-95 transition-all"
-                                (click)="copyText('4152314496671333')">COPIAR</button>
-                      </div>
-                    </div>
-                    <p class="text-[10px] text-red-700/80 text-center font-medium relative z-10">Envía foto del ticket a tu vendedora ✨</p>
-                  </div>
-                }
-              }
-            </div>
-          </div>
-          
-          <!-- Social Media Invite -->
-          <div class="bg-gradient-to-br from-indigo-50 to-pink-50 rounded-3xl p-6 mb-6 mt-8 shadow-sm border border-indigo-100/50 text-center animate-fade-in relative overflow-hidden group">
-            <div class="absolute -right-6 -bottom-6 text-7xl opacity-5 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-500">📸</div>
-            <div class="absolute -left-4 top-2 text-4xl opacity-10 -rotate-12 group-hover:-rotate-45 group-hover:scale-110 transition-transform duration-500">✨</div>
-            
-            <h3 class="text-pink-600 font-display font-black text-2xl mb-2">¡Presume tu estilo! 📸</h3>
-            <p class="text-indigo-900/80 text-xs font-medium px-4 mb-4 leading-relaxed">Etiquétanos en tus historias de Facebook o Instagram al recibir tu pedido y <strong>gana RegiPuntos extra</strong> en tu siguiente compra ✨</p>
-            
-            <div class="flex justify-center gap-4 relative z-10">
-              <a href="https://www.facebook.com/regi.bazar.852309" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#1877f2] to-[#1259b6] text-white flex items-center justify-center text-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all font-serif italic pr-1">
-                f
-              </a>
-              <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white flex items-center justify-center text-xl shadow-lg hover:shadow-xl hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all font-bold">
-                IG
-              </a>
-            </div>
-            <p class="text-[10px] font-bold text-purple-500/70 mt-3 tracking-widest uppercase">@RegiBazar</p>
-          </div>
-          
-          <p class="text-center mt-6 mb-6 font-script text-rose-400 text-lg opacity-80 decoration-wavy underline decoration-pink-200">
-            Hecho con 🎀 para ti
-          </p>
-
-        } <!-- end if order -->
+        }
       </div>
-      
-      <!-- Action Toast Notification -->
-      @if (toastVisible()) {
-        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-in-up">
-          <div class="bg-gray-900/90 backdrop-blur-md text-white text-sm font-medium px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30">
-            <span class="text-xl">✨</span>
-            <span class="whitespace-nowrap font-bold">{{ toastMessage() }}</span>
-          </div>
-        </div>
-      }
-
-      <!-- Lightbox de foto de evidencia -->
-      @if (evidenceLightbox()) {
-        <div class="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-             (click)="evidenceLightbox.set(null)">
-          <img [src]="evidenceLightbox()!" alt="Foto de entrega"
-               class="max-w-full max-h-full rounded-3xl shadow-2xl object-contain border-2 border-white/10" />
-          <button class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white text-xl flex items-center justify-center"
-                  (click)="evidenceLightbox.set(null)">✕</button>
-        </div>
-      }
-
-      <!-- WhatsApp FAB (Z-30) -->
-      @if (order() && isUnboxed()) {
-        <a href="https://wa.me/?text=Hola,%20tengo%20una%20duda%20sobre%20mi%20pedido%20de%20Regi%20Bazar%20%E2%9C%A8" 
-           target="_blank"
-           class="fixed bottom-6 right-6 z-30 w-14 h-14 bg-emerald-500/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-[0_10px_25px_rgba(16,185,129,0.5)] border border-emerald-400/50 hover:scale-110 hover:-translate-y-1 transition-all animate-bounce-in-up">
-          <span class="text-3xl text-white">💬</span>
-          <span class="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
-        </a>
-      }
     </div>
   `,
   styles: [`
@@ -714,6 +591,12 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
       80% { transform: translate(-50%, 5px); }
       100% { transform: translate(-50%, 0); }
     }
+    @keyframes bounce-up-y-only {
+      0% { opacity: 0; transform: translateY(100vh); }
+      60% { opacity: 1; transform: translateY(-15px); }
+      80% { transform: translateY(5px); }
+      100% { transform: translateY(0); }
+    }
     @keyframes shimmer {
       100% { transform: translateX(200%); }
     }
@@ -729,6 +612,7 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
     .animate-fade-in { animation: fade-in 0.4s ease-out both; }
     .animate-bounce-subtle { animation: bounce-subtle 2s infinite; }
     .animate-bounce-in-up { animation: bounce-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .animate-bounce-up-y-only { animation: bounce-up-y-only 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
     .animate-shimmer { animation: shimmer 3s infinite linear; }
     .animate-glint { animation: glint 1.5s infinite; }
 
@@ -799,12 +683,154 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   savingInstructions = signal(false);
   localInstructions = '';
 
+  // UI Layout State
+  activeTab = signal<'status' | 'payment' | 'details'>('status');
+
+  // --- TOUR STATE ---
+  tourActive = signal(false);
+  currentTourStep = signal(0);
+  tourHole = signal({ top: 0, left: 0, width: 0, height: 0, radius: 24 });
+  tourPlacement = signal<'top' | 'bottom'>('bottom');
+  
+  dynamicTourSteps = computed(() => {
+    const o = this.order();
+    if (!o) return [];
+
+    const steps: { target: string, msg: string, tab?: 'status' | 'payment' | 'details' }[] = [
+      { target: '#view-header', msg: '¡Hola hermosa! Soy C.A.M.I. ✨ He diseñado este panel Inteligente para que tengas todo a la mano. ¡Déjame enseñarte!' },
+      { target: '#balance-summary', msg: 'Aquí verás siempre tu saldo pendiente. ¡Súper fácil para saber cuánto falta para pagar! 💰' },
+      { target: '#nav-tabs', msg: 'Usa estas 3 pestañas para ver tu rastreo en vivo, tus métodos de pago o el ticket detallado. 🏠💸🛍️' }
+    ];
+
+    // Status Tab Specifics
+    if (o.status === 'InRoute' || o.status === 'InTransit') {
+      if (o.clientLatitude || this.clientCoords()?.lat) {
+         steps.push({ target: '#client-live-map', msg: '¡Tu pedido va en camino! 🚗💨 Aquí puedes ver en tiempo real por dónde va el repartidor.', tab: 'status' });
+      }
+      if (o.queuePosition) {
+         steps.push({ target: '#queue-info', msg: 'Y aquí te diremos exactamente cuántas entregas faltan antes de llegar a tu casa. ¡Ya casi! ⏳', tab: 'status' });
+      }
+    } else {
+       steps.push({ target: '#tracking-timeline', msg: 'Aquí está la línea de tiempo de tu envío. Sabrás exactamente cuándo lo empacamos y cuándo sale. 📦', tab: 'status' });
+    }
+
+    // Payment Tab Specifics
+    if (o.balanceDue > 0) {
+      steps.push({ target: '#payment-methods', msg: 'En la pestaña "Pagar" encontrarás todas las opciones para liquidar tu saldo de forma segura y rápida. 💸', tab: 'payment' });
+    }
+
+    // Details Tab Specifics
+    steps.push({ target: '#ticket-content', msg: 'En "Pedido" tienes el ticket con tu lista de compras, las cantidades y el precio final. ¡Todo listito para tu hogar! 🏡🛍️', tab: 'details' });
+
+    // Final
+    steps.push({ target: '#cami-fab', msg: '¡Eso es todo! Si hay alguna notificación urgente de tu pedido, siempre me encontrarás flotando aquí lista para ayudarte. 👩🏻‍💻✨', tab: 'status' });
+
+    return steps;
+  });
+
+  startTour() {
+    this.tourActive.set(true);
+    this.currentTourStep.set(0);
+    this.updateHole();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextStep() {
+    if (this.currentTourStep() < this.dynamicTourSteps().length - 1) {
+      this.currentTourStep.update(s => s + 1);
+      this.updateHole();
+    } else {
+      this.closeTour();
+    }
+  }
+
+  prevStep() {
+    if (this.currentTourStep() > 0) {
+      this.currentTourStep.update(s => s - 1);
+      this.updateHole();
+    }
+  }
+
+  closeTour() {
+    this.tourActive.set(false);
+    localStorage.setItem('cami_tour_done', 'true');
+  }
+
+  private checkAndStartTour() {
+    const done = localStorage.getItem('cami_tour_done');
+    if (!done && this.order() && this.isUnboxed()) {
+      setTimeout(() => {
+        // Double check not started manually
+        if (!this.tourActive()) {
+          this.startTour();
+        }
+      }, 1500); // Wait for openBox/ticket reveal animations to settle
+    }
+  }
+
+  private updateHole(forceTabSwitch = true) {
+    if (!this.tourActive()) return;
+
+    setTimeout(() => {
+      const step = this.dynamicTourSteps()[this.currentTourStep()];
+      if (!step) return;
+
+      // Auto-switch tabs if the step requires it
+      if (forceTabSwitch && step.tab && this.activeTab() !== step.tab) {
+        this.activeTab.set(step.tab);
+        // Wait for Angular to render the new tab, then recalculate hole
+        setTimeout(() => this.updateHole(false), 350); 
+        return;
+      }
+
+      const el = document.querySelector(step.target);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        // Ensure the element is somewhat in view
+        if (rect.top < 0 || rect.bottom > window.innerHeight) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            const newRect = el.getBoundingClientRect();
+            this.tourPlacement.set(newRect.top > window.innerHeight / 2 ? 'top' : 'bottom');
+            this.tourHole.set({
+              top: newRect.top,
+              left: newRect.left,
+              width: newRect.width,
+              height: newRect.height,
+              radius: 24
+            });
+          }, 300);
+        } else {
+          this.tourPlacement.set(rect.top > window.innerHeight / 2 ? 'top' : 'bottom');
+          this.tourHole.set({
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            radius: 24
+          });
+        }
+      }
+    }, 100);
+  }
+
   // Señales para C.A.M.I.
   camiMessage = signal<string>('');
   camiAudioUrl = signal<string>('');
   isPlayingCami = signal(false);
   isLoadingCami = signal(true);
+  showCamiBubble = signal(true);
+  // Stratospheric features
+  regiPuntos = computed(() => {
+    const o = this.order();
+    if (!o) return 0;
+    return Math.floor((o.total || 0) / 10); // 1 point per $10 MXN spent
+  });
   
+
+
+
+
   // Countdown State
   countdownText = signal<string>('');
   private countdownInterval: any;
@@ -960,6 +986,17 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         }
       }
     });
+
+    // Feature #9 — CAMI greeting pushed when driver marks InTransit
+    this.signalr.camiGreeting$.subscribe((greeting) => {
+      this.camiMessage.set(greeting.message);
+      if (greeting.audioBase64) {
+        this.camiAudioUrl.set('data:audio/mp3;base64,' + greeting.audioBase64);
+      }
+      this.isLoadingCami.set(false);
+      this.showCamiBubble.set(true);
+      this.showToast('¡C.A.M.I. tiene un mensaje para ti! 💌');
+    });
   }
 
   // Generate Greeting based on time
@@ -1012,7 +1049,15 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           setTimeout(() => {
             this.animateTicketReveal();
             if (data.status === 'Delivered') this.fireConfetti('unboxing');
+            this.checkAndStartTour();
           }, 500);
+        }
+
+        // Set initial tab based on status
+        if (data.balanceDue > 0 && (data.status === 'Pending' || data.status === 'Confirmed')) {
+          this.activeTab.set('payment');
+        } else if (data.status === 'InRoute' || data.status === 'InTransit') {
+          this.activeTab.set('status');
         }
 
         if (data.expiresAt) {
@@ -1054,6 +1099,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         this.camiMessage.set(res.message);
         this.camiAudioUrl.set('data:audio/mp3;base64,' + res.audioBase64);
         this.isLoadingCami.set(false);
+        this.showCamiBubble.set(true);
       },
       error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
     });
@@ -1586,7 +1632,10 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         this.isUnboxed.set(true);
         sessionStorage.setItem(`regibazar_unboxed_${o.id}`, 'true');
         // Give a tiny frame for Angular to render the ticket before staggering items
-        setTimeout(() => this.animateTicketReveal(), 50);
+        setTimeout(() => {
+          this.animateTicketReveal();
+          this.checkAndStartTour();
+        }, 50);
       }
     });
 
@@ -1617,23 +1666,29 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private animateTicketReveal() {
+    const items = document.querySelectorAll('.order-item');
+    const line = document.querySelector('#ticket-line');
+    const totals = document.querySelector('#ticket-totals');
+
+    if (!items.length || !line || !totals) return;
+
     const tl = gsap.timeline();
 
     // Stagger in the order items
-    tl.fromTo('.order-item',
+    tl.fromTo(items,
       { opacity: 0, x: -20, scale: 0.9 },
       { opacity: 1, x: 0, scale: 1, duration: 0.5, stagger: 0.1, ease: "back.out(1.7)" }
     );
 
     // Animate the perforation line
-    tl.fromTo('#ticket-line',
+    tl.fromTo(line,
       { scaleX: 0, opacity: 0 },
       { scaleX: 1, opacity: 1, duration: 0.8, ease: "expo.out" },
       "-=0.3"
     );
 
     // Fade in totals
-    tl.fromTo('#ticket-totals',
+    tl.fromTo(totals,
       { opacity: 0, y: 20 },
       { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" },
       "-=0.4"
