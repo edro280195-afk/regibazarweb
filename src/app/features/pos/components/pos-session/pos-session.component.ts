@@ -20,7 +20,7 @@ import { PosStateService } from '../../../../core/services/pos-state.service';
             🎀
           </div>
           
-          <h1 class="text-3xl font-black text-pink-900 tracking-tight mb-2">Boutique Cashier</h1>
+          <h1 class="text-3xl font-black text-pink-900 tracking-tight mb-2">POS RegiBazar</h1>
           <p class="text-pink-400 font-medium mb-8">Abre la caja para comenzar el turno ✨</p>
 
           <div class="w-full space-y-2 mb-8 text-left">
