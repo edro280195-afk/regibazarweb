@@ -7,9 +7,21 @@ export const authGuard: CanActivateFn = () => {
     const router = inject(Router);
 
     if (auth.isLoggedIn()) {
+        const role = auth.userRole();
+        const url = router.getCurrentNavigation()?.extractedUrl.toString() || window.location.pathname;
+
+        // Security check for Driver
+        if (role === 'Driver' && !url.startsWith('/admin/routes')) {
+            return router.parseUrl('/admin/routes');
+        }
+
+        // Security check for Scaner
+        if (role === 'Scaner' && !url.startsWith('/pos-mobile')) {
+            return router.parseUrl('/pos-mobile/home');
+        }
+
         return true;
     }
 
-    router.navigate(['/login']);
-    return false;
+    return router.parseUrl('/login');
 };

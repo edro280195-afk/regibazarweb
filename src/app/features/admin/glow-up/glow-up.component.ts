@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { AiInsight, GlowUpReportDto } from '../../../core/models';
@@ -14,7 +14,7 @@ interface CamiAlert {
 @Component({
   selector: 'app-glow-up',
   standalone: true,
-  imports: [CommonModule, CurrencyPipe, DatePipe],
+  imports: [CommonModule],
   template: `
     <div class="space-y-6 pb-20">
       <!-- Header -->

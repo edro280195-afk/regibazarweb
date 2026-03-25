@@ -62,6 +62,11 @@ export const routes: Routes = [
         ]
     },
     {
+        path: 'pos',
+        loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent),
+        canActivate: [authGuard]
+    },
+    {
         path: 'pedido/:token',
         loadComponent: () => import('./features/client/order-view/order-view.component').then(m => m.OrderViewComponent)
     },

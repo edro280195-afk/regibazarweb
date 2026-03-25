@@ -1,4 +1,4 @@
-import { Component, inject, signal, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, HostListener } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -38,7 +38,7 @@ interface NavItem {
 
         <!-- Navigation -->
         <nav class="sidebar-nav">
-          @for (item of navItems; track item.route) {
+          @for (item of navItems(); track item.route) {
             <a [routerLink]="item.route"
                routerLinkActive="nav-active"
                [routerLinkActiveOptions]="{ exact: item.route === '/admin' }"
@@ -515,18 +515,28 @@ export class LayoutComponent {
     }
   }
 
-  navItems: NavItem[] = [
-    { label: 'Dashboard', icon: '🏠', route: '/admin' },
-    { label: 'Pedidos', icon: '📦', route: '/admin/orders' },
-    { label: 'Clientas', icon: '👩‍💼', route: '/admin/clients' },
-    { label: 'Rutas', icon: '🚗', route: '/admin/routes' },
-    { label: 'Proveedores', icon: '🏭', route: '/admin/suppliers' },
-    { label: 'Finanzas', icon: '💰', route: '/admin/financials' },
-    { label: 'Reportes', icon: '📊', route: '/admin/reports' },
-    { label: 'Cortes de Venta', icon: '📋', route: '/admin/sales-periods' },
-    { label: 'C.A.M.I.', icon: '✦', route: '/admin/cami' },
-    { label: 'Glow Up', icon: '✨', route: '/admin/glow-up' }
-  ];
+  navItems = computed<NavItem[]>(() => {
+    const role = this.auth.userRole();
+    const allItems: NavItem[] = [
+      { label: 'Dashboard', icon: '🏠', route: '/admin' },
+      { label: 'Pedidos', icon: '📦', route: '/admin/orders' },
+      { label: 'Caja POS', icon: '🛒', route: '/pos' },
+      { label: 'Clientas', icon: '👩‍💼', route: '/admin/clients' },
+      { label: 'Rutas', icon: '🚗', route: '/admin/routes' },
+      { label: 'Proveedores', icon: '🏭', route: '/admin/suppliers' },
+      { label: 'Finanzas', icon: '💰', route: '/admin/financials' },
+      { label: 'Reportes', icon: '📊', route: '/admin/reports' },
+      { label: 'Cortes de Venta', icon: '📋', route: '/admin/sales-periods' },
+      { label: 'C.A.M.I.', icon: '✦', route: '/admin/cami' },
+      { label: 'Glow Up', icon: '✨', route: '/admin/glow-up' }
+    ];
+
+    if (role === 'Driver') {
+      return allItems.filter(i => i.route === '/admin/routes');
+    }
+
+    return allItems;
+  });
 
   greeting(): string {
     const hour = new Date().getHours();

@@ -421,6 +421,7 @@ export interface LoginRequest {
 export interface LoginResponse {
     token: string;
     name: string;
+    role: string;
     expiresAt: string;
 }
 

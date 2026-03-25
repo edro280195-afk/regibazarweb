@@ -125,7 +125,14 @@ export class LoginComponent {
       next: (res) => {
         this.auth.handleLoginSuccess(res);
         this.toast.success('¡Bienvenida, ' + res.name + '! 💖');
-        this.router.navigate(['/admin']);
+        
+        if (res.role === 'Driver') {
+          this.router.navigate(['/admin/routes']);
+        } else if (res.role === 'Scaner') {
+          this.router.navigate(['/pos']);
+        } else {
+          this.router.navigate(['/admin']);
+        }
       },
       error: (err) => {
         this.loading.set(false);
