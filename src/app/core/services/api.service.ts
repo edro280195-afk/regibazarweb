@@ -374,4 +374,8 @@ export class ApiService {
     reorderRouteDeliveries(routeId: number, deliveryIds: number[]): Observable<any> {
         return this.http.put<any>(`${this.base}/routes/${routeId}/reorder`, deliveryIds);
     }
+
+    optimizeRoute(routeId: number): Observable<any> {
+        return this.http.post(`${this.base}/routes/${routeId}/optimize`, {});
+    }
 }

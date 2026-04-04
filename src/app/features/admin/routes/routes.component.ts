@@ -10,6 +10,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
+import { AddressPickerComponent } from './address-picker/address-picker.component';
 
 // Base del backend (sin /api) para construir URLs absolutas de imágenes
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
@@ -40,7 +41,8 @@ interface GeocodedOrder extends OrderSummaryDto {
     MapMarker,
     MapDirectionsRenderer,
     DragDropModule,
-    RouteOptimizerComponent
+    RouteOptimizerComponent,
+    AddressPickerComponent
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
@@ -339,6 +341,10 @@ interface GeocodedOrder extends OrderSummaryDto {
                         (click)="copyDriverLink(route)">
                   📋 <span class="hidden sm:inline">Link</span>
                 </button>
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-purple-50 text-purple-600 text-xs font-bold border border-purple-100 hover:bg-purple-100 active:scale-95 transition-all"
+                        (click)="optimizeRoute(route.id)">
+                  🧩 <span class="hidden sm:inline">Optimizar</span>
+                </button>
                 <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-green-50 text-green-600 text-xs font-bold border border-green-100 hover:bg-green-100 active:scale-95 transition-all"
                         (click)="shareWhatsApp(route)">
                   📱 <span class="hidden sm:inline">WhatsApp</span>
@@ -349,6 +355,10 @@ interface GeocodedOrder extends OrderSummaryDto {
                     💰 <span class="hidden sm:inline">Liquidar</span>
                   </button>
                 }
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-violet-50 text-violet-600 text-xs font-bold border border-violet-100 hover:bg-violet-100 active:scale-95 transition-all shadow-sm"
+                        (click)="optimizeRoute(route.id)">
+                  ✨ <span class="hidden sm:inline">Optimizar</span>
+                </button>
                 <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100 hover:bg-indigo-100 active:scale-95 transition-all"
                         (click)="loadRouteBriefing(route.id)"
                         [disabled]="loadingBriefing() === route.id">
@@ -523,6 +533,17 @@ interface GeocodedOrder extends OrderSummaryDto {
       }
 
       <!-- ═══════════════════════════════════════════════════
+           MODAL: MAGIC ADDRESS PICKER (UX Overdose)
+           ═══════════════════════════════════════════════════ -->
+      @if (showAddressPicker()) {
+        <app-address-picker
+          [initialAddress]="pickerInitialAddress"
+          (confirm)="onAddressPickerConfirm($event)"
+          (cancel)="showAddressPicker.set(false)">
+        </app-address-picker>
+      }
+
+      <!-- ═══════════════════════════════════════════════════
            MODAL: NUEVA RUTA (Enhanced)
            ═══════════════════════════════════════════════════ -->
       @if (showCreateModal()) {
@@ -610,40 +631,19 @@ interface GeocodedOrder extends OrderSummaryDto {
                             }
                           </div>
 
-                          @if (editingOrderId() === order.id) {
-                            <div class="mt-2 flex flex-col gap-2 animate-fade-in" (click)="$event.stopPropagation()">
-                              <div class="flex gap-2">
-                                <input [id]="'addr-input-' + order.id" type="text" [(ngModel)]="tempAddress" 
-                                       placeholder="Busca la dirección..."
-                                       class="flex-1 px-3 py-1.5 text-sm rounded-xl border border-pink-200 focus:ring-2 focus:ring-pink-500 outline-none shadow-inner bg-white" />
-                                <button class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white text-[10px] font-bold shadow-sm flex items-center gap-1 transition-all"
-                                        [disabled]="isSavingAddress()" (click)="saveAddress(order)">
-                                  {{ isSavingAddress() ? '⏳' : '✅ Guardar' }}
-                                </button>
-                                <button class="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 text-[10px] font-bold transition-all" (click)="cancelEditAddress()">✕</button>
-                              </div>
-                              <div class="relative w-full h-[180px] rounded-xl overflow-hidden shadow-inner border border-pink-100 bg-gray-50">
-                                <div [id]="'addr-map-' + order.id" class="absolute inset-0"></div>
-                                <div class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md text-[9px] font-bold text-pink-600 border border-pink-100 flex items-center gap-1.5 pointer-events-none">
-                                  <span>📍</span> Haz clic en el mapa para ajustar el pin
-                                </div>
-                              </div>
-                            </div>
-                          } @else {
-                            @if (order.clientAddress) {
+                          @if (order.clientAddress) {
                               <p class="text-[11px] text-gray-500 font-medium truncate mt-0.5 flex items-center justify-between group/addr">
                                 <span class="truncate">📍 {{ order.alternativeAddress || order.clientAddress }}</span>
-                                <button (click)="startEditAddress(order)" class="shrink-0 ml-2 px-2 py-1 rounded bg-pink-50 text-pink-500 text-[10px] font-bold hover:bg-pink-100 transition-colors flex items-center gap-1">
-                                  ✏️ Editar
+                                <button (click)="openMagicPicker(order)" class="shrink-0 ml-2 px-3 py-1.5 rounded-xl bg-pink-50 text-pink-500 text-[10px] font-bold hover:bg-pink-100 transition-all flex items-center gap-1 border border-pink-100 shadow-sm active:scale-95">
+                                  ✨ Magic Edit
                                 </button>
                               </p>
                             } @else {
                               <div class="flex items-center justify-between mt-0.5">
                                 <p class="text-[10px] text-amber-500 italic">Requiere dirección para optimizar</p>
-                                <button (click)="startEditAddress(order)" class="text-[10px] bg-amber-100 px-2 py-0.5 rounded-lg text-amber-700 font-bold hover:bg-amber-200 transition-colors">📍 Agregar</button>
+                                <button (click)="openMagicPicker(order)" class="text-[10px] bg-gradient-to-r from-amber-400 to-orange-400 px-3 py-1.5 rounded-xl text-white font-black hover:shadow-lg transition-all active:scale-95">📍 Ubicar con Magia</button>
                               </div>
                             }
-                          }
                         </div>
                         <span class="text-sm font-black text-pink-700 shrink-0">{{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                       </div>
@@ -973,7 +973,10 @@ export class RoutesComponent implements OnInit, OnDestroy {
   orchestrationFeed = signal<string[]>([]);
   activeOrchestrationId = signal<number | null>(null);
 
-  // Optimizer V2
+  // Magic Address Picker
+  showAddressPicker = signal(false);
+  pickerInitialAddress = '';
+  private pickerOrder: any = null;
   showOptimizerModal = signal(false);
 
   // Search & Filtering
@@ -1336,20 +1339,16 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
     this.signalr.locationUpdate$.subscribe((upd: { driverToken?: string, latitude: number, longitude: number }) => {
       if (upd.driverToken) {
-        // Legacy (Per Route Map)
         this.driverMarkers.update(map => {
           const next = new Map(map);
           next.set(upd.driverToken!, { lat: upd.latitude, lng: upd.longitude });
           return next;
         });
-
-        // God Mode (Global Radar)
         this.updateGodModeDriver(upd.driverToken, upd.latitude, upd.longitude);
       }
     });
 
     this.signalr.deliveryUpdate$.subscribe((data: any) => {
-      // Acoustic Alerts
       const time = new Date().toLocaleTimeString('es-MX', { hour12: false });
       if (data && data.status === 'Delivered') {
         this.playSuccessChime();
@@ -1362,8 +1361,6 @@ export class RoutesComponent implements OnInit, OnDestroy {
       } else {
         this.latestEvent.set(`[${time}] Actualización de ruta detectada 🔄`);
       }
-
-      // Refresh routes if something changed (status updated by driver)
       this.loadRoutes();
     });
 
@@ -1393,7 +1390,6 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
       if (!input || !mapContainer || typeof google === 'undefined') return;
 
-      // 1. Init Mini Map
       this.addrPreviewMap = new google.maps.Map(mapContainer, {
         center: { lat: GEO_CONFIG.defaultLat, lng: GEO_CONFIG.defaultLng },
         zoom: 14,
@@ -1402,21 +1398,19 @@ export class RoutesComponent implements OnInit, OnDestroy {
         gestureHandling: 'greedy'
       });
 
-      // Marker con estilo de la app
       this.addrPreviewMarker = new google.maps.Marker({
         map: this.addrPreviewMap,
         draggable: true,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 10,
-          fillColor: '#ec4899', // pink-500
+          fillColor: '#ec4899', 
           fillOpacity: 1,
           strokeWeight: 2,
           strokeColor: '#ffffff'
         }
       });
 
-      // 2. Geocode initial address if it exists
       if (this.tempAddress) {
         const geocoder = new google.maps.Geocoder();
         geocoder.geocode({ address: this.tempAddress + `, ${GEO_CONFIG.city}, ${GEO_CONFIG.state}` }, (results, status) => {
@@ -1429,14 +1423,12 @@ export class RoutesComponent implements OnInit, OnDestroy {
         });
       }
 
-      // 3. Init Autocomplete
       const autocomplete = new google.maps.places.Autocomplete(input, {
         componentRestrictions: { country: 'mx' },
         fields: ['formatted_address', 'geometry', 'name'],
         types: ['address']
       });
 
-      // Binding: Autocomplete -> Map
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
         if (place.formatted_address) {
@@ -1452,30 +1444,20 @@ export class RoutesComponent implements OnInit, OnDestroy {
         }
       });
 
-      // Binding: Map Click -> Reverse Geocode -> Input
       const geocoder = new google.maps.Geocoder();
       this.addrPreviewMap.addListener('click', (event: google.maps.MapMouseEvent) => {
         if (!event.latLng) return;
-
-        // Move pin instantly
         this.addrPreviewMarker?.setPosition(event.latLng);
         this.addrPreviewMap?.panTo(event.latLng);
-
-        // Reverse geocode
         geocoder.geocode({ location: event.latLng }, (results, status) => {
           if (status === 'OK' && results && results[0]) {
-            // Usa force update de Angular zone
             this.tempAddress = results[0].formatted_address;
             input.value = this.tempAddress;
-            // Despacha evento input para que ngModel se entere si quedó desincronizado
             input.dispatchEvent(new Event('input'));
-          } else {
-            this.toast.error('No se pudo obtener la dirección de ese punto');
           }
         });
       });
 
-      // Drag marker binding
       this.addrPreviewMarker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
         if (!event.latLng) return;
         geocoder.geocode({ location: event.latLng }, (results, status) => {
@@ -1486,7 +1468,6 @@ export class RoutesComponent implements OnInit, OnDestroy {
           }
         });
       });
-
     }, 150);
   }
 
@@ -1499,9 +1480,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
   saveAddress(order: any): void {
     if (!this.tempAddress.trim() || !order.clientId) return;
-
     this.isSavingAddress.set(true);
-    // Update client address via API
     this.api.updateClient(order.clientId, {
       name: order.clientName,
       address: this.tempAddress,
@@ -1513,15 +1492,53 @@ export class RoutesComponent implements OnInit, OnDestroy {
         order.clientAddress = this.tempAddress;
         this.editingOrderId.set(null);
         this.isSavingAddress.set(false);
-        // Also update in pendingOrders list if present
-        this.pendingOrders.update(list => {
-          return list.map(o => o.id === order.id ? { ...o, clientAddress: this.tempAddress } : o);
-        });
+        this.pendingOrders.update(list => list.map(o => o.id === order.id ? { ...o, clientAddress: this.tempAddress } : o));
       },
       error: () => {
         this.toast.error('Error al actualizar dirección');
         this.isSavingAddress.set(false);
       }
+    });
+  }
+
+  // ─── MAGIC ADDRESS PICKER ───
+  openMagicPicker(order: any): void {
+    this.pickerOrder = order;
+    this.pickerInitialAddress = order.clientAddress || '';
+    this.showAddressPicker.set(true);
+  }
+
+  onAddressPickerConfirm(res: { address: string, lat: number, lng: number }): void {
+    this.showAddressPicker.set(false);
+    if (!this.pickerOrder) return;
+    this.isSavingAddress.set(true);
+    this.api.updateClient(this.pickerOrder.clientId, {
+      name: this.pickerOrder.clientName,
+      address: res.address,
+      tag: this.pickerOrder.tags?.[0] || 'None',
+      type: this.pickerOrder.type || 'Nueva'
+    }).subscribe({
+      next: () => {
+        this.toast.success('Ubicación guardada con magia ✨');
+        this.pickerOrder.clientAddress = res.address;
+        this.isSavingAddress.set(false);
+        this.pendingOrders.update(list => list.map(o => o.id === this.pickerOrder.id ? { ...o, clientAddress: res.address } : o));
+      },
+      error: () => {
+        this.toast.error('Error al guardar ubicación');
+        this.isSavingAddress.set(false);
+      }
+    });
+  }
+
+  optimizeRoute(routeId: number): void {
+    this.toast.info('Optimizando ruta... 🧩');
+    this.api.optimizeRoute(routeId).subscribe({
+      next: () => {
+        this.toast.success('Ruta optimizada con éxito 🚀');
+        this.loadRoutes();
+      },
+      error: () => this.toast.error('Error al optimizar')
     });
   }
 
