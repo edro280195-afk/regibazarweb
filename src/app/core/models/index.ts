@@ -557,3 +557,76 @@ export interface CamiGreetingResponse {
     message: string;
     audioBase64?: string;
 }
+
+// ── Tandas ──
+export interface TandaProductDto {
+    id: string;
+    name: string;
+    description?: string;
+    basePrice: number;
+    isActive: boolean;
+    createdAt: string;
+}
+
+export interface TandaDto {
+    id: string;
+    productId: string;
+    name: string;
+    totalWeeks: number;
+    weeklyAmount: number;
+    penaltyAmount: number;
+    startDate: string;
+    status: string; // Draft, Active, Completed, Cancelled
+    createdAt: string;
+    accessToken?: string;
+    product?: TandaProductDto;
+    participants?: TandaParticipantDto[];
+}
+
+export interface TandaParticipantDto {
+    id: string;
+    tandaId: string;
+    customerId: string;
+    customerName?: string;
+    assignedTurn: number;
+    isDelivered: boolean;
+    deliveryDate?: string;
+    status: string; // Active, Delinquent, Completed
+    variant?: string;
+    payments?: TandaPaymentDto[];
+}
+
+export interface TandaPaymentDto {
+    id: string;
+    participantId: string;
+    weekNumber: number;
+    amountPaid: number;
+    penaltyPaid: number;
+    paymentDate: string;
+    isVerified: boolean;
+    notes?: string;
+}
+
+export interface CreateTandaDto {
+    productId: string;
+    name: string;
+    totalWeeks: number;
+    weeklyAmount: number;
+    penaltyAmount: number;
+    startDate: string;
+}
+
+export interface AddParticipantDto {
+    tandaId: string;
+    customerId: string;
+    assignedTurn: number;
+    variant?: string;
+}
+
+export interface RegisterPaymentDto {
+    participantId: string;
+    weekNumber: number;
+    amountPaid: number;
+    penaltyPaid?: number;
+    notes?: string;
+}

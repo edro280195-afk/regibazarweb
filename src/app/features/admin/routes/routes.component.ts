@@ -427,6 +427,14 @@ interface GeocodedOrder extends OrderSummaryDto {
                             <p class="text-sm font-black text-pink-600">{{ d.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                             <span class="text-xs">{{ d.status === 'Delivered' ? '✅' : d.status === 'NotDelivered' ? '❌' : d.status === 'InTransit' ? '🏃' : '⏳' }}</span>
                           </div>
+                          <button class="w-7 h-7 rounded-full bg-pink-50 text-pink-500 hover:bg-pink-100 flex items-center justify-center text-[10px] transition-all relative group shadow-sm border border-pink-100 shrink-0"
+                                  (click)="$event.stopPropagation(); openAdminChat(route.id, d.deliveryId, d.clientName)"
+                                  title="Chat con la Clienta">
+                             💬
+                             @if (unreadChatsIds().has(d.deliveryId)) {
+                               <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-ping"></span>
+                             }
+                          </button>
                           @if (route.status !== 'Completed') {
                             <!-- ↑/↓ buttons -->
                             <div class="flex flex-col gap-0.5">
@@ -726,6 +734,66 @@ interface GeocodedOrder extends OrderSummaryDto {
               📍 Ruta planificada · {{ mapDeliveries.length }} paradas
             </div>
           </div>
+        </div>
+      }
+
+      <!-- ═══════════════════════════════════════════════════
+           MODAL: CHAT DE SOPORTE ADMIN
+           ═══════════════════════════════════════════════════ -->
+      @if (showAdminChatModal() && currentChatDelivery()) {
+        <div class="fixed inset-0 z-[4000] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" (click)="closeAdminChat()">
+           <div class="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col shadow-2xl animate-scale-in" style="height: 75vh;" (click)="$event.stopPropagation()">
+               <div class="p-4 bg-gradient-to-r from-pink-500 to-rose-500 relative flex items-center justify-center border-b border-pink-200">
+                  <div class="absolute left-4">
+                     <button class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors" (click)="closeAdminChat()">✕</button>
+                  </div>
+                  <div class="text-center">
+                     <h3 class="text-white font-black leading-none drop-shadow-sm font-display tracking-wide text-lg">Chat Soporte</h3>
+                     <p class="text-pink-100 text-[10px] font-bold uppercase tracking-widest leading-tight">{{ currentChatClientName() }} 🎀</p>
+                  </div>
+               </div>
+               
+               <div id="admin-chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-pink-50/30 scroll-smooth">
+                 @if (loadingChat()) {
+                    <div class="h-full flex flex-col justify-center items-center">
+                       <span class="w-10 h-10 rounded-full border-4 border-pink-200 border-t-pink-500 animate-spin"></span>
+                    </div>
+                 } @else if (adminChatMessages().length === 0) {
+                    <div class="h-full flex flex-col justify-center items-center opacity-60">
+                       <span class="text-5xl mb-3 animate-float">💬</span>
+                       <p class="text-pink-800 font-bold text-center text-sm">Aún no hay mensajes.<br/>¡Escribe para comenzar! 💕</p>
+                    </div>
+                 }
+                 @for (m of adminChatMessages(); track m.id) {
+                    <div class="flex flex-col max-w-[85%]" [ngClass]="m.sender === 'Admin' ? 'self-end items-end' : 'self-start items-start'">
+                       @if (m.sender !== 'Admin') {
+                          <span class="text-[9px] font-black uppercase text-pink-400 ml-2 mb-1 tracking-widest drop-shadow-sm">
+                             {{ m.sender === 'Client' ? 'Clienta 💁🏻‍♀️' : 'Repartidor 🚗' }}
+                          </span>
+                       }
+                       <div class="p-3 shadow-sm border"
+                            [ngClass]="m.sender === 'Admin' ? 
+                               'bg-pink-500 text-white rounded-2xl rounded-tr-sm border-pink-400' : 
+                               (m.sender === 'Client' ? 'bg-white text-pink-900 rounded-2xl rounded-tl-sm border-pink-200' : 'bg-blue-50 text-blue-900 rounded-2xl rounded-tl-sm border-blue-200')">
+                          <p class="text-sm font-medium break-words whitespace-pre-wrap leading-relaxed">{{ m.text }}</p>
+                       </div>
+                       <span class="text-[9px] text-gray-400 mt-1.5 font-bold px-2">{{ m.timestamp | date:'h:mm a' }}</span>
+                    </div>
+                 }
+               </div>
+
+               <div class="p-3 bg-white border-t border-pink-100 shrink-0">
+                  <div class="flex gap-2">
+                     <input type="text" [(ngModel)]="newAdminChatMessage" (keyup.enter)="sendAdminChatMessage()"
+                            class="flex-1 bg-pink-50 border-2 border-pink-100 rounded-full px-5 text-sm focus:outline-none focus:border-pink-300 focus:ring-4 focus:ring-pink-100 transition-all font-medium placeholder-pink-300"
+                            placeholder="Mensaje... ✍🏻" />
+                     <button (click)="sendAdminChatMessage()" [disabled]="!newAdminChatMessage.trim() || sendingAdminChat()"
+                             class="w-12 h-12 shrink-0 bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-full flex justify-center items-center shadow-lg hover:shadow-pink-300 disabled:opacity-50 transition-all hover:scale-105 active:scale-95">
+                        <span class="text-xl translate-y-[1px]">✨</span>
+                     </button>
+                  </div>
+               </div>
+           </div>
         </div>
       }
 
@@ -1038,6 +1106,16 @@ export class RoutesComponent implements OnInit, OnDestroy {
   showCorteModal = signal(false);
   corteRoute = signal<RouteDto | null>(null);
   liquidating = signal(false);
+
+  // Admin Chat Modal
+  showAdminChatModal = signal(false);
+  currentChatDelivery = signal<{ routeId: number, deliveryId: number } | null>(null);
+  currentChatClientName = signal<string>('');
+  adminChatMessages = signal<any[]>([]);
+  newAdminChatMessage = '';
+  sendingAdminChat = signal(false);
+  loadingChat = signal(false);
+  unreadChatsIds = signal<Set<number>>(new Set());
 
   // Route Briefing (C.A.M.I.)
   routeBriefing = signal<{ text: string, audioBase64?: string } | null>(null);
@@ -1369,6 +1447,113 @@ export class RoutesComponent implements OnInit, OnDestroy {
       this.latestEvent.set(`[${time}] GASTO REGISTRADO: $${data.amount} (${data.type}) 💸`);
       this.loadRoutes();
     });
+
+    this.signalr.clientChatUpdate$.subscribe((msg: any) => {
+       // Mensaje nuevo en general de algun chat client/driver/admin
+       if (this.currentChatDelivery() && msg.deliveryId === this.currentChatDelivery()?.deliveryId) {
+          this.adminChatMessages.update(msgs => {
+             if (msgs.find(m => m.id === msg.id)) return msgs;
+             return [...msgs, msg];
+          });
+          this.scrollToBottomChat();
+       } else {
+          // Si no está abierto este chat, notificar visualmente (punto rojo) y toast
+          if (msg.sender !== 'Admin') {
+             this.unreadChatsIds.update(set => {
+                const next = new Set(set);
+                next.add(msg.deliveryId);
+                return next;
+             });
+             this.toast.info(`💬 Nuevo mensaje de ruta en la entrega #${msg.deliveryId}`);
+             this.playCashSound(); // Using cash sound for simplicity for now
+          }
+       }
+    });
+
+    this.signalr.adminChatUpdate$.subscribe((msg: any) => {
+       // Tambien puede venir por adminChatUpdate
+       if (this.currentChatDelivery() && msg.deliveryId === this.currentChatDelivery()?.deliveryId) {
+          this.adminChatMessages.update(msgs => {
+             if (msgs.find(m => m.id === msg.id)) return msgs;
+             return [...msgs, msg];
+          });
+          this.scrollToBottomChat();
+       } else {
+          if (msg.sender !== 'Admin') {
+             this.unreadChatsIds.update(set => {
+                const next = new Set(set);
+                next.add(msg.deliveryId);
+                return next;
+             });
+             this.toast.info(`💬 Nuevo mensaje en la ruta #${msg.deliveryRouteId}`);
+          }
+       }
+    });
+  }
+
+  // ─── ADMIN CHAT METHODS ───
+  openAdminChat(routeId: number, deliveryId: number, clientName: string) {
+     this.currentChatDelivery.set({ routeId, deliveryId });
+     this.currentChatClientName.set(clientName);
+     this.showAdminChatModal.set(true);
+     // Limpiar marca de no leido
+     this.unreadChatsIds.update(set => {
+        const next = new Set(set);
+        next.delete(deliveryId);
+        return next;
+     });
+     this.loadAdminChat(routeId, deliveryId);
+  }
+
+  closeAdminChat() {
+     this.showAdminChatModal.set(false);
+     this.currentChatDelivery.set(null);
+     this.adminChatMessages.set([]);
+  }
+
+  loadAdminChat(routeId: number, deliveryId: number) {
+     this.loadingChat.set(true);
+     this.api.getDeliveryChat(routeId, deliveryId).subscribe({
+        next: (msgs) => {
+           this.adminChatMessages.set(msgs);
+           this.loadingChat.set(false);
+           this.scrollToBottomChat();
+        },
+        error: () => {
+           this.loadingChat.set(false);
+           this.toast.error('Error al cargar chat.');
+        }
+     });
+  }
+
+  sendAdminChatMessage() {
+     const req = this.currentChatDelivery();
+     if (!req || !this.newAdminChatMessage.trim() || this.sendingAdminChat()) return;
+     this.sendingAdminChat.set(true);
+     this.api.sendAdminDeliveryMessage(req.routeId, req.deliveryId, this.newAdminChatMessage).subscribe({
+        next: (msg) => {
+           this.adminChatMessages.update(msgs => {
+              if (msgs.find(m => m.id === msg.id)) return msgs;
+              return [...msgs, msg];
+           });
+           this.newAdminChatMessage = '';
+           this.sendingAdminChat.set(false);
+           this.scrollToBottomChat();
+        },
+        error: () => {
+           this.sendingAdminChat.set(false);
+           this.toast.error('Error al enviar el mensaje.');
+        }
+     });
+  }
+
+  scrollToBottomChat() {
+     setTimeout(() => {
+        const box = document.getElementById('admin-chat-box');
+        if (box) {
+           box.scrollTop = box.scrollHeight;
+        }
+     }, 100);
   }
 
   toggleRouteExpand(id: number): void {

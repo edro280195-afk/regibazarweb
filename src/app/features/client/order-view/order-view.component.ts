@@ -149,13 +149,20 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
               <span class="text-xl">🏠</span>
               <span class="text-[10px] font-black uppercase tracking-widest">Estado</span>
             </button>
+            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'details' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('details')">
+              <span class="text-xl">🛍️</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Pedido</span>
+            </button>
             <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'payment' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('payment')">
               <span class="text-xl">💸</span>
               <span class="text-[10px] font-black uppercase tracking-widest">Pagar</span>
             </button>
-            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'details' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('details')">
-              <span class="text-xl">🛍️</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Pedido</span>
+            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl relative" [ngClass]="activeTab() === 'chat' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('chat'); unreadMessages.set(false)">
+              <span class="text-xl">💬</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Chat</span>
+              @if (unreadMessages()) {
+                <span class="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+              }
             </button>
           </div>
 
@@ -424,6 +431,60 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
             </div>
           }
 
+          @if (activeTab() === 'chat') {
+            <!-- ════════════ TAB: CHAT ════════════ -->
+            <div class="animate-fade-in-up flex flex-col h-[65vh] bg-white/90 rounded-[2.5rem] border border-pink-100 shadow-sm relative overflow-hidden">
+               <div class="bg-gradient-to-r from-pink-500 to-rose-400 p-4 shrink-0 shadow-md z-10 flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                     <span class="text-3xl">💖</span>
+                     <div>
+                        <h3 class="text-white font-black leading-none font-display tracking-wide text-lg">Soporte & Entregas</h3>
+                        <p class="text-pink-100 text-[10px] font-bold uppercase tracking-widest leading-tight">Siempre contigo 🎀</p>
+                     </div>
+                  </div>
+               </div>
+
+               <!-- Mensajes -->
+               <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-pink-50/40 scroll-smooth pb-20">
+                 @if (chatMessages().length === 0) {
+                    <div class="h-full flex flex-col justify-center items-center opacity-60">
+                       <span class="text-5xl mb-3 animate-float">💬</span>
+                       <p class="text-pink-800 font-bold text-center text-sm leading-relaxed">Este es el chat de tu pedido.<br/>¡Escríbenos si tienes dudas! 💕</p>
+                    </div>
+                 }
+                 @for (m of chatMessages(); track m.id) {
+                    <div class="flex flex-col max-w-[85%]" [ngClass]="m.sender === 'Client' ? 'self-end items-end' : 'self-start items-start'">
+                       @if (m.sender !== 'Client') {
+                          <span class="text-[9px] font-black uppercase text-pink-400 ml-2 mb-1 tracking-[0.1em] drop-shadow-sm flex items-center gap-1">
+                             {{ m.sender === 'Admin' ? 'Soporte (Regi Bazar) 👩🏻‍💻' : 'Repartidor 🚗' }}
+                          </span>
+                       }
+                       <div class="p-3.5 shadow-sm border"
+                            [ngClass]="m.sender === 'Client' ? 
+                               'bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-[1.5rem] rounded-tr-md border-pink-400' : 
+                               (m.sender === 'Admin' ? 'bg-white text-pink-900 rounded-[1.5rem] rounded-tl-md border-pink-200' : 'bg-rose-50 border-rose-200 text-rose-900 rounded-[1.5rem] rounded-tl-md')">
+                          <p class="text-sm break-words whitespace-pre-wrap font-medium leading-relaxed">{{ m.text }}</p>
+                       </div>
+                       <span class="text-[9px] text-gray-400/80 mt-1.5 font-bold px-2">{{ m.timestamp | date:'h:mm a' }}</span>
+                    </div>
+                 }
+               </div>
+
+               <!-- Input -->
+               <div class="absolute bottom-0 inset-x-0 p-3 bg-white/95 backdrop-blur-md border-t border-pink-100/50 shadow-[0_-10px_20px_rgba(252,211,228,0.3)]">
+                  <div class="flex gap-2">
+                     <input type="text" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
+                            class="flex-1 bg-pink-50/50 border-[2px] border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 focus:ring-4 focus:ring-pink-100 transition-all font-medium placeholder-pink-300 shadow-inner"
+                            placeholder="Escribe tu mensaje... ✍🏻" />
+                     <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
+                             class="w-12 h-12 shrink-0 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex justify-center items-center shadow-lg hover:shadow-pink-300 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all cursor-pointer">
+                        <span class="text-xl translate-x-[-1px] translate-y-[1px]">✨</span>
+                     </button>
+                  </div>
+               </div>
+            </div>
+          }
+
           <p class="text-center mt-12 mb-8 font-script text-rose-300 text-xl opacity-60">
             Hecho con 🎀 para ti
           </p>
@@ -684,7 +745,13 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   localInstructions = '';
 
   // UI Layout State
-  activeTab = signal<'status' | 'payment' | 'details'>('status');
+  activeTab = signal<'status' | 'payment' | 'details' | 'chat'>('status');
+
+  // Chat State
+  chatMessages = signal<any[]>([]);
+  newChatMessage = '';
+  sendingChat = signal(false);
+  unreadMessages = signal(false);
 
   // --- TOUR STATE ---
   tourActive = signal(false);
@@ -987,6 +1054,18 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
 
+    this.signalr.clientChatUpdate$.subscribe((msg) => {
+      this.chatMessages.update(msgs => {
+         if (msgs.find(m => m.id === msg.id)) return msgs;
+         return [...msgs, msg];
+      });
+      if (this.activeTab() !== 'chat') {
+         this.unreadMessages.set(true);
+         this.showToast('¡Escribieron en tu chat! 💬💌');
+      }
+      this.scrollToBottomChat();
+    });
+
     // Feature #9 — CAMI greeting pushed when driver marks InTransit
     this.signalr.camiGreeting$.subscribe((greeting) => {
       this.camiMessage.set(greeting.message);
@@ -1036,6 +1115,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         this.order.set(data);
         this.buildTimeline(data.status);
         this.loading.set(false);
+        this.loadChat();
 
         // Check Unboxing Session Status
         const unboxedKey = `regibazar_unboxed_${data.id}`;
@@ -1103,6 +1183,42 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
     });
+  }
+
+  loadChat() {
+     this.api.publicGetChat(this.accessToken).subscribe(msgs => {
+        this.chatMessages.set(msgs);
+        this.scrollToBottomChat();
+     });
+  }
+
+  sendChatMessage() {
+     if (!this.newChatMessage.trim() || this.sendingChat()) return;
+     this.sendingChat.set(true);
+     this.api.publicSendChatMessage(this.accessToken, this.newChatMessage).subscribe({
+        next: (msg) => {
+           this.chatMessages.update(msgs => {
+              if (msgs.find(m => m.id === msg.id)) return msgs;
+              return [...msgs, msg];
+           });
+           this.newChatMessage = '';
+           this.sendingChat.set(false);
+           this.scrollToBottomChat();
+        },
+        error: () => {
+           this.sendingChat.set(false);
+           this.showToast('No se pudo enviar el mensaje. 😿');
+        }
+     });
+  }
+
+  scrollToBottomChat() {
+     setTimeout(() => {
+        const box = document.getElementById('chat-box');
+        if (box) {
+           box.scrollTop = box.scrollHeight;
+        }
+     }, 100);
   }
 
   confirmOrder(event?: MouseEvent | TouchEvent) {

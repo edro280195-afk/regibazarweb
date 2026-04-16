@@ -165,6 +165,15 @@ export class ApiService {
         return this.http.post(`${this.base}/routes/${id}/liquidate`, {});
     }
 
+    // ── Admin Delivery Chat ──
+    getDeliveryChat(routeId: number, deliveryId: number): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/routes/${routeId}/deliveries/${deliveryId}/chat`);
+    }
+
+    sendAdminDeliveryMessage(routeId: number, deliveryId: number, text: string): Observable<any> {
+        return this.http.post<any>(`${this.base}/routes/${routeId}/deliveries/${deliveryId}/chat`, { text });
+    }
+
     // ── Suppliers ──
     getSuppliers(): Observable<SupplierDto[]> {
         return this.http.get<SupplierDto[]>(`${this.base}/suppliers`);

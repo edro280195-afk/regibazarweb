@@ -7,6 +7,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/auth/login/login.component').then(m => m.LoginComponent)
     },
     {
+        path: 'tanda-view/:token',
+        loadComponent: () => import('./features/client/tanda-view/tanda-view.component').then(m => m.TandaViewComponent)
+    },
+    {
         path: 'admin',
         loadComponent: () => import('./features/admin/layout/layout.component').then(m => m.LayoutComponent),
         canActivate: [authGuard],
@@ -58,14 +62,18 @@ export const routes: Routes = [
             {
                 path: 'glow-up',
                 loadComponent: () => import('./features/admin/glow-up/glow-up.component').then(m => m.GlowUpComponent)
+            },
+            {
+                path: 'tandas',
+                loadComponent: () => import('./features/admin/tandas/tandas.component').then(m => m.TandasComponent)
+            },
+            {
+                path: 'tandas/:id',
+                loadComponent: () => import('./features/admin/tandas/tanda-detail.component').then(m => m.TandaDetailComponent)
             }
         ]
     },
-    {
-        path: 'pos',
-        loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent),
-        canActivate: [authGuard]
-    },
+
     {
         path: 'pedido/:token',
         loadComponent: () => import('./features/client/order-view/order-view.component').then(m => m.OrderViewComponent)

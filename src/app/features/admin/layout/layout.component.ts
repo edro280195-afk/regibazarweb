@@ -520,7 +520,7 @@ export class LayoutComponent {
     const allItems: NavItem[] = [
       { label: 'Dashboard', icon: '🏠', route: '/admin' },
       { label: 'Pedidos', icon: '📦', route: '/admin/orders' },
-      { label: 'Caja POS', icon: '🛒', route: '/pos' },
+      { label: 'Tandas', icon: '🔄', route: '/admin/tandas' },
       { label: 'Clientas', icon: '👩‍💼', route: '/admin/clients' },
       { label: 'Rutas', icon: '🚗', route: '/admin/routes' },
       { label: 'Proveedores', icon: '🏭', route: '/admin/suppliers' },
