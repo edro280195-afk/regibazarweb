@@ -88,27 +88,43 @@ import { FormsModule } from '@angular/forms';
 
             <!-- Weekly Payments Table -->
             <div class="card-coquette p-6 border-pink-100/50">
-              <div class="flex items-center justify-between mb-6">
-                <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">
-                  <span>📅</span> Control Semanal de Abonos
-                </h4>
-                <div class="text-[10px] font-bold text-pink-400 bg-pink-50 px-3 py-1 rounded-full border border-pink-100">
-                  Desliza horizontalmente ➜
+              <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                <div>
+                   <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">
+                     <span>💎</span> Panel de Gestión de Tanda
+                   </h4>
+                   <p class="text-[9px] text-pink-400 font-bold mt-1">Control de abonos y logística de entregas</p>
+                </div>
+                
+                <!-- Premium View Switcher -->
+                <div class="bg-pink-50 p-1 rounded-2xl flex gap-1 border border-pink-100/50 shadow-inner">
+                   <button (click)="viewMode.set('table')" 
+                           [class]="viewMode() === 'table' ? 'bg-white text-pink-600 shadow-md scale-105' : 'text-pink-300 hover:text-pink-500'"
+                           class="px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2">
+                     <span>📋</span> Abonos
+                   </button>
+                   <button (click)="viewMode.set('visual')" 
+                           [class]="viewMode() === 'visual' ? 'bg-white text-pink-600 shadow-md scale-105' : 'text-pink-300 hover:text-pink-500'"
+                           class="px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2">
+                     <span>🌟</span> Ruta Pro
+                   </button>
                 </div>
               </div>
 
-              <div class="overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide">
-                <table class="table-coquette w-full">
-                  <thead>
-                    <tr>
-                      <th class="sticky left-0 z-20 bg-pink-50 shadow-[4px_0_8px_rgba(131,24,67,0.03)] min-w-[180px]">Clienta</th>
-                      @for (w of weeksArray(); track w) {
-                        <th class="text-center min-w-[75px]">Sem {{ w }}</th>
-                      }
-                      <th class="text-center">📦</th>
-                      <th class="text-center">⚙️</th>
-                    </tr>
-                  </thead>
+              @if (viewMode() === 'table') {
+                <div class="overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide animate-fade-in">
+                  <table class="table-coquette w-full">
+                    <thead>
+                      <tr>
+                        <th class="sticky left-0 z-20 bg-pink-50 shadow-[4px_0_8px_rgba(131,24,67,0.03)] min-w-[180px]">Clienta</th>
+                        @for (w of weeksArray(); track w) {
+                          <th class="text-center min-w-[75px]">Sem {{ w }}</th>
+                        }
+                        <th class="text-center min-w-[100px]">📅 Entrega</th>
+                        <th class="text-center">📦</th>
+                        <th class="text-center">⚙️</th>
+                      </tr>
+                    </thead>
                   <tbody>
                     @for (p of participants(); track p.id) {
                       <tr class="group">
@@ -148,15 +164,20 @@ import { FormsModule } from '@angular/forms';
                             }
                           </td>
                         }
+                        @if (tanda(); as t) {
+                          <td class="text-center">
+                            <span class="text-[9px] font-black text-pink-400 uppercase tracking-tight">
+                              {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
+                            </span>
+                          </td>
+                        }
                         <td class="text-center">
-                          <input type="checkbox" [checked]="p.isDelivered" class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300">
+                          <input type="checkbox" [checked]="p.isDelivered" (click)="onConfirmSundayDelivery(p)" class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
                         </td>
                         <td class="text-center">
-                          @if (p.variant) {
-                            <span class="text-[10px] font-black text-pink-500 uppercase bg-pink-50 px-2 py-1 rounded-lg border border-pink-100">{{ p.variant }}</span>
-                          } @else {
-                            <span class="text-pink-200 opacity-30 italic text-[10px]">-</span>
-                          }
+                          <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
+                             ⚙️
+                          </button>
                         </td>
                       </tr>
                     } @empty {
@@ -170,6 +191,70 @@ import { FormsModule } from '@angular/forms';
                   </tbody>
                 </table>
               </div>
+            } @else {
+                <!-- RUTA DE ENTREGAS CON ESTEROIDES (Visual View) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-in">
+                  @for (p of participants(); track p.id) {
+                    <div class="relative group">
+                       <!-- Milestone Card -->
+                       <div class="bg-gradient-to-br from-white to-pink-50/20 rounded-[2.5rem] p-6 border-2 transition-all duration-500 min-h-[220px] flex flex-col justify-between"
+                            [ngClass]="{
+                              'border-pink-200 shadow-xl shadow-pink-100/50 scale-[1.02]': p.assignedTurn === currentWeek(),
+                              'border-pink-50 opacity-80 hover:opacity-100 hover:border-pink-100': p.assignedTurn !== currentWeek(),
+                              'grayscale-[0.5]': p.isDelivered
+                            }">
+                          
+                          <!-- Card Header: Turn & Date -->
+                          <div class="flex justify-between items-start">
+                             <div class="flex flex-col">
+                                <span class="text-[9px] font-black text-pink-400 tracking-[0.2em] uppercase">Semana {{ p.assignedTurn }}</span>
+                                <h5 class="text-lg font-black text-pink-900 leading-tight">
+                                   {{ getDeliveryDate(tanda()!.startDate, p.assignedTurn) | date:'EEEE dd' : '' : 'es-MX' | uppercase }}
+                                </h5>
+                                <p class="text-[10px] text-pink-400 font-bold opacity-60">{{ getDeliveryDate(tanda()!.startDate, p.assignedTurn) | date:'MMMM yyyy' : '' : 'es-MX' | uppercase }}</p>
+                             </div>
+                             @if (p.assignedTurn === currentWeek()) {
+                               <span class="w-10 h-10 rounded-2xl bg-pink-600 text-white flex items-center justify-center text-xl shadow-lg shadow-pink-200 animate-bounce-subtle">📍</span>
+                             }
+                             @if (p.isDelivered) {
+                               <span class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">✅</span>
+                             }
+                          </div>
+
+                          <!-- Card Body: Client -->
+                          <div class="my-4">
+                             <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-400 flex items-center justify-center text-white text-xl font-black shadow-md">
+                                   {{ p.customerName?.charAt(0) }}
+                                </div>
+                                <div>
+                                   <p class="text-base font-black text-pink-900 truncate max-w-[150px]">{{ p.customerName }}</p>
+                                   <!-- VARIANTE CON ESTILO DE ETIQUETA -->
+                                   <div class="mt-1 flex items-center gap-1">
+                                      <span class="text-[8px] bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full font-black uppercase tracking-wider border border-pink-200">💎 {{ p.variant || 'Sin Variante' }}</span>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+
+                          <!-- Card Actions -->
+                          <div class="pt-2 border-t border-pink-50/50">
+                             @if (!p.isDelivered) {
+                               <button (click)="onConfirmSundayDelivery(p)" 
+                                       class="w-full py-2.5 bg-white hover:bg-pink-600 hover:text-white text-pink-600 text-[10px] font-black rounded-xl uppercase tracking-widest transition-all border border-pink-100 shadow-sm flex items-center justify-center gap-2 group-hover:scale-[1.02]">
+                                 🎁 Confirmar Entrega
+                               </button>
+                             } @else {
+                               <div class="text-center py-2 text-emerald-500 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                                  ✨ PRODUCTO ENTREGADO ✨
+                               </div>
+                             }
+                          </div>
+                       </div>
+                    </div>
+                  }
+                </div>
+              }
             </div>
           </div>
 
@@ -377,9 +462,10 @@ import { FormsModule } from '@angular/forms';
 
       <!-- ACTION SHEET: Participant Management -->
       @if (selectedParticipantActions(); as p) {
-        <div class="fixed inset-0 z-[110] flex items-end justify-center sm:items-center p-0 sm:p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/20 backdrop-blur-sm" (click)="selectedParticipantActions.set(null)"></div>
-          <div class="bg-white w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 relative z-10 animate-slide-up shadow-2xl border-t border-pink-100">
+        <!-- PARTICIPANT ACTIONS (Mobile Optimized Modal) -->
+        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-fade-in">
+          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-sm" (click)="selectedParticipantActions.set(null)"></div>
+          <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative z-10 animate-scale-in shadow-2xl border border-pink-100">
              <div class="w-12 h-1.5 bg-pink-100 rounded-full mx-auto mb-6 sm:hidden"></div>
              
              <div class="text-center mb-8">
@@ -496,6 +582,40 @@ export class TandaDetailComponent implements OnInit {
   weeksArray = signal<number[]>([]);
   sundayParticipant = signal<TandaParticipantDto | null>(null);
   loading = signal(true);
+  viewMode = signal<'table' | 'visual'>('table');
+
+  currentWeek = computed(() => {
+    const t = this.tanda();
+    if (!t || !t.startDate) return 0;
+
+    // Parseamos la fecha ignorando zona horaria para consistencia con el backend
+    const datePart = t.startDate.split('T')[0];
+    const parts = datePart.split('-');
+    const startDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+
+    const diffTime = today.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return 0;
+    // Lógica espejo del backend: El domingo es el cierre (día 7), el lunes cambia (día 8)
+    return Math.floor((diffDays === 0 ? 0 : diffDays - 1) / 7) + 1;
+  });
+
+  getDeliveryDate(startDate: string, turn: number): Date {
+    if (!startDate) return new Date();
+    const datePart = startDate.split('T')[0];
+    const parts = datePart.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const date = new Date(year, month, day, 12, 0, 0);
+    date.setDate(date.getDate() + (turn - 1) * 7);
+    return date;
+  }
 
   // Inscripción
   allClients = signal<ClientDto[]>([]);
@@ -512,7 +632,7 @@ export class TandaDetailComponent implements OnInit {
   // Pago
   showPaymentModal = signal(false);
   isSavingPay = signal(false);
-  activePayment = signal<{participant: TandaParticipantDto, week: number} | null>(null);
+  activePayment = signal<{ participant: TandaParticipantDto, week: number } | null>(null);
 
   // Edición
   showEditModal = signal(false);
@@ -542,7 +662,7 @@ export class TandaDetailComponent implements OnInit {
       const clientName = c.name?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "";
       const matchesSearch = !s || clientName.includes(s);
       const isFrequent = (c.ordersCount && c.ordersCount >= 1) || c.type === 'Frecuente';
-      
+
       return matchesSearch && (!frequentOnly || isFrequent);
     }).slice(0, 10);
   });
@@ -567,11 +687,11 @@ export class TandaDetailComponent implements OnInit {
       next: (data) => {
         this.tanda.set(data);
         if (data.participants) {
-          this.participants.set([...data.participants].sort((a,b) => a.assignedTurn - b.assignedTurn));
+          this.participants.set([...data.participants].sort((a, b) => a.assignedTurn - b.assignedTurn));
         }
-        this.weeksArray.set(Array.from({length: data.totalWeeks}, (_, i) => i + 1));
+        this.weeksArray.set(Array.from({ length: data.totalWeeks }, (_, i) => i + 1));
         this.loading.set(false);
-        
+
         this.tandaService.getSundayDelivery(id).subscribe({
           next: (p) => this.sundayParticipant.set(p),
           error: () => this.sundayParticipant.set(null)
@@ -690,7 +810,7 @@ export class TandaDetailComponent implements OnInit {
   }
 
   openPaymentModal(participant: TandaParticipantDto, week: number) {
-    this.activePayment.set({participant, week});
+    this.activePayment.set({ participant, week });
     this.showPaymentModal.set(true);
     this.isSavingPay.set(false);
   }
@@ -805,7 +925,7 @@ export class TandaDetailComponent implements OnInit {
       next: () => {
         this.toastService.success('¡Entrega confirmada con éxito! ✨');
         this.loadTanda(p.tandaId);
-        
+
         // FEATURE: CAMI Audio Announcement
         this.apiService.getAICamiMessage(`Anuncia con mucha alegría que la clienta ${p.customerName} ha recibido su producto de la tanda hoy.`).subscribe((res: CamiChatResponse) => {
           if (res.audioBase64) {
