@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TandaDto, TandaParticipantDto, ClientDto, CLIENT_TAG_LABELS } from '../../../core/models';
+import { TandaDto, TandaParticipantDto, ClientDto, CLIENT_TAG_LABELS, CamiChatResponse } from '../../../core/models';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -53,11 +53,17 @@ import { FormsModule } from '@angular/forms';
                     📦
                   </div>
                   <div>
-                    <h3 class="text-2xl font-black text-pink-900 font-display">Entrega Dominical</h3>
+                    <h3 class="text-2xl font-black text-pink-900 font-display">Entrega de Tanda</h3>
                     @if (sundayParticipant(); as sp) {
-                      <p class="text-pink-500 font-bold flex items-center gap-2 mt-1">
-                        <span class="animate-pulse">💖</span> {{ sp.customerName }} recibe hoy
-                      </p>
+                      @if (sp.isDelivered) {
+                        <p class="text-emerald-500 font-bold flex items-center gap-2 mt-1 animate-fade-in">
+                          <span class="text-xl">✅</span> ¡PRODUCTO ENTREGADO! ✨
+                        </p>
+                      } @else {
+                        <p class="text-pink-500 font-bold flex items-center gap-2 mt-1">
+                          <span class="animate-pulse">💖</span> {{ sp.customerName }} recibe hoy
+                        </p>
+                      }
                       <div class="flex gap-2 mt-3">
                         <span class="px-3 py-1 bg-pink-100 text-pink-700 text-[10px] font-black rounded-lg uppercase tracking-wider">Turno #{{ sp.assignedTurn }}</span>
                         <span class="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-lg uppercase tracking-wider">Entrega: Próx. Domingo</span>
@@ -68,8 +74,14 @@ import { FormsModule } from '@angular/forms';
                   </div>
                 </div>
                 
-                @if (sundayParticipant()) {
-                  <button class="btn-coquette btn-rose px-8 py-4 shadow-xl">Confirmar Entrega ✨</button>
+                @if (sundayParticipant(); as sp) {
+                  @if (!sp.isDelivered) {
+                    <button (click)="onConfirmSundayDelivery(sp)" class="btn-coquette btn-rose px-8 py-4 shadow-xl">Confirmar Entrega ✨</button>
+                  } @else {
+                    <div class="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs border border-emerald-100 uppercase tracking-widest">
+                       Entrega Completada
+                    </div>
+                  }
                 }
               </div>
             </div>
@@ -383,6 +395,10 @@ import { FormsModule } from '@angular/forms';
                         class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
                   <span class="text-lg">🔢</span> Cambiar Turno
                 </button>
+                <button (click)="editingVariantId.set(p.id); editVariantValue = p.variant || ''; selectedParticipantActions.set(null)" 
+                        class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
+                  <span class="text-lg">🎨</span> Editar Variante
+                </button>
                 <button (click)="showRemoveConfirm.set(p); selectedParticipantActions.set(null)" 
                         class="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-500 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-rose-100">
                   <span class="text-lg">🗑️</span> Quitar de esta Tanda
@@ -442,6 +458,29 @@ import { FormsModule } from '@angular/forms';
           </div>
         </div>
       }
+
+      <!-- CUSTOM DELIVERY CONFIRMATION MODAL -->
+      @if (confirmingDelivery(); as p) {
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
+          <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-md"></div>
+          <div class="card-coquette bg-white p-8 w-full max-w-sm relative z-10 animate-scale-in">
+             <div class="w-20 h-20 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-pink-500 text-4xl mb-6 animate-bounce-subtle">
+                🎁
+             </div>
+             <h3 class="text-xl font-black text-pink-900 text-center mb-2">¿Confirmar Entrega?</h3>
+             <p class="text-sm text-pink-400 text-center font-medium leading-relaxed mb-8">
+               ¿Confirmas que <span class="font-black text-pink-600">{{ p.customerName }}</span> recibió su producto hoy? ✨
+             </p>
+
+             <div class="flex gap-4">
+                <button (click)="confirmingDelivery.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
+                <button (click)="confirmDelivery(p)" class="btn-coquette btn-pink flex-1 justify-center shadow-lg shadow-pink-200">
+                   Sí, confirmar ✨
+                </button>
+             </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: []
@@ -462,6 +501,7 @@ export class TandaDetailComponent implements OnInit {
   allClients = signal<ClientDto[]>([]);
   clientSearch = signal('');
   showOnlyFrequent = signal(true);
+  confirmingDelivery = signal<TandaParticipantDto | null>(null);
   showSuggestions = signal(false);
   selectedSuggestionIdx = signal(-1);
   selectedClient = signal<ClientDto | null>(null);
@@ -752,6 +792,29 @@ export class TandaDetailComponent implements OnInit {
         this.isUpdatingVariant.set(false);
         this.toastService.error(err.error?.message || 'Error al actualizar variante');
       }
+    });
+  }
+
+  onConfirmSundayDelivery(p: TandaParticipantDto) {
+    this.confirmingDelivery.set(p);
+  }
+
+  confirmDelivery(p: TandaParticipantDto) {
+    this.confirmingDelivery.set(null);
+    this.tandaService.confirmParticipantDelivery(p.id).subscribe({
+      next: () => {
+        this.toastService.success('¡Entrega confirmada con éxito! ✨');
+        this.loadTanda(p.tandaId);
+        
+        // FEATURE: CAMI Audio Announcement
+        this.apiService.getAICamiMessage(`Anuncia con mucha alegría que la clienta ${p.customerName} ha recibido su producto de la tanda hoy.`).subscribe((res: CamiChatResponse) => {
+          if (res.audioBase64) {
+            const audio = new Audio('data:audio/mp3;base64,' + res.audioBase64);
+            audio.play();
+          }
+        });
+      },
+      error: (err) => this.toastService.error(err.error?.message || 'Error al confirmar entrega')
     });
   }
 

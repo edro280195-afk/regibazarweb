@@ -289,6 +289,10 @@ export class ApiService {
         return this.http.post<CamiChatResponse>(`${this.base}/cami/chat`, body);
     }
 
+    getAICamiMessage(prompt: string): Observable<CamiChatResponse> {
+        return this.camiChat([], prompt);
+    }
+
     getDashboardInsight(data: { revenueToday: number; revenueMonth: number; pendingOrders: number; deliveredOrders: number; activeRoutes: number; pendingAmount: number; totalClients: number }): Observable<CamiChatResponse> {
         return this.http.post<CamiChatResponse>(`${this.base}/cami/dashboard-insight`, data);
     }

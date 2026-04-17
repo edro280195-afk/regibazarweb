@@ -74,6 +74,10 @@ export class TandaService {
     return this.http.patch(`${this.base}/participants/${participantId}/variant`, { variant });
   }
 
+  confirmParticipantDelivery(participantId: string): Observable<any> {
+    return this.http.patch(`${this.base}/participants/${participantId}/confirm-delivery`, {});
+  }
+
   shuffleParticipants(tandaId: string): Observable<any> {
     return this.http.post(`${this.base}/${tandaId}/shuffle`, {});
   }

@@ -87,64 +87,88 @@ import { gsap } from 'gsap';
             <div class="bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl animate-bounce-in relative overflow-hidden">
                <div class="absolute -right-6 -top-6 text-7xl opacity-20 rotate-12">🎁</div>
                <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡ES TU TURNO! ✨</h3>
-               <p class="text-xs font-medium opacity-90">Esta semana el producto es para ti. ¡Abre tu regalo dominical! 💖</p>
+               <p class="text-xs font-medium opacity-90">Esta semana el producto es para ti. ¡Abre tu regalo de tanda! 💖</p>
             </div>
           }
 
           <!-- Transparency Wall (Payments) -->
+          <!-- Transparency Wall -->
           <div class="space-y-4">
             <h3 class="text-center text-pink-950 font-black text-lg font-display flex items-center justify-center gap-2">
-              <span>💎</span> Muro de Transparencia
+              <span>💎</span> Seguimiento & Transparencia
             </h3>
             
-            <div class="grid grid-cols-2 gap-3">
-              @for (p of t.participants; track p.assignedTurn) {
-                <div class="bg-white/80 p-3 rounded-2xl border border-pink-100 flex items-center justify-between group hover:shadow-md transition-all">
-                  <div class="flex items-center gap-2">
-                     <span class="w-6 h-6 rounded-lg bg-pink-50 text-pink-400 text-[10px] font-black flex items-center justify-center">{{ p.assignedTurn }}</span>
-                  <div class="flex-1 min-w-0">
-                     <span class="text-xs font-bold text-pink-900 truncate block">{{ p.name }}</span>
-                     @if (p.variant) {
-                       <span class="text-[9px] font-black text-pink-400 uppercase tracking-tighter">{{ p.variant }}</span>
-                     }
-                  </div>
-                  </div>
-                  @if (p.hasPaidCurrentWeek) {
-                    <span class="text-emerald-500">✅</span>
-                  } @else {
-                    <span class="text-pink-200 text-xs animate-pulse">⏳</span>
-                  }
-                </div>
-              }
-            </div>
-          </div>
+            <div id="transparency-timeline" class="bg-white/90 rounded-[2.5rem] p-8 shadow-sm border border-white relative overflow-hidden">
+               <div class="absolute top-0 right-0 w-32 h-32 bg-pink-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
+               
+               <div class="space-y-8 relative z-10">
+                 @for (p of t.participants; track p.assignedTurn) {
+                   <div class="flex gap-6 group">
+                     <!-- Left Indicator Column -->
+                     <div class="flex flex-col items-center w-10">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm transition-all duration-500"
+                             [ngClass]="{
+                               'bg-pink-600 text-white scale-110 shadow-lg shadow-pink-100': p.assignedTurn === t.currentWeek,
+                               'bg-white text-pink-400 border border-pink-100': p.assignedTurn !== t.currentWeek
+                             }">
+                           {{ p.assignedTurn }}
+                        </div>
+                        @if (!$last) {
+                          <div class="w-0.5 flex-grow bg-pink-50 my-2 rounded-full"></div>
+                        }
+                     </div>
 
-          <!-- Calendario de Entregas -->
-          <div class="bg-white/80 rounded-[2.5rem] p-8 shadow-sm border border-white/50 space-y-6">
-             <h3 class="text-xs font-black text-pink-300 uppercase tracking-[0.3em] text-center">Calendario de Entregas</h3>
-             
-             <div class="space-y-4">
-               @for (p of t.participants; track p.assignedTurn) {
-                 <div class="flex items-center gap-4 p-3 rounded-2xl transition-all"
-                      [ngClass]="p.assignedTurn === t.currentWeek ? 'bg-pink-50 border border-pink-200' : 'opacity-60'">
-                    <div class="w-10 h-10 rounded-xl flex flex-col items-center justify-center bg-white shadow-sm font-black">
-                       <span class="text-[8px] text-pink-400 leading-none">SEMANA</span>
-                       <span class="text-lg text-pink-900 leading-tight">{{ p.assignedTurn }}</span>
-                    </div>
-                    <div class="flex-1">
-                       <p class="text-sm font-black text-pink-950">{{ p.name }}</p>
-                       <p class="text-[10px] text-pink-400 uppercase tracking-widest font-black">
-                          {{ p.variant ? p.variant + ' • ' : '' }}{{ p.assignedTurn === t.currentWeek ? '📍 Entrega Hoy' : 'Próxima entrega' }}
-                       </p>
-                    </div>
-                    @if (p.assignedTurn < t.currentWeek) {
-                      <span class="text-pink-400">🎁</span>
-                    } @else if (p.assignedTurn === t.currentWeek) {
-                      <span class="text-xl animate-wiggle inline-block">🎁</span>
-                    }
-                 </div>
-               }
-             </div>
+                     <!-- Content Column -->
+                     <div class="flex-1 pt-1">
+                        <div class="flex justify-between items-start mb-1">
+                           <div>
+                             <p class="text-sm font-black text-pink-900 leading-tight">{{ p.name }}</p>
+                             <div class="flex items-center gap-1.5 mt-0.5">
+                               @if (p.variant) {
+                                  <span class="text-[9px] font-black text-pink-400 uppercase tracking-widest">{{ p.variant }}</span>
+                                  <span class="text-pink-200 text-[8px]">•</span>
+                               }
+                               <span class="text-[9px] font-bold text-pink-500 uppercase tracking-tight">
+                                  📅 {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'EEE d MMM' : '' : 'es-MX' | uppercase }}
+                               </span>
+                             </div>
+                           </div>
+                           <div class="flex gap-2 items-center">
+                              <!-- Payment Track (Hearts) -->
+                              <div class="flex flex-col items-end gap-1">
+                                 <div class="flex flex-wrap justify-end gap-0.5 max-w-[120px]">
+                                    @for (week of weeksArray(); track week) {
+                                      <span class="text-[10px] transition-all duration-300"
+                                            [class.grayscale]="!p.paidWeeks.includes(week)"
+                                            [class.opacity-30]="!p.paidWeeks.includes(week)"
+                                            [title]="'Semana ' + week">
+                                        💖
+                                      </span>
+                                    }
+                                 </div>
+                                 <span class="text-[8px] font-black text-pink-400 uppercase tracking-tighter">
+                                   {{ p.paidWeeks.length }} de {{ t.totalWeeks }} abonos ✨
+                                 </span>
+                              </div>
+
+                              <!-- Delivery Status Badge -->
+                              @if (p.assignedTurn <= t.currentWeek) {
+                                <div class="w-10 h-10 rounded-2xl flex flex-col items-center justify-center transition-all bg-gradient-to-br"
+                                     [ngClass]="p.isDelivered ? 'from-emerald-400 to-teal-500 shadow-emerald-100 shadow-lg' : 'from-pink-100 to-rose-200 opacity-50'">
+                                   <span class="text-lg">{{ p.isDelivered ? '🎁' : '📍' }}</span>
+                                   <span class="text-[6px] font-black text-white uppercase tracking-tighter">{{ p.isDelivered ? 'LISTO' : 'RUTA' }}</span>
+                                </div>
+                              }
+                           </div>
+                        </div>
+                        <div class="h-1 w-full bg-pink-50 rounded-full mt-2 overflow-hidden">
+                           <div class="h-full bg-pink-300 transition-all duration-1000" [style.width]="(p.paidWeeks.length / t.totalWeeks * 100) + '%'"></div>
+                        </div>
+                     </div>
+                   </div>
+                 }
+               </div>
+            </div>
           </div>
 
           <!-- Rules Section -->
@@ -152,7 +176,7 @@ import { gsap } from 'gsap';
              <h4 class="text-xs font-black uppercase tracking-widest mb-3">🌸 Políticas de Tanda</h4>
              <p class="text-[11px] leading-relaxed font-medium">
                Los abonos se reciben los <strong class="text-pink-600">Viernes y Sábados</strong>. <br>
-               Las entregas se realizan los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana.
+               Las entregas se realizan los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana. (Entrega de Tanda ✨)
              </p>
           </div>
 
@@ -241,5 +265,30 @@ export class TandaViewComponent implements OnInit {
         this.error.set(true);
       }
     });
+  }
+
+  weeksArray = computed(() => {
+    const t = this.tanda();
+    if (!t) return [];
+    return Array.from({ length: t.totalWeeks }, (_, i) => i + 1);
+  });
+
+  getDeliveryDate(startDate: string, turn: number): Date {
+    if (!startDate) return new Date();
+    
+    // Extraemos las partes de la fecha (YYYY-MM-DD)
+    const datePart = startDate.split('T')[0];
+    const parts = datePart.split('-');
+    
+    // Forzamos el parseo local para evitar saltos de día por UTC
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    
+    const date = new Date(year, month, day, 12, 0, 0); // 12:00 PM local para ser súper seguros
+    
+    // Sumamos las semanas según el turno
+    date.setDate(date.getDate() + (turn - 1) * 7);
+    return date;
   }
 }

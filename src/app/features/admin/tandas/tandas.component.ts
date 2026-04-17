@@ -246,7 +246,7 @@ export class TandasComponent implements OnInit {
     name: '',
     totalWeeks: 10,
     weeklyAmount: 100,
-    startDate: new Date().toISOString().split('T')[0]
+    startDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
   };
 
   filteredTandas = () => {
@@ -380,7 +380,7 @@ export class TandasComponent implements OnInit {
       name: '',
       totalWeeks: 10,
       weeklyAmount: 100,
-      startDate: new Date().toISOString().split('T')[0]
+      startDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
     };
     this.productSearch = '';
     this.selectedProduct.set(null);

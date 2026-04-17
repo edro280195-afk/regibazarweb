@@ -607,6 +607,27 @@ export interface TandaPaymentDto {
     notes?: string;
 }
 
+export interface TandaViewDto {
+    id: string;
+    name: string;
+    productName: string;
+    totalWeeks: number;
+    weeklyAmount: number;
+    startDate: string;
+    currentWeek: number;
+    participants: TandaParticipantViewDto[];
+}
+
+export interface TandaParticipantViewDto {
+    name: string;
+    assignedTurn: number;
+    hasPaidCurrentWeek: boolean;
+    paidWeeks: number[];
+    isWinnerThisWeek: boolean;
+    isDelivered: boolean;
+    variant?: string;
+}
+
 export interface CreateTandaDto {
     productId: string;
     name: string;

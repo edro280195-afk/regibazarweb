@@ -349,7 +349,12 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
                     <div class="flex justify-between items-center group order-item">
                       <div class="flex flex-col">
                         <span class="font-bold text-pink-950 text-sm leading-tight group-hover:text-pink-600 transition-colors">{{ item.productName }}</span>
-                        <span class="text-[10px] font-black text-pink-400 uppercase tracking-widest">x{{ item.quantity }}</span>
+                        <div class="flex items-center gap-2">
+                           <span class="text-[10px] font-black text-pink-400 uppercase tracking-widest">x{{ item.quantity }}</span>
+                           @if (item.variant) {
+                              <span class="text-[9px] font-black text-white bg-pink-400 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">{{ item.variant }}</span>
+                           }
+                        </div>
                       </div>
                       <span class="font-black text-pink-600">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
                     </div>
@@ -1283,6 +1288,11 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         originX = (rect.left + rect.width / 2) / window.innerWidth;
         originY = (rect.top + rect.height / 2) / window.innerHeight;
       }
+    }
+
+    // Safety confirmation prompt
+    if (!confirm('¿Segura que deseas confirmar tu pedido? ✨')) {
+      return;
     }
 
     const tl = gsap.timeline();
