@@ -145,24 +145,17 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
 
           <!-- Quick Action Tabs -->
           <div id="nav-tabs" class="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-[2rem] mb-6 border border-white sticky top-24 z-20" [style.opacity]="isUnboxed() ? 1 : 0">
-            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'status' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('status')">
-              <span class="text-xl">🏠</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Estado</span>
-            </button>
             <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'details' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('details')">
               <span class="text-xl">🛍️</span>
               <span class="text-[10px] font-black uppercase tracking-widest">Pedido</span>
             </button>
             <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'payment' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('payment')">
               <span class="text-xl">💸</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Pagar</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Pago</span>
             </button>
-            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl relative" [ngClass]="activeTab() === 'chat' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('chat'); unreadMessages.set(false)">
-              <span class="text-xl">💬</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Chat</span>
-              @if (unreadMessages()) {
-                <span class="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-              }
+            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'status' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('status')">
+              <span class="text-xl">🏠</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Estado</span>
             </button>
           </div>
 
@@ -263,18 +256,6 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
                 </div>
               </div>
 
-              <!-- Pending Confirmation Card -->
-              @if (o.status === 'Pending') {
-                <div id="confirm-card" class="bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl group">
-                  <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡Confirma tu Pedido! 🎀</h3>
-                  <p class="text-[10px] font-medium opacity-80 mb-6">Toca el botón para empezar a prepararlo cuidando cada detalle.</p>
-                  <button id="confirm-btn" (click)="confirmOrder($event)" 
-                          class="w-full py-5 rounded-2xl bg-white text-pink-600 font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-all text-sm">
-                     ✨ SÍ, CONFIRMAR PEDIDO
-                  </button>
-                </div>
-              }
-              
               <!-- Payment Methods -->
               <div id="payment-methods" class="relative z-10">
                 <h3 class="text-center text-pink-900 font-black text-lg font-display mb-1">Formas de Pago 💸</h3>
@@ -394,7 +375,17 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
                   </div>
                 </div>
 
-
+                <!-- Pending Confirmation Card (Relocated) -->
+                @if (o.status === 'Pending') {
+                  <div id="confirm-card" class="mt-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl group animate-bounce-subtle">
+                    <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡Todo se ve increíble! 🎀</h3>
+                    <p class="text-[10px] font-medium opacity-80 mb-6">Confirma tu pedido para empezar a prepararlo con mucho amor.</p>
+                    <button id="confirm-btn" (click)="confirmOrder($event)" 
+                            class="w-full py-5 rounded-2xl bg-white text-pink-600 font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-all text-sm">
+                       ✨ SÍ, CONFIRMAR PEDIDO
+                    </button>
+                  </div>
+                }
               </div>
 
               <!-- Delivery Instructions -->
@@ -431,57 +422,70 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
             </div>
           }
 
-          @if (activeTab() === 'chat') {
-            <!-- ════════════ TAB: CHAT ════════════ -->
-            <div class="animate-fade-in-up flex flex-col h-[65vh] bg-white/90 rounded-[2.5rem] border border-pink-100 shadow-sm relative overflow-hidden">
-               <div class="bg-gradient-to-r from-pink-500 to-rose-400 p-4 shrink-0 shadow-md z-10 flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                     <span class="text-3xl">💖</span>
-                     <div>
-                        <h3 class="text-white font-black leading-none font-display tracking-wide text-lg">Soporte & Entregas</h3>
-                        <p class="text-pink-100 text-[10px] font-bold uppercase tracking-widest leading-tight">Siempre contigo 🎀</p>
-                     </div>
-                  </div>
-               </div>
-
-               <!-- Mensajes -->
-               <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-pink-50/40 scroll-smooth pb-20">
-                 @if (chatMessages().length === 0) {
-                    <div class="h-full flex flex-col justify-center items-center opacity-60">
-                       <span class="text-5xl mb-3 animate-float">💬</span>
-                       <p class="text-pink-800 font-bold text-center text-sm leading-relaxed">Este es el chat de tu pedido.<br/>¡Escríbenos si tienes dudas! 💕</p>
+          <!-- Chat Modal Overlay -->
+          @if (isChatOpen()) {
+            <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fade-in">
+              <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-sm" (click)="isChatOpen.set(false)"></div>
+              
+              <div class="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl border border-pink-100 overflow-hidden flex flex-col h-[70vh] animate-bounce-up-y-only">
+                <!-- Chat Header -->
+                <div class="bg-gradient-to-r from-pink-500 to-rose-400 p-5 shrink-0 flex items-center justify-between">
+                  <div class="flex items-center gap-3 text-white">
+                    <span class="text-3xl">💖</span>
+                    <div>
+                      <h3 class="font-black leading-none font-display text-lg">Soporte & Entregas</h3>
+                      <p class="text-pink-100 text-[9px] font-bold uppercase tracking-widest mt-1">Chat del pedido 🎀</p>
                     </div>
-                 }
-                 @for (m of chatMessages(); track m.id) {
+                  </div>
+                  <button (click)="isChatOpen.set(false)" class="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">✕</button>
+                </div>
+
+                <!-- Messages -->
+                <div id="modal-chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-pink-50/30">
+                  <!-- Security Notice -->
+                  <div class="flex justify-center mb-4">
+                    <div class="bg-blue-50/50 border border-blue-100 rounded-2xl px-4 py-2 flex items-center gap-2">
+                      <span class="text-xs">🛡️</span>
+                      <p class="text-[9px] text-blue-600 font-bold uppercase tracking-wider">Chat Seguro & Monitoreado</p>
+                    </div>
+                  </div>
+
+                  @if (chatMessages().length === 0) {
+                    <div class="h-full flex flex-col justify-center items-center opacity-40">
+                      <span class="text-5xl mb-3 animate-float">💬</span>
+                      <p class="text-pink-800 font-bold text-center text-xs">¡Escríbenos si tienes dudas! 💕</p>
+                    </div>
+                  }
+                  @for (m of chatMessages(); track m.id) {
                     <div class="flex flex-col max-w-[85%]" [ngClass]="m.sender === 'Client' ? 'self-end items-end' : 'self-start items-start'">
                        @if (m.sender !== 'Client') {
-                          <span class="text-[9px] font-black uppercase text-pink-400 ml-2 mb-1 tracking-[0.1em] drop-shadow-sm flex items-center gap-1">
-                             {{ m.sender === 'Admin' ? 'Soporte (Regi Bazar) 👩🏻‍💻' : 'Repartidor 🚗' }}
+                          <span class="text-[8px] font-black uppercase text-pink-400 ml-2 mb-0.5 tracking-wider">
+                             {{ m.sender === 'Admin' ? 'Soporte 👩🏻‍💻' : 'Repartidor 🚗' }}
                           </span>
                        }
-                       <div class="p-3.5 shadow-sm border"
+                       <div class="p-3 shadow-sm border"
                             [ngClass]="m.sender === 'Client' ? 
-                               'bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-[1.5rem] rounded-tr-md border-pink-400' : 
-                               (m.sender === 'Admin' ? 'bg-white text-pink-900 rounded-[1.5rem] rounded-tl-md border-pink-200' : 'bg-rose-50 border-rose-200 text-rose-900 rounded-[1.5rem] rounded-tl-md')">
-                          <p class="text-sm break-words whitespace-pre-wrap font-medium leading-relaxed">{{ m.text }}</p>
+                               'bg-pink-500 text-white rounded-[1.2rem] rounded-tr-md border-pink-400' : 
+                               'bg-white text-pink-900 rounded-[1.2rem] rounded-tl-md border-pink-100'">
+                          <p class="text-sm leading-relaxed">{{ m.text }}</p>
                        </div>
-                       <span class="text-[9px] text-gray-400/80 mt-1.5 font-bold px-2">{{ m.timestamp | date:'h:mm a' }}</span>
                     </div>
-                 }
-               </div>
+                  }
+                </div>
 
-               <!-- Input -->
-               <div class="absolute bottom-0 inset-x-0 p-3 bg-white/95 backdrop-blur-md border-t border-pink-100/50 shadow-[0_-10px_20px_rgba(252,211,228,0.3)]">
+                <!-- Input -->
+                <div class="p-4 bg-white border-t border-pink-50">
                   <div class="flex gap-2">
-                     <input type="text" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
-                            class="flex-1 bg-pink-50/50 border-[2px] border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 focus:ring-4 focus:ring-pink-100 transition-all font-medium placeholder-pink-300 shadow-inner"
-                            placeholder="Escribe tu mensaje... ✍🏻" />
-                     <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
-                             class="w-12 h-12 shrink-0 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex justify-center items-center shadow-lg hover:shadow-pink-300 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all cursor-pointer">
-                        <span class="text-xl translate-x-[-1px] translate-y-[1px]">✨</span>
-                     </button>
+                    <input type="text" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
+                           class="flex-1 bg-pink-50/50 border-2 border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 font-medium"
+                           placeholder="Escribe algo... ✨" />
+                    <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
+                            class="w-12 h-12 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-lg disabled:opacity-50">
+                      <span class="text-xl">✨</span>
+                    </button>
                   </div>
-               </div>
+                </div>
+              </div>
             </div>
           }
 
@@ -515,73 +519,79 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
           }
 
           <!-- ✦ C.A.M.I. Floating Assistant Widget (Z-40) ✦ -->
-          @if (order() && isUnboxed()) {
-            <div id="cami-fab" class="fixed bottom-6 right-6 z-40 flex items-end justify-end gap-3 pointer-events-none">
+          @if (order()) {
+            <div id="cami-fab" class="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
               
-              <!-- Chat Speech Bubble -->
-              @if (!isLoadingCami() && camiMessage() && showCamiBubble()) {
-                <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[250px] pointer-events-auto animate-fade-in-up origin-bottom-right relative transition-all">
-                  <!-- Close Button -->
-                  <button (click)="showCamiBubble.set(false)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-xs transition-colors z-20" title="Cerrar mensaje">✕</button>
-
-                  <!-- Tail of the speech bubble -->
-                  <div class="absolute -right-1 bottom-4 w-4 h-4 bg-white border-b border-r border-pink-100 rotate-[-45deg] transform origin-center"></div>
-                  
-                  <div class="flex items-center gap-2 mb-1.5 relative z-10">
-                    <span class="text-[9px] font-black text-pink-500 uppercase tracking-widest leading-none">C.A.M.I. AI</span>
-                    <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                  </div>
-                  <p class="text-xs text-pink-900 font-medium leading-relaxed italic relative z-10 pr-6">"{{ camiMessage() }}"</p>
-                  
-                  @if (camiAudioUrl()) {
-                    <button (click)="playCamiAudio()" class="mt-3 bg-pink-50 hover:bg-pink-100 text-pink-600 w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
-                       {{ isPlayingCami() ? '🔊 Escuchando...' : '▶️ Escuchar' }}
-                    </button>
-                  }
-                </div>
-              }
-
-              <!-- The Avatar Interactive Button -->
-              <button (click)="startTour()" class="shrink-0 w-16 h-16 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-4xl shadow-[0_15px_30px_rgba(244,114,182,0.4)] border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all relative animate-bounce-subtle z-20 group">
-                👩🏻‍💻
-                <!-- Status Dots -->
-                @if (isLoadingCami()) {
-                  <span class="absolute -top-1 -right-1 w-4 h-4 bg-pink-400 rounded-full border-2 border-white animate-pulse"></span>
-                } @else if (camiMessage()) {
-                  <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-sm"></span>
+              <!-- Chat Floating Bubble (New) -->
+              <button id="chat-fab" (click)="isChatOpen.set(true); unreadMessages.set(false)" 
+                      class="pointer-events-auto w-14 h-14 bg-white rounded-full flex items-center justify-center text-2xl shadow-xl border-2 border-pink-100 hover:scale-110 active:scale-95 transition-all relative group animate-float">
+                💬
+                @if (unreadMessages()) {
+                  <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                 }
-                
-                <!-- Hover Tooltip -->
-                <span class="absolute -top-8 right-0 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                  Ver Tour ✨
+                <!-- Tooltip -->
+                <span class="absolute right-full mr-3 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  Chat de Ayuda 💬
                 </span>
               </button>
+
+              @if (isUnboxed()) {
+                <!-- Speech Bubble (existing) -->
+                @if (!isLoadingCami() && camiMessage() && showCamiBubble()) {
+                  <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[250px] pointer-events-auto animate-fade-in-up origin-bottom-right relative transition-all">
+                    <!-- Close Button -->
+                    <button (click)="showCamiBubble.set(false)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-xs transition-colors z-20" title="Cerrar mensaje">✕</button>
+
+                    <!-- Tail of the speech bubble -->
+                    <div class="absolute -right-1 bottom-4 w-4 h-4 bg-white border-b border-r border-pink-100 rotate-[-45deg] transform origin-center"></div>
+                    
+                    <div class="flex items-center gap-2 mb-1.5 relative z-10">
+                      <span class="text-[9px] font-black text-pink-500 uppercase tracking-widest leading-none">C.A.M.I. AI</span>
+                      <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                    </div>
+                    <p class="text-xs text-pink-900 font-medium leading-relaxed italic relative z-10 pr-6">"{{ camiMessage() }}"</p>
+                    
+                    @if (camiAudioUrl()) {
+                      <button (click)="playCamiAudio()" class="mt-3 bg-pink-50 hover:bg-pink-100 text-pink-600 w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
+                         {{ isPlayingCami() ? '🔊 Escuchando...' : '▶️ Escuchar' }}
+                      </button>
+                    }
+                  </div>
+                }
+
+                <!-- The Avatar Interactive Button -->
+                <button (click)="startTour()" class="shrink-0 w-16 h-16 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-4xl shadow-[0_15px_30px_rgba(244,114,182,0.4)] border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all relative animate-bounce-subtle z-20 group">
+                  👩🏻‍💻
+                  <!-- Status Dots -->
+                  @if (isLoadingCami()) {
+                    <span class="absolute -top-1 -right-1 w-4 h-4 bg-pink-400 rounded-full border-2 border-white animate-pulse"></span>
+                  } @else if (camiMessage()) {
+                    <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-sm"></span>
+                  }
+                  
+                  <!-- Hover Tooltip -->
+                  <span class="absolute -top-8 right-0 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                    Ver Tour ✨
+                  </span>
+                </button>
+              }
             </div>
           }
 
           <!-- ✦ C.A.M.I. TOUR OVERLAY ✦ -->
           @if (tourActive()) {
-            <div class="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
+            <div class="fixed inset-0 z-[100] pointer-events-none overflow-hidden animate-fade-in">
+              <!-- Spotlight Path Overlay (Even-Odd logic for robust masking) -->
               <svg class="w-full h-full pointer-events-auto">
-                <defs>
-                  <mask id="tour-mask">
-                    <rect width="100%" height="100%" fill="white" />
-                    <rect [attr.x]="tourHole().left - 10" 
-                          [attr.y]="tourHole().top - 10" 
-                          [attr.width]="tourHole().width + 20" 
-                          [attr.height]="tourHole().height + 20" 
-                          [attr.rx]="tourHole().radius" 
-                          fill="black" 
-                          class="transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
-                  </mask>
-                </defs>
-                <rect width="100%" height="100%" fill="rgba(80, 7, 36, 0.75)" mask="url(#tour-mask)" class="backdrop-blur-[2px]" />
+                <path [attr.d]="tourPath()" 
+                      fill="rgba(80, 7, 36, 0.75)" 
+                      fill-rule="evenodd"
+                      class="backdrop-blur-[2px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
               </svg>
 
               <div class="fixed left-0 right-0 z-[101] pointer-events-auto flex justify-center px-4 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-bounce-up-y-only" 
                    [class.top-28]="tourPlacement() === 'top'"
-                   [class.bottom-8]="tourPlacement() === 'bottom'"
-                   [class.translate-y-0]="true">
+                   [class.bottom-8]="tourPlacement() === 'bottom'">
                 <div class="w-full max-w-[380px] bg-white rounded-[2.5rem] p-6 shadow-[0_20px_50px_rgba(244,114,182,0.4)] border-4 border-pink-300 relative">
                    
                    <div class="flex items-center gap-4 mb-4">
@@ -745,7 +755,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   localInstructions = '';
 
   // UI Layout State
-  activeTab = signal<'status' | 'payment' | 'details' | 'chat'>('status');
+  activeTab = signal<'status' | 'payment' | 'details'>('details');
+  isChatOpen = signal(false);
 
   // Chat State
   chatMessages = signal<any[]>([]);
@@ -758,39 +769,67 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   currentTourStep = signal(0);
   tourHole = signal({ top: 0, left: 0, width: 0, height: 0, radius: 24 });
   tourPlacement = signal<'top' | 'bottom'>('bottom');
+
+  // Spotlight Path (Root fix: Even-Odd cutout)
+  tourPath = computed(() => {
+    const h = this.tourHole();
+    const wW = window.innerWidth;
+    const wH = window.innerHeight;
+    
+    // Outer Rectangle (Screen)
+    const d0 = `M 0 0 H ${wW} V ${wH} H 0 Z`;
+    
+    // Inner Rounded Rectangle (Hole with padding and radius)
+    const padding = 10;
+    const x = h.left - padding;
+    const y = h.top - padding;
+    const w = h.width + (padding * 2);
+    const height = h.height + (padding * 2);
+    const r = h.radius || 24;
+
+    const d1 = `M ${x} ${y + r} ` +
+               `A ${r} ${r} 0 0 1 ${x + r} ${y} ` +
+               `H ${x + w - r} ` +
+               `A ${r} ${r} 0 0 1 ${x + w} ${y + r} ` +
+               `V ${y + height - r} ` +
+               `A ${r} ${r} 0 0 1 ${x + w - r} ${y + height} ` +
+               `H ${x + r} ` +
+               `A ${r} ${r} 0 0 1 ${x} ${y + height - r} ` +
+               `Z`;
+               
+    return `${d0} ${d1}`;
+  });
   
   dynamicTourSteps = computed(() => {
     const o = this.order();
     if (!o) return [];
 
-    const steps: { target: string, msg: string, tab?: 'status' | 'payment' | 'details' }[] = [
-      { target: '#view-header', msg: '¡Hola hermosa! Soy C.A.M.I. ✨ He diseñado este panel Inteligente para que tengas todo a la mano. ¡Déjame enseñarte!' },
-      { target: '#balance-summary', msg: 'Aquí verás siempre tu saldo pendiente. ¡Súper fácil para saber cuánto falta para pagar! 💰' },
-      { target: '#nav-tabs', msg: 'Usa estas 3 pestañas para ver tu rastreo en vivo, tus métodos de pago o el ticket detallado. 🏠💸🛍️' }
+    const steps: { target: string, msg: string, tab?: 'status' | 'payment' | 'details', modal?: boolean }[] = [
+      { target: '#view-header', msg: '¡Hola hermosa! Soy C.A.M.I. ✨ He diseñado este panel para que tengas todo a la mano. ¡Déjame enseñarte!' },
+      { target: '#nav-tabs', msg: 'Aquí tienes tus 3 pestañas principales: Detalle de Pedido, Métodos de Pago y Rastreo en Vivo. 🛍️💸🏠' },
+      { target: '#ticket-content', msg: 'En "Pedido" tienes tu ticket detallado. ¡Revisa que todo esté perfecto! 🧾', tab: 'details' }
     ];
 
-    // Status Tab Specifics
-    if (o.status === 'InRoute' || o.status === 'InTransit') {
-      if (o.clientLatitude || this.clientCoords()?.lat) {
-         steps.push({ target: '#client-live-map', msg: '¡Tu pedido va en camino! 🚗💨 Aquí puedes ver en tiempo real por dónde va el repartidor.', tab: 'status' });
-      }
-      if (o.queuePosition) {
-         steps.push({ target: '#queue-info', msg: 'Y aquí te diremos exactamente cuántas entregas faltan antes de llegar a tu casa. ¡Ya casi! ⏳', tab: 'status' });
-      }
-    } else {
-       steps.push({ target: '#tracking-timeline', msg: 'Aquí está la línea de tiempo de tu envío. Sabrás exactamente cuándo lo empacamos y cuándo sale. 📦', tab: 'status' });
+    // Confirm Step (Relocated)
+    if (o.status === 'Pending') {
+      steps.push({ target: '#confirm-card', msg: 'Una vez que revises tus productos, no olvides confirmar tu pedido aquí abajo. ¡Es el paso más importante! 🎀', tab: 'details' });
     }
 
     // Payment Tab Specifics
     if (o.balanceDue > 0) {
-      steps.push({ target: '#payment-methods', msg: 'En la pestaña "Pagar" encontrarás todas las opciones para liquidar tu saldo de forma segura y rápida. 💸', tab: 'payment' });
+      steps.push({ target: '#payment-methods', msg: 'En la pestaña de "Pago" encontrarás las cuentas para liquidar tu saldo de forma segura. 💸', tab: 'payment' });
     }
 
-    // Details Tab Specifics
-    steps.push({ target: '#ticket-content', msg: 'En "Pedido" tienes el ticket con tu lista de compras, las cantidades y el precio final. ¡Todo listito para tu hogar! 🏡🛍️', tab: 'details' });
+    // Status Tab Specifics
+    if (o.status === 'InRoute' || o.status === 'InTransit') {
+       steps.push({ target: '#nav-tabs', msg: 'En "Estado" podrás seguir al repartidor en tiempo real y ver cuántas entregas faltan. 🚗💨', tab: 'status' });
+    }
+
+    // Chat Step (New FAB)
+    steps.push({ target: '#chat-fab', msg: 'Si tienes alguna duda, usa esta burbuja para chatear directamente con nosotros o el repartidor. 💬' });
 
     // Final
-    steps.push({ target: '#cami-fab', msg: '¡Eso es todo! Si hay alguna notificación urgente de tu pedido, siempre me encontrarás flotando aquí lista para ayudarte. 👩🏻‍💻✨', tab: 'status' });
+    steps.push({ target: '#cami-fab', msg: '¡Eso es todo! Estaré aquí flotando por si necesitas algo más. ¡Que disfrutes tu compra! 👩🏻‍💻✨' });
 
     return steps;
   });
@@ -826,48 +865,48 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   private checkAndStartTour() {
     const done = localStorage.getItem('cami_tour_done');
     if (!done && this.order() && this.isUnboxed()) {
+      // Small delay to let the 'unboxing' fade-out finish and elements settle in DOM
       setTimeout(() => {
-        // Double check not started manually
         if (!this.tourActive()) {
           this.startTour();
         }
-      }, 1500); // Wait for openBox/ticket reveal animations to settle
+      }, 800); 
     }
   }
 
   private updateHole(forceTabSwitch = true) {
     if (!this.tourActive()) return;
 
-    setTimeout(() => {
-      const step = this.dynamicTourSteps()[this.currentTourStep()];
+    // Use requestAnimationFrame to ensure we measure after the last layout pass
+    requestAnimationFrame(() => {
+      const steps = this.dynamicTourSteps();
+      const step = steps[this.currentTourStep()];
       if (!step) return;
 
       // Auto-switch tabs if the step requires it
       if (forceTabSwitch && step.tab && this.activeTab() !== step.tab) {
         this.activeTab.set(step.tab);
-        // Wait for Angular to render the new tab, then recalculate hole
-        setTimeout(() => this.updateHole(false), 350); 
+        // Wait for Angular change detection and DOM update
+        setTimeout(() => this.updateHole(false), 300); 
         return;
       }
 
-      const el = document.querySelector(step.target);
+      // Root Fix: Exhaustive Element Search
+      const el = document.querySelector(step.target) as HTMLElement;
+      
       if (el) {
-        const rect = el.getBoundingClientRect();
-        // Ensure the element is somewhat in view
-        if (rect.top < 0 || rect.bottom > window.innerHeight) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(() => {
-            const newRect = el.getBoundingClientRect();
-            this.tourPlacement.set(newRect.top > window.innerHeight / 2 ? 'top' : 'bottom');
-            this.tourHole.set({
-              top: newRect.top,
-              left: newRect.left,
-              width: newRect.width,
-              height: newRect.height,
-              radius: 24
-            });
-          }, 300);
-        } else {
+        const calculateCoordinates = () => {
+          const rect = el.getBoundingClientRect();
+          
+          // Debugging logging if needed (internal)
+          // console.log(`[Tour] Highlight target ${step.target}:`, rect);
+
+          // If element is not actually visible or in layout (dimensions 0), retry
+          if (rect.width === 0 && rect.height === 0) {
+             setTimeout(() => this.updateHole(false), 200);
+             return;
+          }
+
           this.tourPlacement.set(rect.top > window.innerHeight / 2 ? 'top' : 'bottom');
           this.tourHole.set({
             top: rect.top,
@@ -876,9 +915,24 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
             height: rect.height,
             radius: 24
           });
+        };
+
+        const rect = el.getBoundingClientRect();
+        // Handle scrolling if element is not fully in view
+        if (rect.top < 100 || rect.bottom > window.innerHeight - 100) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Wait for smooth scroll to finish before final calculation
+          setTimeout(calculateCoordinates, 600);
+        } else {
+          calculateCoordinates();
+        }
+      } else {
+        // Fallback: If element not found, retry once or highlight safe area
+        if (forceTabSwitch) {
+           setTimeout(() => this.updateHole(false), 500);
         }
       }
-    }, 100);
+    });
   }
 
   // Señales para C.A.M.I.
@@ -1059,7 +1113,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
          if (msgs.find(m => m.id === msg.id)) return msgs;
          return [...msgs, msg];
       });
-      if (this.activeTab() !== 'chat') {
+      if (!this.isChatOpen()) {
          this.unreadMessages.set(true);
          this.showToast('¡Escribieron en tu chat! 💬💌');
       }
@@ -1133,12 +1187,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           }, 500);
         }
 
-        // Set initial tab based on status
-        if (data.balanceDue > 0 && (data.status === 'Pending' || data.status === 'Confirmed')) {
-          this.activeTab.set('payment');
-        } else if (data.status === 'InRoute' || data.status === 'InTransit') {
-          this.activeTab.set('status');
-        }
+        // Note: Default tab is 'details' (Pedido) as requested by user.
+        this.activeTab.set('details');
 
         if (data.expiresAt) {
           // Fallback if API hasn't updated its DTO yet or sync Issues
@@ -1214,7 +1264,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
   scrollToBottomChat() {
      setTimeout(() => {
-        const box = document.getElementById('chat-box');
+        const box = document.getElementById('modal-chat-box');
         if (box) {
            box.scrollTop = box.scrollHeight;
         }
