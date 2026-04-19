@@ -137,6 +137,7 @@ export interface OrderSummaryDto {
     deliveryInstructions?: string;
     discountAmount?: number;
     alternativeAddress?: string;
+    deliveryRouteId?: number;
 }
 
 export interface PagedResult<T> {
