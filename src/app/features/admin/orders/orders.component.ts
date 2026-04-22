@@ -123,6 +123,11 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                   <p class="text-[10px] text-pink-300 mt-2.5 flex items-center gap-1 font-medium">
                     📅 {{ order.createdAt | date:'dd MMM yyyy, HH:mm' }}
                   </p>
+                  @if (order.scheduledDeliveryDate) {
+                    <p class="text-[10px] text-pink-600 mt-1 flex items-center gap-1 font-black">
+                      🚚 Entrega: {{ order.scheduledDeliveryDate | date:'dd MMM yyyy' }}
+                    </p>
+                  }
                 </div>
 
                 <!-- Financials & Progress -->
@@ -317,6 +322,20 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                   }
                 </select>
               </div>
+            </div>
+
+            <!-- Scheduled Delivery Date -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
+                <h4 class="text-xs font-black text-pink-600 mb-2 uppercase tracking-widest flex items-center gap-2">📅 Fecha de Entrega Programada</h4>
+                <div class="flex items-center gap-2">
+                    <input type="date" class="input-coquette text-xs py-2 grow" 
+                           [ngModel]="selectedOrder()!.scheduledDeliveryDate?.substring(0, 10)" 
+                           (change)="updateScheduledDate($event)">
+                    @if (selectedOrder()!.scheduledDeliveryDate) {
+                        <button class="text-pink-300 hover:text-rose-500 p-1" (click)="clearScheduledDate()" title="Quitar fecha programada">✕</button>
+                    }
+                </div>
+                <p class="text-[9px] text-pink-400 mt-1">Si se asigna, el enlace vencerá 2 días después de esta fecha.</p>
             </div>
 
             <!-- Delivery Instructions & Alternative Address -->
@@ -1371,6 +1390,41 @@ export class OrdersComponent implements OnInit {
     }).subscribe({
       next: () => this.toast.success('Cambios guardados ✨'),
       error: () => this.toast.error('Error al guardar cambios')
+    });
+  }
+
+  updateScheduledDate(event: any): void {
+    const order = this.selectedOrder();
+    const date = event.target.value;
+    if (!order) return;
+
+    this.api.updateOrderDetails(order.id, {
+      scheduledDeliveryDate: date || undefined,
+      clientName: order.clientName
+    }).subscribe({
+      next: () => {
+        this.toast.success('Fecha de entrega actualizada 📅');
+        this.reloadSelectedOrder();
+        this.loadOrders();
+      },
+      error: () => this.toast.error('Error al actualizar fecha')
+    });
+  }
+
+  clearScheduledDate(): void {
+    const order = this.selectedOrder();
+    if (!order) return;
+
+    this.api.updateOrderDetails(order.id, {
+      scheduledDeliveryDate: undefined,
+      clientName: order.clientName
+    }).subscribe({
+      next: () => {
+        this.toast.success('Fecha programada eliminada 🗑️');
+        this.reloadSelectedOrder();
+        this.loadOrders();
+      },
+      error: () => this.toast.error('Error al eliminar fecha')
     });
   }
 }

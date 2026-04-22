@@ -83,6 +83,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   manualOrderType = 'Delivery';
   manualClient = signal('');
   manualAlternativeAddress = signal('');
+  manualScheduledDate = signal('');
   manualType = '';
   manualItems: { id: string; productName: string; quantity: number; unitPrice: number }[] = [];
   currentItem = { productName: '', quantity: 1, unitPrice: 0 };
@@ -322,7 +323,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       alternativeAddress: this.manualAlternativeAddress().trim(),
       type: this.manualType || 'Nueva',
       orderType: this.manualOrderType,
-      items: this.manualItems.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
+      items: this.manualItems.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice })),
+      scheduledDeliveryDate: this.manualScheduledDate() || undefined
     };
 
     this.api.createManualOrder(req).subscribe({
@@ -338,6 +340,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
         this.manualItems = [];
         this.currentItem = { productName: '', quantity: 1, unitPrice: 0 };
         this.manualOrderType = 'Delivery';
+        this.manualScheduledDate.set('');
 
         // Set single result format if needed, but not strictly required by user flow
         // The original logic just showed a toast. If we want link preview:

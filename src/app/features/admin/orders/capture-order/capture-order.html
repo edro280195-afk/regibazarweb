@@ -260,10 +260,11 @@
             </div>
 
             <div class="card-coquette p-5 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="relative">
                         <label class="label-coquette">👩‍💼 Nombre de la clienta</label>
-                        <input type="text" class="input-coquette text-lg py-3" [(ngModel)]="manualClient"
+                        <input type="text" class="input-coquette text-lg py-3" [ngModel]="manualClient()"
+                            (ngModelChange)="manualClient.set($event)"
                             (input)="onSearchClient()" (focus)="showSuggestions.set(true)"
                             (blur)="hideSuggestionsWithDelay()" placeholder="Busca o escribe nombre..." autocomplete="off">
 
@@ -286,8 +287,15 @@
 
                     <div>
                         <label class="label-coquette">📍 Dirección Alternativa (Opcional)</label>
-                        <input type="text" class="input-coquette text-lg py-3" [(ngModel)]="manualAlternativeAddress"
+                        <input type="text" class="input-coquette text-lg py-3" [ngModel]="manualAlternativeAddress()"
+                            (ngModelChange)="manualAlternativeAddress.set($event)"
                             placeholder="Ej. Casa de su mamá / Oficina">
+                    </div>
+
+                    <div>
+                        <label class="label-coquette">📅 Fecha Entrega (Opcional)</label>
+                        <input type="date" class="input-coquette text-lg py-3" [ngModel]="manualScheduledDate()"
+                            (ngModelChange)="manualScheduledDate.set($event)">
                     </div>
                 </div>
 

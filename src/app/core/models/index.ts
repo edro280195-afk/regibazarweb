@@ -138,6 +138,7 @@ export interface OrderSummaryDto {
     discountAmount?: number;
     alternativeAddress?: string;
     deliveryRouteId?: number;
+    scheduledDeliveryDate?: string;
 }
 
 export interface PagedResult<T> {
@@ -412,6 +413,7 @@ export interface ManualOrderRequest {
     status?: string;
     deliveryInstructions?: string;
     alternativeAddress?: string;
+    scheduledDeliveryDate?: string;
 }
 
 export interface LoginRequest {
@@ -480,6 +482,7 @@ export interface UpdateOrderDetailsRequest {
     salesPeriodId?: number;
     deliveryInstructions?: string;
     alternativeAddress?: string;
+    scheduledDeliveryDate?: string;
 }
 
 export interface CreateAdminExpenseRequest {
