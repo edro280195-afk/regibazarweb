@@ -355,10 +355,6 @@ interface GeocodedOrder extends OrderSummaryDto {
                     💰 <span class="hidden sm:inline">Liquidar</span>
                   </button>
                 }
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-violet-50 text-violet-600 text-xs font-bold border border-violet-100 hover:bg-violet-100 active:scale-95 transition-all shadow-sm"
-                        (click)="optimizeRoute(route.id)">
-                  ✨ <span class="hidden sm:inline">Optimizar</span>
-                </button>
                 <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100 hover:bg-indigo-100 active:scale-95 transition-all"
                         (click)="loadRouteBriefing(route.id)"
                         [disabled]="loadingBriefing() === route.id">
@@ -871,6 +867,52 @@ interface GeocodedOrder extends OrderSummaryDto {
         </div>
       }
 
+      <!-- ═══════════════════════════════════════════════════
+           MODAL: PEDIDOS EXCLUIDOS (Override Prompt)
+           ═══════════════════════════════════════════════════ -->
+      @if (skippedOrdersModal(); as modal) {
+        <div class="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border border-pink-100 animate-scale-in relative overflow-hidden">
+            <!-- Background Accent -->
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-pink-50 rounded-full blur-3xl opacity-50"></div>
+            
+            <div class="relative z-10">
+              <div class="w-16 h-16 bg-pink-100 rounded-3xl flex items-center justify-center text-3xl mb-6 shadow-inner">
+                🤔
+              </div>
+              
+              <h3 class="text-xl font-black text-pink-900 mb-2">¿Incluir pedidos especiales?</h3>
+              <p class="text-sm text-gray-500 mb-6 leading-relaxed">
+                Detectamos {{ modal.orders.length }} pedidos que ya están en otra ruta o son PickUp. ¿Deseas agregarlos de todas formas? 🎀
+              </p>
+
+              <div class="max-h-40 overflow-y-auto mb-8 pr-2 space-y-2">
+                @for (o of modal.orders; track o.id) {
+                  <div class="flex items-center justify-between p-3 rounded-2xl bg-pink-50/50 border border-pink-100/50">
+                    <div>
+                      <p class="text-xs font-black text-pink-900">#{{ o.id }} · {{ o.name }}</p>
+                      <p class="text-[10px] text-pink-400 font-bold uppercase tracking-wider">{{ o.reason }}</p>
+                    </div>
+                    <span class="text-pink-300">📌</span>
+                  </div>
+                }
+              </div>
+
+              <div class="flex gap-3">
+                <button (click)="skippedOrdersModal.set(null)" 
+                        class="flex-1 py-4 rounded-2xl border-2 border-pink-100 text-pink-400 font-black text-sm hover:bg-pink-50 transition-all">
+                  Omitir
+                </button>
+                <button (click)="confirmForceCreate()" 
+                        class="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all">
+                  Sí, inclúyelos ✨
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- ═══ LIGHTBOX DE EVIDENCIA ═══ -->
       @if (lightboxUrl()) {
         <div class="fixed inset-0 z-[9000] bg-black/90 flex items-center justify-center p-4 animate-fade-in"
@@ -1026,6 +1068,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   selectedOrderIds = signal<Set<number>>(new Set());
   creating = signal(false);
   expandedRouteIds = signal<Set<number>>(new Set());
+  skippedOrdersModal = signal<{ ids: number[], orders: any[], isOptimized: boolean } | null>(null);
 
   // Inline Address Editing
   editingOrderId = signal<number | null>(null);
@@ -1716,9 +1759,11 @@ export class RoutesComponent implements OnInit, OnDestroy {
     });
   }
 
-  optimizeRoute(routeId: number): void {
+  async optimizeRoute(routeId: number): Promise<void> {
     this.toast.info('Optimizando ruta... 🧩');
-    this.api.optimizeRoute(routeId).subscribe({
+    const pos = await this.getCurrentLocation();
+    
+    this.api.optimizeRoute(routeId, pos?.lat, pos?.lng).subscribe({
       next: () => {
         this.toast.success('Ruta optimizada con éxito 🚀');
         this.loadRoutes();
@@ -1810,8 +1855,9 @@ export class RoutesComponent implements OnInit, OnDestroy {
     });
   }
 
-  addOrderToRoute(route: any, orderId: number) {
-    this.api.addOrderToRoute(route.id, orderId).subscribe({
+  async addOrderToRoute(route: any, orderId: number) {
+    const pos = await this.getCurrentLocation();
+    this.api.addOrderToRoute(route.id, orderId, pos?.lat, pos?.lng).subscribe({
       next: () => {
         this.toast.success('Pedido agregado a la ruta 🚀');
         this.loadRoutes();
@@ -2026,24 +2072,55 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.showOptimizerModal.set(false);
     this.toast.info('Creando ruta mágica... ✨🚗');
 
-    // Call API with exactly the array of ordered IDs
     this.api.createRoute(orderedIds).subscribe({
-      next: () => {
+      next: (res: RouteDto) => {
         this.toast.success('¡Ruta creada y optimizada con éxito! 🎉');
         this.selectedOrderIds.set(new Set());
         this.loadRoutes();
       },
       error: (err) => {
-        console.error('SERVER ERROR:', err.error);
-        this.toast.error(err.error?.message || 'Error al crear la ruta mágica');
+        if (err.status === 409 && err.error?.skippedOrders) {
+          this.skippedOrdersModal.set({ 
+            ids: orderedIds, 
+            orders: err.error.skippedOrders,
+            isOptimized: true
+          });
+        } else {
+          console.error('SERVER ERROR:', err.error);
+          this.toast.error(err.error?.message || 'Error al crear la ruta mágica');
+        }
       }
+    });
+  }
+
+  confirmForceCreate(): void {
+    const modal = this.skippedOrdersModal();
+    if (!modal) return;
+
+    this.skippedOrdersModal.set(null);
+    this.toast.info('Forzando creación de ruta... 🚀');
+
+    this.api.createRoute(modal.ids, true).subscribe({
+      next: () => {
+        this.toast.success('¡Ruta creada incluyendo pedidos especiales! 🎉');
+        this.selectedOrderIds.set(new Set());
+        if (modal.isOptimized) {
+            // Si venía de optimizado, el backend ya la optimizó al crear
+            this.loadRoutes();
+        } else {
+            this.showCreateModal.set(false);
+            this.loadRoutes();
+        }
+      },
+      error: (err) => this.toast.error(err.error?.message || 'Error al forzar creación')
     });
   }
 
   // ═══ DEPRECATED (Kept for reference, replaced by Optimization flow) ═══
   createRoute(): void {
     this.creating.set(true);
-    this.api.createRoute([...this.selectedOrderIds()]).subscribe({
+    const ids = [...this.selectedOrderIds()];
+    this.api.createRoute(ids).subscribe({
       next: () => {
         this.toast.success('¡Ruta creada! 🚗✨');
         this.showCreateModal.set(false);
@@ -2051,7 +2128,18 @@ export class RoutesComponent implements OnInit, OnDestroy {
         this.loadRoutes();
         this.creating.set(false);
       },
-      error: (err) => { this.toast.error(err.error?.message || 'Error al crear ruta'); this.creating.set(false); }
+      error: (err) => { 
+        if (err.status === 409 && err.error?.skippedOrders) {
+           this.skippedOrdersModal.set({ 
+             ids: ids, 
+             orders: err.error.skippedOrders,
+             isOptimized: false
+           });
+        } else {
+           this.toast.error(err.error?.message || 'Error al crear ruta'); 
+        }
+        this.creating.set(false); 
+      }
     });
   }
 

@@ -155,7 +155,7 @@ import { FormsModule } from '@angular/forms';
                         @for (w of weeksArray(); track w) {
                           <td class="text-center p-2">
                             @if (hasPaid(p, w)) {
-                              <span class="text-lg drop-shadow-sm animate-bounce-in inline-block" title="Pagado">💖</span>
+                              <button (click)="onRemovePayment(p, w)" class="text-lg drop-shadow-sm animate-bounce-in inline-block hover:scale-125 transition-transform" title="Quitar pago">💖</button>
                             } @else {
                               <button (click)="openPaymentModal(p, w)" 
                                       class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
@@ -954,5 +954,21 @@ export class TandaDetailComponent implements OnInit {
         this.toastService.error(`No se pudo eliminar: ${errorMsg} 😿`);
       }
     });
+  }
+
+  onRemovePayment(participant: TandaParticipantDto, week: number) {
+    const payment = participant.payments?.find(pay => pay.weekNumber === week);
+    if (!payment) return;
+
+    if (confirm(`¿Quieres quitar el pago de la semana ${week} para ${participant.customerName}? Se borrará del historial.`)) {
+      this.tandaService.deletePayment(payment.id).subscribe({
+        next: () => {
+          this.toastService.success('Pago eliminado ✨');
+          const t = this.tanda();
+          if (t) this.loadTanda(t.id);
+        },
+        error: (err) => this.toastService.error(err.error?.message || 'Error al eliminar pago')
+      });
+    }
   }
 }

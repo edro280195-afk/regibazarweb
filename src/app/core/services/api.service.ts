@@ -153,8 +153,8 @@ export class ApiService {
         return this.http.get<RouteDto>(`${this.base}/routes/${id}`);
     }
 
-    createRoute(orderIds: number[]): Observable<RouteDto> {
-        return this.http.post<RouteDto>(`${this.base}/routes`, { orderIds });
+    createRoute(orderIds: number[], force: boolean = false): Observable<RouteDto> {
+        return this.http.post<RouteDto>(`${this.base}/routes`, { orderIds, force });
     }
 
     deleteRoute(id: number): Observable<any> {
@@ -375,8 +375,11 @@ export class ApiService {
     }
 
     // ── Route Mutation ──
-    addOrderToRoute(routeId: number, orderId: number): Observable<any> {
-        return this.http.post(`${this.base}/routes/${routeId}/add-order`, orderId);
+    addOrderToRoute(routeId: number, orderId: number, lat?: number, lng?: number): Observable<any> {
+        let params = new HttpParams();
+        if (lat !== undefined) params = params.set('lat', lat.toString());
+        if (lng !== undefined) params = params.set('lng', lng.toString());
+        return this.http.post(`${this.base}/routes/${routeId}/add-order`, orderId, { params });
     }
 
     removeOrderFromRoute(routeId: number, orderId: number): Observable<any> {
@@ -388,7 +391,10 @@ export class ApiService {
         return this.http.put<any>(`${this.base}/routes/${routeId}/reorder`, deliveryIds);
     }
 
-    optimizeRoute(routeId: number): Observable<any> {
-        return this.http.post(`${this.base}/routes/${routeId}/optimize`, {});
+    optimizeRoute(routeId: number, lat?: number, lng?: number): Observable<any> {
+        let params = new HttpParams();
+        if (lat !== undefined) params = params.set('lat', lat.toString());
+        if (lng !== undefined) params = params.set('lng', lng.toString());
+        return this.http.post(`${this.base}/routes/${routeId}/optimize`, {}, { params });
     }
 }

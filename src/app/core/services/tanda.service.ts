@@ -53,6 +53,10 @@ export class TandaService {
     return this.http.post<TandaPaymentDto>(`${this.base}/payments`, dto);
   }
 
+  deletePayment(paymentId: string): Observable<any> {
+    return this.http.delete(`${this.base}/payments/${paymentId}`);
+  }
+
   // ── Operaciones Especiales ──
   getSundayDelivery(tandaId: string): Observable<TandaParticipantDto> {
     return this.http.get<TandaParticipantDto>(`${this.base}/${tandaId}/sunday-delivery`);
