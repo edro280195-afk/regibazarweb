@@ -123,7 +123,7 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
             @if (o.scheduledDeliveryDate) {
               <div class="mt-4 bg-white/60 backdrop-blur-sm border border-pink-200 rounded-2xl px-4 py-3 inline-block animate-fade-in-up">
                 <p class="text-[9px] font-black text-pink-500 uppercase tracking-[0.2em] mb-1">📅 Entrega Programada</p>
-                <p class="text-base font-black text-pink-900">{{ o.scheduledDeliveryDate | date:'EEEE d ' + 'de' + ' MMMM' }}</p>
+                <p class="text-base font-black text-pink-900">{{ o.scheduledDeliveryDate | date:"EEEE d 'de' MMMM" }}</p>
               </div>
             }
             
