@@ -289,6 +289,15 @@ export class TandaViewComponent implements OnInit {
     
     // Sumamos las semanas según el turno
     date.setDate(date.getDate() + (turn - 1) * 7);
+
+    // Ajustamos al domingo de esa semana (Las entregas son los domingos)
+    // En JS getDay(): 0=Domingo, 1=Lunes, ..., 6=Sábado
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek !== 0) {
+      // Sumamos los días necesarios para llegar al domingo (7 - dayOfWeek)
+      date.setDate(date.getDate() + (7 - dayOfWeek) % 7);
+    }
+
     return date;
   }
 }
