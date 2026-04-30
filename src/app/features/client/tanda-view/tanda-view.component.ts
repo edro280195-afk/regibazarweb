@@ -168,11 +168,20 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                 <div id="mp-expirationDate" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                                 <div id="mp-securityCode" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                               </div>
-                              <div id="mp-cardholderName" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                               <input type="text" id="mp-cardholderName" 
+                                      class="h-12 w-full bg-pink-50/30 border border-pink-100 rounded-xl px-4 text-sm font-bold text-pink-900 placeholder:text-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-200 transition-all"
+                                      placeholder="Nombre en la tarjeta">
                               
                               <select id="mp-issuer" class="hidden"></select>
                               <select id="mp-installments" class="hidden"></select>
                               <input type="email" id="mp-cardholderEmail" class="hidden" value="cliente@regibazar.com">
+
+                              @if (mpFetching()) {
+                                <div class="flex items-center justify-center gap-2 py-1">
+                                  <div class="w-3 h-3 border-2 border-pink-300 border-t-pink-500 rounded-full animate-spin"></div>
+                                  <span class="text-[11px] text-pink-500 font-bold">Identificando tarjeta...</span>
+                                </div>
+                              }
 
                               <button type="submit" 
                                       class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-pink-200 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
@@ -206,6 +215,23 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                         <p class="text-[9px] text-pink-400 text-center font-bold uppercase tracking-tighter opacity-50">
                           Protegido por Mercado Pago 🛡️
                         </p>
+                      </div>
+                    }
+                    @case ('transfer') {
+                      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[2rem] p-6 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏦</div>
+                        <div class="flex items-center gap-3 mb-4 relative z-10">
+                          <div class="text-3xl">🏦</div>
+                          <div>
+                            <h4 class="font-black text-blue-900 text-xs leading-tight uppercase tracking-widest">Transferencia</h4>
+                            <span class="text-[10px] font-bold text-blue-600 uppercase">Citibanamex</span>
+                          </div>
+                        </div>
+                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10 cursor-pointer active:scale-95 transition-all" (click)="copyText('5256786137583898')">
+                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Número de Tarjeta</p>
+                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">5256 7861 3758 3898</p>
+                        </div>
+                        <p class="text-[9px] text-blue-700/80 text-center font-black uppercase">A nombre de: Yazmin Vara ✨</p>
                       </div>
                     }
                     @case ('oxxo') {
@@ -403,8 +429,9 @@ export class TandaViewComponent implements OnInit {
   cardFormInstance: any;
   mpSdkLoaded = signal(false);
   mpProcessing = signal(false);
-  mpResult = signal<{ status: string; message: string } | null>(null);
-  selectedParticipantId = signal<string | null>(null);
+   mpResult = signal<{ status: string; message: string } | null>(null);
+   mpFetching = signal(false);
+   selectedParticipantId = signal<string | null>(null);
 
   get messengerUrl() {
     const t = this.tanda();
@@ -477,49 +504,113 @@ export class TandaViewComponent implements OnInit {
       if ((window as any).MercadoPago) { resolve(); return; }
       const script = document.createElement('script');
       script.src = 'https://sdk.mercadopago.com/js/v2';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('MP SDK failed'));
+      script.crossOrigin = 'anonymous'; // Crucial for detailed error logging
+      script.onload = () => {
+        console.log('✅ MP SDK Loaded Successfully');
+        resolve();
+      };
+      script.onerror = (e) => {
+        console.error('❌ MP SDK Load Failed:', e);
+        reject(new Error('MP SDK script error or blocked by adblocker'));
+      };
       document.body.appendChild(script);
     });
   }
 
   private async onCardTabSelected() {
+    console.log('💳 Card Tab Selected');
     if (!this.mpSdkLoaded()) {
       try {
         await this.loadMpScript();
-        this.mp = new (window as any).MercadoPago(environment.mpPublicKey, { locale: 'es-MX' });
-        this.mpSdkLoaded.set(true);
-      } catch (err) {
+        if ((window as any).MercadoPago) {
+          console.log('Initializing MP with Key:', environment.mpPublicKey);
+          this.mp = new (window as any).MercadoPago(environment.mpPublicKey, { locale: 'es-MX' });
+          this.mpSdkLoaded.set(true);
+        } else {
+          throw new Error('MercadoPago object not found after script load');
+        }
+      } catch (err: any) {
+        console.error('🛑 MP Initialization Error:', {
+          message: err.message,
+          stack: err.stack,
+          cause: err.cause
+        });
         this.showToast('Error al cargar pagos con tarjeta 💔');
         return;
       }
     }
-    setTimeout(() => this.mountCardForm(), 150);
+    
+    // Give Angular time to render the form container
+    setTimeout(() => {
+      const formEl = document.getElementById('mp-card-form');
+      console.log('🔍 Checking for card form element:', !!formEl);
+      if (formEl) {
+        try {
+          this.mountCardForm();
+        } catch (mountErr: any) {
+          console.error('🛑 MP Mounting Error:', mountErr);
+        }
+      } else {
+        console.warn('⚠️ Card form element not found, retrying...');
+        setTimeout(() => this.mountCardForm(), 300);
+      }
+    }, 200);
   }
 
   private mountCardForm() {
-    if (!this.mp || this.cardFormInstance) return;
+    console.log('🔨 Mounting Card Form...');
+    if (!this.mp) {
+      console.error('❌ Cannot mount: MP not initialized');
+      return;
+    }
+    if (this.cardFormInstance) {
+      console.warn('⚠️ Card form already mounted');
+      return;
+    }
+    
+    const formEl = document.getElementById('mp-card-form');
+    if (!formEl) {
+      console.error('❌ Cannot mount: Form element missing');
+      return;
+    }
 
-    this.cardFormInstance = this.mp.cardForm({
-      amount: String(this.tanda()?.weeklyAmount || '0'),
-      iframe: true,
-      form: {
-        id: 'mp-card-form',
-        cardNumber: { id: 'mp-cardNumber', placeholder: 'Número de tarjeta' },
-        expirationDate: { id: 'mp-expirationDate', placeholder: 'MM/AA' },
-        securityCode: { id: 'mp-securityCode', placeholder: 'CVV' },
-        cardholderName: { id: 'mp-cardholderName', placeholder: 'Nombre' },
-        issuer: { id: 'mp-issuer' },
-        installments: { id: 'mp-installments' },
-        cardholderEmail: { id: 'mp-cardholderEmail' }
-      },
-      callbacks: {
-        onSubmit: (event: Event) => {
-          event.preventDefault();
-          this.submitCardPayment();
+    try {
+      this.cardFormInstance = this.mp.cardForm({
+        amount: String(this.tanda()?.weeklyAmount || '0'),
+        iframe: true,
+        form: {
+          id: 'mp-card-form',
+          cardNumber: { id: 'mp-cardNumber', placeholder: 'Número de tarjeta' },
+          expirationDate: { id: 'mp-expirationDate', placeholder: 'MM/AA' },
+          securityCode: { id: 'mp-securityCode', placeholder: 'CVV' },
+          cardholderName: { id: 'mp-cardholderName', placeholder: 'Nombre' },
+          issuer: { id: 'mp-issuer' },
+          installments: { id: 'mp-installments' },
+          cardholderEmail: { id: 'mp-cardholderEmail' }
+        },
+        callbacks: {
+          onFormMounted: (error: any) => {
+            if (error) return console.warn('Form Mounted Error:', error);
+            console.log('✅ MP Form Mounted');
+          },
+          onSubmit: (event: Event) => {
+            event.preventDefault();
+            this.submitCardPayment();
+          },
+          onFetching: (resource: string) => {
+            console.log('Fetching resource:', resource);
+            this.mpFetching.set(true);
+            setTimeout(() => this.mpFetching.set(false), 2000); // Reset if it gets stuck
+          }
         }
+      });
+      console.log('✨ Card Form Instance Created:', !!this.cardFormInstance);
+    } catch (e: any) {
+      console.error('🛑 MP cardForm Initialization Error:', JSON.stringify(e));
+      if (Array.isArray(e)) {
+        e.forEach((err, idx) => console.error(`Error [${idx}]:`, err));
       }
-    });
+    }
   }
 
   private unmountCardForm() {
