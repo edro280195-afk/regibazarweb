@@ -364,13 +364,21 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
        <!-- Assistant Widget -->
        @if (tanda() && !loading()) {
         <div class="fixed bottom-6 right-6 z-40 flex items-end justify-end gap-3 pointer-events-none">
-          <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[200px] pointer-events-auto animate-fade-in-up">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-[9px] font-black text-pink-500 uppercase">Asistente Virtual</span>
+          @if (showAssistantBubble()) {
+            <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[200px] pointer-events-auto animate-fade-in-up relative group/bubble">
+              <button (click)="showAssistantBubble.set(false)" 
+                      class="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white text-pink-500 shadow-lg border border-pink-50 flex items-center justify-center hover:bg-pink-500 hover:text-white transition-all z-30 active:scale-90" 
+                      title="Cerrar mensaje">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[9px] font-black text-pink-500 uppercase">Asistente Virtual</span>
+              </div>
+              <p class="text-[10px] text-pink-900 font-medium italic">"¡Recuerda que estamos ahorrando juntas! Si tienes dudas sobre tu pago, escríbenos. ✨"</p>
             </div>
-            <p class="text-[10px] text-pink-900 font-medium italic">"¡Recuerda que estamos ahorrando juntas! Si tienes dudas sobre tu pago, escríbenos. ✨"</p>
-          </div>
-          <button class="shrink-0 w-14 h-14 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-3xl shadow-xl border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all animate-bounce-subtle">
+          }
+          <button (click)="showAssistantBubble.set(true)" class="shrink-0 w-14 h-14 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-3xl shadow-xl border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all animate-bounce-subtle">
             👩🏻‍💻
           </button>
         </div>
@@ -380,9 +388,12 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
        @if (toastVisible()) {
         <div class="fixed bottom-24 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4">
           <div class="animate-bounce-up-y-only pointer-events-auto">
-            <div class="bg-pink-950/90 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30">
+            <div class="bg-pink-950/95 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest pl-6 pr-12 py-4 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30 relative">
               <span class="text-lg">✨</span>
               <span>{{ toastMessage() }}</span>
+              <button (click)="toastVisible.set(false)" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all z-20">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
             </div>
           </div>
         </div>
@@ -429,9 +440,11 @@ export class TandaViewComponent implements OnInit {
   cardFormInstance: any;
   mpSdkLoaded = signal(false);
   mpProcessing = signal(false);
-   mpResult = signal<{ status: string; message: string } | null>(null);
-   mpFetching = signal(false);
-   selectedParticipantId = signal<string | null>(null);
+  mpResult = signal<{ status: string; message: string } | null>(null);
+  mpFetching = signal(false);
+  selectedParticipantId = signal<string | null>(null);
+  showAssistantBubble = signal(true);
+  private bubbleTimeout: any;
 
   get messengerUrl() {
     const t = this.tanda();
@@ -486,6 +499,11 @@ export class TandaViewComponent implements OnInit {
       this.accessToken = params['token'];
       if (this.accessToken) this.loadTanda(this.accessToken);
     });
+
+    // Auto-dismiss assistant after 10 seconds
+    this.bubbleTimeout = setTimeout(() => {
+      this.showAssistantBubble.set(false);
+    }, 10000);
   }
 
   setPaymentTab(tab: 'transfer' | 'cash' | 'oxxo' | 'card') {

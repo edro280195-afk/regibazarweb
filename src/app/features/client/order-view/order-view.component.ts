@@ -668,9 +668,13 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               @if (isUnboxed()) {
                 <!-- Speech Bubble (existing) -->
                 @if (!isLoadingCami() && camiMessage() && showCamiBubble()) {
-                  <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[250px] pointer-events-auto animate-fade-in-up origin-bottom-right relative transition-all">
+                  <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[250px] pointer-events-auto animate-fade-in-up origin-bottom-right relative transition-all group/bubble">
                     <!-- Close Button -->
-                    <button (click)="showCamiBubble.set(false)" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-xs transition-colors z-20" title="Cerrar mensaje">✕</button>
+                    <button (click)="showCamiBubble.set(false)" 
+                            class="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white text-pink-500 shadow-lg border border-pink-50 flex items-center justify-center hover:bg-pink-500 hover:text-white transition-all z-30 active:scale-90" 
+                            title="Cerrar mensaje">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
 
                     <!-- Tail of the speech bubble -->
                     <div class="absolute -right-1 bottom-4 w-4 h-4 bg-white border-b border-r border-pink-100 rotate-[-45deg] transform origin-center"></div>
@@ -1113,6 +1117,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   // Countdown State
   countdownText = signal<string>('');
   private countdownInterval: any;
+  private bubbleTimeout: any;
 
   // --- MAP STEROIDS ---
   private mapInitialized = false;
@@ -1280,14 +1285,23 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Feature #9 — CAMI greeting pushed when driver marks InTransit
     this.signalr.camiGreeting$.subscribe((greeting) => {
-      this.camiMessage.set(greeting.message);
-      if (greeting.audioBase64) {
-        this.camiAudioUrl.set('data:audio/mp3;base64,' + greeting.audioBase64);
-      }
-      this.isLoadingCami.set(false);
-      this.showCamiBubble.set(true);
+      this.displayCamiMessage(greeting.message, greeting.audioBase64);
       this.showToast('¡C.A.M.I. tiene un mensaje para ti! 💌');
     });
+  }
+
+  displayCamiMessage(text: string, audioBase64?: string) {
+    this.camiMessage.set(text);
+    if (audioBase64) {
+      this.camiAudioUrl.set('data:audio/mp3;base64,' + audioBase64);
+    }
+    this.isLoadingCami.set(false);
+    this.showCamiBubble.set(true);
+
+    if (this.bubbleTimeout) clearTimeout(this.bubbleTimeout);
+    this.bubbleTimeout = setTimeout(() => {
+      this.showCamiBubble.set(false);
+    }, 8000); // 8 seconds for better readability, but can be closed manually
   }
 
   // Generate Greeting based on time
@@ -1385,10 +1399,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.api.publicGetCamiGreeting(this.accessToken).subscribe({
       next: (res) => {
-        this.camiMessage.set(res.message);
-        this.camiAudioUrl.set('data:audio/mp3;base64,' + res.audioBase64);
-        this.isLoadingCami.set(false);
-        this.showCamiBubble.set(true);
+        this.displayCamiMessage(res.message, res.audioBase64);
       },
       error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
     });
