@@ -285,6 +285,16 @@ export class ApiService {
             `${this.base}/pedido/${accessToken}/payment/card`, body);
     }
 
+    publicTandaCardPayment(token: string, body: {
+        participantId: string;
+        weekNumber: number;
+        cardToken: string;
+        paymentMethodId: string;
+    }): Observable<{ status: string; statusDetail: string; paymentId?: number }> {
+        return this.http.post<{ status: string; statusDetail: string; paymentId?: number }>(
+            `${this.base}/public-tanda/${token}/payment/card`, body);
+    }
+
     // ── AI Voice Routes ──
     getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<AiRouteSelectionResponse> {
         return this.http.post<AiRouteSelectionResponse>(`${this.base}/routes/ai-select`, {

@@ -14,13 +14,13 @@ import gsap from 'gsap';
 
 
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
-const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
+const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
 
 @Component({
   selector: 'app-order-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, CurrencyPipe, DatePipe],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="relative min-h-screen overflow-hidden bg-gradient-to-b from-pink-50 via-rose-50 to-purple-50 pb-24 font-sans text-stone-800"
          (scroll)="onScroll($event)">
@@ -356,7 +356,6 @@ const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                         <!-- Estado: aprobado → modal comprobante -->
                         @if (mpResult()?.status === 'approved' && mpReceipt()) {
                           <div class="relative z-10 animate-fade-in">
-                            <!-- Tarjeta comprobante -->
                             <div class="bg-white rounded-2xl p-5 border-2 border-emerald-200 shadow-md mb-3">
                               <div class="flex items-center gap-2 mb-4">
                                 <span class="text-2xl">✅</span>
@@ -377,27 +376,19 @@ const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                 </div>
                                 <div class="flex justify-between">
                                   <span class="text-gray-500 font-medium">Método</span>
-                                  <span class="font-bold text-gray-700">Tarjeta de crédito/débito</span>
+                                  <span class="font-bold text-gray-700">Tarjeta</span>
                                 </div>
                               </div>
                             </div>
-                            <!-- Instrucción captura + botón Messenger -->
                             <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100 text-center space-y-3">
-                              <p class="text-sm font-black text-blue-900">
-                                📸 Toma captura de esta pantalla
-                              </p>
-                              <p class="text-xs text-blue-700 font-medium leading-relaxed">
-                                y envíala a <strong>Regi Bazar</strong> por Messenger para confirmar tu pago 💕
-                              </p>
+                              <p class="text-sm font-black text-blue-900">📸 Toma captura de esta pantalla</p>
                               <a [href]="messengerUrl" target="_blank" rel="noopener"
-                                 class="flex items-center justify-center gap-2 bg-[#0099FF] text-white font-black text-sm py-3 px-5 rounded-xl active:scale-95 transition-all shadow-md w-full">
-                                <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
-                                Enviar por Messenger
+                                 class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-sm py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl w-full">
+                                <svg class="w-6 h-6 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                                ENVIAR POR MESSENGER 🎀
                               </a>
                             </div>
                           </div>
-
-                        <!-- Estado: en revisión / pendiente -->
                         } @else if (mpResult()?.status === 'in_process' || mpResult()?.status === 'pending') {
                           <div class="relative z-10 animate-fade-in">
                             <div class="text-center py-4">
@@ -406,9 +397,7 @@ const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               <p class="text-xs text-amber-600 mt-2 mb-4">{{ mpResult()?.message }}</p>
                             </div>
                             <div class="bg-amber-50 rounded-2xl p-4 border border-amber-100 text-center space-y-3">
-                              <p class="text-xs text-amber-800 font-medium leading-relaxed">
-                                Mientras se confirma, escríbenos por Messenger y cuéntanos. Te avisamos en cuanto se apruebe 💕
-                              </p>
+                              <p class="text-xs text-amber-800 font-medium leading-relaxed">Te avisamos en cuanto se apruebe 💕</p>
                               <a [href]="messengerUrl" target="_blank" rel="noopener"
                                  class="flex items-center justify-center gap-2 bg-[#0099FF] text-white font-black text-sm py-3 px-5 rounded-xl active:scale-95 transition-all shadow-md w-full">
                                 <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
@@ -416,8 +405,6 @@ const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               </a>
                             </div>
                           </div>
-
-                        <!-- Estado: rechazado / error -->
                         } @else if (mpResult()) {
                           <div class="text-center py-4 relative z-10">
                             <div class="text-5xl mb-2">😔</div>
@@ -425,15 +412,11 @@ const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                             <button class="mt-3 bg-violet-500 text-white text-xs font-bold px-5 py-2.5 rounded-full active:scale-95 transition-all shadow-md"
                                     (click)="retryCardPayment()">Intentar de nuevo</button>
                           </div>
-
-                        <!-- Procesando -->
                         } @else if (mpProcessing()) {
                           <div class="flex flex-col items-center py-6 gap-3 relative z-10">
                             <div class="w-10 h-10 border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin"></div>
                             <p class="text-sm text-violet-600 font-bold">Procesando tu pago...</p>
                           </div>
-
-                        <!-- Formulario -->
                         } @else {
                           <div class="relative z-10">
                             @if (!mpSdkLoaded()) {
@@ -443,35 +426,27 @@ const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               </div>
                             }
                             <form id="mp-card-form" class="space-y-3" [class.hidden]="!mpSdkLoaded()">
-                              <!-- Número de tarjeta (iframe MP) -->
                               <div id="mp-cardNumber" class="mp-iframe-field"></div>
-                              <!-- Vencimiento + CVV -->
                               <div class="flex gap-2">
                                 <div id="mp-expirationDate" class="mp-iframe-field flex-1"></div>
                                 <div id="mp-securityCode"   class="mp-iframe-field flex-1"></div>
                               </div>
-                              <!-- Nombre en la tarjeta -->
                               <input type="text" id="mp-cardholderName"
                                      placeholder="Nombre en la tarjeta"
                                      autocomplete="cc-name"
                                      class="w-full text-sm border border-violet-200 rounded-xl px-4 py-3 bg-white/80 text-violet-900 placeholder-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-300">
-                              <!-- Email fijo (oculto, requerido por MP internamente) -->
                               <input type="email" id="mp-cardholderEmail" class="hidden" value="pagos@regibazar.com">
-                              <!-- Banco emisor (oculto, MP lo llena) -->
                               <select id="mp-issuer" class="hidden"></select>
-                              <!-- Cuotas (oculto, MP lo necesita en el DOM) -->
                               <select id="mp-installments" class="hidden"></select>
-                              <!-- Indicador mientras MP identifica la tarjeta -->
                               @if (mpFetching()) {
                                 <div class="flex items-center justify-center gap-2 py-1">
                                   <div class="w-3 h-3 border-2 border-violet-300 border-t-violet-500 rounded-full animate-spin"></div>
                                   <span class="text-[11px] text-violet-500 font-bold">Identificando tarjeta...</span>
                                 </div>
                               }
-                              <!-- Botón pagar -->
                               <button type="submit"
                                       [disabled]="mpProcessing() || mpFetching()"
-                                      class="w-full bg-gradient-to-r from-violet-500 to-pink-500 text-white font-black text-sm py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">
+                                      class="w-full bg-gradient-to-r from-violet-500 to-pink-500 text-white font-black text-sm py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                                 💳 Pagar {{ o.balanceDue | currency:'MXN':'symbol-narrow' }}
                               </button>
                             </form>
@@ -899,8 +874,6 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
   paymentTab = signal<'cash' | 'transfer' | 'oxxo' | 'card'>('transfer');
 
-  readonly messengerUrl = MESSENGER_URL;
-
   // MercadoPago card payment
   mpSdkLoaded = signal(false);
   mpProcessing = signal(false);
@@ -1130,6 +1103,12 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
 
+
+  get messengerUrl() {
+    const o = this.order();
+    if (!o) return BASE_MESSENGER_URL;
+    return `${BASE_MESSENGER_URL}?ref=order_${o.id}`;
+  }
 
   // Countdown State
   countdownText = signal<string>('');
@@ -2104,7 +2083,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           ...commonConfig,
           particleCount: 100,
           origin: { y: 0.7 },
-          shapes: ['circle', 'square']
+          shapes: [flower, ribbon, sparkle, 'circle'],
+          scalar: 1.1
         });
         break;
     }

@@ -1,14 +1,19 @@
 import { Component, inject, signal, OnInit, HostListener, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { ApiService } from '../../../core/services/api.service';
+import { environment } from '../../../../environments/environment';
 import { gsap } from 'gsap';
+
+const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
 @Component({
   selector: 'app-tanda-view',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="relative min-h-screen overflow-hidden bg-gradient-to-b from-pink-50 via-rose-50 to-purple-50 pb-24 font-sans text-stone-800"
          (scroll)="onScroll($event)">
@@ -123,28 +128,84 @@ import { gsap } from 'gsap';
                 <!-- Payment Tabs -->
                 <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white/50">
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'card' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          (click)="setPaymentTab('card')">💳 Tarjeta</button>
+                  <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
-                          (click)="paymentTab.set('transfer')">🏦 Transfer</button>
+                          (click)="setPaymentTab('transfer')">🏦 Transfer</button>
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
-                          (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
+                          (click)="setPaymentTab('oxxo')">🏪 OXXO</button>
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
-                          (click)="paymentTab.set('cash')">💵 Cash</button>
+                          (click)="setPaymentTab('cash')">💵 Cash</button>
                 </div>
 
                 <!-- Tab Content -->
                 <div class="min-h-[160px]">
                   @switch (paymentTab()) {
-                    @case ('transfer') {
-                      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[2rem] p-6 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
-                        <div class="absolute -right-4 -top-4 text-6xl opacity-10 rotate-12">🏦</div>
-                        <h4 class="font-black text-blue-900 text-xs mb-3 uppercase tracking-widest">Citibanamex</h4>
-                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 cursor-pointer active:scale-95 transition-all" (click)="copyText('5256786137583898')">
-                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Tarjeta / CLABE</p>
-                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">5256 7861 3758 3898</p>
-                        </div>
-                        <p class="text-[9px] text-blue-700/80 font-black uppercase">Beneficiario: Yazmin Vara ✨</p>
+                    @case ('card') {
+                      <div class="bg-white/90 backdrop-blur-sm rounded-[2rem] p-6 border border-pink-100 shadow-xl animate-fade-in space-y-4">
+                        
+                        @if (!mpResult()) {
+                          <div class="space-y-4">
+                            <!-- Participant Selector -->
+                            <div class="space-y-2">
+                              <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">¿Quién eres? ✨</label>
+                              <select class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl px-4 py-3 text-sm font-bold text-pink-900 focus:outline-none focus:border-pink-300 transition-all"
+                                      [(ngModel)]="selectedParticipantId">
+                                <option [value]="null" disabled>Selecciona tu nombre...</option>
+                                @for (p of t.participants; track p.id) {
+                                  <option [value]="p.id">{{ p.name }} (Semana {{ p.assignedTurn }})</option>
+                                }
+                              </select>
+                            </div>
+
+                            <!-- MP Form -->
+                            <form id="mp-card-form" class="space-y-3">
+                              <div id="mp-cardNumber" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                              <div class="grid grid-cols-2 gap-3">
+                                <div id="mp-expirationDate" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                                <div id="mp-securityCode" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                              </div>
+                              <div id="mp-cardholderName" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                              
+                              <select id="mp-issuer" class="hidden"></select>
+                              <select id="mp-installments" class="hidden"></select>
+                              <input type="email" id="mp-cardholderEmail" class="hidden" value="cliente@regibazar.com">
+
+                              <button type="submit" 
+                                      class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-pink-200 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                                      [disabled]="mpProcessing() || !selectedParticipantId()">
+                                {{ mpProcessing() ? 'PROCESANDO... ✨' : 'PAGAR MI SEMANA 💖' }}
+                              </button>
+                            </form>
+                          </div>
+                        } @else {
+                          <!-- Result View -->
+                          <div class="text-center py-6 animate-bounce-in">
+                            @if (mpResult()?.status === 'approved') {
+                              <div class="text-5xl mb-4">🎉</div>
+                              <h4 class="text-xl font-black text-pink-900 mb-1">¡Abono Realizado!</h4>
+                              <p class="text-pink-600 text-xs font-medium px-4 mb-6">Tu pago de la semana {{ t.currentWeek }} ha sido registrado con éxito. ✨</p>
+                              
+                              <a [href]="messengerUrl" target="_blank" rel="noopener"
+                                 class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-xs py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl w-full">
+                                <svg class="w-6 h-6 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                                AVISAR POR MESSENGER 🎀
+                              </a>
+                            } @else {
+                              <div class="text-5xl mb-4">❌</div>
+                              <h4 class="text-xl font-black text-rose-900 mb-1">Pago no procesado</h4>
+                              <p class="text-rose-600 text-xs font-medium px-4 mb-6">{{ mpResult()?.message || 'Hubo un problema. Intenta de nuevo, hermosa.' }}</p>
+                              <button (click)="retryCardPayment()" class="text-xs font-black text-pink-600 underline uppercase tracking-widest">Reintentar Pago</button>
+                            }
+                          </div>
+                        }
+
+                        <p class="text-[9px] text-pink-400 text-center font-bold uppercase tracking-tighter opacity-50">
+                          Protegido por Mercado Pago 🛡️
+                        </p>
                       </div>
                     }
                     @case ('oxxo') {
@@ -166,6 +227,16 @@ import { gsap } from 'gsap';
                       </div>
                     }
                   }
+                </div>
+
+                <!-- General Contact -->
+                <div class="mt-6 pt-6 border-t border-pink-100/50">
+                  <p class="text-center text-[10px] text-pink-400 font-black uppercase tracking-[0.2em] mb-4">¿Dudas o Comprobantes? ✨</p>
+                  <a [href]="messengerUrl" target="_blank" rel="noopener"
+                     class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-xs py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl w-full">
+                    <svg class="w-6 h-6 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                    CONTACTAR POR MESSENGER 🎀
+                  </a>
                 </div>
               </div>
 
@@ -316,14 +387,40 @@ import { gsap } from 'gsap';
 export class TandaViewComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private tandaService = inject(TandaService);
+  private api = inject(ApiService);
   
   tanda = signal<any | null>(null);
   loading = signal(true);
   error = signal(false);
   scrollY = signal(0);
+  accessToken: string = '';
 
   activeTab = signal<'summary' | 'transparency'>('summary');
-  paymentTab = signal<'transfer' | 'cash' | 'oxxo'>('transfer');
+  paymentTab = signal<'transfer' | 'cash' | 'oxxo' | 'card'>('transfer');
+  
+  // Mercado Pago Signals
+  mp: any;
+  cardFormInstance: any;
+  mpSdkLoaded = signal(false);
+  mpProcessing = signal(false);
+  mpResult = signal<{ status: string; message: string } | null>(null);
+  selectedParticipantId = signal<string | null>(null);
+
+  get messengerUrl() {
+    const t = this.tanda();
+    if (!t) return BASE_MESSENGER_URL;
+    let ref = `tanda_${t.id}`;
+    
+    // Si ya seleccionó quién es, lo incluimos en el ref para que sepas quién te escribe
+    const pId = this.selectedParticipantId();
+    if (pId) {
+      const p = t.participants.find((x: any) => x.id === pId);
+      if (p) ref += `_cli_${p.name.replace(/\s/g, '_')}`;
+    }
+    
+    return `${BASE_MESSENGER_URL}?ref=${ref}`;
+  }
+
   toastVisible = signal(false);
   toastMessage = signal('');
   private toastTimeout: any;
@@ -359,9 +456,118 @@ export class TandaViewComponent implements OnInit {
 
   ngOnInit() {
     this.route.params.subscribe(params => {
-      const token = params['token'];
-      if (token) this.loadTanda(token);
+      this.accessToken = params['token'];
+      if (this.accessToken) this.loadTanda(this.accessToken);
     });
+  }
+
+  setPaymentTab(tab: 'transfer' | 'cash' | 'oxxo' | 'card') {
+    if (this.paymentTab() === 'card' && tab !== 'card') {
+      this.unmountCardForm();
+      this.mpResult.set(null);
+    }
+    this.paymentTab.set(tab);
+    if (tab === 'card') {
+      this.onCardTabSelected();
+    }
+  }
+
+  private loadMpScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).MercadoPago) { resolve(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://sdk.mercadopago.com/js/v2';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('MP SDK failed'));
+      document.body.appendChild(script);
+    });
+  }
+
+  private async onCardTabSelected() {
+    if (!this.mpSdkLoaded()) {
+      try {
+        await this.loadMpScript();
+        this.mp = new (window as any).MercadoPago(environment.mpPublicKey, { locale: 'es-MX' });
+        this.mpSdkLoaded.set(true);
+      } catch (err) {
+        this.showToast('Error al cargar pagos con tarjeta 💔');
+        return;
+      }
+    }
+    setTimeout(() => this.mountCardForm(), 150);
+  }
+
+  private mountCardForm() {
+    if (!this.mp || this.cardFormInstance) return;
+
+    this.cardFormInstance = this.mp.cardForm({
+      amount: String(this.tanda()?.weeklyAmount || '0'),
+      iframe: true,
+      form: {
+        id: 'mp-card-form',
+        cardNumber: { id: 'mp-cardNumber', placeholder: 'Número de tarjeta' },
+        expirationDate: { id: 'mp-expirationDate', placeholder: 'MM/AA' },
+        securityCode: { id: 'mp-securityCode', placeholder: 'CVV' },
+        cardholderName: { id: 'mp-cardholderName', placeholder: 'Nombre' },
+        issuer: { id: 'mp-issuer' },
+        installments: { id: 'mp-installments' },
+        cardholderEmail: { id: 'mp-cardholderEmail' }
+      },
+      callbacks: {
+        onSubmit: (event: Event) => {
+          event.preventDefault();
+          this.submitCardPayment();
+        }
+      }
+    });
+  }
+
+  private unmountCardForm() {
+    if (this.cardFormInstance) {
+      this.cardFormInstance.unmount();
+      this.cardFormInstance = null;
+    }
+  }
+
+  private submitCardPayment() {
+    const participantId = this.selectedParticipantId();
+    const t = this.tanda();
+    if (!participantId || !t) return;
+
+    const data = this.cardFormInstance.getCardFormData();
+    if (!data.token) {
+      this.showToast('Completa los datos de tu tarjeta 💳');
+      return;
+    }
+
+    this.mpProcessing.set(true);
+
+    this.api.publicTandaCardPayment(this.accessToken, {
+      participantId: participantId,
+      weekNumber: t.currentWeek,
+      cardToken: data.token,
+      paymentMethodId: data.paymentMethodId
+    }).subscribe({
+      next: (res) => {
+        this.mpProcessing.set(false);
+        this.mpResult.set({ status: res.status, message: 'Pago aprobado' });
+        if (res.status === 'approved') {
+          this.showToast('¡Pago Realizado! 🎉');
+          // Actualizar UI local (opcional: recargar tanda)
+          this.loadTanda(this.accessToken);
+        }
+        this.unmountCardForm();
+      },
+      error: (err) => {
+        this.mpProcessing.set(false);
+        this.mpResult.set({ status: 'error', message: err.error?.message || 'Error al procesar el pago' });
+      }
+    });
+  }
+
+  retryCardPayment() {
+    this.mpResult.set(null);
+    setTimeout(() => this.mountCardForm(), 150);
   }
 
   loadTanda(token: string) {
