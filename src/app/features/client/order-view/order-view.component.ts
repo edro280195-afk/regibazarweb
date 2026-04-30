@@ -1883,11 +1883,28 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  private loadMpScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).MercadoPago) { resolve(); return; }
+      const existing = document.getElementById('mp-sdk-script');
+      if (existing) {
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', () => reject(new Error('Script MP falló')));
+        return;
+      }
+      const script = document.createElement('script');
+      script.id  = 'mp-sdk-script';
+      script.src = 'https://sdk.mercadopago.com/js/v2';
+      script.onload  = () => resolve();
+      script.onerror = () => reject(new Error('No se pudo cargar el SDK de Mercado Pago'));
+      document.body.appendChild(script);
+    });
+  }
+
   private async onCardTabSelected() {
     if (!this.mpSdkLoaded()) {
       try {
-        const { loadMercadoPago } = await import('@mercadopago/sdk-js');
-        await loadMercadoPago();
+        await this.loadMpScript();
         this.mp = new (window as any).MercadoPago(environment.mpPublicKey, { locale: 'es-MX' });
         this.mpSdkLoaded.set(true);
       } catch (err) {
