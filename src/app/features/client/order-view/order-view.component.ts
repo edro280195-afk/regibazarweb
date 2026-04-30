@@ -14,6 +14,7 @@ import gsap from 'gsap';
 
 
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
+const MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
 
 @Component({
@@ -269,16 +270,19 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
                 <p class="text-center text-xs text-pink-700/70 font-medium mb-4">Elige cómo quieres pagar tu saldo restante</p>
 
                 <!-- Custom Tabs -->
-                <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white">
-                  <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
+                <div class="grid grid-cols-2 gap-1 p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white">
+                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                          (click)="paymentTab.set('cash')">💵 Efectivo</button>
-                  <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
+                          (click)="setPaymentTab('cash')">💵 Efectivo</button>
+                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                          (click)="paymentTab.set('transfer')">🏦 Transfer</button>
-                  <button class="flex-1 py-2 text-xs font-bold rounded-xl transition-all"
+                          (click)="setPaymentTab('transfer')">🏦 Transfer</button>
+                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                          (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
+                          (click)="setPaymentTab('oxxo')">🏪 OXXO</button>
+                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'card' ? 'bg-white text-violet-600 shadow-sm' : 'text-violet-400 hover:text-violet-500'"
+                          (click)="setPaymentTab('card')">💳 Tarjeta</button>
                 </div>
 
                 <!-- Tab Content -->
@@ -334,6 +338,145 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
                           </div>
                         </div>
                         <p class="text-[10px] text-red-700/80 text-center font-bold">Envía foto del ticket a tu vendedora ✨</p>
+                      </div>
+                    }
+                    @case ('card') {
+                      <div class="bg-gradient-to-br from-violet-50 to-pink-50 rounded-3xl p-5 border border-violet-100 shadow-sm animate-fade-in relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">💳</div>
+
+                        <!-- Header -->
+                        <div class="flex items-center gap-3 mb-4 relative z-10">
+                          <div class="text-3xl">💳</div>
+                          <div>
+                            <h4 class="font-bold text-violet-900 text-sm leading-tight">Pago con Tarjeta</h4>
+                            <span class="text-xs font-bold text-violet-500 uppercase">🔒 Seguro por Mercado Pago</span>
+                          </div>
+                        </div>
+
+                        <!-- Estado: aprobado → modal comprobante -->
+                        @if (mpResult()?.status === 'approved' && mpReceipt()) {
+                          <div class="relative z-10 animate-fade-in">
+                            <!-- Tarjeta comprobante -->
+                            <div class="bg-white rounded-2xl p-5 border-2 border-emerald-200 shadow-md mb-3">
+                              <div class="flex items-center gap-2 mb-4">
+                                <span class="text-2xl">✅</span>
+                                <span class="font-black text-emerald-700 text-base">Pago aprobado</span>
+                              </div>
+                              <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                  <span class="text-gray-500 font-medium">Monto</span>
+                                  <span class="font-black text-pink-700">{{ mpReceipt()!.amount | currency:'MXN':'symbol-narrow' }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                  <span class="text-gray-500 font-medium">Fecha</span>
+                                  <span class="font-bold text-gray-700">{{ mpReceipt()!.date | date:'dd/MM/yyyy HH:mm' }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                  <span class="text-gray-500 font-medium">Referencia</span>
+                                  <span class="font-mono font-bold text-gray-700 text-xs">{{ mpReceipt()!.ref }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                  <span class="text-gray-500 font-medium">Método</span>
+                                  <span class="font-bold text-gray-700">Tarjeta de crédito/débito</span>
+                                </div>
+                              </div>
+                            </div>
+                            <!-- Instrucción captura + botón Messenger -->
+                            <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100 text-center space-y-3">
+                              <p class="text-sm font-black text-blue-900">
+                                📸 Toma captura de esta pantalla
+                              </p>
+                              <p class="text-xs text-blue-700 font-medium leading-relaxed">
+                                y envíala a <strong>Regi Bazar</strong> por Messenger para confirmar tu pago 💕
+                              </p>
+                              <a [href]="messengerUrl" target="_blank" rel="noopener"
+                                 class="flex items-center justify-center gap-2 bg-[#0099FF] text-white font-black text-sm py-3 px-5 rounded-xl active:scale-95 transition-all shadow-md w-full">
+                                <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                                Enviar por Messenger
+                              </a>
+                            </div>
+                          </div>
+
+                        <!-- Estado: en revisión / pendiente -->
+                        } @else if (mpResult()?.status === 'in_process' || mpResult()?.status === 'pending') {
+                          <div class="relative z-10 animate-fade-in">
+                            <div class="text-center py-4">
+                              <div class="text-5xl mb-3">⏳</div>
+                              <p class="font-black text-amber-700 text-base">Pago en revisión</p>
+                              <p class="text-xs text-amber-600 mt-2 mb-4">{{ mpResult()?.message }}</p>
+                            </div>
+                            <div class="bg-amber-50 rounded-2xl p-4 border border-amber-100 text-center space-y-3">
+                              <p class="text-xs text-amber-800 font-medium leading-relaxed">
+                                Mientras se confirma, escríbenos por Messenger y cuéntanos. Te avisamos en cuanto se apruebe 💕
+                              </p>
+                              <a [href]="messengerUrl" target="_blank" rel="noopener"
+                                 class="flex items-center justify-center gap-2 bg-[#0099FF] text-white font-black text-sm py-3 px-5 rounded-xl active:scale-95 transition-all shadow-md w-full">
+                                <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                                Escribir a Regi Bazar
+                              </a>
+                            </div>
+                          </div>
+
+                        <!-- Estado: rechazado / error -->
+                        } @else if (mpResult()) {
+                          <div class="text-center py-4 relative z-10">
+                            <div class="text-5xl mb-2">😔</div>
+                            <p class="font-black text-red-700 text-sm">{{ mpResult()?.message }}</p>
+                            <button class="mt-3 bg-violet-500 text-white text-xs font-bold px-5 py-2.5 rounded-full active:scale-95 transition-all shadow-md"
+                                    (click)="retryCardPayment()">Intentar de nuevo</button>
+                          </div>
+
+                        <!-- Procesando -->
+                        } @else if (mpProcessing()) {
+                          <div class="flex flex-col items-center py-6 gap-3 relative z-10">
+                            <div class="w-10 h-10 border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin"></div>
+                            <p class="text-sm text-violet-600 font-bold">Procesando tu pago...</p>
+                          </div>
+
+                        <!-- Formulario -->
+                        } @else {
+                          <div class="relative z-10">
+                            @if (!mpSdkLoaded()) {
+                              <div class="flex flex-col items-center py-6 gap-2">
+                                <div class="w-8 h-8 border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin"></div>
+                                <p class="text-xs text-violet-500 font-bold">Cargando formulario...</p>
+                              </div>
+                            }
+                            <form id="mp-card-form" class="space-y-3" [class.hidden]="!mpSdkLoaded()">
+                              <!-- Número de tarjeta (iframe MP) -->
+                              <div id="mp-cardNumber" class="mp-iframe-field"></div>
+                              <!-- Vencimiento + CVV -->
+                              <div class="flex gap-2">
+                                <div id="mp-expirationDate" class="mp-iframe-field flex-1"></div>
+                                <div id="mp-securityCode"   class="mp-iframe-field flex-1"></div>
+                              </div>
+                              <!-- Nombre en la tarjeta -->
+                              <input type="text" id="mp-cardholderName"
+                                     placeholder="Nombre en la tarjeta"
+                                     autocomplete="cc-name"
+                                     class="w-full text-sm border border-violet-200 rounded-xl px-4 py-3 bg-white/80 text-violet-900 placeholder-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-300">
+                              <!-- Email fijo (oculto, requerido por MP internamente) -->
+                              <input type="email" id="mp-cardholderEmail" class="hidden" value="pagos@regibazar.com">
+                              <!-- Banco emisor (oculto, MP lo llena) -->
+                              <select id="mp-issuer" class="hidden"></select>
+                              <!-- Cuotas (oculto, MP lo necesita en el DOM) -->
+                              <select id="mp-installments" class="hidden"></select>
+                              <!-- Indicador mientras MP identifica la tarjeta -->
+                              @if (mpFetching()) {
+                                <div class="flex items-center justify-center gap-2 py-1">
+                                  <div class="w-3 h-3 border-2 border-violet-300 border-t-violet-500 rounded-full animate-spin"></div>
+                                  <span class="text-[11px] text-violet-500 font-bold">Identificando tarjeta...</span>
+                                </div>
+                              }
+                              <!-- Botón pagar -->
+                              <button type="submit"
+                                      [disabled]="mpProcessing() || mpFetching()"
+                                      class="w-full bg-gradient-to-r from-violet-500 to-pink-500 text-white font-black text-sm py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">
+                                💳 Pagar {{ o.balanceDue | currency:'MXN':'symbol-narrow' }}
+                              </button>
+                            </form>
+                          </div>
+                        }
                       </div>
                     }
                   }
@@ -704,6 +847,19 @@ const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #fbcfe8; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #f9a8d4; }
+
+    /* MercadoPago iframe containers */
+    .mp-iframe-field {
+      height: 46px;
+      border: 1px solid #ddd6fe;
+      border-radius: 0.75rem;
+      background: rgba(255,255,255,0.8);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+    }
+    .mp-iframe-field iframe { width: 100%; height: 100%; border: none; }
   `]
 })
 export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
@@ -741,7 +897,18 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   etaText = signal<string>('');
 
 
-  paymentTab = signal<'transfer' | 'cash' | 'oxxo'>('transfer');
+  paymentTab = signal<'cash' | 'transfer' | 'oxxo' | 'card'>('transfer');
+
+  readonly messengerUrl = MESSENGER_URL;
+
+  // MercadoPago card payment
+  mpSdkLoaded = signal(false);
+  mpProcessing = signal(false);
+  mpFetching = signal(false);
+  mpResult = signal<{ status: string; message: string } | null>(null);
+  mpReceipt = signal<{ amount: number; date: Date; ref: string } | null>(null);
+  private mp: any = null;
+  private cardFormInstance: any = null;
 
   // Parallax Scroll Tracking
   scrollY = signal(0);
@@ -1173,6 +1340,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy() {
     if (this.toastTimeout) clearTimeout(this.toastTimeout);
     if (this.countdownInterval) clearInterval(this.countdownInterval);
+    this.unmountCardForm();
   }
 
   loadOrder() {
@@ -1699,6 +1867,126 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       dots.push({ you: isYou, current: isCurrent, done: isDone, idx: i });
     }
     return dots;
+  }
+
+  // ── MercadoPago Card Payment ──
+
+  setPaymentTab(tab: 'cash' | 'transfer' | 'oxxo' | 'card') {
+    if (this.paymentTab() === 'card' && tab !== 'card') {
+      this.unmountCardForm();
+      this.mpResult.set(null);
+      this.mpReceipt.set(null);
+    }
+    this.paymentTab.set(tab);
+    if (tab === 'card') {
+      this.onCardTabSelected();
+    }
+  }
+
+  private async onCardTabSelected() {
+    if (!this.mpSdkLoaded()) {
+      try {
+        const { loadMercadoPago } = await import('@mercadopago/sdk-js');
+        await loadMercadoPago();
+        this.mp = new (window as any).MercadoPago(environment.mpPublicKey, { locale: 'es-MX' });
+        this.mpSdkLoaded.set(true);
+      } catch (err) {
+        console.error('[MP] Error al cargar SDK:', err);
+        this.showToast('Error al cargar el formulario de pago 💔');
+        return;
+      }
+    }
+    setTimeout(() => this.mountCardForm(), 150);
+  }
+
+  private mountCardForm() {
+    const o = this.order();
+    if (!o || !this.mp || this.cardFormInstance) return;
+
+    this.cardFormInstance = this.mp.cardForm({
+      amount: String(o.balanceDue),
+      iframe: true,
+      form: {
+        id: 'mp-card-form',
+        cardNumber:     { id: 'mp-cardNumber',     placeholder: 'Número de tarjeta' },
+        expirationDate: { id: 'mp-expirationDate', placeholder: 'MM/AA' },
+        securityCode:   { id: 'mp-securityCode',   placeholder: 'CVV' },
+        cardholderName: { id: 'mp-cardholderName', placeholder: 'Nombre en la tarjeta' },
+        issuer:         { id: 'mp-issuer',         placeholder: 'Banco emisor' },
+        installments:   { id: 'mp-installments',   placeholder: 'Cuotas' },
+        cardholderEmail:{ id: 'mp-cardholderEmail',placeholder: 'Email (para tu comprobante)' },
+      },
+      callbacks: {
+        onFormMounted: (error: any) => {
+          if (error) console.error('[MP] Form mount error:', error);
+        },
+        onSubmit: (event: Event) => {
+          event.preventDefault();
+          this.submitCardPayment();
+        },
+        onFetching: (_resource: string) => {
+          this.mpFetching.set(true);
+          return () => { this.mpFetching.set(false); };
+        }
+      }
+    });
+  }
+
+  private unmountCardForm() {
+    if (this.cardFormInstance) {
+      this.cardFormInstance.unmount();
+      this.cardFormInstance = null;
+    }
+  }
+
+  private submitCardPayment() {
+    if (!this.cardFormInstance) return;
+
+    const data = this.cardFormInstance.getCardFormData();
+    if (!data.token) {
+      this.showToast('Completa los datos de tu tarjeta 💳');
+      return;
+    }
+
+    this.mpProcessing.set(true);
+
+    this.api.publicCardPayment(this.accessToken, {
+      cardToken:       data.token,
+      paymentMethodId: data.paymentMethodId,
+      issuerId:        data.issuerId ?? null,
+      installments:    Number(data.installments) || 1
+    }).subscribe({
+      next: (result) => {
+        this.mpProcessing.set(false);
+        this.mpResult.set({ status: result.status, message: result.message });
+
+        if (result.status === 'approved') {
+          this.mpReceipt.set({
+            amount: result.amount,
+            date:   new Date(),
+            ref:    result.paymentId ? `MP-${result.paymentId}` : '—'
+          });
+          this.fireConfetti('celebration');
+          this.order.update(o => o
+            ? { ...o, balanceDue: 0, amountPaid: o.total }
+            : null);
+        }
+        this.unmountCardForm();
+      },
+      error: (err) => {
+        this.mpProcessing.set(false);
+        const msg = err?.error?.message || err?.message || `Error ${err?.status ?? ''}`;
+        console.error('[MP] Error en pago con tarjeta:', err);
+        this.mpResult.set({ status: 'error', message: msg || 'Error al procesar el pago. Intenta de nuevo.' });
+        this.unmountCardForm();
+      }
+    });
+  }
+
+  retryCardPayment() {
+    this.mpResult.set(null);
+    this.mpReceipt.set(null);
+    setTimeout(() => this.mountCardForm(), 150);
   }
 
   copyText(val: string) {

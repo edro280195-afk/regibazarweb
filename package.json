@@ -40,6 +40,7 @@
     "@capacitor/app": "^8.0.1",
     "@capacitor/core": "^8.2.0",
     "@capgo/capacitor-printer": "^8.0.10",
+    "@mercadopago/sdk-js": "^0.0.3",
     "@microsoft/signalr": "^10.0.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/google.maps": "^3.58.1",

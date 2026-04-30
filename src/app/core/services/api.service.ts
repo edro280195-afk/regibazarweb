@@ -275,6 +275,16 @@ export class ApiService {
         return this.http.get<CamiGreetingResponse>(`${this.base}/pedido/${accessToken}/cami-greeting`);
     }
 
+    publicCardPayment(accessToken: string, body: {
+        cardToken: string;
+        paymentMethodId: string;
+        issuerId: string | null;
+        installments: number;
+    }): Observable<{ status: string; statusDetail: string; amount: number; message: string; paymentId?: number }> {
+        return this.http.post<{ status: string; statusDetail: string; amount: number; message: string; paymentId?: number }>(
+            `${this.base}/pedido/${accessToken}/payment/card`, body);
+    }
+
     // ── AI Voice Routes ──
     getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<AiRouteSelectionResponse> {
         return this.http.post<AiRouteSelectionResponse>(`${this.base}/routes/ai-select`, {
