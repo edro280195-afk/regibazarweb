@@ -45,7 +45,7 @@ import { gsap } from 'gsap';
         } @else if (tanda(); as t) {
           
           <!-- Header Hero -->
-          <div class="text-center animate-slide-down relative">
+          <div class="text-center animate-slide-down relative mb-8">
              <div class="text-5xl mb-2 animate-wiggle inline-block drop-shadow-sm">🎀</div>
              <h1 class="text-3xl font-black text-pink-600 tracking-tight font-display mb-1">
                {{ t.name }}
@@ -55,215 +55,212 @@ import { gsap } from 'gsap';
              </p>
           </div>
 
-          <!-- Weekly Progress Card -->
-          <div class="card-coquette bg-white/90 p-6 shadow-xl border-pink-100 flex flex-col items-center text-center">
-            <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">Progreso de la Tanda</p>
-            
-            <div class="relative w-32 h-32 flex items-center justify-center mb-4">
-              <svg class="w-full h-full -rotate-90">
-                <circle cx="64" cy="64" r="58" stroke="currentColor" stroke-width="8" fill="transparent" class="text-pink-50" />
-                <circle cx="64" cy="64" r="58" stroke="currentColor" stroke-width="8" fill="transparent" 
-                        class="text-pink-500 transition-all duration-1000"
-                        [attr.stroke-dasharray]="364.4"
-                        [attr.stroke-dashoffset]="364.4 - (364.4 * (t.currentWeek / t.totalWeeks))" />
-              </svg>
-              <div class="absolute inset-0 flex flex-col items-center justify-center">
-                <span class="text-3xl font-black text-pink-950 leading-none">{{ t.currentWeek }}</span>
-                <span class="text-[9px] font-bold text-pink-400 uppercase tracking-tighter">Semana</span>
-              </div>
-            </div>
-
-            <p class="text-sm font-bold text-pink-900">
-               Vamos en la semana <span class="text-pink-600">{{ t.currentWeek }}</span> de <span class="text-pink-600">{{ t.totalWeeks }}</span>
-            </p>
-            <div class="mt-4 bg-pink-100/50 px-4 py-2 rounded-2xl flex items-center gap-2">
-              <span class="text-lg">💰</span>
-              <span class="text-xs font-black text-pink-700">Abono: {{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
-            </div>
+          <!-- Sticky Nav Tabs -->
+          <div id="nav-tabs" class="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-[2rem] mb-8 border border-white sticky top-4 z-30 shadow-sm">
+            <button class="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all duration-300" 
+                    [ngClass]="activeTab() === 'summary' ? 'bg-white text-pink-600 shadow-sm scale-105' : 'text-pink-300'" 
+                    (click)="activeTab.set('summary')">
+              <span class="text-lg">🌸</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Mi Tanda</span>
+            </button>
+            <button class="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all duration-300" 
+                    [ngClass]="activeTab() === 'transparency' ? 'bg-white text-pink-600 shadow-sm scale-105' : 'text-pink-300'" 
+                    (click)="activeTab.set('transparency')">
+              <span class="text-lg">💎</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">Grupo</span>
+            </button>
           </div>
 
-          <!-- Delivery Turn Hero (Special message if it's their turn) -->
-          @if (isWinnerThisWeek()) {
-            <div class="bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl animate-bounce-in relative overflow-hidden">
-               <div class="absolute -right-6 -top-6 text-7xl opacity-20 rotate-12">🎁</div>
-               <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡ES TU TURNO! ✨</h3>
-               <p class="text-xs font-medium opacity-90">Esta semana el producto es para ti. ¡Abre tu regalo de tanda! 💖</p>
+          @if (activeTab() === 'summary') {
+            <!-- ════════════ TAB: MI TANDA (RESUMEN) ════════════ -->
+            <div class="animate-fade-in-up space-y-8">
+              
+              <!-- Weekly Progress Card -->
+              <div class="card-coquette bg-white/90 p-6 shadow-xl border-pink-100 flex flex-col items-center text-center">
+                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">Estado de la Tanda</p>
+                
+                <div class="relative w-32 h-32 flex items-center justify-center mb-4">
+                  <svg class="w-full h-full -rotate-90">
+                    <circle cx="64" cy="64" r="58" stroke="currentColor" stroke-width="8" fill="transparent" class="text-pink-50" />
+                    <circle cx="64" cy="64" r="58" stroke="currentColor" stroke-width="8" fill="transparent" 
+                            class="text-pink-500 transition-all duration-1000"
+                            [attr.stroke-dasharray]="364.4"
+                            [attr.stroke-dashoffset]="364.4 - (364.4 * (t.currentWeek / t.totalWeeks))" />
+                  </svg>
+                  <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-3xl font-black text-pink-950 leading-none">{{ t.currentWeek }}</span>
+                    <span class="text-[9px] font-bold text-pink-400 uppercase tracking-tighter">Semana</span>
+                  </div>
+                </div>
+
+                <div class="space-y-1">
+                  <p class="text-sm font-bold text-pink-900">
+                    Semana <span class="text-pink-600">{{ t.currentWeek }}</span> de <span class="text-pink-600">{{ t.totalWeeks }}</span>
+                  </p>
+                  <div class="bg-pink-100/50 px-4 py-2 rounded-2xl flex items-center gap-2">
+                    <span class="text-lg">💰</span>
+                    <span class="text-xs font-black text-pink-700">Abono Semanal: {{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Delivery Turn Hero -->
+              @if (isWinnerThisWeek()) {
+                <div class="bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl animate-bounce-in relative overflow-hidden">
+                   <div class="absolute -right-6 -top-6 text-7xl opacity-20 rotate-12">🎁</div>
+                   <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡ES TU TURNO! ✨</h3>
+                   <p class="text-xs font-medium opacity-90">Esta semana el producto es para ti. ¡Abre tu regalo de tanda! 💖</p>
+                </div>
+              }
+
+              <!-- Payment Methods Section -->
+              <div id="payment-methods" class="relative z-10">
+                <h3 class="text-center text-pink-950 font-black text-lg font-display mb-1 flex items-center justify-center gap-2">
+                  <span>💸</span> Formas de Pago
+                </h3>
+                <p class="text-center text-[10px] text-pink-700/70 font-bold uppercase tracking-widest mb-4">Toca para copiar los datos</p>
+
+                <!-- Payment Tabs -->
+                <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white/50">
+                  <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          (click)="paymentTab.set('transfer')">🏦 Transfer</button>
+                  <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
+                  <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          (click)="paymentTab.set('cash')">💵 Cash</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="min-h-[160px]">
+                  @switch (paymentTab()) {
+                    @case ('transfer') {
+                      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[2rem] p-6 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-6xl opacity-10 rotate-12">🏦</div>
+                        <h4 class="font-black text-blue-900 text-xs mb-3 uppercase tracking-widest">Citibanamex</h4>
+                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 cursor-pointer active:scale-95 transition-all" (click)="copyText('5256786137583898')">
+                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Tarjeta / CLABE</p>
+                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">5256 7861 3758 3898</p>
+                        </div>
+                        <p class="text-[9px] text-blue-700/80 font-black uppercase">Beneficiario: Yazmin Vara ✨</p>
+                      </div>
+                    }
+                    @case ('oxxo') {
+                      <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-[2rem] p-6 border border-red-100 shadow-sm animate-fade-in relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-6xl opacity-10 rotate-12">🏪</div>
+                        <h4 class="font-black text-red-900 text-xs mb-3 uppercase tracking-widest">BBVA (OXXO)</h4>
+                        <div class="bg-white/60 rounded-2xl p-4 border border-red-200/50 mb-3 cursor-pointer active:scale-95 transition-all" (click)="copyText('4152314496671333')">
+                          <p class="text-[9px] text-red-700/70 font-black uppercase mb-1">Número de Tarjeta</p>
+                          <p class="font-mono font-black text-red-900 text-sm tracking-widest">4152 3144 9667 1333</p>
+                        </div>
+                        <p class="text-[9px] text-red-700/80 font-black uppercase">Envía foto de tu ticket 📸</p>
+                      </div>
+                    }
+                    @case ('cash') {
+                      <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-[2rem] p-6 border border-emerald-100 shadow-sm animate-fade-in flex flex-col items-center justify-center text-center">
+                        <div class="text-4xl mb-2">💵</div>
+                        <h4 class="font-black text-emerald-900 text-xs uppercase tracking-widest">Pago en Efectivo</h4>
+                        <p class="text-[10px] text-emerald-700 mt-2 font-medium leading-relaxed px-4">Recibimos tus abonos directamente en el bazar los viernes y sábados. 💕</p>
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+
+              <!-- Rules Section -->
+              <div class="bg-pink-950/5 text-pink-900 border border-pink-200/50 rounded-[2rem] p-6 text-center">
+                 <h4 class="text-xs font-black uppercase tracking-widest mb-3">🌸 Políticas de Tanda</h4>
+                 <p class="text-[11px] leading-relaxed font-medium">
+                   Entregas los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana. <br>
+                   ¡Ahorrar juntas es más divertido! ✨
+                 </p>
+              </div>
+
             </div>
           }
 
-          <!-- Transparency Wall (Payments) -->
-          <!-- Transparency Wall -->
-          <div class="space-y-4">
-            <h3 class="text-center text-pink-950 font-black text-lg font-display flex items-center justify-center gap-2">
-              <span>💎</span> Seguimiento & Transparencia
-            </h3>
-            
-            <div id="transparency-timeline" class="bg-white/90 rounded-[2.5rem] p-8 shadow-sm border border-white relative overflow-hidden">
-               <div class="absolute top-0 right-0 w-32 h-32 bg-pink-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
-               
-               <div class="space-y-8 relative z-10">
-                 @for (p of t.participants; track p.assignedTurn) {
-                   <div class="flex gap-6 group">
-                     <!-- Left Indicator Column -->
-                     <div class="flex flex-col items-center w-10">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm transition-all duration-500"
-                             [ngClass]="{
-                               'bg-pink-600 text-white scale-110 shadow-lg shadow-pink-100': p.assignedTurn === t.currentWeek,
-                               'bg-white text-pink-400 border border-pink-100': p.assignedTurn !== t.currentWeek
-                             }">
-                           {{ p.assignedTurn }}
-                        </div>
-                        @if (!$last) {
-                          <div class="w-0.5 flex-grow bg-pink-50 my-2 rounded-full"></div>
-                        }
-                     </div>
-
-                     <!-- Content Column -->
-                     <div class="flex-1 pt-1">
-                        <div class="flex justify-between items-start mb-1">
-                           <div>
-                             <p class="text-sm font-black text-pink-900 leading-tight">{{ p.name }}</p>
-                             <div class="flex items-center gap-1.5 mt-0.5">
-                               @if (p.variant) {
-                                  <span class="text-[9px] font-black text-pink-400 uppercase tracking-widest">{{ p.variant }}</span>
-                                  <span class="text-pink-200 text-[8px]">•</span>
-                               }
-                               <span class="text-[9px] font-bold text-pink-500 uppercase tracking-tight">
-                                  📅 {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'EEE d MMM' : '' : 'es-MX' | uppercase }}
-                               </span>
-                             </div>
-                           </div>
-                           <div class="flex gap-2 items-center">
-                              <!-- Payment Track (Hearts) -->
-                              <div class="flex flex-col items-end gap-1">
-                                 <div class="flex flex-wrap justify-end gap-0.5 max-w-[120px]">
-                                    @for (week of weeksArray(); track week) {
-                                      <span class="text-[10px] transition-all duration-300"
-                                            [class.grayscale]="!p.paidWeeks.includes(week)"
-                                            [class.opacity-30]="!p.paidWeeks.includes(week)"
-                                            [title]="'Semana ' + week">
-                                        💖
-                                      </span>
-                                    }
-                                 </div>
-                                 <span class="text-[8px] font-black text-pink-400 uppercase tracking-tighter">
-                                   {{ p.paidWeeks.length }} de {{ t.totalWeeks }} abonos ✨
-                                 </span>
-                              </div>
-
-                              <!-- Delivery Status Badge -->
-                              @if (p.assignedTurn <= t.currentWeek) {
-                                <div class="w-10 h-10 rounded-2xl flex flex-col items-center justify-center transition-all bg-gradient-to-br"
-                                     [ngClass]="p.isDelivered ? 'from-emerald-400 to-teal-500 shadow-emerald-100 shadow-lg' : 'from-pink-100 to-rose-200 opacity-50'">
-                                   <span class="text-lg">{{ p.isDelivered ? '🎁' : '📍' }}</span>
-                                   <span class="text-[6px] font-black text-white uppercase tracking-tighter">{{ p.isDelivered ? 'LISTO' : 'RUTA' }}</span>
-                                </div>
-                              }
-                           </div>
-                        </div>
-                        <div class="h-1 w-full bg-pink-50 rounded-full mt-2 overflow-hidden">
-                           <div class="h-full bg-pink-300 transition-all duration-1000" [style.width]="(p.paidWeeks.length / t.totalWeeks * 100) + '%'"></div>
-                        </div>
-                     </div>
-                   </div>
-                 }
-               </div>
-            </div>
-          </div>
-
-           <!-- Rules Section -->
-           <div class="bg-pink-950/5 text-pink-900 border border-pink-200/50 rounded-[2rem] p-6 text-center">
-              <h4 class="text-xs font-black uppercase tracking-widest mb-3">🌸 Políticas de Tanda</h4>
-              <p class="text-[11px] leading-relaxed font-medium">
-                Los abonos se reciben los <strong class="text-pink-600">Viernes y Sábados</strong>. <br>
-                Las entregas se realizan los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana. (Entrega de Tanda ✨)
-              </p>
-           </div>
-
-           <!-- Payment Methods Section -->
-           <div id="payment-methods" class="relative z-10 animate-fade-in-up">
-              <h3 class="text-center text-pink-950 font-black text-lg font-display mb-1 flex items-center justify-center gap-2">
-                <span>💸</span> Formas de Pago
+          @if (activeTab() === 'transparency') {
+            <!-- ════════════ TAB: GRUPO (TRANSPARENCIA) ════════════ -->
+            <div class="animate-fade-in-up space-y-4">
+              <h3 class="text-center text-pink-950 font-black text-lg font-display flex items-center justify-center gap-2">
+                <span>💎</span> Transparencia de Pagos
               </h3>
-              <p class="text-center text-[10px] text-pink-700/70 font-bold uppercase tracking-widest mb-4">Elige cómo quieres realizar tu abono</p>
-
-              <!-- Custom Tabs -->
-              <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white/50">
-                <button class="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
-                        [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                        (click)="paymentTab.set('transfer')">🏦 Transfer</button>
-                <button class="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
-                        [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                        (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
-                <button class="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
-                        [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
-                        (click)="paymentTab.set('cash')">💵 Efectivo</button>
+              
+              <div id="transparency-timeline" class="bg-white/90 rounded-[2.5rem] p-8 shadow-sm border border-white relative overflow-hidden">
+                 <div class="absolute top-0 right-0 w-32 h-32 bg-pink-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
+                 
+                 <div class="space-y-8 relative z-10">
+                   @for (p of t.participants; track p.assignedTurn) {
+                     <div class="flex gap-6 group">
+                       <!-- Left Indicator Column -->
+                       <div class="flex flex-col items-center w-10">
+                          <div class="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm transition-all duration-500"
+                               [ngClass]="{
+                                 'bg-pink-600 text-white scale-110 shadow-lg shadow-pink-100': p.assignedTurn === t.currentWeek,
+                                 'bg-white text-pink-400 border border-pink-100': p.assignedTurn !== t.currentWeek
+                               }">
+                             {{ p.assignedTurn }}
+                          </div>
+                          @if (!$last) {
+                            <div class="w-0.5 flex-grow bg-pink-50 my-2 rounded-full"></div>
+                          }
+                       </div>
+  
+                       <!-- Content Column -->
+                       <div class="flex-1 pt-1">
+                          <div class="flex justify-between items-start mb-1">
+                             <div>
+                               <p class="text-sm font-black text-pink-900 leading-tight">{{ p.name }}</p>
+                               <div class="flex items-center gap-1.5 mt-0.5">
+                                 @if (p.variant) {
+                                    <span class="text-[9px] font-black text-pink-400 uppercase tracking-widest">{{ p.variant }}</span>
+                                    <span class="text-pink-200 text-[8px]">•</span>
+                                 }
+                                 <span class="text-[9px] font-bold text-pink-500 uppercase tracking-tight">
+                                    📅 {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'EEE d MMM' : '' : 'es-MX' | uppercase }}
+                                 </span>
+                               </div>
+                             </div>
+                             <div class="flex gap-2 items-center">
+                                <!-- Payment Track (Hearts) -->
+                                <div class="flex flex-col items-end gap-1">
+                                   <div class="flex flex-wrap justify-end gap-0.5 max-w-[120px]">
+                                      @for (week of weeksArray(); track week) {
+                                        <span class="text-[10px] transition-all duration-300"
+                                              [class.grayscale]="!p.paidWeeks.includes(week)"
+                                              [class.opacity-30]="!p.paidWeeks.includes(week)"
+                                              [title]="'Semana ' + week">
+                                          💖
+                                        </span>
+                                      }
+                                   </div>
+                                   <span class="text-[8px] font-black text-pink-400 uppercase tracking-tighter">
+                                     {{ p.paidWeeks.length }} de {{ t.totalWeeks }} abonos ✨
+                                   </span>
+                                </div>
+  
+                                <!-- Delivery Status Badge -->
+                                @if (p.assignedTurn <= t.currentWeek) {
+                                  <div class="w-10 h-10 rounded-2xl flex flex-col items-center justify-center transition-all bg-gradient-to-br"
+                                       [ngClass]="p.isDelivered ? 'from-emerald-400 to-teal-500 shadow-emerald-100 shadow-lg' : 'from-pink-100 to-rose-200 opacity-50'">
+                                     <span class="text-lg">{{ p.isDelivered ? '🎁' : '📍' }}</span>
+                                     <span class="text-[6px] font-black text-white uppercase tracking-tighter">{{ p.isDelivered ? 'LISTO' : 'RUTA' }}</span>
+                                  </div>
+                                }
+                             </div>
+                          </div>
+                          <div class="h-1 w-full bg-pink-50 rounded-full mt-2 overflow-hidden">
+                             <div class="h-full bg-pink-300 transition-all duration-1000" [style.width]="(p.paidWeeks.length / t.totalWeeks * 100) + '%'"></div>
+                          </div>
+                       </div>
+                     </div>
+                   }
+                 </div>
               </div>
-
-              <!-- Tab Content -->
-              <div class="min-h-[140px]">
-                @switch (paymentTab()) {
-                  @case ('transfer') {
-                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[2rem] p-6 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
-                      <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏦</div>
-                      <div class="flex items-center gap-3 mb-4 relative z-10">
-                        <div class="text-3xl">🏦</div>
-                        <div>
-                          <h4 class="font-black text-blue-900 text-sm leading-tight">Transferencia Directa</h4>
-                          <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Citibanamex</span>
-                        </div>
-                      </div>
-                      <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10">
-                        <div class="flex justify-between items-center mb-1">
-                          <span class="text-[9px] text-blue-700/70 font-black uppercase tracking-widest">Número de Tarjeta</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                          <span class="font-mono font-black text-blue-900 tracking-wider text-sm">5256 7861 3758 3898</span>
-                          <button class="bg-blue-500 text-white text-[9px] font-black px-4 py-2 rounded-xl active:scale-95 transition-all shadow-lg shadow-blue-100" (click)="copyText('5256786137583898')">COPIAR</button>
-                        </div>
-                      </div>
-                      <p class="text-[9px] text-blue-700/80 text-center font-black uppercase tracking-tighter">Beneficiario: Yazmin Vara ✨</p>
-                    </div>
-                  }
-                  @case ('oxxo') {
-                    <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-[2rem] p-6 border border-red-100 shadow-sm animate-fade-in relative overflow-hidden">
-                      <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏪</div>
-                      <div class="flex items-center gap-3 mb-4 relative z-10">
-                        <div class="text-3xl">🏪</div>
-                        <div>
-                          <h4 class="font-black text-red-900 text-sm leading-tight">Depósito OXXO</h4>
-                          <span class="text-[10px] font-black text-red-600 uppercase tracking-widest">BBVA</span>
-                        </div>
-                      </div>
-                      <div class="bg-white/60 rounded-2xl p-4 border border-red-200/50 relative z-10 mb-3">
-                        <div class="flex justify-between items-center mb-1">
-                          <span class="text-[9px] text-red-700/70 font-black uppercase tracking-widest">Número de Tarjeta</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                          <span class="font-mono font-black text-red-900 tracking-wider text-sm">4152 3144 9667 1333</span>
-                          <button class="bg-red-500 text-white text-[9px] font-black px-4 py-2 rounded-xl active:scale-95 transition-all shadow-lg shadow-red-100" (click)="copyText('4152314496671333')">COPIAR</button>
-                        </div>
-                      </div>
-                      <p class="text-[9px] text-red-700/80 text-center font-black uppercase tracking-tighter">Envía foto del ticket a tu vendedora ✨</p>
-                    </div>
-                  }
-                  @case ('cash') {
-                    <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-[2rem] p-6 border border-emerald-100 shadow-sm animate-fade-in text-center relative overflow-hidden flex flex-col items-center justify-center">
-                      <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">💵</div>
-                      <div class="text-4xl mb-2 relative z-10">💵</div>
-                      <h4 class="font-black text-emerald-900 text-sm relative z-10">Pago en Persona</h4>
-                      <p class="text-[11px] text-emerald-700 mt-2 relative z-10 font-medium">Puedes entregar tu abono directamente en el bazar los días de pago acordados. 💕</p>
-                    </div>
-                  }
-                }
-              </div>
-           </div>
-
-           <!-- Footer -->
-           <div class="text-center pt-8">
-              <p class="Irish Grover text-pink-300 text-xl opacity-60">Hecho con 🎀 para ti</p>
-           </div>
-         }
+            </div>
+          }
       </div>
 
        <!-- Assistant Widget -->
@@ -324,6 +321,7 @@ export class TandaViewComponent implements OnInit {
   error = signal(false);
   scrollY = signal(0);
 
+  activeTab = signal<'summary' | 'transparency'>('summary');
   paymentTab = signal<'transfer' | 'cash' | 'oxxo'>('transfer');
   toastVisible = signal(false);
   toastMessage = signal('');
