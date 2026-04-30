@@ -261,6 +261,7 @@ import { gsap } from 'gsap';
               </div>
             </div>
           }
+        }
       </div>
 
        <!-- Assistant Widget -->
