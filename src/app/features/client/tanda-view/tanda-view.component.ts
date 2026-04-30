@@ -171,20 +171,99 @@ import { gsap } from 'gsap';
             </div>
           </div>
 
-          <!-- Rules Section -->
-          <div class="bg-pink-950/5 text-pink-900 border border-pink-200/50 rounded-[2rem] p-6 text-center">
-             <h4 class="text-xs font-black uppercase tracking-widest mb-3">🌸 Políticas de Tanda</h4>
-             <p class="text-[11px] leading-relaxed font-medium">
-               Los abonos se reciben los <strong class="text-pink-600">Viernes y Sábados</strong>. <br>
-               Las entregas se realizan los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana. (Entrega de Tanda ✨)
-             </p>
-          </div>
+           <!-- Rules Section -->
+           <div class="bg-pink-950/5 text-pink-900 border border-pink-200/50 rounded-[2rem] p-6 text-center">
+              <h4 class="text-xs font-black uppercase tracking-widest mb-3">🌸 Políticas de Tanda</h4>
+              <p class="text-[11px] leading-relaxed font-medium">
+                Los abonos se reciben los <strong class="text-pink-600">Viernes y Sábados</strong>. <br>
+                Las entregas se realizan los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana. (Entrega de Tanda ✨)
+              </p>
+           </div>
 
-          <!-- Footer -->
-          <div class="text-center pt-8">
-             <p class="Irish Grover text-pink-300 text-xl opacity-60">Hecho con 🎀 para ti</p>
-          </div>
-        }
+           <!-- Payment Methods Section -->
+           <div id="payment-methods" class="relative z-10 animate-fade-in-up">
+              <h3 class="text-center text-pink-950 font-black text-lg font-display mb-1 flex items-center justify-center gap-2">
+                <span>💸</span> Formas de Pago
+              </h3>
+              <p class="text-center text-[10px] text-pink-700/70 font-bold uppercase tracking-widest mb-4">Elige cómo quieres realizar tu abono</p>
+
+              <!-- Custom Tabs -->
+              <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white/50">
+                <button class="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                        [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                        (click)="paymentTab.set('transfer')">🏦 Transfer</button>
+                <button class="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                        [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                        (click)="paymentTab.set('oxxo')">🏪 OXXO</button>
+                <button class="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                        [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                        (click)="paymentTab.set('cash')">💵 Efectivo</button>
+              </div>
+
+              <!-- Tab Content -->
+              <div class="min-h-[140px]">
+                @switch (paymentTab()) {
+                  @case ('transfer') {
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[2rem] p-6 border border-blue-100 shadow-sm animate-fade-in relative overflow-hidden">
+                      <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏦</div>
+                      <div class="flex items-center gap-3 mb-4 relative z-10">
+                        <div class="text-3xl">🏦</div>
+                        <div>
+                          <h4 class="font-black text-blue-900 text-sm leading-tight">Transferencia Directa</h4>
+                          <span class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Citibanamex</span>
+                        </div>
+                      </div>
+                      <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10">
+                        <div class="flex justify-between items-center mb-1">
+                          <span class="text-[9px] text-blue-700/70 font-black uppercase tracking-widest">Número de Tarjeta</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                          <span class="font-mono font-black text-blue-900 tracking-wider text-sm">5256 7861 3758 3898</span>
+                          <button class="bg-blue-500 text-white text-[9px] font-black px-4 py-2 rounded-xl active:scale-95 transition-all shadow-lg shadow-blue-100" (click)="copyText('5256786137583898')">COPIAR</button>
+                        </div>
+                      </div>
+                      <p class="text-[9px] text-blue-700/80 text-center font-black uppercase tracking-tighter">Beneficiario: Yazmin Vara ✨</p>
+                    </div>
+                  }
+                  @case ('oxxo') {
+                    <div class="bg-gradient-to-br from-red-50 to-orange-50 rounded-[2rem] p-6 border border-red-100 shadow-sm animate-fade-in relative overflow-hidden">
+                      <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">🏪</div>
+                      <div class="flex items-center gap-3 mb-4 relative z-10">
+                        <div class="text-3xl">🏪</div>
+                        <div>
+                          <h4 class="font-black text-red-900 text-sm leading-tight">Depósito OXXO</h4>
+                          <span class="text-[10px] font-black text-red-600 uppercase tracking-widest">BBVA</span>
+                        </div>
+                      </div>
+                      <div class="bg-white/60 rounded-2xl p-4 border border-red-200/50 relative z-10 mb-3">
+                        <div class="flex justify-between items-center mb-1">
+                          <span class="text-[9px] text-red-700/70 font-black uppercase tracking-widest">Número de Tarjeta</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                          <span class="font-mono font-black text-red-900 tracking-wider text-sm">4152 3144 9667 1333</span>
+                          <button class="bg-red-500 text-white text-[9px] font-black px-4 py-2 rounded-xl active:scale-95 transition-all shadow-lg shadow-red-100" (click)="copyText('4152314496671333')">COPIAR</button>
+                        </div>
+                      </div>
+                      <p class="text-[9px] text-red-700/80 text-center font-black uppercase tracking-tighter">Envía foto del ticket a tu vendedora ✨</p>
+                    </div>
+                  }
+                  @case ('cash') {
+                    <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-[2rem] p-6 border border-emerald-100 shadow-sm animate-fade-in text-center relative overflow-hidden flex flex-col items-center justify-center">
+                      <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">💵</div>
+                      <div class="text-4xl mb-2 relative z-10">💵</div>
+                      <h4 class="font-black text-emerald-900 text-sm relative z-10">Pago en Persona</h4>
+                      <p class="text-[11px] text-emerald-700 mt-2 relative z-10 font-medium">Puedes entregar tu abono directamente en el bazar los días de pago acordados. 💕</p>
+                    </div>
+                  }
+                }
+              </div>
+           </div>
+
+           <!-- Footer -->
+           <div class="text-center pt-8">
+              <p class="Irish Grover text-pink-300 text-xl opacity-60">Hecho con 🎀 para ti</p>
+           </div>
+         }
       </div>
 
        <!-- Assistant Widget -->
@@ -201,6 +280,18 @@ import { gsap } from 'gsap';
           </button>
         </div>
        }
+
+       <!-- Toast Notification -->
+       @if (toastVisible()) {
+        <div class="fixed bottom-24 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4">
+          <div class="animate-bounce-up-y-only pointer-events-auto">
+            <div class="bg-pink-950/90 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30">
+              <span class="text-lg">✨</span>
+              <span>{{ toastMessage() }}</span>
+            </div>
+          </div>
+        </div>
+       }
     </div>
   `,
   styles: [`
@@ -212,6 +303,8 @@ import { gsap } from 'gsap';
     @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
     @keyframes bounce-subtle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
     
+    @keyframes bounce-up-y-only { 0% { opacity: 0; transform: translateY(100vh); } 60% { opacity: 1; transform: translateY(-15px); } 80% { transform: translateY(5px); } 100% { transform: translateY(0); } }
+    
     .animate-float { animation: float 6s ease-in-out infinite; }
     .animate-float-delayed { animation: float-delayed 5s ease-in-out infinite; animation-delay: 2s; }
     .animate-pulse-slow { animation: pulse-slow 4s ease-in-out infinite; }
@@ -219,6 +312,7 @@ import { gsap } from 'gsap';
     .animate-fade-in-up { animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
     .animate-fade-in { animation: fade-in 0.4s ease-out both; }
     .animate-bounce-subtle { animation: bounce-subtle 2s infinite; }
+    .animate-bounce-up-y-only { animation: bounce-up-y-only 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
   `]
 })
 export class TandaViewComponent implements OnInit {
@@ -229,6 +323,11 @@ export class TandaViewComponent implements OnInit {
   loading = signal(true);
   error = signal(false);
   scrollY = signal(0);
+
+  paymentTab = signal<'transfer' | 'cash' | 'oxxo'>('transfer');
+  toastVisible = signal(false);
+  toastMessage = signal('');
+  private toastTimeout: any;
   
   isWinnerThisWeek = computed(() => {
     const t = this.tanda();
@@ -244,6 +343,19 @@ export class TandaViewComponent implements OnInit {
   @HostListener('window:scroll', ['$event'])
   onScroll(event?: any) { 
     this.scrollY.set(window.scrollY); 
+  }
+
+  copyText(val: string) {
+    navigator.clipboard.writeText(val).then(() => {
+      this.showToast('Número Copiado 📋✨');
+    });
+  }
+
+  showToast(msg: string) {
+    this.toastMessage.set(msg);
+    this.toastVisible.set(true);
+    if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    this.toastTimeout = setTimeout(() => this.toastVisible.set(false), 3000);
   }
 
   ngOnInit() {
