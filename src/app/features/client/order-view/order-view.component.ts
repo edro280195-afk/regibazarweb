@@ -2106,6 +2106,20 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const o = this.order();
     if (!o) return;
 
+    // Confirmación automática al abrir el regalito
+    if (o.status === 'Pending' || o.status === 'Postponed') {
+      this.api.publicConfirmOrder(this.accessToken).subscribe({
+        next: (res) => {
+          this.showToast(res.message || '¡Pedido confirmado! 💖');
+          this.order.update(prev => prev ? { ...prev, status: 'Confirmed' } : null);
+          this.buildTimeline('Confirmed');
+        },
+        error: (err) => {
+          console.error('[AutoConfirm] Error al confirmar pedido al abrir regalo:', err);
+        }
+      });
+    }
+
     const tl = gsap.timeline({
       onComplete: () => {
         this.isUnboxed.set(true);
