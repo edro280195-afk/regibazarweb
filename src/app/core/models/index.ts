@@ -349,6 +349,51 @@ export interface AvailableTandaDto {
     deliveryInstructions?: string;
 }
 
+export interface SkippedStopDto {
+    kind: 'Order' | 'Tanda';
+    id: string;
+    name: string;
+    reason: string;
+}
+
+export interface CreateRouteResponse {
+    route: RouteDto;
+    skipped: SkippedStopDto[];
+}
+
+export interface PreviewStopDto {
+    kind: 'Order' | 'Tanda';
+    orderId?: number;
+    tandaParticipantId?: string;
+    sortOrder: number;
+    clientName: string;
+    clientAddress?: string;
+    latitude?: number;
+    longitude?: number;
+    total: number;
+    hasCoords: boolean;
+    tandaName?: string;
+    tandaWeek?: number;
+}
+
+export interface PreviewRouteResponse {
+    stops: PreviewStopDto[];
+    totalDistanceMeters: number;
+    totalDurationSeconds: number;
+    optimizerSource: string;
+    skipped: SkippedStopDto[];
+    stopsWithoutCoords: number;
+}
+
+export interface BulkGeocodeResultDto {
+    clientId: number;
+    success: boolean;
+    latitude?: number;
+    longitude?: number;
+    formattedAddress?: string;
+    error?: string;
+}
+
 export interface DriverExpenseDto {
     id: number;
     driverRouteId?: number;

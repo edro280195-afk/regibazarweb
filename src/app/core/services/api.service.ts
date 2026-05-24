@@ -12,7 +12,7 @@ import {
     AiParsedOrder, AiInsight,
     CamiMessage, CamiChatRequest, CamiChatResponse,
     AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse,
-    AvailableTandaDto
+    AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -154,12 +154,26 @@ export class ApiService {
         return this.http.get<RouteDto>(`${this.base}/routes/${id}`);
     }
 
-    createRoute(orderIds: number[], force: boolean = false, tandaParticipantIds?: string[]): Observable<RouteDto> {
-        return this.http.post<RouteDto>(`${this.base}/routes`, { orderIds, force, tandaParticipantIds });
+    createRoute(orderIds: number[], force: boolean = false, tandaParticipantIds?: string[], preOptimized: boolean = false): Observable<CreateRouteResponse> {
+        return this.http.post<CreateRouteResponse>(`${this.base}/routes`, { orderIds, force, tandaParticipantIds, preOptimized });
+    }
+
+    previewRoute(orderIds: number[], tandaParticipantIds: string[], startLat?: number, startLng?: number): Observable<PreviewRouteResponse> {
+        return this.http.post<PreviewRouteResponse>(`${this.base}/routes/preview`, {
+            orderIds, tandaParticipantIds, startLat, startLng
+        });
     }
 
     getAvailableTandas(): Observable<AvailableTandaDto[]> {
         return this.http.get<AvailableTandaDto[]>(`${this.base}/routes/available-tandas`);
+    }
+
+    bulkGeocodeClients(clientIds: number[]): Observable<BulkGeocodeResultDto[]> {
+        return this.http.post<BulkGeocodeResultDto[]>(`${this.base}/clients/bulk-geocode`, { clientIds });
+    }
+
+    setClientCoordinates(clientId: number, latitude: number, longitude: number, address?: string): Observable<any> {
+        return this.http.post(`${this.base}/clients/${clientId}/set-coordinates`, { latitude, longitude, address });
     }
 
     deleteRoute(id: number): Observable<any> {

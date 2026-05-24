@@ -1111,9 +1111,13 @@ export class TandaDetailComponent implements OnInit {
           });
         } else {
           this.apiService.createRoute([], false, [p.id]).subscribe({
-            next: () => {
+            next: (res) => {
               this.addingToRoute.set(false);
-              this.toastService.success(`✨ Ruta del domingo creada con ${p.customerName}`);
+              if (res.skipped && res.skipped.length > 0) {
+                this.toastService.error(res.skipped[0].reason);
+              } else {
+                this.toastService.success(`✨ Ruta del domingo creada con ${p.customerName}`);
+              }
             },
             error: (err) => {
               this.addingToRoute.set(false);
