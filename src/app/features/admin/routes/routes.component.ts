@@ -312,7 +312,12 @@ interface GeocodedOrder extends OrderSummaryDto {
                       {{ getStatusLabel(route.status) }}
                     </span>
                     <div class="text-right">
-                      <p class="text-[10px] sm:text-xs text-pink-400 font-semibold">{{ route.deliveries.length }} entregas</p>
+                      <p class="text-[10px] sm:text-xs text-pink-400 font-semibold">
+                        {{ getOrderCount(route) }} pedidos
+                        @if (getTandaCount(route) > 0) {
+                          · <span class="text-fuchsia-500">{{ getTandaCount(route) }} tandas ✨</span>
+                        }
+                      </p>
                       <p class="text-base sm:text-lg font-black text-pink-900">{{ getRouteTotal(route) | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                     </div>
                   </div>
@@ -394,7 +399,17 @@ interface GeocodedOrder extends OrderSummaryDto {
                           {{ d.sortOrder }}
                         </div>
                         <div class="flex-1 min-w-0">
-                          <p class="text-sm font-bold text-gray-800 truncate">{{ d.clientName }}</p>
+                          <p class="text-sm font-bold text-gray-800 truncate flex items-center gap-2">
+                            {{ d.clientName }}
+                            @if (d.kind === 'Tanda') {
+                              <span class="text-[9px] px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-700 rounded-md font-black uppercase tracking-wider">✨ Tanda</span>
+                            }
+                          </p>
+                          @if (d.kind === 'Tanda') {
+                            <p class="text-[10px] text-fuchsia-500 truncate">
+                              {{ d.tandaName }}@if (d.tandaWeek != null) { · Semana {{ d.tandaWeek }}@if (d.tandaTotalWeeks) {/{{ d.tandaTotalWeeks }}} }@if (d.tandaVariant) { · {{ d.tandaVariant }} }
+                            </p>
+                          }
                           @if (d.alternativeAddress || d.clientAddress) {
                             <p class="text-[11px] text-gray-400 truncate">📍 {{ d.alternativeAddress || d.clientAddress }}</p>
                           }
@@ -442,7 +457,7 @@ interface GeocodedOrder extends OrderSummaryDto {
                                       title="Mover abajo">↓</button>
                             </div>
                             <button class="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                    (click)="$event.stopPropagation(); removeOrderFromRoute(route, d.orderId)"
+                                    (click)="$event.stopPropagation(); removeDeliveryFromRoute(route, d)"
                                     title="Quitar de ruta">
                               🗑️
                             </button>
@@ -1788,6 +1803,14 @@ export class RoutesComponent implements OnInit, OnDestroy {
     return r.deliveries.filter(d => d.status === 'Delivered').length;
   }
 
+  getOrderCount(r: RouteDto): number {
+    return r.deliveries.filter(d => d.kind !== 'Tanda').length;
+  }
+
+  getTandaCount(r: RouteDto): number {
+    return r.deliveries.filter(d => d.kind === 'Tanda').length;
+  }
+
   getProgress(r: RouteDto): number {
     return r.deliveries.length ? (this.getDelivered(r) / r.deliveries.length) * 100 : 0;
   }
@@ -1853,6 +1876,23 @@ export class RoutesComponent implements OnInit, OnDestroy {
       },
       error: (err) => this.toast.error('Error al remover pedido')
     });
+  }
+
+  removeDeliveryFromRoute(route: any, d: RouteDeliveryDto) {
+    if (d.kind === 'Tanda' && d.tandaParticipantId) {
+      if (!confirm('¿Seguro que quieres quitar esta tanda de la ruta?')) return;
+      this.api.removeTandaFromRoute(route.id, d.tandaParticipantId).subscribe({
+        next: () => {
+          this.toast.success('Tanda removida de la ruta ✨');
+          this.loadRoutes();
+        },
+        error: () => this.toast.error('Error al remover tanda')
+      });
+      return;
+    }
+    if (d.orderId != null) {
+      this.removeOrderFromRoute(route, d.orderId);
+    }
   }
 
   async addOrderToRoute(route: any, orderId: number) {

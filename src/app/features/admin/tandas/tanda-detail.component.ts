@@ -78,7 +78,14 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                 
                 @if (sundayParticipant(); as sp) {
                   @if (!sp.isDelivered) {
-                    <button (click)="onConfirmSundayDelivery(sp)" class="btn-coquette btn-rose px-8 py-4 shadow-xl">Confirmar Entrega ✨</button>
+                    <div class="flex flex-col sm:flex-row gap-2 items-stretch">
+                      <button (click)="addToSundayRoute(sp)"
+                              [disabled]="addingToRoute()"
+                              class="btn-coquette btn-pink px-6 py-4 shadow-xl disabled:opacity-60 disabled:cursor-not-allowed">
+                        {{ addingToRoute() ? 'Agregando...' : '📍 Agregar a ruta del domingo' }}
+                      </button>
+                      <button (click)="onConfirmSundayDelivery(sp)" class="btn-coquette btn-rose px-8 py-4 shadow-xl">Confirmar Entrega ✨</button>
+                    </div>
                   } @else {
                     <div class="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs border border-emerald-100 uppercase tracking-widest">
                        Entrega Completada
@@ -712,6 +719,7 @@ export class TandaDetailComponent implements OnInit {
   clientSearch = signal('');
   showOnlyFrequent = signal(true);
   confirmingDelivery = signal<TandaParticipantDto | null>(null);
+  addingToRoute = signal(false);
   showSuggestions = signal(false);
   selectedSuggestionIdx = signal(-1);
   selectedClient = signal<ClientDto | null>(null);
@@ -1079,6 +1087,46 @@ export class TandaDetailComponent implements OnInit {
 
   onConfirmSundayDelivery(p: TandaParticipantDto) {
     this.confirmingDelivery.set(p);
+  }
+
+  addToSundayRoute(p: TandaParticipantDto) {
+    if (this.addingToRoute()) return;
+    this.addingToRoute.set(true);
+
+    // Busca una ruta Pending existente. Si hay, agregamos ahí.
+    // Si no hay, creamos una ruta nueva con solo esta tanda.
+    this.apiService.getRoutes().subscribe({
+      next: (routes) => {
+        const pendingRoute = routes.find(r => r.status === 'Pending');
+        if (pendingRoute) {
+          this.apiService.addTandaToRoute(pendingRoute.id, p.id).subscribe({
+            next: () => {
+              this.addingToRoute.set(false);
+              this.toastService.success(`✨ ${p.customerName} agregada a la ruta del domingo`);
+            },
+            error: (err) => {
+              this.addingToRoute.set(false);
+              this.toastService.error(err.error?.message || 'No se pudo agregar a la ruta');
+            }
+          });
+        } else {
+          this.apiService.createRoute([], false, [p.id]).subscribe({
+            next: () => {
+              this.addingToRoute.set(false);
+              this.toastService.success(`✨ Ruta del domingo creada con ${p.customerName}`);
+            },
+            error: (err) => {
+              this.addingToRoute.set(false);
+              this.toastService.error(err.error?.message || 'No se pudo crear la ruta');
+            }
+          });
+        }
+      },
+      error: () => {
+        this.addingToRoute.set(false);
+        this.toastService.error('No se pudieron cargar las rutas');
+      }
+    });
   }
 
   confirmDelivery(p: TandaParticipantDto) {
