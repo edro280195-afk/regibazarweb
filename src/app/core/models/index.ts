@@ -298,7 +298,7 @@ export interface ReportDto {
 
 export interface RouteDeliveryDto {
     deliveryId: number;
-    orderId: number;
+    orderId?: number;
     sortOrder: number;
     clientName: string;
     clientAddress?: string;
@@ -319,6 +319,92 @@ export interface RouteDeliveryDto {
     items?: OrderItemDto[];
     arrivedAt?: string;
     alternativeAddress?: string;
+    clientTag?: string;
+    clientType?: string;
+    // ── Tanda ──
+    kind?: 'Order' | 'Tanda';
+    tandaParticipantId?: string;
+    tandaId?: string;
+    tandaName?: string;
+    tandaProductName?: string;
+    tandaWeek?: number;
+    tandaTotalWeeks?: number;
+    tandaVariant?: string;
+}
+
+export interface AvailableTandaDto {
+    tandaParticipantId: string;
+    tandaId: string;
+    tandaName: string;
+    tandaProductName?: string;
+    week: number;
+    totalWeeks: number;
+    variant?: string;
+    clientId: number;
+    clientName: string;
+    clientAddress?: string;
+    clientPhone?: string;
+    clientLatitude?: number;
+    clientLongitude?: number;
+    deliveryInstructions?: string;
+}
+
+export interface SkippedStopDto {
+    kind: 'Order' | 'Tanda';
+    id: string;
+    name: string;
+    reason: string;
+}
+
+export interface CreateRouteResponse {
+    route: RouteDto;
+    skipped: SkippedStopDto[];
+}
+
+export interface PreviewStopDto {
+    kind: 'Order' | 'Tanda';
+    orderId?: number;
+    tandaParticipantId?: string;
+    sortOrder: number;
+    clientName: string;
+    clientAddress?: string;
+    latitude?: number;
+    longitude?: number;
+    total: number;
+    hasCoords: boolean;
+    tandaName?: string;
+    tandaWeek?: number;
+}
+
+export interface PreviewRouteResponse {
+    stops: PreviewStopDto[];
+    totalDistanceMeters: number;
+    totalDurationSeconds: number;
+    optimizerSource: string;
+    skipped: SkippedStopDto[];
+    stopsWithoutCoords: number;
+    polylineEncoded?: string;
+    depotLatitude?: number;
+    depotLongitude?: number;
+}
+
+export interface RecomposeRouteRequest {
+    orderIds: number[];
+    tandaParticipantIds?: string[];
+}
+
+export interface RecomposeRouteResponse {
+    route: RouteDto;
+    skipped: SkippedStopDto[];
+}
+
+export interface BulkGeocodeResultDto {
+    clientId: number;
+    success: boolean;
+    latitude?: number;
+    longitude?: number;
+    formattedAddress?: string;
+    error?: string;
 }
 
 export interface DriverExpenseDto {

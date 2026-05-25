@@ -126,21 +126,42 @@
                 
                 <div class="flex justify-between items-start mb-4 mt-2">
                     <div class="flex-1 min-w-0">
-                        <span class="inline-block px-2 py-0.5 bg-pink-600 text-[10px] font-bold rounded-md mb-2 uppercase tracking-tight">
-                            #{{ d.sortOrder }} • Entrega Activa
-                        </span>
+                        <div class="flex items-center gap-2 mb-2 flex-wrap">
+                            <span class="inline-block px-2 py-0.5 bg-pink-600 text-[10px] font-bold rounded-md uppercase tracking-tight">
+                                #{{ d.sortOrder }} • Entrega Activa
+                            </span>
+                            @if (d.kind === 'Tanda') {
+                                <span class="inline-block px-2 py-0.5 bg-fuchsia-500 text-[10px] font-bold rounded-md uppercase tracking-tight">
+                                    ✨ Tanda
+                                </span>
+                            }
+                        </div>
                         <h2 class="text-3xl font-black leading-none mb-1 uppercase tracking-tight truncate">{{ d.clientName }}</h2>
                         <div class="flex items-center text-white/40 text-sm">
                             <span class="truncate block w-full">{{ d.alternativeAddress || d.address || d.clientAddress }}</span>
                         </div>
                     </div>
-                    @if (d.status !== 'Delivered' && d.status !== 'NotDelivered') {
-                        <button (click)="openClientChat(d, $event)" 
+                    @if (d.status !== 'Delivered' && d.status !== 'NotDelivered' && d.kind !== 'Tanda') {
+                        <button (click)="openClientChat(d, $event)"
                                 class="w-12 h-12 bg-white/10 border border-white/20 rounded-2xl flex items-center justify-center text-xl active:scale-90 transition-transform shadow-lg ml-4 flex-shrink-0">
                             💬
                         </button>
                     }
                 </div>
+
+                @if (d.kind === 'Tanda') {
+                    <div class="bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-xl p-3 mb-3 text-sm">
+                        <span class="block text-[10px] uppercase tracking-widest text-fuchsia-300 font-bold mb-1">✨ Entrega de Tanda</span>
+                        <p class="font-bold text-white/90">{{ d.tandaName }}</p>
+                        @if (d.tandaProductName) {
+                            <p class="text-white/70 text-xs">Producto: {{ d.tandaProductName }}@if (d.tandaVariant) { · <span class="text-fuchsia-300">{{ d.tandaVariant }}</span> }</p>
+                        }
+                        @if (d.tandaWeek != null) {
+                            <p class="text-white/50 text-xs">Semana {{ d.tandaWeek }}@if (d.tandaTotalWeeks) { de {{ d.tandaTotalWeeks }} }</p>
+                        }
+                        <p class="text-emerald-300 text-[11px] mt-2 italic">No se cobra al entregar · El pago se administra en la sección de Tandas.</p>
+                    </div>
+                }
 
                 @if (d.deliveryInstructions) {
                     <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3 mb-3 text-sm text-indigo-200 overflow-hidden">
@@ -149,29 +170,31 @@
                     </div>
                 }
 
-                <!-- ARTÍCULOS DEL PEDIDO -->
-                @if (d.items && d.items.length) {
-                    <div class="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4">
-                        <span class="block text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2">📦 Artículos</span>
-                        <div class="space-y-1">
-                            @for (item of d.items; track item.id) {
-                                <div class="flex justify-between items-center text-sm">
-                                    <span class="text-white/80 truncate flex-1 mr-2">{{ item.quantity }}× {{ item.productName }}</span>
-                                    <span class="text-white/50 shrink-0">${{ item.lineTotal | number:'1.0-0' }}</span>
-                                </div>
-                            }
+                <!-- ARTÍCULOS DEL PEDIDO (no aplica para Tandas) -->
+                @if (d.kind !== 'Tanda') {
+                    @if (d.items && d.items.length) {
+                        <div class="bg-white/5 border border-white/10 rounded-2xl p-3 mb-4">
+                            <span class="block text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2">📦 Artículos</span>
+                            <div class="space-y-1">
+                                @for (item of d.items; track item.id) {
+                                    <div class="flex justify-between items-center text-sm">
+                                        <span class="text-white/80 truncate flex-1 mr-2">{{ item.quantity }}× {{ item.productName }}</span>
+                                        <span class="text-white/50 shrink-0">${{ item.lineTotal | number:'1.0-0' }}</span>
+                                    </div>
+                                }
+                            </div>
+                            <div class="border-t border-white/10 mt-2 pt-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-white/50 uppercase">Total</span>
+                                <span class="font-black text-emerald-400">${{ d.total | number:'1.0-0' }}</span>
+                            </div>
                         </div>
-                        <div class="border-t border-white/10 mt-2 pt-2 flex justify-between items-center">
-                            <span class="text-xs font-bold text-white/50 uppercase">Total</span>
-                            <span class="font-black text-emerald-400">${{ d.total | number:'1.0-0' }}</span>
+                    } @else {
+                        <!-- Total sin items detallados -->
+                        <div class="flex justify-between items-center mb-4 px-1">
+                            <span class="text-xs font-bold text-white/40 uppercase">Total del pedido</span>
+                            <span class="font-black text-emerald-400 text-lg">${{ d.total | number:'1.0-0' }}</span>
                         </div>
-                    </div>
-                } @else {
-                    <!-- Total sin items detallados -->
-                    <div class="flex justify-between items-center mb-4 px-1">
-                        <span class="text-xs font-bold text-white/40 uppercase">Total del pedido</span>
-                        <span class="font-black text-emerald-400 text-lg">${{ d.total | number:'1.0-0' }}</span>
-                    </div>
+                    }
                 }
 
                 <!-- ACTIONS AREA -->
@@ -231,8 +254,12 @@
                 <!-- DELIVER BUTTON -->
                 <button (click)="markDelivered(d.id)"
                         [disabled]="((d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id]) || isDelivering()"
-                        class="w-full h-20 bg-emerald-600 rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all disabled:grayscale disabled:opacity-40 disabled:cursor-not-allowed">
-                    {{ isDelivering() ? 'Entregando...' : ((d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id] ? 'Selecciona pago' : '✓ Entregar') }}
+                        class="w-full h-20 rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:grayscale disabled:opacity-40 disabled:cursor-not-allowed"
+                        [class.bg-emerald-600]="d.kind !== 'Tanda'"
+                        [class.shadow-emerald-600/20]="d.kind !== 'Tanda'"
+                        [class.bg-fuchsia-600]="d.kind === 'Tanda'"
+                        [class.shadow-fuchsia-600/20]="d.kind === 'Tanda'">
+                    {{ isDelivering() ? 'Entregando...' : (d.kind === 'Tanda' ? '✨ Confirmar Tanda' : ((d.balanceDue ?? d.total) > 0 && !paymentMethods[d.id] ? 'Selecciona pago' : '✓ Entregar')) }}
                 </button>
             </div>
         } @else {
@@ -279,7 +306,12 @@
                             </div>
                             <!-- Info -->
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-bold text-sm uppercase truncate">{{ d.clientName }}</h4>
+                                <h4 class="font-bold text-sm uppercase truncate flex items-center gap-1">
+                                    {{ d.clientName }}
+                                    @if (d.kind === 'Tanda') {
+                                        <span class="text-[8px] px-1 py-0.5 bg-fuchsia-500/30 text-fuchsia-200 rounded">TANDA</span>
+                                    }
+                                </h4>
                                 <p class="text-[10px] text-white/40 truncate">{{ d.address || d.clientAddress }}</p>
                             </div>
                             <!-- Botones ↑/↓ -->

@@ -879,10 +879,13 @@ export class OrdersComponent implements OnInit {
     const order = this.selectedOrder();
     if (!order) return;
 
+    const trimmedAddress = (this.editClientData.address || '').trim();
     this.api.updateOrderDetails(order.id, {
       clientName: this.editClientData.name,
       clientPhone: this.editClientData.phone,
-      clientAddress: this.editClientData.address,
+      // Si el campo viene vacío, no lo mandamos: evita borrar la dirección capturada
+      // previamente cuando el formulario se usa solo para editar otros campos.
+      ...(trimmedAddress ? { clientAddress: trimmedAddress } : {}),
       alternativeAddress: this.editClientData.alternativeAddress,
       type: this.editClientData.type,
       deliveryInstructions: this.editClientData.deliveryInstructions

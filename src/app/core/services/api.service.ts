@@ -11,7 +11,9 @@ import {
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
     AiParsedOrder, AiInsight,
     CamiMessage, CamiChatRequest, CamiChatResponse,
-    AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse
+    AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse,
+    AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto,
+    RecomposeRouteResponse
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -153,8 +155,26 @@ export class ApiService {
         return this.http.get<RouteDto>(`${this.base}/routes/${id}`);
     }
 
-    createRoute(orderIds: number[], force: boolean = false): Observable<RouteDto> {
-        return this.http.post<RouteDto>(`${this.base}/routes`, { orderIds, force });
+    createRoute(orderIds: number[], force: boolean = false, tandaParticipantIds?: string[], preOptimized: boolean = false): Observable<CreateRouteResponse> {
+        return this.http.post<CreateRouteResponse>(`${this.base}/routes`, { orderIds, force, tandaParticipantIds, preOptimized });
+    }
+
+    previewRoute(orderIds: number[], tandaParticipantIds: string[], startLat?: number, startLng?: number): Observable<PreviewRouteResponse> {
+        return this.http.post<PreviewRouteResponse>(`${this.base}/routes/preview`, {
+            orderIds, tandaParticipantIds, startLat, startLng
+        });
+    }
+
+    getAvailableTandas(): Observable<AvailableTandaDto[]> {
+        return this.http.get<AvailableTandaDto[]>(`${this.base}/routes/available-tandas`);
+    }
+
+    bulkGeocodeClients(clientIds: number[]): Observable<BulkGeocodeResultDto[]> {
+        return this.http.post<BulkGeocodeResultDto[]>(`${this.base}/clients/bulk-geocode`, { clientIds });
+    }
+
+    setClientCoordinates(clientId: number, latitude: number, longitude: number, address?: string): Observable<any> {
+        return this.http.post(`${this.base}/clients/${clientId}/set-coordinates`, { latitude, longitude, address });
     }
 
     deleteRoute(id: number): Observable<any> {
@@ -404,6 +424,27 @@ export class ApiService {
 
     removeOrderFromRoute(routeId: number, orderId: number): Observable<any> {
         return this.http.delete(`${this.base}/routes/${routeId}/remove-order/${orderId}`);
+    }
+
+    addTandaToRoute(routeId: number, tandaParticipantId: string, lat?: number, lng?: number): Observable<any> {
+        let params = new HttpParams();
+        if (lat !== undefined) params = params.set('lat', lat.toString());
+        if (lng !== undefined) params = params.set('lng', lng.toString());
+        return this.http.post(`${this.base}/routes/${routeId}/add-tanda`, JSON.stringify(tandaParticipantId), {
+            params,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    removeTandaFromRoute(routeId: number, tandaParticipantId: string): Observable<any> {
+        return this.http.delete(`${this.base}/routes/${routeId}/remove-tanda/${tandaParticipantId}`);
+    }
+
+    recomposeRoute(routeId: number, orderIds: number[], tandaParticipantIds?: string[]): Observable<RecomposeRouteResponse> {
+        return this.http.put<RecomposeRouteResponse>(`${this.base}/routes/${routeId}/recompose`, {
+            orderIds,
+            tandaParticipantIds: tandaParticipantIds ?? []
+        });
     }
 
     // ── Route Reorder ──

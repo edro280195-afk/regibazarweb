@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, signal, computed, HostListener, CUSTOM_EL
 import { CommonModule, CurrencyPipe, DatePipe, KeyValuePipe } from '@angular/common';
 import { GoogleMap, MapMarker, MapDirectionsRenderer } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
+import { RouterLink, Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
@@ -37,6 +38,7 @@ interface GeocodedOrder extends OrderSummaryDto {
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     GoogleMap,
     MapMarker,
     MapDirectionsRenderer,
@@ -180,7 +182,7 @@ interface GeocodedOrder extends OrderSummaryDto {
             <span class="transition-transform group-active:rotate-180" [class.animate-spin]="loading()">🔄</span> Actualizar
           </button>
           <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95"
-                  (click)="openCreateModal()">
+                  routerLink="/admin/routes/new">
             ✨ Nueva Ruta
           </button>
         </div>
@@ -312,7 +314,12 @@ interface GeocodedOrder extends OrderSummaryDto {
                       {{ getStatusLabel(route.status) }}
                     </span>
                     <div class="text-right">
-                      <p class="text-[10px] sm:text-xs text-pink-400 font-semibold">{{ route.deliveries.length }} entregas</p>
+                      <p class="text-[10px] sm:text-xs text-pink-400 font-semibold">
+                        {{ getOrderCount(route) }} pedidos
+                        @if (getTandaCount(route) > 0) {
+                          · <span class="text-fuchsia-500">{{ getTandaCount(route) }} tandas ✨</span>
+                        }
+                      </p>
                       <p class="text-base sm:text-lg font-black text-pink-900">{{ getRouteTotal(route) | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                     </div>
                   </div>
@@ -345,6 +352,12 @@ interface GeocodedOrder extends OrderSummaryDto {
                         (click)="optimizeRoute(route.id)">
                   🧩 <span class="hidden sm:inline">Optimizar</span>
                 </button>
+                @if (route.status !== 'Completed') {
+                  <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-rose-50 text-rose-600 text-xs font-bold border border-rose-100 hover:bg-rose-100 active:scale-95 transition-all"
+                          (click)="router.navigate(['/admin/routes', route.id, 'edit'])">
+                    🔄 <span class="hidden sm:inline">Rearmar</span>
+                  </button>
+                }
                 <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-green-50 text-green-600 text-xs font-bold border border-green-100 hover:bg-green-100 active:scale-95 transition-all"
                         (click)="shareWhatsApp(route)">
                   📱 <span class="hidden sm:inline">WhatsApp</span>
@@ -394,7 +407,17 @@ interface GeocodedOrder extends OrderSummaryDto {
                           {{ d.sortOrder }}
                         </div>
                         <div class="flex-1 min-w-0">
-                          <p class="text-sm font-bold text-gray-800 truncate">{{ d.clientName }}</p>
+                          <p class="text-sm font-bold text-gray-800 truncate flex items-center gap-2">
+                            {{ d.clientName }}
+                            @if (d.kind === 'Tanda') {
+                              <span class="text-[9px] px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-700 rounded-md font-black uppercase tracking-wider">✨ Tanda</span>
+                            }
+                          </p>
+                          @if (d.kind === 'Tanda') {
+                            <p class="text-[10px] text-fuchsia-500 truncate">
+                              {{ d.tandaName }}@if (d.tandaWeek != null) { · Semana {{ d.tandaWeek }}@if (d.tandaTotalWeeks) {/{{ d.tandaTotalWeeks }}} }@if (d.tandaVariant) { · {{ d.tandaVariant }} }
+                            </p>
+                          }
                           @if (d.alternativeAddress || d.clientAddress) {
                             <p class="text-[11px] text-gray-400 truncate">📍 {{ d.alternativeAddress || d.clientAddress }}</p>
                           }
@@ -442,7 +465,7 @@ interface GeocodedOrder extends OrderSummaryDto {
                                       title="Mover abajo">↓</button>
                             </div>
                             <button class="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                    (click)="$event.stopPropagation(); removeOrderFromRoute(route, d.orderId)"
+                                    (click)="$event.stopPropagation(); removeDeliveryFromRoute(route, d)"
                                     title="Quitar de ruta">
                               🗑️
                             </button>
@@ -868,46 +891,40 @@ interface GeocodedOrder extends OrderSummaryDto {
       }
 
       <!-- ═══════════════════════════════════════════════════
-           MODAL: PEDIDOS EXCLUIDOS (Override Prompt)
+           MODAL: PEDIDOS NO INCLUIDOS (Informativo post-creación)
            ═══════════════════════════════════════════════════ -->
       @if (skippedOrdersModal(); as modal) {
         <div class="fixed inset-0 z-[10000] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border border-pink-100 animate-scale-in relative overflow-hidden">
-            <!-- Background Accent -->
-            <div class="absolute -top-24 -right-24 w-48 h-48 bg-pink-50 rounded-full blur-3xl opacity-50"></div>
-            
+          <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border border-amber-100 animate-scale-in relative overflow-hidden">
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-amber-50 rounded-full blur-3xl opacity-50"></div>
+
             <div class="relative z-10">
-              <div class="w-16 h-16 bg-pink-100 rounded-3xl flex items-center justify-center text-3xl mb-6 shadow-inner">
-                🤔
+              <div class="w-16 h-16 bg-amber-100 rounded-3xl flex items-center justify-center text-3xl mb-6 shadow-inner">
+                ⚠️
               </div>
-              
-              <h3 class="text-xl font-black text-pink-900 mb-2">¿Incluir pedidos especiales?</h3>
+
+              <h3 class="text-xl font-black text-amber-900 mb-2">
+                {{ modal.orders.length }} {{ modal.orders.length === 1 ? 'pedido no se incluyó' : 'pedidos no se incluyeron' }}
+              </h3>
               <p class="text-sm text-gray-500 mb-6 leading-relaxed">
-                Detectamos {{ modal.orders.length }} pedidos que ya están en otra ruta o son PickUp. ¿Deseas agregarlos de todas formas? 🎀
+                La ruta se creó con los pedidos válidos. Estos quedaron fuera con su motivo específico:
               </p>
 
-              <div class="max-h-40 overflow-y-auto mb-8 pr-2 space-y-2">
+              <div class="max-h-60 overflow-y-auto mb-8 pr-2 space-y-2">
                 @for (o of modal.orders; track o.id) {
-                  <div class="flex items-center justify-between p-3 rounded-2xl bg-pink-50/50 border border-pink-100/50">
-                    <div>
-                      <p class="text-xs font-black text-pink-900">#{{ o.id }} · {{ o.name }}</p>
-                      <p class="text-[10px] text-pink-400 font-bold uppercase tracking-wider">{{ o.reason }}</p>
+                  <div class="flex items-center justify-between p-3 rounded-2xl bg-amber-50/50 border border-amber-100/50">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-xs font-black text-amber-900 truncate">#{{ o.id }} · {{ o.name }}</p>
+                      <p class="text-[10px] text-amber-500 font-bold uppercase tracking-wider">{{ o.reason }}</p>
                     </div>
-                    <span class="text-pink-300">📌</span>
                   </div>
                 }
               </div>
 
-              <div class="flex gap-3">
-                <button (click)="skippedOrdersModal.set(null)" 
-                        class="flex-1 py-4 rounded-2xl border-2 border-pink-100 text-pink-400 font-black text-sm hover:bg-pink-50 transition-all">
-                  Omitir
-                </button>
-                <button (click)="confirmForceCreate()" 
-                        class="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all">
-                  Sí, inclúyelos ✨
-                </button>
-              </div>
+              <button (click)="skippedOrdersModal.set(null)"
+                      class="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-sm shadow-lg shadow-pink-200 hover:shadow-xl active:scale-95 transition-all">
+                Entendido ✨
+              </button>
             </div>
           </div>
         </div>
@@ -1017,6 +1034,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private signalr = inject(SignalRService);
   private push = inject(PushNotificationService);
+  router = inject(Router);
 
   routes = signal<RouteDto[]>([]);
   loading = signal(true);
@@ -1068,7 +1086,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   selectedOrderIds = signal<Set<number>>(new Set());
   creating = signal(false);
   expandedRouteIds = signal<Set<number>>(new Set());
-  skippedOrdersModal = signal<{ ids: number[], orders: any[], isOptimized: boolean } | null>(null);
+  skippedOrdersModal = signal<{ ids: (number | string)[], orders: { id: number | string, name: string, reason: string }[], isOptimized: boolean } | null>(null);
 
   // Inline Address Editing
   editingOrderId = signal<number | null>(null);
@@ -1788,6 +1806,14 @@ export class RoutesComponent implements OnInit, OnDestroy {
     return r.deliveries.filter(d => d.status === 'Delivered').length;
   }
 
+  getOrderCount(r: RouteDto): number {
+    return r.deliveries.filter(d => d.kind !== 'Tanda').length;
+  }
+
+  getTandaCount(r: RouteDto): number {
+    return r.deliveries.filter(d => d.kind === 'Tanda').length;
+  }
+
   getProgress(r: RouteDto): number {
     return r.deliveries.length ? (this.getDelivered(r) / r.deliveries.length) * 100 : 0;
   }
@@ -1853,6 +1879,23 @@ export class RoutesComponent implements OnInit, OnDestroy {
       },
       error: (err) => this.toast.error('Error al remover pedido')
     });
+  }
+
+  removeDeliveryFromRoute(route: any, d: RouteDeliveryDto) {
+    if (d.kind === 'Tanda' && d.tandaParticipantId) {
+      if (!confirm('¿Seguro que quieres quitar esta tanda de la ruta?')) return;
+      this.api.removeTandaFromRoute(route.id, d.tandaParticipantId).subscribe({
+        next: () => {
+          this.toast.success('Tanda removida de la ruta ✨');
+          this.loadRoutes();
+        },
+        error: () => this.toast.error('Error al remover tanda')
+      });
+      return;
+    }
+    if (d.orderId != null) {
+      this.removeOrderFromRoute(route, d.orderId);
+    }
   }
 
   async addOrderToRoute(route: any, orderId: number) {
@@ -2072,48 +2115,31 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.showOptimizerModal.set(false);
     this.toast.info('Creando ruta mágica... ✨🚗');
 
-    this.api.createRoute(orderedIds).subscribe({
-      next: (res: RouteDto) => {
+    // Como ya vienen optimizadas del modal, marcamos preOptimized=true.
+    this.api.createRoute(orderedIds, false, undefined, true).subscribe({
+      next: (res) => {
         this.toast.success('¡Ruta creada y optimizada con éxito! 🎉');
         this.selectedOrderIds.set(new Set());
         this.loadRoutes();
-      },
-      error: (err) => {
-        if (err.status === 409 && err.error?.skippedOrders) {
-          this.skippedOrdersModal.set({ 
-            ids: orderedIds, 
-            orders: err.error.skippedOrders,
+        if (res.skipped && res.skipped.length > 0) {
+          this.skippedOrdersModal.set({
+            ids: orderedIds,
+            orders: res.skipped.map(s => ({ id: s.id, name: s.name, reason: s.reason })),
             isOptimized: true
           });
-        } else {
-          console.error('SERVER ERROR:', err.error);
-          this.toast.error(err.error?.message || 'Error al crear la ruta mágica');
         }
+      },
+      error: (err) => {
+        console.error('SERVER ERROR:', err.error);
+        this.toast.error(err.error?.message || 'Error al crear la ruta mágica');
       }
     });
   }
 
+  // El backend ya no requiere force: siempre crea con los válidos y devuelve los skipped
+  // como información. Este botón ahora solo cierra el modal informativo.
   confirmForceCreate(): void {
-    const modal = this.skippedOrdersModal();
-    if (!modal) return;
-
     this.skippedOrdersModal.set(null);
-    this.toast.info('Forzando creación de ruta... 🚀');
-
-    this.api.createRoute(modal.ids, true).subscribe({
-      next: () => {
-        this.toast.success('¡Ruta creada incluyendo pedidos especiales! 🎉');
-        this.selectedOrderIds.set(new Set());
-        if (modal.isOptimized) {
-            // Si venía de optimizado, el backend ya la optimizó al crear
-            this.loadRoutes();
-        } else {
-            this.showCreateModal.set(false);
-            this.loadRoutes();
-        }
-      },
-      error: (err) => this.toast.error(err.error?.message || 'Error al forzar creación')
-    });
   }
 
   // ═══ DEPRECATED (Kept for reference, replaced by Optimization flow) ═══
@@ -2121,24 +2147,23 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.creating.set(true);
     const ids = [...this.selectedOrderIds()];
     this.api.createRoute(ids).subscribe({
-      next: () => {
+      next: (res) => {
         this.toast.success('¡Ruta creada! 🚗✨');
         this.showCreateModal.set(false);
         this.selectedOrderIds.set(new Set());
         this.loadRoutes();
         this.creating.set(false);
-      },
-      error: (err) => { 
-        if (err.status === 409 && err.error?.skippedOrders) {
-           this.skippedOrdersModal.set({ 
-             ids: ids, 
-             orders: err.error.skippedOrders,
-             isOptimized: false
-           });
-        } else {
-           this.toast.error(err.error?.message || 'Error al crear ruta'); 
+        if (res.skipped && res.skipped.length > 0) {
+          this.skippedOrdersModal.set({
+            ids,
+            orders: res.skipped.map(s => ({ id: s.id, name: s.name, reason: s.reason })),
+            isOptimized: false
+          });
         }
-        this.creating.set(false); 
+      },
+      error: (err) => {
+        this.toast.error(err.error?.message || 'Error al crear ruta');
+        this.creating.set(false);
       }
     });
   }
