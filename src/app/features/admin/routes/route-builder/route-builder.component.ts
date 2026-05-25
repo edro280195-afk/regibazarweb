@@ -6,6 +6,7 @@ import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto } from '../../../../core/models';
+import { AddressPickerComponent } from '../address-picker/address-picker.component';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
@@ -30,7 +31,7 @@ declare const google: any;
 @Component({
     selector: 'app-route-builder',
     standalone: true,
-    imports: [CommonModule, FormsModule, GoogleMap, MapMarker, MapPolyline],
+    imports: [CommonModule, FormsModule, GoogleMap, MapMarker, MapPolyline, AddressPickerComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     template: `
     <div class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 p-4 sm:p-6">
@@ -203,6 +204,13 @@ declare const google: any;
                                     <p class="text-[10px] text-pink-400 truncate">📍 {{ row.address }}</p>
                                 }
                             </div>
+                            @if (row.kind === 'Order' && row.clientId) {
+                                <button (click)="openAddressPicker(row, $event)"
+                                        class="w-7 h-7 rounded-xl bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-sm transition-all shrink-0"
+                                        title="Editar dirección">
+                                    📍
+                                </button>
+                            }
                         </label>
                     }
                 </div>
@@ -356,6 +364,14 @@ declare const google: any;
             </div>
         </div>
     </div>
+
+    @if (pickingAddressFor(); as row) {
+        <app-address-picker
+            [initialAddress]="row.address ?? ''"
+            (confirm)="onAddressConfirmed($event)"
+            (cancel)="pickingAddressFor.set(null)">
+        </app-address-picker>
+    }
     `,
     styles: []
 })
@@ -388,6 +404,10 @@ export class RouteBuilderComponent implements OnInit {
     loadingPreview = signal(false);
     saving = signal(false);
     geocodingNow = signal(false);
+    pickingAddressFor = signal<CandidateRow | null>(null);
+
+    private readonly DEPOT_LAT = 27.4861;
+    private readonly DEPOT_LNG = -99.5069;
 
     mapsReady = signal(typeof google !== 'undefined' && !!google?.maps);
     mapCenter = signal<google.maps.LatLngLiteral>({ lat: 27.4861, lng: -99.5069 });
@@ -423,7 +443,7 @@ export class RouteBuilderComponent implements OnInit {
     };
 
     polylinePath = signal<google.maps.LatLngLiteral[]>([]);
-    depotPosition = signal<google.maps.LatLngLiteral | null>(null);
+    depotPosition = signal<google.maps.LatLngLiteral | null>({ lat: 27.4861, lng: -99.5069 });
 
     private previewTrigger$ = new Subject<void>();
     private mapsPollTimer?: any;
@@ -507,29 +527,14 @@ export class RouteBuilderComponent implements OnInit {
                 this.polylinePath.set([]);
                 return;
             }
-            if (p.depotLatitude != null && p.depotLongitude != null) {
-                this.depotPosition.set({ lat: p.depotLatitude, lng: p.depotLongitude });
-            }
-            if (p.polylineEncoded && typeof google !== 'undefined' && google.maps?.geometry?.encoding) {
-                try {
-                    const decoded = google.maps.geometry.encoding.decodePath(p.polylineEncoded);
-                    this.polylinePath.set(decoded.map((pt: any) => ({ lat: pt.lat(), lng: pt.lng() })));
-                } catch {
-                    this.polylinePath.set([]);
-                }
+            if (p.polylineEncoded) {
+                this.polylinePath.set(this.decodePolyline(p.polylineEncoded));
             } else {
+                const depot = this.depotPosition()!;
                 const pts = p.stops
                     .filter(s => s.latitude != null && s.longitude != null)
                     .map(s => ({ lat: s.latitude!, lng: s.longitude! }));
-                if (pts.length > 0 && p.depotLatitude != null && p.depotLongitude != null) {
-                    this.polylinePath.set([
-                        { lat: p.depotLatitude, lng: p.depotLongitude },
-                        ...pts,
-                        { lat: p.depotLatitude, lng: p.depotLongitude }
-                    ]);
-                } else {
-                    this.polylinePath.set(pts);
-                }
+                this.polylinePath.set(pts.length > 0 ? [depot, ...pts, depot] : pts);
             }
             this.fitMapBounds();
         }, { allowSignalWrites: true });
@@ -750,7 +755,7 @@ export class RouteBuilderComponent implements OnInit {
         }
 
         this.loadingPreview.set(true);
-        this.api.previewRoute(orderIds, tandaIds).subscribe({
+        this.api.previewRoute(orderIds, tandaIds, this.DEPOT_LAT, this.DEPOT_LNG).subscribe({
             next: (res) => {
                 this.preview.set(res);
                 this.loadingPreview.set(false);
@@ -834,6 +839,43 @@ export class RouteBuilderComponent implements OnInit {
                 }
             });
         }
+    }
+
+    private decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
+        const path: google.maps.LatLngLiteral[] = [];
+        let index = 0, lat = 0, lng = 0;
+        while (index < encoded.length) {
+            let b: number, shift = 0, result = 0;
+            do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+            lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+            shift = 0; result = 0;
+            do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+            lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+            path.push({ lat: lat / 1e5, lng: lng / 1e5 });
+        }
+        return path;
+    }
+
+    openAddressPicker(row: CandidateRow, event: Event): void {
+        event.stopPropagation();
+        this.pickingAddressFor.set(row);
+    }
+
+    onAddressConfirmed(result: { address: string; lat: number; lng: number }): void {
+        const row = this.pickingAddressFor();
+        if (!row || !row.clientId) { this.pickingAddressFor.set(null); return; }
+        this.api.setClientCoordinates(row.clientId, result.lat, result.lng, result.address).subscribe({
+            next: () => {
+                this.toast.success(`📍 Dirección guardada para ${row.clientName}`);
+                this.pickingAddressFor.set(null);
+                this.loadCandidates();
+                setTimeout(() => this.refreshPreview(), 400);
+            },
+            error: () => {
+                this.toast.error('No se pudo guardar la dirección');
+                this.pickingAddressFor.set(null);
+            }
+        });
     }
 
     goBack(): void {
