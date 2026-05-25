@@ -555,14 +555,14 @@ export class RouteBuilderComponent implements OnInit {
             next: (route: RouteDto) => {
                 this.loadingRoute.set(false);
                 const locked = route.deliveries.filter(d =>
-                    d.status === 'Delivered' || d.status === 'Failed'
+                    d.status === 'Delivered' || d.status === 'NotDelivered'
                 ).sort((a, b) => a.sortOrder - b.sortOrder);
                 this.lockedStops.set(locked);
 
                 // Pre-select the pending deliveries from the existing route
                 const preSelected = new Set<StopKey>();
                 for (const d of route.deliveries) {
-                    if (d.status === 'Delivered' || d.status === 'Failed') continue;
+                    if (d.status === 'Delivered' || d.status === 'NotDelivered') continue;
                     if (d.kind === 'Tanda' && d.tandaParticipantId) {
                         preSelected.add(`tanda:${d.tandaParticipantId}`);
                     } else if (d.orderId != null) {
