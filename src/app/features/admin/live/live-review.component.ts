@@ -1,1240 +1,877 @@
-import {
-  Component,
-  OnInit,
-  DestroyRef,
-  inject,
-  signal,
-  computed,
-  HostListener
-} from '@angular/core';
-import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
+import { CommonModule, CurrencyPipe } from '@angular/common';
+import { Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { interval } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
+import {
+    LiveCandidateDto,
+    LiveProductDto,
+    LiveSessionDto,
+    ResolveCandidateDto
+} from '../../../core/models';
 import { LiveCaptureService } from '../../../core/services/live-capture.service';
 import { ToastService } from '../../../core/services/toast.service';
-import {
-  LiveReviewDto,
-  LiveSessionDto,
-  LiveProductDto,
-  LiveCandidateDto,
-  LiveSessionStatus,
-  ConfirmCandidateRequest
-} from '../../../core/models';
+import { ClientResolveResult, ClientResolverComponent } from '../orders/capture-order/client-resolver/client-resolver.component';
 
-const IN_PROGRESS_STATUSES: LiveSessionStatus[] = ['Queued', 'Downloading', 'Transcribing', 'Parsing', 'Scanning'];
+type CandidateFilter = 'Pending' | 'Confirmed' | 'Ignored' | 'conflict' | 'all';
 
 @Component({
-  selector: 'app-live-review',
-  standalone: true,
-  imports: [CommonModule, FormsModule, CurrencyPipe, DatePipe, RouterLink],
-  template: `
-    <div class="review-shell">
+    selector: 'app-live-review',
+    standalone: true,
+    imports: [CommonModule, FormsModule, CurrencyPipe, RouterLink, ClientResolverComponent],
+    template: `
+    <section class="review-page">
+      <header class="review-header">
+        <div>
+          <a routerLink="/admin/live/import" class="back-link">Volver a importar</a>
+          <h1>{{ session()?.title || ('Live #' + liveId) }}</h1>
+        </div>
+        <div class="progress-pill">
+          <strong>{{ confirmedCount() }}</strong>
+          <span>/ {{ candidates().length }} confirmados</span>
+        </div>
+      </header>
 
-      <!-- ── LOADING / NOT READY ── -->
-      @if (loadingReview()) {
-        <div class="loading-screen">
-          <span class="spinner-lg"></span>
-          <p class="mt-4 text-pink-700 font-semibold">Cargando revisión…</p>
+      @if (session()?.statusDetail) {
+        <div class="diagnostic-strip" [class.warn]="(session()?.candidateCount || 0) === 0">
+          <strong>{{ statusLabel(session()?.status || '') }}</strong>
+          <span>{{ session()?.statusDetail }}</span>
         </div>
       }
 
-      <!-- ── SESSION NOT READY YET ── -->
-      @if (!loadingReview() && session() && !isReady()) {
-        <div class="not-ready-screen">
-          <div class="card-coquette p-8 text-center max-w-md mx-auto mt-12">
-            <div class="text-5xl mb-4">⏳</div>
-            <h2 class="text-xl font-bold text-pink-900 mb-2">Procesando Live…</h2>
-            <p class="text-pink-700 mb-4">{{ statusLabel(session()!.status) }}</p>
-            <div class="progress-bar mb-4">
-              <div class="progress-fill" [style.width]="progressPercent(session()!.status) + '%'"></div>
-            </div>
-            @if (session()!.statusDetail) {
-              <p class="text-xs text-pink-500 italic">{{ session()!.statusDetail }}</p>
+      <div class="review-toolbar">
+        <button type="button" [class.active]="filter() === 'Pending'" (click)="setFilter('Pending')">Sin revisar</button>
+        <button type="button" [class.active]="filter() === 'conflict'" (click)="setFilter('conflict')">Con conflicto</button>
+        <button type="button" [class.active]="filter() === 'Confirmed'" (click)="setFilter('Confirmed')">Confirmados</button>
+        <button type="button" [class.active]="filter() === 'all'" (click)="setFilter('all')">Todos</button>
+      </div>
+
+      @if (loading()) {
+        <div class="loading-panel">Cargando candidates del live...</div>
+      } @else {
+        <div class="review-grid">
+          <aside class="product-panel">
+            <div class="panel-title">Productos</div>
+            <button
+              type="button"
+              class="product-row all"
+              [class.selected]="selectedProductId() === null"
+              (click)="selectProduct(null)">
+              <span>Todos</span>
+              <strong>{{ filteredAllCount() }}</strong>
+            </button>
+            @for (product of products(); track product.id) {
+              <button
+                type="button"
+                class="product-row"
+                [class.selected]="selectedProductId() === product.id"
+                (click)="selectProduct(product.id)">
+                <span class="keyword">{{ product.keyword }}</span>
+                <small>{{ product.description }}</small>
+                <strong>{{ countForProduct(product.id) }}</strong>
+              </button>
             }
-            <p class="text-xs text-pink-500 mt-3">Actualizando automáticamente…</p>
-          </div>
-        </div>
-      }
+          </aside>
 
-      <!-- ── ERROR ── -->
-      @if (!loadingReview() && session()?.status === 'Failed') {
-        <div class="p-8 text-center">
-          <div class="card-coquette p-8 max-w-md mx-auto mt-12 text-center">
-            <div class="text-5xl mb-4">❌</div>
-            <h2 class="text-xl font-bold text-pink-900 mb-2">Error al procesar</h2>
-            <p class="text-pink-700 mb-1">{{ session()!.statusDetail || 'El procesamiento del live falló.' }}</p>
-            <a routerLink="/admin/live" class="btn-coquette btn-pink mt-4 inline-flex">← Volver</a>
-          </div>
-        </div>
-      }
-
-      <!-- ── MAIN REVIEW UI ── -->
-      @if (!loadingReview() && reviewData() && isReady()) {
-        <div class="review-layout">
-
-          <!-- Header -->
-          <div class="review-header">
-            <div class="header-left">
-              <a routerLink="/admin/live" class="back-link">← Lives</a>
-              <h1 class="header-title">
-                📹 {{ session()!.title || ('Live del ' + (session()!.importedAt | date:'dd/MM/yy')) }}
-              </h1>
+          <main class="candidate-panel">
+            <div class="panel-title">
+              <span>Pedidos detectados</span>
+              <small>{{ visibleCandidates().length }} filas</small>
             </div>
-            <div class="header-stats">
-              <div class="stat-chip stat-confirmed">
-                <span class="stat-num">{{ confirmedCount() }}</span>
-                <span class="stat-label">confirmados</span>
-              </div>
-              <div class="stat-chip stat-pending">
-                <span class="stat-num">{{ pendingCount() }}</span>
-                <span class="stat-label">pendientes</span>
-              </div>
-              <div class="stat-chip stat-total">
-                <span class="stat-num">{{ totalCount() }}</span>
-                <span class="stat-label">total</span>
-              </div>
-            </div>
-          </div>
 
-          <!-- Body: sidebar + content -->
-          <div class="review-body">
-
-            <!-- ── LEFT SIDEBAR: Products ── -->
-            <aside class="products-sidebar">
-              <div class="sidebar-label">Productos</div>
-
-              @for (product of products(); track product.id; let i = $index) {
-                <button
-                  class="product-item"
-                  [class.product-selected]="selectedProductIndex() === i"
-                  (click)="selectProduct(i)">
-                  <div class="product-keyword">{{ product.keyword }}</div>
-                  @if (product.description) {
-                    <div class="product-desc">{{ product.description }}</div>
-                  }
-                  <div class="product-meta">
-                    <span class="product-price">{{ product.price | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
-                    @if (pendingForProduct(product.id) > 0) {
-                      <span class="pending-pill">{{ pendingForProduct(product.id) }} pendientes</span>
-                    }
-                  </div>
-                </button>
-              }
-
-              <!-- Unmatched section -->
-              @if (unmatchedCandidates().length > 0) {
-                <button
-                  class="product-item unmatched-item"
-                  [class.product-selected]="selectedProductIndex() === products().length"
-                  (click)="selectUnmatched()">
-                  <div class="product-keyword">Sin producto</div>
-                  <div class="pending-pill">{{ unmatchedCandidates().length }}</div>
-                </button>
-              }
-            </aside>
-
-            <!-- ── RIGHT AREA: Candidates ── -->
-            <main class="candidates-area">
-              @if (currentCandidates().length === 0) {
-                <div class="empty-candidates">
-                  <div class="text-4xl mb-3">✨</div>
-                  <p class="text-pink-700">No hay candidatos para este producto.</p>
-                </div>
-              }
-
-              <div class="candidates-list">
-                @for (candidate of currentCandidates(); track candidate.id; let i = $index) {
-                  <div
-                    class="candidate-row"
-                    [class.candidate-confirmed]="candidate.status === 'Confirmed'"
-                    [class.candidate-ignored]="candidate.status === 'Ignored'"
-                    [class.candidate-focused]="focusedCandidateIndex() === i && candidate.status === 'Pending'">
-
-                    <div class="candidate-main">
-                      <!-- Source badge + clip player -->
-                      <div class="source-row">
-                        <span class="source-badge source-{{ candidate.source.toLowerCase() }}">
-                          {{ sourceLabel(candidate.source) }}
-                        </span>
-
-                        <button
-                          type="button"
-                          class="clip-btn"
-                          [class.clip-playing]="playingClipId() === candidate.id"
-                          [disabled]="candidate.spokenAtSeconds == null || loadingClipId() === candidate.id"
-                          [title]="candidate.spokenAtSeconds == null
-                            ? 'No hay momento detectado en el audio'
-                            : (playingClipId() === candidate.id ? 'Pausar clip' : 'Escuchar 5s del audio')"
-                          (click)="playClip(candidate)">
-                          @if (loadingClipId() === candidate.id) {
-                            <span class="spinner-sm"></span>
-                          } @else if (playingClipId() === candidate.id) {
-                            ⏸
-                          } @else {
-                            🔊
-                          }
-                        </button>
-                      </div>
-
-                      <!-- Name info -->
-                      <div class="candidate-names">
-                        @if (candidate.clientNameSpoken) {
-                          <div class="spoken-name">{{ candidate.clientNameSpoken }}</div>
-                        }
-                        @if (candidate.commentDisplayName && candidate.commentDisplayName !== candidate.clientNameSpoken) {
-                          <div class="comment-name">💬 {{ candidate.commentDisplayName }}</div>
-                        }
-                      </div>
-
-                      <!-- Resolved client chip -->
-                      @if (candidate.resolvedClientName && candidate.status === 'Pending') {
-                        <div class="resolved-chip">
-                          ✅ {{ candidate.resolvedClientName }}
-                        </div>
-                      }
-
-                      <!-- Alias proposal -->
-                      @if (candidate.proposedAliasPairJson && candidate.status === 'Pending') {
-                        <label class="alias-label">
-                          <input
-                            type="checkbox"
-                            class="alias-checkbox"
-                            [checked]="getAliasChecked(candidate.id)"
-                            (change)="toggleAlias(candidate.id, $event)">
-                          🔗 Proponer alias: {{ formatAlias(candidate.proposedAliasPairJson) }}
-                        </label>
-                      }
-
-                      <!-- Inline name input (when no resolved client) -->
-                      @if (!candidate.resolvedClientId && candidate.status === 'Pending') {
-                        <div class="name-input-row">
-                          <input
-                            type="text"
-                            class="inline-input"
-                            placeholder="Nombre de la clienta"
-                            [value]="getManualName(candidate.id)"
-                            (input)="setManualName(candidate.id, $event)"
-                          />
-                        </div>
-                      }
-                    </div>
-
-                    <!-- Status overlay for done candidates -->
-                    @if (candidate.status === 'Confirmed') {
-                      <div class="done-overlay confirmed-overlay">
-                        <span class="done-icon">✅</span>
-                        <span class="done-label">{{ candidate.resolvedClientName || 'Confirmado' }}</span>
-                      </div>
-                    }
-
-                    @if (candidate.status === 'Ignored') {
-                      <div class="done-overlay ignored-overlay">
-                        <span class="done-icon">⏭</span>
-                        <span class="done-label">Ignorado</span>
-                      </div>
-                    }
-
-                    <!-- Action buttons -->
-                    @if (candidate.status === 'Pending') {
-                      <div class="action-btns">
-                        <button
-                          class="btn-confirm"
-                          [disabled]="busyCandidate() === candidate.id"
-                          (click)="confirmCandidate(candidate)">
-                          @if (busyCandidate() === candidate.id) {
-                            <span class="spinner-sm"></span>
-                          } @else {
-                            ✅ Confirmar
-                          }
-                        </button>
-                        <button
-                          class="btn-ignore"
-                          [disabled]="busyCandidate() === candidate.id"
-                          (click)="ignoreCandidate(candidate)">
-                          ⏭ Ignorar
-                        </button>
-                      </div>
-                    }
-                  </div>
+            @if (visibleCandidates().length === 0) {
+              <div class="empty-state">
+                <strong>No hay candidatos con este filtro.</strong>
+                @if ((session()?.candidateCount || 0) === 0) {
+                  <span>{{ session()?.statusDetail || 'El procesamiento termino sin pedidos detectados.' }}</span>
                 }
               </div>
-            </main>
-          </div>
+            }
+
+            <div class="candidate-list">
+              @for (candidate of visibleCandidates(); track candidate.id) {
+                <article
+                  class="candidate-row"
+                  [class.selected]="selectedCandidateId() === candidate.id"
+                  [class.confirmed]="candidate.status === 'Confirmed'"
+                  [class.ignored]="candidate.status === 'Ignored'"
+                  (click)="selectCandidate(candidate)">
+                  <div class="row-main">
+                    <div class="avatar">{{ initials(displayName(candidate)) }}</div>
+                    <div>
+                      <strong>{{ displayName(candidate) }}</strong>
+                      <span>{{ productDescription(candidate) }}</span>
+                    </div>
+                  </div>
+                  <div class="row-meta">
+                    <span class="source" [class.high]="candidate.source === 'SpokenAndComment'">{{ sourceLabel(candidate.source) }}</span>
+                    <strong>{{ productPrice(candidate) | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
+                  </div>
+                </article>
+              }
+            </div>
+          </main>
+
+          <aside class="detail-panel">
+            @if (selectedCandidate(); as candidate) {
+              <div class="detail-top">
+                <div>
+                  <span class="source high">{{ sourceLabel(candidate.source) }}</span>
+                  <h2>{{ displayName(candidate) }}</h2>
+                </div>
+                <span class="status" [class.done]="candidate.status === 'Confirmed'" [class.muted]="candidate.status === 'Ignored'">
+                  {{ statusLabel(candidate.status) }}
+                </span>
+              </div>
+
+              <div class="clip-box">
+                @if (clipLoading()) {
+                  <span>Cargando clip...</span>
+                } @else if (clipUrl()) {
+                  <video [src]="clipUrl()" controls playsinline></video>
+                } @else {
+                  <span>Clip no disponible todavia.</span>
+                }
+              </div>
+
+              <div class="edit-grid">
+                <label>
+                  Producto
+                  <input [(ngModel)]="productOverride" [placeholder]="productDescription(candidate)">
+                </label>
+                <label>
+                  Precio
+                  <input type="number" min="0" step="1" [(ngModel)]="priceOverride">
+                </label>
+              </div>
+
+              <section class="identity-box">
+                <div class="identity-header">
+                  <strong>Identidad</strong>
+                  @if (selectedClientName()) {
+                    <span>{{ selectedClientName() }}</span>
+                  }
+                </div>
+
+                @if (candidate.resolvedClientId && candidate.resolvedClientName) {
+                  <button type="button" class="choice selected" (click)="useResolved(candidate)">
+                    Usar {{ candidate.resolvedClientName }}
+                  </button>
+                }
+
+                <app-client-resolver
+                  [name]="identityName(candidate)"
+                  (resolved)="onResolverResult($event)">
+                </app-client-resolver>
+
+                <button type="button" class="choice new-client" [class.selected]="selectedClientId() === null && selectedClientName() === 'Clienta nueva'" (click)="markAsNew(candidate)">
+                  Crear como clienta nueva
+                </button>
+              </section>
+
+              @if (proposedAliasPair(candidate); as aliasPair) {
+                <label class="alias-toggle">
+                  <input type="checkbox" [(ngModel)]="acceptAlias">
+                  <span>
+                    Aprender alias:
+                    <strong>{{ aliasPair.comment || aliasPair.alias }}</strong>
+                    para {{ aliasPair.spoken || aliasPair.canonicalName }}
+                  </span>
+                </label>
+              }
+
+              <div class="detail-actions">
+                <button type="button" class="confirm" [disabled]="busy()" (click)="confirm(candidate)">Confirmar</button>
+                <button type="button" class="ignore" [disabled]="busy()" (click)="ignore(candidate)">Ignorar</button>
+              </div>
+            } @else {
+              <div class="empty-state">Selecciona un pedido detectado.</div>
+            }
+          </aside>
         </div>
       }
-    </div>
+    </section>
   `,
-  styles: [`
+    styles: [`
     :host { display: block; }
-
-    .review-shell {
-      min-height: 100vh;
+    .review-page {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding-bottom: 28px;
     }
-
-    /* Loading */
-    .loading-screen, .not-ready-screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 60vh;
-    }
-
-    .spinner-lg {
-      width: 48px; height: 48px;
-      border: 4px solid rgba(255, 192, 215, 0.3);
-      border-top-color: #c777b8;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      display: inline-block;
-    }
-
-    .spinner-sm {
-      width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .card-coquette {
-      background: rgba(255, 255, 255, 0.75);
-      border: 1px solid rgba(255, 192, 215, 0.5);
-      border-radius: 1.25rem;
-      box-shadow: 0 4px 20px rgba(255, 182, 200, 0.15);
-      backdrop-filter: blur(8px);
-    }
-
-    .progress-bar {
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(255, 192, 215, 0.3);
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #c777b8, #f9a8d4);
-      transition: width 0.6s ease;
-      animation: shimmer 1.5s ease-in-out infinite;
-    }
-
-    @keyframes shimmer { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
-
-    /* ── REVIEW LAYOUT ── */
-    .review-layout {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-
     .review-header {
       display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    .back-link {
+      display: inline-block;
+      color: #be185d;
+      text-decoration: none;
+      font-weight: 900;
+      margin-bottom: 4px;
+      font-size: .82rem;
+    }
+    h1, h2 { margin: 0; color: #831843; letter-spacing: 0; }
+    h1 { font-size: 2rem; line-height: 1.05; }
+    h2 { font-size: 1.35rem; }
+    .progress-pill {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(249,168,212,.4);
+      border-radius: 999px;
+      padding: 9px 14px;
+      color: #9d174d;
+      white-space: nowrap;
+    }
+    .progress-pill strong { font-size: 1.2rem; }
+    .diagnostic-strip {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 11px 13px;
+      border-radius: 14px;
+      background: #fffbfd;
+      border: 1px solid #fbcfe8;
+      color: #7a3d6a;
+      line-height: 1.35;
+    }
+    .diagnostic-strip strong {
+      color: #831843;
+      white-space: nowrap;
+    }
+    .diagnostic-strip.warn {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #9a3412;
+    }
+    .review-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .review-toolbar button,
+    .product-row,
+    .choice,
+    .detail-actions button {
+      font: inherit;
+      cursor: pointer;
+    }
+    .review-toolbar button {
+      border: 1px solid rgba(249,168,212,.45);
+      color: #9d174d;
+      background: rgba(255,255,255,.7);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-weight: 900;
+    }
+    .review-toolbar button.active {
+      background: #be185d;
+      color: #fffafd;
+      border-color: #be185d;
+    }
+    .review-grid {
+      display: grid;
+      grid-template-columns: 280px minmax(360px, 1fr) 390px;
+      gap: 14px;
+      align-items: start;
+    }
+    .product-panel,
+    .candidate-panel,
+    .detail-panel,
+    .loading-panel {
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(249,168,212,.35);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(190,24,93,.08);
+    }
+    .product-panel,
+    .candidate-panel,
+    .detail-panel {
+      max-height: calc(100vh - 188px);
+      overflow: auto;
+    }
+    .panel-title {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding: 1rem 1.5rem;
-      background: rgba(255, 255, 255, 0.6);
-      border-bottom: 1px solid rgba(255, 192, 215, 0.4);
-      flex-wrap: wrap;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .back-link {
-      color: #c777b8;
-      font-size: 0.85rem;
-      font-weight: 600;
-      text-decoration: none;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(199, 119, 184, 0.3);
-      transition: all 0.2s ease;
-    }
-
-    .back-link:hover {
-      background: rgba(199, 119, 184, 0.08);
-    }
-
-    .header-title {
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: #5a2d4f;
-    }
-
-    .header-stats {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-
-    .stat-chip {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 4px 14px;
-      border-radius: 12px;
-      font-size: 0.7rem;
-      min-width: 60px;
-    }
-
-    .stat-num {
-      font-size: 1.2rem;
+      background: rgba(255,251,253,.94);
+      border-bottom: 1px solid #fce7f3;
+      padding: 13px 14px;
+      color: #831843;
       font-weight: 900;
-      line-height: 1.2;
+      border-radius: 18px 18px 0 0;
     }
-
-    .stat-label {
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-size: 0.6rem;
-    }
-
-    .stat-confirmed { background: rgba(52, 211, 153, 0.12); color: #065f46; }
-    .stat-pending { background: rgba(251, 191, 36, 0.12); color: #92400e; }
-    .stat-total { background: rgba(199, 119, 184, 0.12); color: #5a2d4f; }
-
-    /* ── BODY ── */
-    .review-body {
-      display: flex;
-      flex: 1;
-      min-height: 0;
-      height: calc(100vh - 130px);
-    }
-
-    /* ── SIDEBAR ── */
-    .products-sidebar {
-      width: 240px;
-      min-width: 200px;
-      border-right: 1px solid rgba(255, 192, 215, 0.4);
-      overflow-y: auto;
-      padding: 0.75rem 0.5rem;
-      background: rgba(255, 245, 247, 0.5);
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .products-sidebar::-webkit-scrollbar { width: 3px; }
-    .products-sidebar::-webkit-scrollbar-thumb {
-      background: rgba(199, 119, 184, 0.2);
-      border-radius: 10px;
-    }
-
-    .sidebar-label {
-      font-size: 0.65rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #9d3a72;
-      padding: 0 8px;
-      margin-bottom: 4px;
-    }
-
-    .product-item {
+    .panel-title small { color: #be185d; font-weight: 800; }
+    .product-row {
+      width: calc(100% - 16px);
+      margin: 8px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 10px;
       text-align: left;
-      padding: 10px 12px;
-      border-radius: 12px;
       border: 1px solid transparent;
       background: transparent;
-      cursor: pointer;
-      transition: all 0.18s ease;
-      width: 100%;
-      font-family: inherit;
-    }
-
-    .product-item:hover {
-      background: rgba(199, 119, 184, 0.08);
-      border-color: rgba(199, 119, 184, 0.15);
-    }
-
-    .product-selected {
-      background: linear-gradient(135deg, rgba(199, 119, 184, 0.18), rgba(248, 176, 214, 0.12)) !important;
-      border-color: rgba(199, 119, 184, 0.4) !important;
-      box-shadow: 0 2px 10px rgba(199, 119, 184, 0.12);
-    }
-
-    .product-keyword {
-      font-weight: 700;
-      color: #5a2d4f;
-      font-size: 0.9rem;
-    }
-
-    .product-desc {
-      font-size: 0.75rem;
-      color: #8a7080;
-      margin-top: 2px;
-    }
-
-    .product-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 4px;
-      flex-wrap: wrap;
-    }
-
-    .product-price {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #c777b8;
-    }
-
-    .pending-pill {
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 1px 8px;
-      border-radius: 999px;
-      background: rgba(251, 191, 36, 0.2);
-      color: #92400e;
-    }
-
-    .unmatched-item .product-keyword {
-      color: #8a7080;
-    }
-
-    /* ── CANDIDATES AREA ── */
-    .candidates-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem 1.5rem;
-    }
-
-    .candidates-area::-webkit-scrollbar { width: 4px; }
-    .candidates-area::-webkit-scrollbar-thumb {
-      background: rgba(199, 119, 184, 0.2);
-      border-radius: 10px;
-    }
-
-    .empty-candidates {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem;
-      text-align: center;
-    }
-
-    .candidates-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .candidate-row {
-      position: relative;
-      background: rgba(255, 255, 255, 0.7);
-      border: 1.5px solid rgba(255, 192, 215, 0.4);
       border-radius: 14px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      justify-content: space-between;
-      transition: all 0.18s ease;
-      box-shadow: 0 2px 8px rgba(255, 182, 200, 0.08);
-    }
-
-    .candidate-row:hover {
-      box-shadow: 0 4px 16px rgba(255, 182, 200, 0.2);
-    }
-
-    .candidate-focused {
-      border-color: #c777b8 !important;
-      box-shadow: 0 0 0 3px rgba(199, 119, 184, 0.2) !important;
-    }
-
-    .candidate-confirmed {
-      opacity: 0.55;
-      background: rgba(220, 252, 231, 0.4) !important;
-      border-color: rgba(52, 211, 153, 0.3) !important;
-    }
-
-    .candidate-ignored {
-      opacity: 0.4;
-      background: rgba(243, 244, 246, 0.6) !important;
-      border-color: rgba(209, 213, 219, 0.5) !important;
-    }
-
-    .candidate-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .source-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 999px;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      width: fit-content;
-    }
-
-    .source-spoken { background: rgba(199, 119, 184, 0.15); color: #7a3d6a; }
-    .source-comment { background: rgba(99, 179, 237, 0.15); color: #1a5276; }
-    .source-spokenandcomment { background: rgba(52, 211, 153, 0.15); color: #065f46; }
-
-    .source-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .clip-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      border: 1px solid rgba(199, 119, 184, 0.3);
-      background: rgba(255, 255, 255, 0.7);
+      padding: 10px;
       color: #7a3d6a;
-      cursor: pointer;
-      font-size: 0.85rem;
-      line-height: 1;
-      padding: 0;
-      transition: all 0.18s ease;
     }
-
-    .clip-btn:hover:not(:disabled) {
-      background: rgba(199, 119, 184, 0.12);
-      border-color: rgba(199, 119, 184, 0.5);
-      transform: scale(1.06);
+    .product-row:hover,
+    .product-row.selected {
+      background: #fdf2f8;
+      border-color: #fbcfe8;
     }
-
-    .clip-btn:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-
-    .clip-playing {
-      background: linear-gradient(135deg, #c777b8, #9d5990) !important;
-      color: white !important;
-      border-color: transparent !important;
-      box-shadow: 0 2px 8px rgba(199, 119, 184, 0.3);
-    }
-
-    .candidate-names {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .spoken-name {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #5a2d4f;
-    }
-
-    .comment-name {
-      font-size: 0.8rem;
-      color: #8a7080;
-    }
-
-    .resolved-chip {
-      display: inline-block;
-      padding: 3px 12px;
-      background: rgba(52, 211, 153, 0.15);
-      border: 1px solid rgba(52, 211, 153, 0.3);
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #065f46;
-      width: fit-content;
-    }
-
-    .alias-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.78rem;
-      color: #7a3d6a;
-      cursor: pointer;
-    }
-
-    .alias-checkbox {
-      accent-color: #c777b8;
-      cursor: pointer;
-    }
-
-    .name-input-row {
-      margin-top: 2px;
-    }
-
-    .inline-input {
-      padding: 5px 10px;
-      border-radius: 8px;
-      border: 1.5px solid rgba(255, 192, 215, 0.5);
-      background: rgba(255, 255, 255, 0.8);
-      font-size: 0.85rem;
-      color: #5a2d4f;
-      outline: none;
-      width: 100%;
-      max-width: 260px;
-      box-sizing: border-box;
-      transition: border-color 0.2s ease;
-    }
-
-    .inline-input:focus {
-      border-color: #c777b8;
-      box-shadow: 0 0 0 2px rgba(199, 119, 184, 0.15);
-    }
-
-    .done-overlay {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-
-    .confirmed-overlay { color: #065f46; }
-    .ignored-overlay { color: #6b7280; }
-
-    .done-icon { font-size: 1rem; }
-
-    .action-btns {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    .btn-confirm, .btn-ignore {
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all 0.18s ease;
+    .product-row small {
+      grid-column: 1 / -1;
+      color: #9a7187;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
-      display: inline-flex;
+    }
+    .keyword {
+      color: #831843;
+      font-weight: 900;
+    }
+    .candidate-list {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+    }
+    .candidate-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
       align-items: center;
-      gap: 4px;
-    }
-
-    .btn-confirm {
-      background: linear-gradient(135deg, #c777b8, #9d5990);
-      color: white;
-      box-shadow: 0 2px 8px rgba(199, 119, 184, 0.3);
-    }
-
-    .btn-confirm:hover:not(:disabled) {
-      filter: brightness(1.08);
-      transform: translateY(-1px);
-    }
-
-    .btn-confirm:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-ignore {
-      background: rgba(243, 244, 246, 0.8);
-      color: #6b7280;
-      border: 1px solid rgba(209, 213, 219, 0.6);
-    }
-
-    .btn-ignore:hover:not(:disabled) {
-      background: rgba(229, 231, 235, 0.9);
-    }
-
-    .btn-ignore:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-coquette {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      padding: 0.6rem 1.25rem;
-      border-radius: 999px;
-      font-size: 0.875rem;
-      font-weight: 700;
+      border: 1px solid #fce7f3;
+      background: #fffbfd;
+      border-radius: 14px;
+      padding: 10px;
       cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
-      text-decoration: none;
     }
-
-    .btn-pink {
-      background: linear-gradient(135deg, #c777b8, #9d5990);
+    .candidate-row:hover,
+    .candidate-row.selected {
+      border-color: #f9a8d4;
+      background: #fdf2f8;
+    }
+    .candidate-row.confirmed { border-color: #bbf7d0; background: #f0fdf4; }
+    .candidate-row.ignored { opacity: .55; }
+    .row-main {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #f9a8d4, #be185d);
       color: white;
-      box-shadow: 0 4px 14px rgba(199, 119, 184, 0.35);
+      font-weight: 900;
     }
-
-    .btn-pink:hover {
-      filter: brightness(1.08);
+    .row-main strong,
+    .row-main span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .review-body {
-        flex-direction: column;
-        height: auto;
-      }
-
-      .products-sidebar {
-        width: 100%;
-        min-width: unset;
-        border-right: none;
-        border-bottom: 1px solid rgba(255, 192, 215, 0.4);
-        flex-direction: row;
-        overflow-x: auto;
-        padding: 0.5rem;
-      }
-
-      .product-item {
-        min-width: 120px;
-        flex-shrink: 0;
-      }
+    .row-main strong { color: #4a2040; }
+    .row-main span { color: #9a7187; font-size: .86rem; }
+    .row-meta {
+      display: grid;
+      justify-items: end;
+      gap: 4px;
+      color: #831843;
+    }
+    .source,
+    .status {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #fce7f3;
+      color: #9d174d;
+      font-size: .72rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .source.high,
+    .status.done {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .status.muted {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+    .detail-panel { padding: 14px; }
+    .detail-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .clip-box {
+      min-height: 156px;
+      border-radius: 14px;
+      background: #4a2040;
+      color: #fdf2f8;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      max-height: 220px;
+      display: block;
+      background: #4a2040;
+    }
+    .edit-grid {
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    label {
+      color: #831843;
+      font-size: .78rem;
+      font-weight: 900;
+    }
+    input {
+      width: 100%;
+      margin-top: 5px;
+      border: 2px solid #fce7f3;
+      background: #fffbfd;
+      color: #4a2040;
+      border-radius: 12px;
+      padding: 10px;
+      font: inherit;
+      outline: none;
+    }
+    input:focus {
+      border-color: #f9a8d4;
+      box-shadow: 0 0 0 4px rgba(249,168,212,.15);
+    }
+    .identity-box {
+      border: 1px solid #fce7f3;
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background: #fffbfd;
+    }
+    .identity-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: #831843;
+      margin-bottom: 9px;
+    }
+    .identity-header span {
+      color: #166534;
+      font-weight: 900;
+      text-align: right;
+    }
+    .quick-choices {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    .choice {
+      width: 100%;
+      border: 1px solid #fbcfe8;
+      background: #fffafd;
+      color: #7a3d6a;
+      border-radius: 11px;
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: 900;
+    }
+    .choice small { float: right; color: #be185d; }
+    .choice.selected {
+      background: #fdf2f8;
+      border-color: #be185d;
+      color: #831843;
+    }
+    .new-client { margin-top: 10px; }
+    .alias-toggle {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 9px;
+      align-items: start;
+      background: #fdf2f8;
+      border: 1px solid #fbcfe8;
+      border-radius: 14px;
+      padding: 10px;
+      margin-bottom: 12px;
+      color: #7a3d6a;
+      line-height: 1.35;
+    }
+    .alias-toggle input { width: auto; margin: 2px 0 0; }
+    .detail-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .detail-actions button {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px;
+      color: white;
+      font-weight: 900;
+    }
+    .confirm { background: linear-gradient(135deg, #ec4899, #be185d); }
+    .ignore { background: linear-gradient(135deg, #9a7187, #6b4a5e); }
+    .detail-actions button:disabled { opacity: .55; cursor: not-allowed !important; }
+    .empty-state,
+    .loading-panel {
+      color: #9d174d;
+      padding: 22px;
+      text-align: center;
+      font-weight: 800;
+    }
+    .empty-state strong,
+    .empty-state span {
+      display: block;
+    }
+    .empty-state span {
+      margin-top: 6px;
+      color: #7a3d6a;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    @media (max-width: 1180px) {
+      .review-grid { grid-template-columns: 240px 1fr; }
+      .detail-panel { grid-column: 1 / -1; max-height: none; }
+    }
+    @media (max-width: 760px) {
+      .review-header { align-items: flex-start; flex-direction: column; }
+      .review-grid { grid-template-columns: 1fr; }
+      .product-panel,
+      .candidate-panel,
+      .detail-panel { max-height: none; }
+      .edit-grid { grid-template-columns: 1fr; }
+      .candidate-row { grid-template-columns: 1fr; }
+      .row-meta { justify-items: start; grid-auto-flow: column; justify-content: space-between; }
     }
   `]
 })
-export class LiveReviewComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private router = inject(Router);
-  private liveService = inject(LiveCaptureService);
-  private toast = inject(ToastService);
-  private destroyRef = inject(DestroyRef);
+export class LiveReviewComponent implements OnInit, OnDestroy {
+    private route = inject(ActivatedRoute);
+    private liveCapture = inject(LiveCaptureService);
+    private toast = inject(ToastService);
 
-  // ── State signals ──
-  loadingReview = signal(true);
-  reviewData = signal<LiveReviewDto | null>(null);
-  session = signal<LiveSessionDto | null>(null);
+    liveId = Number(this.route.snapshot.paramMap.get('id'));
+    loading = signal(true);
+    busy = signal(false);
+    clipLoading = signal(false);
+    session = signal<LiveSessionDto | null>(null);
+    products = signal<LiveProductDto[]>([]);
+    candidates = signal<LiveCandidateDto[]>([]);
+    selectedProductId = signal<number | null>(null);
+    selectedCandidateId = signal<number | null>(null);
+    filter = signal<CandidateFilter>('Pending');
+    selectedClientId = signal<number | null | undefined>(undefined);
+    selectedClientName = signal('');
+    clipUrl = signal<string | null>(null);
+    acceptAlias = true;
+    productOverride = '';
+    priceOverride: number | null = null;
 
-  selectedProductIndex = signal(0);
-  focusedCandidateIndex = signal(0);
-  busyCandidate = signal<number | null>(null);
-
-  // Clip de audio del candidato (5s) — se carga bajo demanda.
-  playingClipId = signal<number | null>(null);
-  loadingClipId = signal<number | null>(null);
-  private audio: HTMLAudioElement | null = null;
-  private audioObjectUrl: string | null = null;
-
-  // Track per-candidate overrides
-  private aliasChecked = new Map<number, boolean>();
-  private manualNames = new Map<number, string>();
-
-  // ── Computed ──
-  products = computed<LiveProductDto[]>(() => this.reviewData()?.products ?? []);
-
-  unmatchedCandidates = computed<LiveCandidateDto[]>(() => {
-    const d = this.reviewData();
-    if (!d) return [];
-    return (d.unmatchedCandidates ?? []).map(c => this.localCandidate(c.id) ?? c);
-  });
-
-  currentCandidates = computed<LiveCandidateDto[]>(() => {
-    const d = this.reviewData();
-    if (!d) return [];
-    const prods = this.products();
-    const idx = this.selectedProductIndex();
-
-    if (idx === prods.length) {
-      // Unmatched section
-      return this.unmatchedCandidates();
-    }
-
-    const prod = prods[idx];
-    if (!prod) return [];
-    const raw = d.candidatesByProduct[prod.id.toString()] ?? [];
-    return raw.map(c => this.localCandidate(c.id) ?? c);
-  });
-
-  confirmedCount = computed(() => {
-    const d = this.reviewData();
-    if (!d) return 0;
-    let count = 0;
-    for (const list of Object.values(d.candidatesByProduct)) {
-      for (const c of list) {
-        const local = this.localCandidate(c.id);
-        if ((local ?? c).status === 'Confirmed') count++;
-      }
-    }
-    for (const c of (d.unmatchedCandidates ?? [])) {
-      const local = this.localCandidate(c.id);
-      if ((local ?? c).status === 'Confirmed') count++;
-    }
-    return count;
-  });
-
-  pendingCount = computed(() => {
-    const d = this.reviewData();
-    if (!d) return 0;
-    let count = 0;
-    for (const list of Object.values(d.candidatesByProduct)) {
-      for (const c of list) {
-        const local = this.localCandidate(c.id);
-        if ((local ?? c).status === 'Pending') count++;
-      }
-    }
-    for (const c of (d.unmatchedCandidates ?? [])) {
-      const local = this.localCandidate(c.id);
-      if ((local ?? c).status === 'Pending') count++;
-    }
-    return count;
-  });
-
-  totalCount = computed(() => {
-    const d = this.reviewData();
-    if (!d) return 0;
-    let count = 0;
-    for (const list of Object.values(d.candidatesByProduct)) count += list.length;
-    count += (d.unmatchedCandidates ?? []).length;
-    return count;
-  });
-
-  isReady = computed(() => this.session()?.status === 'Ready');
-
-  // Local overrides for optimistic updates
-  private localOverrides = new Map<number, LiveCandidateDto>();
-
-  private localCandidate(id: number): LiveCandidateDto | undefined {
-    return this.localOverrides.get(id);
-  }
-
-  // ── Lifecycle ──
-  ngOnInit() {
-    const id = Number(this.route.snapshot.paramMap.get('id'));
-    if (!id) {
-      this.router.navigate(['/admin/live']);
-      return;
-    }
-
-    this.loadReview(id);
-
-    // Poll session status if not ready
-    interval(3000)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        const s = this.session();
-        if (s && IN_PROGRESS_STATUSES.includes(s.status)) {
-          this.liveService.getById(id).subscribe({
-            next: (updated) => {
-              this.session.set(updated);
-              if (updated.status === 'Ready' && !this.reviewData()) {
-                this.loadReview(id);
-              }
-            },
-            error: () => {}
-          });
-        }
-      });
-  }
-
-  private loadReview(id: number) {
-    this.loadingReview.set(true);
-    this.liveService.getReview(id).subscribe({
-      next: (data) => {
-        this.reviewData.set(data);
-        this.session.set(data.session);
-        this.loadingReview.set(false);
-        // Initialize alias checkboxes
-        for (const list of Object.values(data.candidatesByProduct)) {
-          for (const c of list) {
-            if (c.proposedAliasPairJson != null) {
-              this.aliasChecked.set(c.id, true);
+    confirmedCount = computed(() => this.candidates().filter(c => c.status === 'Confirmed').length);
+    productById = computed(() => new Map(this.products().map(product => [product.id, product])));
+    visibleCandidates = computed(() => {
+        const productId = this.selectedProductId();
+        const filter = this.filter();
+        return this.candidates().filter(candidate => {
+            const productOk = productId === null || candidate.liveProductId === productId;
+            if (!productOk) return false;
+            if (filter === 'all') return true;
+            if (filter === 'conflict') {
+                return candidate.status === 'Pending' && (!candidate.resolvedClientId || !!this.proposedAliasPair(candidate));
             }
-          }
-        }
-        for (const c of (data.unmatchedCandidates ?? [])) {
-          if (c.proposedAliasPairJson != null) {
-            this.aliasChecked.set(c.id, true);
-          }
-        }
-      },
-      error: () => {
-        // Maybe session not ready yet — try fetching just the session
-        const routeId = Number(this.route.snapshot.paramMap.get('id'));
-        this.liveService.getById(routeId).subscribe({
-          next: (s) => { this.session.set(s); this.loadingReview.set(false); },
-          error: () => { this.loadingReview.set(false); }
+            return candidate.status === filter;
         });
-      }
     });
-  }
+    selectedCandidate = computed(() => {
+        const id = this.selectedCandidateId();
+        return this.candidates().find(c => c.id === id) ?? this.visibleCandidates()[0] ?? null;
+    });
+    filteredAllCount = computed(() => this.countForProduct(null));
 
-  // ── Actions ──
-  selectProduct(index: number) {
-    this.selectedProductIndex.set(index);
-    this.focusedCandidateIndex.set(0);
-  }
-
-  selectUnmatched() {
-    this.selectedProductIndex.set(this.products().length);
-    this.focusedCandidateIndex.set(0);
-  }
-
-  pendingForProduct(productId: number): number {
-    const d = this.reviewData();
-    if (!d) return 0;
-    const list = d.candidatesByProduct[productId.toString()] ?? [];
-    return list.filter(c => (this.localCandidate(c.id) ?? c).status === 'Pending').length;
-  }
-
-  confirmCandidate(candidate: LiveCandidateDto) {
-    const req: ConfirmCandidateRequest = {};
-
-    if (candidate.resolvedClientId) {
-      req.clientId = candidate.resolvedClientId;
-    } else {
-      const name = this.manualNames.get(candidate.id)?.trim();
-      if (!name) {
-        this.toast.error('Ingresa el nombre de la clienta para confirmar');
-        return;
-      }
-      req.clientName = name;
+    ngOnInit(): void {
+        this.load();
     }
 
-    const aliasJson = candidate.proposedAliasPairJson;
-    if (aliasJson != null) {
-      req.acceptAlias = this.aliasChecked.get(candidate.id) ?? true;
+    ngOnDestroy(): void {
+        this.revokeClip();
     }
 
-    this.busyCandidate.set(candidate.id);
-    this.liveService.confirm(candidate.id, req).subscribe({
-      next: () => {
-        this.busyCandidate.set(null);
-        // Optimistic update
-        const updated: LiveCandidateDto = {
-          ...candidate,
-          status: 'Confirmed',
-          resolvedClientName: req.clientName ?? candidate.resolvedClientName
-        };
-        this.localOverrides.set(candidate.id, updated);
-        // Force re-computation by updating session signal
-        this.session.update(s => s ? { ...s } : s);
-        this.toast.success('Confirmado 💖');
-      },
-      error: () => {
-        this.busyCandidate.set(null);
-        this.toast.error('Error al confirmar 😿');
-      }
-    });
-  }
-
-  ignoreCandidate(candidate: LiveCandidateDto) {
-    this.busyCandidate.set(candidate.id);
-    this.liveService.ignore(candidate.id).subscribe({
-      next: () => {
-        this.busyCandidate.set(null);
-        const updated: LiveCandidateDto = { ...candidate, status: 'Ignored' };
-        this.localOverrides.set(candidate.id, updated);
-        this.session.update(s => s ? { ...s } : s);
-      },
-      error: () => {
-        this.busyCandidate.set(null);
-        this.toast.error('Error al ignorar 😿');
-      }
-    });
-  }
-
-  // ── Audio clip playback ──
-  playClip(candidate: LiveCandidateDto) {
-    if (candidate.spokenAtSeconds == null) return;
-
-    // Si ya hay un audio sonando, lo paramos primero.
-    this.stopAudio();
-
-    // Si el botón pulsado corresponde al clip que ya estaba sonando, sólo toggleamos off.
-    if (this.playingClipId() === candidate.id) {
-      this.playingClipId.set(null);
-      return;
-    }
-
-    this.playingClipId.set(null);
-    this.loadingClipId.set(candidate.id);
-
-    this.liveService.fetchClip(candidate.id).subscribe({
-      next: (blob) => {
-        this.loadingClipId.set(null);
-        // Por si el usuario disparó otro clip mientras cargaba este.
-        if (this.playingClipId() !== null) return;
-
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => {
-          this.playingClipId.set(null);
-          this.releaseAudio();
-        };
-        audio.onerror = () => {
-          this.playingClipId.set(null);
-          this.releaseAudio();
-          this.toast.error('No se pudo reproducir el clip 😿');
-        };
-
-        this.audio = audio;
-        this.audioObjectUrl = url;
-        this.playingClipId.set(candidate.id);
-
-        audio.play().catch(() => {
-          this.playingClipId.set(null);
-          this.releaseAudio();
-          this.toast.error('No se pudo reproducir el clip 😿');
+    load(): void {
+        this.loading.set(true);
+        this.liveCapture.getReview(this.liveId).subscribe({
+            next: review => {
+                this.session.set(review.session);
+                this.products.set(review.products);
+                const grouped = Object.values(review.candidatesByProduct || {}).flat();
+                this.candidates.set([...grouped, ...(review.unmatchedCandidates || [])]);
+                this.loading.set(false);
+                this.ensureSelection();
+            },
+            error: () => {
+                this.loading.set(false);
+                this.toast.error('No se pudo cargar la revision del live');
+            }
         });
-      },
-      error: () => {
-        this.loadingClipId.set(null);
-        this.playingClipId.set(null);
-        this.toast.error('No hay clip disponible para este candidato');
-      },
-    });
-  }
-
-  private stopAudio() {
-    if (this.audio) {
-      try { this.audio.pause(); } catch { /* ignore */ }
     }
-    this.releaseAudio();
-  }
 
-  private releaseAudio() {
-    if (this.audioObjectUrl) {
-      URL.revokeObjectURL(this.audioObjectUrl);
-      this.audioObjectUrl = null;
+    setFilter(filter: CandidateFilter): void {
+        this.filter.set(filter);
+        this.ensureSelection();
     }
-    this.audio = null;
-  }
 
-  // ── Alias / Manual name helpers ──
-  getAliasChecked(candidateId: number): boolean {
-    return this.aliasChecked.get(candidateId) ?? true;
-  }
-
-  toggleAlias(candidateId: number, event: Event) {
-    const checked = (event.target as HTMLInputElement).checked;
-    this.aliasChecked.set(candidateId, checked);
-  }
-
-  getManualName(candidateId: number): string {
-    return this.manualNames.get(candidateId) ?? '';
-  }
-
-  setManualName(candidateId: number, event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    this.manualNames.set(candidateId, value);
-  }
-
-  formatAlias(json: string): string {
-    try {
-      const obj = JSON.parse(json);
-      if (obj.spoken && obj.comment) return `${obj.spoken} ↔ ${obj.comment}`;
-      if (obj.name1 && obj.name2) return `${obj.name1} ↔ ${obj.name2}`;
-      return JSON.stringify(obj);
-    } catch {
-      return json;
+    selectProduct(productId: number | null): void {
+        this.selectedProductId.set(productId);
+        this.ensureSelection();
     }
-  }
 
-  // ── Status helpers ──
-  statusLabel(status: LiveSessionStatus): string {
-    switch (status) {
-      case 'Queued': return 'En cola';
-      case 'Downloading': return 'Descargando video';
-      case 'Transcribing': return 'Transcribiendo audio';
-      case 'Parsing': return 'Analizando pedidos';
-      case 'Scanning': return 'Escaneando comentarios';
-      case 'Ready': return 'Listo para revisar';
-      case 'Failed': return 'Error';
-      default: return status;
+    selectCandidate(candidate: LiveCandidateDto): void {
+        this.selectedCandidateId.set(candidate.id);
+        this.hydrateDetail(candidate);
     }
-  }
 
-  progressPercent(status: LiveSessionStatus): number {
-    switch (status) {
-      case 'Queued': return 10;
-      case 'Downloading': return 30;
-      case 'Transcribing': return 55;
-      case 'Parsing': return 75;
-      case 'Scanning': return 90;
-      default: return 100;
+    hydrateDetail(candidate: LiveCandidateDto): void {
+        this.productOverride = this.productDescription(candidate);
+        this.priceOverride = this.productPrice(candidate);
+        this.acceptAlias = !!this.proposedAliasPair(candidate);
+
+        const auto = this.autoClient(candidate);
+        this.selectedClientId.set(auto?.clientId ?? candidate.resolvedClientId ?? undefined);
+        this.selectedClientName.set(auto?.name ?? candidate.resolvedClientName ?? '');
+        this.loadClip(candidate);
     }
-  }
 
-  sourceLabel(source: string): string {
-    switch (source) {
-      case 'Spoken': return '🎤 Hablado';
-      case 'Comment': return '💬 Comentario';
-      case 'SpokenAndComment': return '🎤💬 Ambos';
-      default: return source;
-    }
-  }
-
-  // ── Keyboard navigation ──
-  @HostListener('document:keydown', ['$event'])
-  onKeyDown(event: KeyboardEvent) {
-    const target = event.target as HTMLElement;
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-    if (isInput) return;
-
-    const candidates = this.currentCandidates().filter(c => c.status === 'Pending');
-    const totalProducts = this.products().length + (this.unmatchedCandidates().length > 0 ? 1 : 0);
-
-    switch (event.key) {
-      case 'ArrowDown':
-      case 'j':
-        event.preventDefault();
-        if (candidates.length > 0) {
-          this.focusedCandidateIndex.update(i => Math.min(i + 1, candidates.length - 1));
+    ensureSelection(): void {
+        const visible = this.visibleCandidates();
+        const current = this.selectedCandidate();
+        if (!current || !visible.some(c => c.id === current.id)) {
+            if (visible[0]) this.selectCandidate(visible[0]);
+            else this.selectedCandidateId.set(null);
+        } else {
+            this.hydrateDetail(current);
         }
-        break;
-
-      case 'ArrowUp':
-      case 'k':
-        event.preventDefault();
-        if (candidates.length > 0) {
-          this.focusedCandidateIndex.update(i => Math.max(i - 1, 0));
-        }
-        break;
-
-      case 'Enter': {
-        event.preventDefault();
-        const focused = candidates[this.focusedCandidateIndex()];
-        if (focused) this.confirmCandidate(focused);
-        break;
-      }
-
-      case 'Escape':
-      case 'x': {
-        event.preventDefault();
-        const focused = candidates[this.focusedCandidateIndex()];
-        if (focused) this.ignoreCandidate(focused);
-        break;
-      }
-
-      case 'ArrowLeft':
-        event.preventDefault();
-        this.selectedProductIndex.update(i => Math.max(i - 1, 0));
-        this.focusedCandidateIndex.set(0);
-        break;
-
-      case 'ArrowRight':
-        event.preventDefault();
-        this.selectedProductIndex.update(i => Math.min(i + 1, totalProducts - 1));
-        this.focusedCandidateIndex.set(0);
-        break;
     }
-  }
+
+    useResolved(candidate: LiveCandidateDto): void {
+        this.selectedClientId.set(candidate.resolvedClientId ?? undefined);
+        this.selectedClientName.set(candidate.resolvedClientName ?? '');
+    }
+
+    chooseClient(option: ResolveCandidateDto): void {
+        this.selectedClientId.set(option.clientId);
+        this.selectedClientName.set(option.name);
+    }
+
+    onResolverResult(result: ClientResolveResult): void {
+        if (result.action === 'create' || !result.clientId) {
+            this.selectedClientId.set(null);
+            this.selectedClientName.set('Clienta nueva');
+            return;
+        }
+        this.selectedClientId.set(result.clientId);
+        this.selectedClientName.set(result.matchedCandidate?.name ?? 'Clienta seleccionada');
+    }
+
+    markAsNew(candidate: LiveCandidateDto): void {
+        this.selectedClientId.set(null);
+        this.selectedClientName.set('Clienta nueva');
+        if (!this.productOverride) this.productOverride = this.productDescription(candidate);
+    }
+
+    confirm(candidate: LiveCandidateDto): void {
+        this.busy.set(true);
+        this.liveCapture.confirmCandidate(candidate.id, {
+            clientId: this.selectedClientId() ?? null,
+            clientName: this.selectedClientId() === null ? this.identityName(candidate) : null,
+            productOverride: this.productOverride.trim() || undefined,
+            priceOverride: this.priceOverride ?? undefined,
+            acceptAlias: this.acceptAlias
+        }).pipe(finalize(() => this.busy.set(false))).subscribe({
+            next: () => {
+                this.updateCandidateStatus(candidate.id, 'Confirmed');
+                this.toast.success('Pedido confirmado');
+                this.moveNext();
+            },
+            error: err => this.toast.error(err?.error || 'No se pudo confirmar')
+        });
+    }
+
+    ignore(candidate: LiveCandidateDto): void {
+        this.busy.set(true);
+        this.liveCapture.ignoreCandidate(candidate.id).pipe(finalize(() => this.busy.set(false))).subscribe({
+            next: () => {
+                this.updateCandidateStatus(candidate.id, 'Ignored');
+                this.toast.info('Candidate ignorado');
+                this.moveNext();
+            },
+            error: () => this.toast.error('No se pudo ignorar')
+        });
+    }
+
+    updateCandidateStatus(id: number, status: 'Confirmed' | 'Ignored'): void {
+        this.candidates.update(items => items.map(item => item.id === id ? { ...item, status } : item));
+    }
+
+    moveNext(direction = 1): void {
+        const visible = this.visibleCandidates();
+        if (!visible.length) {
+            this.selectedCandidateId.set(null);
+            return;
+        }
+        const currentId = this.selectedCandidateId();
+        const index = Math.max(0, visible.findIndex(c => c.id === currentId));
+        const next = visible[Math.min(visible.length - 1, Math.max(0, index + direction))];
+        if (next) this.selectCandidate(next);
+    }
+
+    moveProduct(direction: number): void {
+        const ids = [null, ...this.products().map(p => p.id)];
+        const currentIndex = ids.findIndex(id => id === this.selectedProductId());
+        const nextIndex = Math.min(ids.length - 1, Math.max(0, currentIndex + direction));
+        this.selectProduct(ids[nextIndex]);
+    }
+
+    @HostListener('window:keydown', ['$event'])
+    onKeydown(event: KeyboardEvent): void {
+        const target = event.target as HTMLElement | null;
+        if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+        const candidate = this.selectedCandidate();
+        if (!candidate || this.busy()) return;
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            this.confirm(candidate);
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            this.ignore(candidate);
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            this.moveNext(1);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            this.moveNext(-1);
+        } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            this.moveProduct(1);
+        } else if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            this.moveProduct(-1);
+        }
+    }
+
+    loadClip(candidate: LiveCandidateDto): void {
+        this.revokeClip();
+        if (candidate.spokenAtSeconds === null || candidate.spokenAtSeconds === undefined) return;
+
+        this.clipLoading.set(true);
+        this.liveCapture.getCandidateClip(candidate.id)
+            .pipe(finalize(() => this.clipLoading.set(false)))
+            .subscribe({
+                next: blob => this.clipUrl.set(URL.createObjectURL(blob)),
+                error: () => this.clipUrl.set(null)
+            });
+    }
+
+    revokeClip(): void {
+        const current = this.clipUrl();
+        if (current) URL.revokeObjectURL(current);
+        this.clipUrl.set(null);
+    }
+
+    autoClient(candidate: LiveCandidateDto): ResolveCandidateDto | undefined {
+        return undefined;
+    }
+
+    identityName(candidate: LiveCandidateDto): string {
+        return candidate.clientNameSpoken || candidate.commentDisplayName || '';
+    }
+
+    displayName(candidate: LiveCandidateDto): string {
+        return candidate.clientNameSpoken || candidate.commentDisplayName || 'Sin nombre';
+    }
+
+    productFor(candidate: LiveCandidateDto): LiveProductDto | undefined {
+        return candidate.liveProductId ? this.productById().get(candidate.liveProductId) : undefined;
+    }
+
+    productDescription(candidate: LiveCandidateDto): string {
+        const product = this.productFor(candidate);
+        return product?.description || product?.keyword || candidate.keyword;
+    }
+
+    productPrice(candidate: LiveCandidateDto): number {
+        return this.productFor(candidate)?.price ?? 0;
+    }
+
+    proposedAliasPair(candidate: LiveCandidateDto): { alias?: string; canonicalName?: string; spoken?: string; comment?: string } | null {
+        if (!candidate.proposedAliasPairJson) return null;
+        try {
+            return JSON.parse(candidate.proposedAliasPairJson) as { alias?: string; canonicalName?: string; spoken?: string; comment?: string };
+        } catch {
+            return null;
+        }
+    }
+
+    countForProduct(productId: number | null): number {
+        const filter = this.filter();
+        return this.candidates().filter(candidate => {
+            if (productId !== null && candidate.liveProductId !== productId) return false;
+            if (filter === 'all') return true;
+            if (filter === 'conflict') return candidate.status === 'Pending' && (!candidate.resolvedClientId || !!this.proposedAliasPair(candidate));
+            return candidate.status === filter;
+        }).length;
+    }
+
+    sourceLabel(source: string): string {
+        const labels: Record<string, string> = {
+            Spoken: 'Audio',
+            CommentOnly: 'Comentario',
+            SpokenAndComment: 'Audio + comentario'
+        };
+        return labels[source] ?? source;
+    }
+
+    statusLabel(status: string): string {
+        const labels: Record<string, string> = {
+            Pending: 'Pendiente',
+            Confirmed: 'Confirmado',
+            Ignored: 'Ignorado'
+        };
+        return labels[status] ?? status;
+    }
+
+    initials(name: string): string {
+        const parts = name.trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return '?';
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+
+    percent(value: number): number {
+        return Math.round(value * 100);
+    }
 }

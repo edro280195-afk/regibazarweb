@@ -1,432 +1,436 @@
-import { Component, OnInit, DestroyRef, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { interval } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription, timer, switchMap } from 'rxjs';
 import { LiveCaptureService } from '../../../core/services/live-capture.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { LiveSessionDto, LiveSessionStatus } from '../../../core/models';
+import { LiveSessionDto } from '../../../core/models';
 
-const IN_PROGRESS_STATUSES: LiveSessionStatus[] = ['Queued', 'Downloading', 'Transcribing', 'Parsing', 'Scanning'];
+type StepId = 'Queued' | 'Downloading' | 'Transcribing' | 'Parsing' | 'Ready';
 
 @Component({
-  selector: 'app-live-import',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  template: `
-    <div class="p-4 lg:p-8 min-h-[80vh]">
-      <div class="max-w-3xl mx-auto">
-
-        <!-- Header -->
-        <header class="mb-6">
-          <h1 class="text-3xl font-bold text-pink-900">📹 Importar Live</h1>
-          <p class="text-pink-700 mt-1">
-            Pega la URL de un Facebook Live para capturar los pedidos automáticamente.
-          </p>
-        </header>
-
-        <!-- Import Form Card -->
-        <div class="card-coquette p-6 mb-8">
-          <div class="form-group mb-4">
-            <label class="field-label">URL del Facebook Live</label>
-            <div class="input-wrapper">
-              <span class="input-icon">📋</span>
-              <input
-                type="url"
-                class="field-input"
-                placeholder="https://www.facebook.com/..."
-                [(ngModel)]="facebookUrl"
-                [disabled]="importing()"
-              />
-            </div>
-          </div>
-
-          <div class="form-group mb-5">
-            <label class="field-label">Título (opcional)</label>
-            <input
-              type="text"
-              class="field-input"
-              placeholder="Ej. Live del viernes 23 mayo"
-              [(ngModel)]="title"
-              [disabled]="importing()"
-            />
-          </div>
-
-          <button
-            class="btn-coquette btn-pink w-full"
-            [disabled]="importing() || !facebookUrl.trim()"
-            (click)="importLive()">
-            @if (importing()) {
-              <span class="spinner inline-block mr-2"></span> Enviando…
-            } @else {
-              📹 Importar Live
-            }
-          </button>
+    selector: 'app-live-import',
+    standalone: true,
+    imports: [CommonModule, FormsModule, RouterLink],
+    template: `
+    <section class="live-import-page">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Captura por video</p>
+          <h1>Importar live de Facebook</h1>
         </div>
+        <a routerLink="/admin/capture" class="secondary-link">Captura manual</a>
+      </header>
 
-        <!-- Sessions List -->
-        <section>
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-bold text-pink-900">Lives anteriores</h2>
-            @if (hasInProgress()) {
-              <span class="refresh-badge">
-                <span class="dot-pulse"></span> Actualizando…
-              </span>
-            }
+      <div class="import-grid">
+        <form class="import-panel" (ngSubmit)="importLive()">
+          <label for="facebookUrl">URL del video publicado</label>
+          <div class="url-row">
+            <input
+              id="facebookUrl"
+              name="facebookUrl"
+              type="url"
+              [(ngModel)]="facebookUrl"
+              placeholder="https://www.facebook.com/..."
+              [disabled]="importing() || polling()"
+              autocomplete="off">
+            <button type="submit" [disabled]="!canImport()">
+              @if (importing()) { Importando... } @else { Importar }
+            </button>
           </div>
+          <input
+            name="title"
+            class="title-input"
+            [(ngModel)]="title"
+            placeholder="Titulo interno opcional">
 
-          @if (loadingSessions()) {
-            <div class="card-coquette p-6 text-center text-pink-700">
-              <span class="spinner inline-block mr-2"></span> Cargando lives…
-            </div>
-          }
-
-          @if (!loadingSessions() && sessions().length === 0) {
-            <div class="card-coquette p-8 text-center">
-              <div class="text-5xl mb-3">📭</div>
-              <p class="text-pink-700">No hay lives importados aún.</p>
-            </div>
-          }
-
-          @if (!loadingSessions() && sessions().length > 0) {
-            <div class="space-y-3">
-              @for (session of sessions(); track session.id) {
-                <div class="session-card card-coquette p-4">
-                  <div class="flex items-start gap-3">
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2 flex-wrap mb-1">
-                        <span class="session-title">
-                          {{ session.title || 'Live sin título' }}
-                        </span>
-                        <span class="status-badge" [class]="statusBadgeClass(session.status)">
-                          {{ statusLabel(session.status) }}
-                        </span>
-                      </div>
-                      <div class="text-xs text-pink-600 mt-1">
-                        {{ session.facebookUrl | slice:0:60 }}{{ session.facebookUrl.length > 60 ? '…' : '' }}
-                      </div>
-                      <div class="flex items-center gap-3 mt-2 text-xs text-pink-700">
-                        <span>🗓 {{ session.importedAt | date:'dd/MM/yy HH:mm' }}</span>
-                        @if (session.productCount > 0) {
-                          <span>🛍 {{ session.productCount }} productos</span>
-                        }
-                        @if (session.pendingCount > 0) {
-                          <span class="font-semibold text-amber-600">⏳ {{ session.pendingCount }} pendientes</span>
-                        }
-                        @if (session.status === 'Ready' && session.pendingCount === 0) {
-                          <span class="text-green-600 font-semibold">✅ Revisado</span>
-                        }
-                      </div>
-                      @if (session.statusDetail) {
-                        <div class="text-xs text-pink-500 mt-1 italic">{{ session.statusDetail }}</div>
-                      }
-                    </div>
-                    @if (session.status === 'Ready') {
-                      <a [routerLink]="['/admin/live', session.id, 'review']"
-                         class="btn-coquette btn-pink text-xs shrink-0">
-                        Revisar →
-                      </a>
-                    }
-                  </div>
-
-                  @if (isInProgress(session.status)) {
-                    <div class="progress-bar mt-3">
-                      <div class="progress-fill" [style.width]="progressPercent(session.status) + '%'"></div>
-                    </div>
-                  }
-                </div>
+          @if (session()) {
+            <div class="session-strip">
+              <span>Live #{{ session()!.id }}</span>
+              <strong>{{ statusLabel(session()!.status) }}</strong>
+              @if (session()!.durationSeconds) {
+                <span>{{ durationLabel(session()!.durationSeconds!) }}</span>
               }
             </div>
           }
-        </section>
+        </form>
+
+        <aside class="status-panel">
+          <div class="status-header">
+            <span>Proceso</span>
+            @if (session()) {
+              <strong>{{ progressPercent() }}%</strong>
+            }
+          </div>
+
+          <div class="progress-track">
+            <div class="progress-fill" [style.width.%]="progressPercent()"></div>
+          </div>
+
+          <ol class="step-list">
+            @for (step of steps; track step.id) {
+              <li [class.done]="stepIndex(step.id) < activeStepIndex()" [class.active]="stepIndex(step.id) === activeStepIndex()">
+                <span class="step-dot"></span>
+                <div>
+                  <strong>{{ step.label }}</strong>
+                  <small>{{ step.help }}</small>
+                </div>
+              </li>
+            }
+          </ol>
+
+          @if (session()?.status === 'Failed') {
+            <p class="error-box">{{ session()?.statusDetail || 'No se pudo procesar el live.' }}</p>
+          } @else if (session()?.statusDetail) {
+            <p class="detail-box">{{ session()?.statusDetail }}</p>
+          }
+
+          @if (session()?.status === 'Ready') {
+            <div class="result-grid">
+              <span><strong>{{ session()?.productCount || 0 }}</strong> productos</span>
+              <span><strong>{{ session()?.candidateCount || 0 }}</strong> candidatos</span>
+              <span><strong>{{ session()?.pendingCount || 0 }}</strong> pendientes</span>
+            </div>
+            <button type="button" class="review-button" (click)="goReview()">Revisar pedidos</button>
+          }
+        </aside>
       </div>
-    </div>
+    </section>
   `,
-  styles: [`
-    .card-coquette {
-      background: rgba(255, 255, 255, 0.75);
-      border: 1px solid rgba(255, 192, 215, 0.5);
-      border-radius: 1.25rem;
-      box-shadow: 0 4px 20px rgba(255, 182, 200, 0.15);
-      backdrop-filter: blur(8px);
+    styles: [`
+    :host { display: block; }
+    .live-import-page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding-bottom: 32px;
     }
-
-    .field-label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #9d3a72;
+    .page-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .eyebrow {
+      margin: 0 0 4px;
+      color: #be185d;
+      font-weight: 800;
+      letter-spacing: .08em;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 0.4rem;
+      font-size: .72rem;
     }
-
-    .input-wrapper {
-      position: relative;
+    h1 {
+      margin: 0;
+      color: #831843;
+      font-size: 2.2rem;
+      line-height: 1.05;
+      letter-spacing: 0;
     }
-
-    .input-icon {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 1rem;
-      pointer-events: none;
-    }
-
-    .input-wrapper .field-input {
-      padding-left: 2.5rem;
-    }
-
-    .field-input {
-      width: 100%;
-      padding: 0.6rem 0.875rem;
-      border-radius: 0.75rem;
-      border: 1.5px solid rgba(255, 192, 215, 0.6);
-      background: rgba(255, 255, 255, 0.8);
-      color: #5a2d4f;
-      font-size: 0.9rem;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-      box-sizing: border-box;
-    }
-
-    .field-input:focus {
-      border-color: #c777b8;
-      box-shadow: 0 0 0 3px rgba(199, 119, 184, 0.15);
-    }
-
-    .field-input:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-coquette {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      padding: 0.6rem 1.25rem;
-      border-radius: 999px;
-      font-size: 0.875rem;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
+    .secondary-link {
+      color: #9d174d;
+      background: rgba(255,255,255,.7);
+      border: 1px solid rgba(249,168,212,.45);
       text-decoration: none;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-weight: 800;
+      white-space: nowrap;
     }
-
-    .btn-pink {
-      background: linear-gradient(135deg, #c777b8, #9d5990);
-      color: white;
-      box-shadow: 0 4px 14px rgba(199, 119, 184, 0.35);
+    .import-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(340px, .75fr);
+      gap: 18px;
+      align-items: start;
     }
-
-    .btn-pink:hover:not(:disabled) {
-      filter: brightness(1.08);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(199, 119, 184, 0.45);
+    .import-panel,
+    .status-panel {
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(249,168,212,.35);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(190,24,93,.08);
     }
-
-    .btn-pink:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
+    .import-panel {
+      padding: 22px;
+      min-height: 260px;
     }
-
-    .w-full { width: 100%; }
-
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
+    label {
+      display: block;
+      color: #831843;
+      font-weight: 900;
+      margin-bottom: 10px;
     }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .session-card {
-      transition: box-shadow 0.2s ease;
+    .url-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
     }
-
-    .session-card:hover {
-      box-shadow: 0 6px 24px rgba(255, 182, 200, 0.25);
+    input {
+      width: 100%;
+      border: 2px solid #fce7f3;
+      background: #fffbfd;
+      color: #4a2040;
+      border-radius: 14px;
+      padding: 13px 14px;
+      font: inherit;
+      outline: none;
     }
-
-    .session-title {
-      font-weight: 700;
-      color: #5a2d4f;
-      font-size: 0.95rem;
+    input:focus {
+      border-color: #f9a8d4;
+      box-shadow: 0 0 0 4px rgba(249,168,212,.16);
     }
-
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 0 18px;
+      font: inherit;
+      font-weight: 900;
+      color: #fffafd;
+      background: linear-gradient(135deg, #ec4899, #be185d);
+      box-shadow: 0 12px 24px rgba(190,24,93,.22);
+      min-height: 50px;
+    }
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed !important;
+      box-shadow: none;
+    }
+    .title-input { margin-top: 12px; }
+    .session-strip {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      color: #7a3d6a;
+    }
+    .session-strip span,
+    .session-strip strong {
+      background: #fdf2f8;
+      border: 1px solid #fbcfe8;
       border-radius: 999px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      padding: 5px 10px;
+      font-size: .82rem;
     }
-
-    .badge-progress {
-      background: rgba(251, 191, 36, 0.15);
-      color: #92400e;
+    .status-panel { padding: 18px; }
+    .status-header {
+      display: flex;
+      justify-content: space-between;
+      color: #831843;
+      font-weight: 900;
+      margin-bottom: 10px;
     }
-
-    .badge-ready {
-      background: rgba(52, 211, 153, 0.15);
-      color: #065f46;
-    }
-
-    .badge-failed {
-      background: rgba(239, 68, 68, 0.15);
-      color: #991b1b;
-    }
-
-    .progress-bar {
-      height: 4px;
+    .progress-track {
+      height: 10px;
+      background: #fce7f3;
       border-radius: 999px;
-      background: rgba(255, 192, 215, 0.3);
       overflow: hidden;
+      margin-bottom: 18px;
     }
-
     .progress-fill {
       height: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #c777b8, #f9a8d4);
-      transition: width 0.6s ease;
-      animation: shimmer 1.5s ease-in-out infinite;
+      background: linear-gradient(90deg, #f9a8d4, #be185d);
+      border-radius: inherit;
+      transition: width .25s ease;
     }
-
-    @keyframes shimmer {
-      0% { opacity: 0.7; }
-      50% { opacity: 1; }
-      100% { opacity: 0.7; }
+    .step-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
     }
-
-    .refresh-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.72rem;
-      color: #7a3d6a;
-      font-weight: 600;
+    .step-list li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 10px;
+      color: #9a7187;
     }
-
-    .dot-pulse {
-      width: 8px;
-      height: 8px;
+    .step-dot {
+      width: 12px;
+      height: 12px;
+      margin-top: 5px;
       border-radius: 50%;
-      background: #c777b8;
-      animation: pulse-dot 1.2s ease-in-out infinite;
-      display: inline-block;
+      border: 2px solid #f9a8d4;
+      background: #fffafd;
     }
-
-    @keyframes pulse-dot {
-      0%, 100% { transform: scale(0.8); opacity: 0.5; }
-      50% { transform: scale(1.2); opacity: 1; }
+    .step-list li.done .step-dot,
+    .step-list li.active .step-dot {
+      background: #be185d;
+      border-color: #be185d;
+    }
+    .step-list li.active strong,
+    .step-list li.done strong {
+      color: #831843;
+    }
+    .step-list strong,
+    .step-list small {
+      display: block;
+    }
+    .step-list small {
+      font-size: .78rem;
+      line-height: 1.3;
+    }
+    .error-box {
+      margin: 16px 0 0;
+      color: #991b1b;
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      padding: 10px 12px;
+      border-radius: 12px;
+    }
+    .detail-box {
+      margin: 16px 0 0;
+      color: #7a3d6a;
+      background: #fffbfd;
+      border: 1px solid #fbcfe8;
+      padding: 10px 12px;
+      border-radius: 12px;
+      line-height: 1.35;
+    }
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .result-grid span {
+      background: #fdf2f8;
+      border: 1px solid #fbcfe8;
+      border-radius: 12px;
+      padding: 9px;
+      color: #7a3d6a;
+      text-align: center;
+      font-size: .78rem;
+      font-weight: 800;
+    }
+    .result-grid strong {
+      display: block;
+      color: #831843;
+      font-size: 1.15rem;
+    }
+    .review-button {
+      width: 100%;
+      margin-top: 16px;
+    }
+    @media (max-width: 900px) {
+      .page-header { align-items: flex-start; flex-direction: column; }
+      .import-grid { grid-template-columns: 1fr; }
+      .url-row { grid-template-columns: 1fr; }
+      button { min-height: 48px; }
     }
   `]
 })
-export class LiveImportComponent implements OnInit {
-  private liveService = inject(LiveCaptureService);
-  private toast = inject(ToastService);
-  private router = inject(Router);
-  private destroyRef = inject(DestroyRef);
+export class LiveImportComponent implements OnDestroy {
+    private liveCapture = inject(LiveCaptureService);
+    private toast = inject(ToastService);
+    private router = inject(Router);
+    private pollSub?: Subscription;
 
-  facebookUrl = '';
-  title = '';
+    facebookUrl = '';
+    title = '';
+    importing = signal(false);
+    polling = signal(false);
+    session = signal<LiveSessionDto | null>(null);
 
-  importing = signal(false);
-  loadingSessions = signal(true);
-  sessions = signal<LiveSessionDto[]>([]);
+    readonly steps: { id: StepId; label: string; help: string }[] = [
+        { id: 'Queued', label: 'En cola', help: 'El servidor preparo el trabajo.' },
+        { id: 'Downloading', label: 'Descargando video', help: 'Se guarda el MP4 en R2.' },
+        { id: 'Transcribing', label: 'Transcribiendo audio', help: 'Whisper genera segmentos con tiempo.' },
+        { id: 'Parsing', label: 'Detectando productos', help: 'Gemini identifica keywords y pedidos leidos.' },
+        { id: 'Ready', label: 'Listo para revisar', help: 'Ya puedes confirmar pedidos.' },
+    ];
 
-  hasInProgress = computed(() =>
-    this.sessions().some(s => IN_PROGRESS_STATUSES.includes(s.status))
-  );
-
-  ngOnInit() {
-    this.loadSessions();
-
-    // Auto-refresh every 5s while any session is in-progress
-    interval(5000)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
-        if (this.hasInProgress()) {
-          this.loadSessions(false);
-        }
-      });
-  }
-
-  loadSessions(showLoading = true) {
-    if (showLoading) this.loadingSessions.set(true);
-    this.liveService.getAll().subscribe({
-      next: (data) => {
-        this.sessions.set(data.sort((a, b) => b.id - a.id));
-        this.loadingSessions.set(false);
-      },
-      error: () => {
-        this.loadingSessions.set(false);
-        if (showLoading) this.toast.error('No se pudieron cargar los lives 😿');
-      }
+    canImport = computed(() => {
+        return this.facebookUrl.trim().length > 12 && !this.importing() && !this.polling();
     });
-  }
 
-  importLive() {
-    const url = this.facebookUrl.trim();
-    if (!url) return;
-
-    this.importing.set(true);
-    this.liveService.import({ facebookUrl: url, title: this.title.trim() || undefined }).subscribe({
-      next: (session) => {
-        this.importing.set(false);
-        this.toast.success('Live enviado a procesar 💖');
-        this.router.navigate(['/admin/live', session.id, 'review']);
-      },
-      error: () => {
-        this.importing.set(false);
-        this.toast.error('Error al importar el live 😿');
-      }
+    progressPercent = computed(() => {
+        if (!this.session()) return 0;
+        return Math.round((this.activeStepIndex() / (this.steps.length - 1)) * 100);
     });
-  }
 
-  isInProgress(status: LiveSessionStatus): boolean {
-    return IN_PROGRESS_STATUSES.includes(status);
-  }
-
-  statusLabel(status: LiveSessionStatus): string {
-    switch (status) {
-      case 'Queued': return 'En cola';
-      case 'Downloading': return 'Descargando video';
-      case 'Transcribing': return 'Transcribiendo audio';
-      case 'Parsing': return 'Analizando pedidos';
-      case 'Scanning': return 'Escaneando comentarios';
-      case 'Ready': return 'Listo para revisar';
-      case 'Failed': return 'Error';
-      default: return status;
+    ngOnDestroy(): void {
+        this.pollSub?.unsubscribe();
     }
-  }
 
-  statusBadgeClass(status: LiveSessionStatus): string {
-    if (status === 'Ready') return 'status-badge badge-ready';
-    if (status === 'Failed') return 'status-badge badge-failed';
-    return 'status-badge badge-progress';
-  }
+    importLive(): void {
+        const url = this.facebookUrl.trim();
+        if (!url) return;
 
-  progressPercent(status: LiveSessionStatus): number {
-    switch (status) {
-      case 'Queued': return 10;
-      case 'Downloading': return 30;
-      case 'Transcribing': return 55;
-      case 'Parsing': return 75;
-      case 'Scanning': return 90;
-      default: return 100;
+        this.importing.set(true);
+        this.liveCapture.importLive({ facebookUrl: url, title: this.title.trim() || undefined }).subscribe({
+            next: session => {
+                this.importing.set(false);
+                this.session.set(session);
+                this.toast.success(`Live #${session.id} importado`);
+                this.startPolling(session.id);
+            },
+            error: err => {
+                this.importing.set(false);
+                this.toast.error(err?.error || 'No se pudo importar el live');
+            }
+        });
     }
-  }
+
+    startPolling(id: number): void {
+        this.pollSub?.unsubscribe();
+        this.polling.set(true);
+        this.pollSub = timer(0, 5000).pipe(
+            switchMap(() => this.liveCapture.getSession(id))
+        ).subscribe({
+            next: session => {
+                this.session.set(session);
+                if (session.status === 'Ready') {
+                    this.polling.set(false);
+                    this.pollSub?.unsubscribe();
+                }
+                if (session.status === 'Failed') {
+                    this.polling.set(false);
+                    this.pollSub?.unsubscribe();
+                }
+            },
+            error: () => {
+                this.polling.set(false);
+                this.pollSub?.unsubscribe();
+                this.toast.error('No se pudo consultar el estado del live');
+            }
+        });
+    }
+
+    goReview(): void {
+        const id = this.session()?.id;
+        if (id) this.router.navigate(['/admin/live', id, 'review']);
+    }
+
+    activeStepIndex(): number {
+        const status = this.session()?.status as StepId | 'Failed' | undefined;
+        if (!status) return 0;
+        if (status === 'Failed') return 0;
+        return Math.max(0, this.steps.findIndex(step => step.id === status));
+    }
+
+    stepIndex(id: StepId): number {
+        return this.steps.findIndex(step => step.id === id);
+    }
+
+    statusLabel(status: string): string {
+        const labels: Record<string, string> = {
+            Queued: 'En cola',
+            Downloading: 'Descargando',
+            Transcribing: 'Transcribiendo',
+            Parsing: 'Analizando productos',
+            Ready: 'Listo',
+            Failed: 'Error'
+        };
+        return labels[status] ?? status;
+    }
+
+    durationLabel(seconds: number): string {
+        const minutes = Math.round(seconds / 60);
+        if (minutes < 60) return `${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        const rest = minutes % 60;
+        return `${hours} h ${rest} min`;
+    }
 }

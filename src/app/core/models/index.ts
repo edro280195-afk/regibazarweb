@@ -272,6 +272,77 @@ export interface ClientMergeAuditDto {
     mergedAt: string;
 }
 
+// Captura asistida por video de lives
+export type LiveSessionStatus =
+    | 'Queued'
+    | 'Downloading'
+    | 'Transcribing'
+    | 'Parsing'
+    | 'Scanning'
+    | 'Combining'
+    | 'Ready'
+    | 'Failed';
+
+export type LiveCandidateStatus = 'Pending' | 'Confirmed' | 'Ignored';
+export type LiveCandidateSource = 'Spoken' | 'CommentOnly' | 'SpokenAndComment';
+
+export interface ImportLiveRequest {
+    facebookUrl: string;
+    title?: string;
+}
+
+export interface LiveSessionDto {
+    id: number;
+    facebookUrl: string;
+    title?: string | null;
+    status: LiveSessionStatus | string;
+    statusDetail?: string | null;
+    importedAt: string;
+    processedAt?: string | null;
+    durationSeconds?: number | null;
+    productCount: number;
+    candidateCount: number;
+    pendingCount: number;
+}
+
+export interface LiveProductDto {
+    id: number;
+    keyword: string;
+    description?: string | null;
+    price: number;
+    announcedAtSeconds?: number | null;
+    candidateCount: number;
+}
+
+export interface LiveCandidateDto {
+    id: number;
+    keyword: string;
+    liveProductId?: number | null;
+    clientNameSpoken?: string | null;
+    commentDisplayName?: string | null;
+    resolvedClientId?: number | null;
+    resolvedClientName?: string | null;
+    proposedAliasPairJson?: string | null;
+    source: LiveCandidateSource | string;
+    status: LiveCandidateStatus | string;
+    spokenAtSeconds?: number | null;
+}
+
+export interface ConfirmLiveCandidateRequest {
+    clientId?: number | null;
+    clientName?: string | null;
+    productOverride?: string;
+    priceOverride?: number;
+    acceptAlias?: boolean;
+}
+
+export interface LiveReviewDto {
+    session: LiveSessionDto;
+    products: LiveProductDto[];
+    candidatesByProduct: Record<number, LiveCandidateDto[]>;
+    unmatchedCandidates: LiveCandidateDto[];
+}
+
 export interface MonthlySalesDto {
     month: string;
     sales: number;
@@ -1028,62 +1099,3 @@ export interface TandaShuffleResultDto {
     shuffleDate: string;
 }
 
-// Live Capture
-export type LiveSessionStatus = 'Queued' | 'Downloading' | 'Transcribing' | 'Parsing' | 'Scanning' | 'Ready' | 'Failed';
-
-export interface LiveSessionDto {
-  id: number;
-  facebookUrl: string;
-  title?: string;
-  status: LiveSessionStatus;
-  statusDetail?: string;
-  importedAt: string;
-  processedAt?: string;
-  durationSeconds?: number;
-  productCount: number;
-  candidateCount: number;
-  pendingCount: number;
-}
-
-export interface LiveProductDto {
-  id: number;
-  keyword: string;
-  description?: string;
-  price: number;
-  announcedAtSeconds?: number;
-  candidateCount: number;
-}
-
-export interface LiveCandidateDto {
-  id: number;
-  keyword: string;
-  liveProductId?: number;
-  clientNameSpoken?: string;
-  commentDisplayName?: string;
-  resolvedClientId?: number;
-  resolvedClientName?: string;
-  proposedAliasPairJson?: string;
-  source: 'Spoken' | 'Comment' | 'SpokenAndComment';
-  status: 'Pending' | 'Confirmed' | 'Ignored';
-  spokenAtSeconds?: number;
-}
-
-export interface LiveReviewDto {
-  session: LiveSessionDto;
-  products: LiveProductDto[];
-  candidatesByProduct: { [productId: string]: LiveCandidateDto[] };
-  unmatchedCandidates: LiveCandidateDto[];
-}
-
-export interface ConfirmCandidateRequest {
-  clientId?: number;
-  clientName?: string;
-  productOverride?: string;
-  priceOverride?: number;
-  acceptAlias?: boolean;
-}
-
-export interface ImportLiveRequest {
-  facebookUrl: string;
-  title?: string;
-}

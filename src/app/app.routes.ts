@@ -28,6 +28,14 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/orders/capture-order/capture-order').then(m => m.CaptureOrderComponent)
             },
             {
+                path: 'live/import',
+                loadComponent: () => import('./features/admin/live/live-import.component').then(m => m.LiveImportComponent)
+            },
+            {
+                path: 'live/:id/review',
+                loadComponent: () => import('./features/admin/live/live-review.component').then(m => m.LiveReviewComponent)
+            },
+            {
                 path: 'clients',
                 loadComponent: () => import('./features/admin/clients/clients.component').then(m => m.ClientsComponent)
             },
