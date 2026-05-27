@@ -735,6 +735,16 @@ export interface CamiGreetingResponse {
     audioBase64?: string;
 }
 
+export interface CamiProactiveSuggestionDto {
+    kind: string;
+    icon: string;
+    title: string;
+    detail: string;
+    actionLabel: string;
+    actionRoute: string;
+    priority: number;
+}
+
 // ── Tandas ──
 export interface TandaProductDto {
     id: string;
@@ -1041,6 +1051,7 @@ export interface LiveCandidateDto {
   proposedAliasPairJson?: string;
   source: 'Spoken' | 'Comment' | 'SpokenAndComment';
   status: 'Pending' | 'Confirmed' | 'Ignored';
+  spokenAtSeconds?: number;
 }
 
 export interface LiveReviewDto {

@@ -153,10 +153,30 @@ const IN_PROGRESS_STATUSES: LiveSessionStatus[] = ['Queued', 'Downloading', 'Tra
                     [class.candidate-focused]="focusedCandidateIndex() === i && candidate.status === 'Pending'">
 
                     <div class="candidate-main">
-                      <!-- Source badge -->
-                      <span class="source-badge source-{{ candidate.source.toLowerCase() }}">
-                        {{ sourceLabel(candidate.source) }}
-                      </span>
+                      <!-- Source badge + clip player -->
+                      <div class="source-row">
+                        <span class="source-badge source-{{ candidate.source.toLowerCase() }}">
+                          {{ sourceLabel(candidate.source) }}
+                        </span>
+
+                        <button
+                          type="button"
+                          class="clip-btn"
+                          [class.clip-playing]="playingClipId() === candidate.id"
+                          [disabled]="candidate.spokenAtSeconds == null || loadingClipId() === candidate.id"
+                          [title]="candidate.spokenAtSeconds == null
+                            ? 'No hay momento detectado en el audio'
+                            : (playingClipId() === candidate.id ? 'Pausar clip' : 'Escuchar 5s del audio')"
+                          (click)="playClip(candidate)">
+                          @if (loadingClipId() === candidate.id) {
+                            <span class="spinner-sm"></span>
+                          } @else if (playingClipId() === candidate.id) {
+                            ⏸
+                          } @else {
+                            🔊
+                          }
+                        </button>
+                      </div>
 
                       <!-- Name info -->
                       <div class="candidate-names">
@@ -569,6 +589,48 @@ const IN_PROGRESS_STATUSES: LiveSessionStatus[] = ['Queued', 'Downloading', 'Tra
     .source-comment { background: rgba(99, 179, 237, 0.15); color: #1a5276; }
     .source-spokenandcomment { background: rgba(52, 211, 153, 0.15); color: #065f46; }
 
+    .source-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .clip-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid rgba(199, 119, 184, 0.3);
+      background: rgba(255, 255, 255, 0.7);
+      color: #7a3d6a;
+      cursor: pointer;
+      font-size: 0.85rem;
+      line-height: 1;
+      padding: 0;
+      transition: all 0.18s ease;
+    }
+
+    .clip-btn:hover:not(:disabled) {
+      background: rgba(199, 119, 184, 0.12);
+      border-color: rgba(199, 119, 184, 0.5);
+      transform: scale(1.06);
+    }
+
+    .clip-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .clip-playing {
+      background: linear-gradient(135deg, #c777b8, #9d5990) !important;
+      color: white !important;
+      border-color: transparent !important;
+      box-shadow: 0 2px 8px rgba(199, 119, 184, 0.3);
+    }
+
     .candidate-names {
       display: flex;
       flex-direction: column;
@@ -764,6 +826,12 @@ export class LiveReviewComponent implements OnInit {
   selectedProductIndex = signal(0);
   focusedCandidateIndex = signal(0);
   busyCandidate = signal<number | null>(null);
+
+  // Clip de audio del candidato (5s) — se carga bajo demanda.
+  playingClipId = signal<number | null>(null);
+  loadingClipId = signal<number | null>(null);
+  private audio: HTMLAudioElement | null = null;
+  private audioObjectUrl: string | null = null;
 
   // Track per-candidate overrides
   private aliasChecked = new Map<number, boolean>();
@@ -981,6 +1049,73 @@ export class LiveReviewComponent implements OnInit {
         this.toast.error('Error al ignorar 😿');
       }
     });
+  }
+
+  // ── Audio clip playback ──
+  playClip(candidate: LiveCandidateDto) {
+    if (candidate.spokenAtSeconds == null) return;
+
+    // Si ya hay un audio sonando, lo paramos primero.
+    this.stopAudio();
+
+    // Si el botón pulsado corresponde al clip que ya estaba sonando, sólo toggleamos off.
+    if (this.playingClipId() === candidate.id) {
+      this.playingClipId.set(null);
+      return;
+    }
+
+    this.playingClipId.set(null);
+    this.loadingClipId.set(candidate.id);
+
+    this.liveService.fetchClip(candidate.id).subscribe({
+      next: (blob) => {
+        this.loadingClipId.set(null);
+        // Por si el usuario disparó otro clip mientras cargaba este.
+        if (this.playingClipId() !== null) return;
+
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => {
+          this.playingClipId.set(null);
+          this.releaseAudio();
+        };
+        audio.onerror = () => {
+          this.playingClipId.set(null);
+          this.releaseAudio();
+          this.toast.error('No se pudo reproducir el clip 😿');
+        };
+
+        this.audio = audio;
+        this.audioObjectUrl = url;
+        this.playingClipId.set(candidate.id);
+
+        audio.play().catch(() => {
+          this.playingClipId.set(null);
+          this.releaseAudio();
+          this.toast.error('No se pudo reproducir el clip 😿');
+        });
+      },
+      error: () => {
+        this.loadingClipId.set(null);
+        this.playingClipId.set(null);
+        this.toast.error('No hay clip disponible para este candidato');
+      },
+    });
+  }
+
+  private stopAudio() {
+    if (this.audio) {
+      try { this.audio.pause(); } catch { /* ignore */ }
+    }
+    this.releaseAudio();
+  }
+
+  private releaseAudio() {
+    if (this.audioObjectUrl) {
+      URL.revokeObjectURL(this.audioObjectUrl);
+      this.audioObjectUrl = null;
+    }
+    this.audio = null;
   }
 
   // ── Alias / Manual name helpers ──

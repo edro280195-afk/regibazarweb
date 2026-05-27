@@ -32,4 +32,8 @@ export class LiveCaptureService {
   ignore(candidateId: number): Observable<void> {
     return this.http.post<void>(`${this.base}/candidates/${candidateId}/ignore`, {});
   }
+
+  fetchClip(candidateId: number): Observable<Blob> {
+    return this.http.get(`${this.base}/candidates/${candidateId}/clip`, { responseType: 'blob' });
+  }
 }
