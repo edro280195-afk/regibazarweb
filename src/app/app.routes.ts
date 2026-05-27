@@ -32,6 +32,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/clients/clients.component').then(m => m.ClientsComponent)
             },
             {
+                path: 'clients/duplicates',
+                loadComponent: () => import('./features/admin/clients/duplicates/duplicates.component').then(m => m.ClientsDuplicatesComponent)
+            },
+            {
                 path: 'clients/:id',
                 loadComponent: () => import('./features/admin/clients/client-profile/client-profile.component').then(m => m.ClientProfileComponent)
             },

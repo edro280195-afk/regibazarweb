@@ -188,6 +188,74 @@ export interface ClientDto {
     deliveryInstructions?: string;
     latitude?: number | null;
     longitude?: number | null;
+    aliases?: string[];
+}
+
+// ── Resolver multi-señal de clientas ──
+
+export interface ResolveClientRequest {
+    name: string;
+    phone?: string;
+    address?: string;
+}
+
+export interface ResolveCandidateDto {
+    clientId: number;
+    name: string;
+    phone?: string;
+    address?: string;
+    tag: string;
+    type: string;
+    ordersCount: number;
+    totalSpent: number;
+    aliases: string[];
+    balanceDue: number;
+    score: number;
+    matchedBy: 'alias' | 'phone' | 'name-fuzzy' | 'alias-fuzzy' | 'address-fuzzy' | string;
+}
+
+export type ResolveSuggestedAction = 'use' | 'choose' | 'create';
+
+export interface ResolveClientResponse {
+    candidates: ResolveCandidateDto[];
+    suggestedAction: ResolveSuggestedAction;
+}
+
+export type ClientAliasSource =
+    | 'Unknown'
+    | 'ManualConfirm'
+    | 'Merge'
+    | 'Import'
+    | 'LiveOcr'
+    | 'LiveAudio';
+
+export interface ClientAliasDto {
+    id: number;
+    alias: string;
+    source: ClientAliasSource | string;
+    timesSeen: number;
+    createdAt: string;
+}
+
+export interface AddAliasRequest {
+    alias: string;
+    source?: ClientAliasSource;
+}
+
+export interface MergeClientsRequest {
+    sourceId: number;
+    targetId: number;
+}
+
+export interface DuplicateSuggestionDto {
+    leftClientId: number;
+    leftName: string;
+    leftOrdersCount: number;
+    rightClientId: number;
+    rightName: string;
+    rightOrdersCount: number;
+    reason: 'same-phone' | 'similar-name' | 'similar-address' | string;
+    confidence: number;
 }
 
 export interface MonthlySalesDto {
@@ -515,6 +583,10 @@ export interface ManualOrderRequest {
     deliveryInstructions?: string;
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
+    /** ID de clienta ya resuelto vía el resolver multi-señal. Si viene, el backend
+     *  salta el lookup por nombre y usa este ID, agregando el clientName tecleado
+     *  como alias automáticamente si difiere del nombre canónico. */
+    clientId?: number;
 }
 
 export interface LoginRequest {
