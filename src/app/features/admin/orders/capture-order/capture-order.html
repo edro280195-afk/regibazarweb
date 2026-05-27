@@ -186,6 +186,19 @@
                                     placeholder="Nombre clienta...">
                                 <span class="font-black text-pink-600 ml-2">${{ group.total | number:'1.0-0' }}</span>
                             </div>
+                            @if (group.items[0].resolvedClientId) {
+                            <div class="px-2 py-1 text-[11px] text-purple-700 flex items-center gap-1">
+                                <span>💖</span>
+                                <span>Identidad confirmada</span>
+                            </div>
+                            } @else if (!group.items[0].isExistingClient) {
+                            <div class="px-2 pb-2">
+                                <app-client-resolver
+                                    [name]="group.clientName"
+                                    (resolved)="onTurboClientResolved(group.clientName, $event)">
+                                </app-client-resolver>
+                            </div>
+                            }
                             <div class="queue-group-items">
                                 @for (item of group.items; track item.id) {
                                 <div class="queue-group-item group">
@@ -282,6 +295,28 @@
                             </li>
                             }
                         </ul>
+                        }
+
+                        <!-- Resolver multi-señal: aparece cuando hay texto y no es match exacto del autocomplete.
+                             Muestra candidatas con score y permite confirmar identidad con 1 tap. -->
+                        @if (manualClient().trim().length >= 2 && !manualResolvedClientId()) {
+                        <div class="mt-2">
+                            <app-client-resolver
+                                [name]="manualClient()"
+                                [address]="manualAlternativeAddress()"
+                                (resolved)="onManualClientResolved($event)">
+                            </app-client-resolver>
+                        </div>
+                        }
+                        @if (manualResolvedClientId() && manualResolvedCanonicalName()) {
+                        <div class="mt-2 px-3 py-2 rounded-xl bg-purple-50 border border-purple-200 text-sm text-purple-800 flex items-center gap-2">
+                            <span>💖</span>
+                            <span>Identidad confirmada: <strong>{{ manualResolvedCanonicalName() }}</strong></span>
+                            <button class="ml-auto text-xs text-purple-600 hover:underline"
+                                (click)="manualResolvedClientId.set(null); manualResolvedCanonicalName.set('')">
+                                Cambiar
+                            </button>
+                        </div>
                         }
                     </div>
 

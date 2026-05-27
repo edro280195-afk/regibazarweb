@@ -10,10 +10,13 @@ import {
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
     AiParsedOrder, AiInsight,
-    CamiMessage, CamiChatRequest, CamiChatResponse,
+    CamiMessage, CamiChatRequest, CamiChatResponse, CamiProactiveSuggestionDto,
     AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse,
     AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto,
-    RecomposeRouteResponse
+    RecomposeRouteResponse,
+    ResolveClientRequest, ResolveClientResponse,
+    ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto,
+    ClientMergeAuditDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -144,6 +147,36 @@ export class ApiService {
 
     deleteClient(id: number): Observable<any> {
         return this.http.delete(`${this.base}/clients/${id}`);
+    }
+
+    // ── Resolver multi-señal de clientas ──
+    resolveClient(req: ResolveClientRequest): Observable<ResolveClientResponse> {
+        return this.http.post<ResolveClientResponse>(`${this.base}/clients/resolve`, req);
+    }
+
+    getClientAliases(clientId: number): Observable<ClientAliasDto[]> {
+        return this.http.get<ClientAliasDto[]>(`${this.base}/clients/${clientId}/aliases`);
+    }
+
+    addClientAlias(clientId: number, req: AddAliasRequest): Observable<ClientAliasDto> {
+        return this.http.post<ClientAliasDto>(`${this.base}/clients/${clientId}/aliases`, req);
+    }
+
+    deleteClientAlias(aliasId: number): Observable<any> {
+        return this.http.delete(`${this.base}/clients/aliases/${aliasId}`);
+    }
+
+    mergeClients(req: MergeClientsRequest): Observable<any> {
+        return this.http.post(`${this.base}/clients/merge`, req);
+    }
+
+    getDuplicateSuggestions(limit: number = 50): Observable<DuplicateSuggestionDto[]> {
+        const params = new HttpParams().set('limit', limit.toString());
+        return this.http.get<DuplicateSuggestionDto[]>(`${this.base}/clients/duplicate-suggestions`, { params });
+    }
+
+    getClientMergeAudits(take: number = 50): Observable<ClientMergeAuditDto[]> {
+        return this.http.get<ClientMergeAuditDto[]>(`${this.base}/clients/merge-audits?take=${take}`);
     }
 
     // ── Routes ──
@@ -347,6 +380,10 @@ export class ApiService {
 
     getCamiAlerts(): Observable<Array<{ type: string; message: string; icon: string; relatedId?: number }>> {
         return this.http.get<Array<{ type: string; message: string; icon: string; relatedId?: number }>>(`${this.base}/cami/alerts`);
+    }
+
+    getCamiProactiveSuggestions(): Observable<CamiProactiveSuggestionDto[]> {
+        return this.http.get<CamiProactiveSuggestionDto[]>(`${this.base}/cami/proactive-suggestions`);
     }
 
     // ── Driver (Repartidor) ──

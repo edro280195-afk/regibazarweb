@@ -4,8 +4,9 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
-import { CamiMessage } from '../../../core/models';
+import { CamiMessage, CamiProactiveSuggestionDto } from '../../../core/models';
 
 interface DisplayMessage {
   role: 'user' | 'model';
@@ -57,6 +58,26 @@ interface DisplayMessage {
 
       <!-- ══════════ MESSAGES AREA ══════════ -->
       <section class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth" #messagesContainer>
+        <!-- ✨ Proactive Suggestions Widget -->
+        @if (suggestionItems().length > 0) {
+          <div class="proactive-suggestions animate-fade-in-up">
+            <div class="proactive-title">
+              <span class="proactive-spark">✨</span>
+              <span>Sugerencias para ti</span>
+            </div>
+            @for (s of suggestionItems(); track s.kind + s.actionRoute) {
+              <button type="button" class="suggestion-card" (click)="goTo(s.actionRoute)">
+                <span class="suggestion-icon">{{ s.icon }}</span>
+                <div class="suggestion-body">
+                  <div class="suggestion-title">{{ s.title }}</div>
+                  <div class="suggestion-detail">{{ s.detail }}</div>
+                </div>
+                <span class="suggestion-action">{{ s.actionLabel }} →</span>
+              </button>
+            }
+          </div>
+        }
+
         @if (messages().length === 0) {
           <div class="h-full flex flex-col items-center justify-center text-center px-6 animate-fade-in">
             <div class="w-20 h-20 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-4xl mb-6 animate-pulse">
@@ -206,10 +227,103 @@ interface DisplayMessage {
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in-up { animation: fade-in-up 0.3s ease-out forwards; }
+
+    /* ── Proactive Suggestions (coquette pink on dark) ── */
+    .proactive-suggestions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .proactive-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #f9a8d4; /* pink-300 */
+      padding: 0 0.25rem 0.25rem;
+    }
+    .proactive-spark {
+      font-size: 0.9rem;
+      filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.5));
+    }
+    .suggestion-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      text-align: left;
+      padding: 0.85rem 0.95rem;
+      border-radius: 1rem;
+      border: 1px solid rgba(244, 114, 182, 0.25); /* pink-400/25 */
+      background: linear-gradient(135deg,
+        rgba(244, 114, 182, 0.10) 0%,
+        rgba(192, 132, 252, 0.08) 100%); /* pink → lavender */
+      backdrop-filter: blur(8px);
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
+      cursor: pointer;
+      color: #fce7f3; /* pink-100 */
+    }
+    .suggestion-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(244, 114, 182, 0.55);
+      box-shadow: 0 8px 24px -10px rgba(244, 114, 182, 0.45);
+      background: linear-gradient(135deg,
+        rgba(244, 114, 182, 0.18) 0%,
+        rgba(192, 132, 252, 0.14) 100%);
+    }
+    .suggestion-card:active { transform: translateY(0); }
+    .suggestion-icon {
+      flex-shrink: 0;
+      width: 2.5rem;
+      height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      border-radius: 0.85rem;
+      background: rgba(244, 114, 182, 0.18);
+      border: 1px solid rgba(244, 114, 182, 0.3);
+    }
+    .suggestion-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .suggestion-title {
+      font-weight: 700;
+      font-size: 0.875rem;
+      color: #fce7f3; /* pink-100 — bold pink-900 reads poorly on dark, using light pink */
+      line-height: 1.25;
+    }
+    .suggestion-detail {
+      font-size: 0.75rem;
+      color: #f5d0fe; /* fuchsia-200, soft */
+      opacity: 0.85;
+      line-height: 1.3;
+    }
+    .suggestion-action {
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #f9a8d4; /* pink-300 */
+      padding: 0.4rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(244, 114, 182, 0.15);
+      border: 1px solid rgba(244, 114, 182, 0.3);
+      white-space: nowrap;
+    }
   `]
 })
 export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
   private api = inject(ApiService);
+  private router = inject(Router);
 
   @ViewChild('messagesContainer') private container!: ElementRef<HTMLElement>;
 
@@ -221,6 +335,7 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
   lastError = signal(false);
   lastUserMessage = signal('');
   textInput = '';
+  suggestionItems = signal<CamiProactiveSuggestionDto[]>([]);
 
   private recognition: any = null;
   private wakeWordRecognition: any = null;
@@ -239,6 +354,18 @@ export class CamiPanelComponent implements AfterViewChecked, OnDestroy, OnInit {
     this.loadFromStorage();
     this.initWakeWordListener();
     document.addEventListener('visibilitychange', this.visibilityHandler);
+    this.loadProactiveSuggestions();
+  }
+
+  private loadProactiveSuggestions(): void {
+    this.api.getCamiProactiveSuggestions().subscribe({
+      next: (s) => this.suggestionItems.set(s ?? []),
+      error: () => this.suggestionItems.set([])
+    });
+  }
+
+  goTo(route: string): void {
+    this.router.navigate([route]);
   }
 
   ngAfterViewChecked(): void {

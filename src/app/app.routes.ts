@@ -32,6 +32,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/clients/clients.component').then(m => m.ClientsComponent)
             },
             {
+                path: 'clients/duplicates',
+                loadComponent: () => import('./features/admin/clients/duplicates/duplicates.component').then(m => m.ClientsDuplicatesComponent)
+            },
+            {
                 path: 'clients/:id',
                 loadComponent: () => import('./features/admin/clients/client-profile/client-profile.component').then(m => m.ClientProfileComponent)
             },
@@ -78,6 +82,14 @@ export const routes: Routes = [
             {
                 path: 'tandas/:id',
                 loadComponent: () => import('./features/admin/tandas/tanda-detail.component').then(m => m.TandaDetailComponent)
+            },
+            {
+                path: 'live',
+                loadComponent: () => import('./features/admin/live/live-import.component').then(m => m.LiveImportComponent)
+            },
+            {
+                path: 'live/:id/review',
+                loadComponent: () => import('./features/admin/live/live-review.component').then(m => m.LiveReviewComponent)
             },
             {
                 path: 'raffles',

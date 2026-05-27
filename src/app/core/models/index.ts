@@ -188,6 +188,88 @@ export interface ClientDto {
     deliveryInstructions?: string;
     latitude?: number | null;
     longitude?: number | null;
+    aliases?: string[];
+}
+
+// ── Resolver multi-señal de clientas ──
+
+export interface ResolveClientRequest {
+    name: string;
+    phone?: string;
+    address?: string;
+}
+
+export interface ResolveCandidateDto {
+    clientId: number;
+    name: string;
+    phone?: string;
+    address?: string;
+    tag: string;
+    type: string;
+    ordersCount: number;
+    totalSpent: number;
+    aliases: string[];
+    balanceDue: number;
+    score: number;
+    matchedBy: 'alias' | 'phone' | 'name-fuzzy' | 'alias-fuzzy' | 'address-fuzzy' | string;
+}
+
+export type ResolveSuggestedAction = 'use' | 'choose' | 'create';
+
+export interface ResolveClientResponse {
+    candidates: ResolveCandidateDto[];
+    suggestedAction: ResolveSuggestedAction;
+}
+
+export type ClientAliasSource =
+    | 'Unknown'
+    | 'ManualConfirm'
+    | 'Merge'
+    | 'Import'
+    | 'LiveOcr'
+    | 'LiveAudio';
+
+export interface ClientAliasDto {
+    id: number;
+    alias: string;
+    source: ClientAliasSource | string;
+    timesSeen: number;
+    createdAt: string;
+}
+
+export interface AddAliasRequest {
+    alias: string;
+    source?: ClientAliasSource;
+}
+
+export interface MergeClientsRequest {
+    sourceId: number;
+    targetId: number;
+}
+
+export interface DuplicateSuggestionDto {
+    leftClientId: number;
+    leftName: string;
+    leftOrdersCount: number;
+    rightClientId: number;
+    rightName: string;
+    rightOrdersCount: number;
+    reason: 'same-phone' | 'similar-name' | 'similar-address' | string;
+    confidence: number;
+}
+
+export interface ClientMergeAuditDto {
+    id: number;
+    sourceClientId: number;
+    sourceName: string;
+    targetClientId: number;
+    targetName: string;
+    mode: 'Manual' | 'Auto';
+    reason?: string;
+    confidence: number;
+    ordersMoved: number;
+    aliasesMoved: number;
+    mergedAt: string;
 }
 
 export interface MonthlySalesDto {
@@ -515,6 +597,10 @@ export interface ManualOrderRequest {
     deliveryInstructions?: string;
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
+    /** ID de clienta ya resuelto vía el resolver multi-señal. Si viene, el backend
+     *  salta el lookup por nombre y usa este ID, agregando el clientName tecleado
+     *  como alias automáticamente si difiere del nombre canónico. */
+    clientId?: number;
 }
 
 export interface LoginRequest {
@@ -661,6 +747,16 @@ export interface AiRouteSelectionResponse {
 export interface CamiGreetingResponse {
     message: string;
     audioBase64?: string;
+}
+
+export interface CamiProactiveSuggestionDto {
+    kind: string;
+    icon: string;
+    title: string;
+    detail: string;
+    actionLabel: string;
+    actionRoute: string;
+    priority: number;
 }
 
 // ── Tandas ──
@@ -930,4 +1026,64 @@ export interface TandaShuffleResultDto {
     participantsShuffled: number;
     turnAssignments: TandaTurnAssignmentDto[];
     shuffleDate: string;
+}
+
+// Live Capture
+export type LiveSessionStatus = 'Queued' | 'Downloading' | 'Transcribing' | 'Parsing' | 'Scanning' | 'Ready' | 'Failed';
+
+export interface LiveSessionDto {
+  id: number;
+  facebookUrl: string;
+  title?: string;
+  status: LiveSessionStatus;
+  statusDetail?: string;
+  importedAt: string;
+  processedAt?: string;
+  durationSeconds?: number;
+  productCount: number;
+  candidateCount: number;
+  pendingCount: number;
+}
+
+export interface LiveProductDto {
+  id: number;
+  keyword: string;
+  description?: string;
+  price: number;
+  announcedAtSeconds?: number;
+  candidateCount: number;
+}
+
+export interface LiveCandidateDto {
+  id: number;
+  keyword: string;
+  liveProductId?: number;
+  clientNameSpoken?: string;
+  commentDisplayName?: string;
+  resolvedClientId?: number;
+  resolvedClientName?: string;
+  proposedAliasPairJson?: string;
+  source: 'Spoken' | 'Comment' | 'SpokenAndComment';
+  status: 'Pending' | 'Confirmed' | 'Ignored';
+  spokenAtSeconds?: number;
+}
+
+export interface LiveReviewDto {
+  session: LiveSessionDto;
+  products: LiveProductDto[];
+  candidatesByProduct: { [productId: string]: LiveCandidateDto[] };
+  unmatchedCandidates: LiveCandidateDto[];
+}
+
+export interface ConfirmCandidateRequest {
+  clientId?: number;
+  clientName?: string;
+  productOverride?: string;
+  priceOverride?: number;
+  acceptAlias?: boolean;
+}
+
+export interface ImportLiveRequest {
+  facebookUrl: string;
+  title?: string;
 }
