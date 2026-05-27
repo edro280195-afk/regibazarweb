@@ -84,6 +84,14 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/tandas/tanda-detail.component').then(m => m.TandaDetailComponent)
             },
             {
+                path: 'live',
+                loadComponent: () => import('./features/admin/live/live-import.component').then(m => m.LiveImportComponent)
+            },
+            {
+                path: 'live/:id/review',
+                loadComponent: () => import('./features/admin/live/live-review.component').then(m => m.LiveReviewComponent)
+            },
+            {
                 path: 'raffles',
                 loadComponent: () => import('./features/admin/raffles/raffles.component').then(m => m.RafflesComponent)
             },

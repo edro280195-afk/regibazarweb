@@ -1003,3 +1003,62 @@ export interface TandaShuffleResultDto {
     turnAssignments: TandaTurnAssignmentDto[];
     shuffleDate: string;
 }
+
+// Live Capture
+export type LiveSessionStatus = 'Queued' | 'Downloading' | 'Transcribing' | 'Parsing' | 'Scanning' | 'Ready' | 'Failed';
+
+export interface LiveSessionDto {
+  id: number;
+  facebookUrl: string;
+  title?: string;
+  status: LiveSessionStatus;
+  statusDetail?: string;
+  importedAt: string;
+  processedAt?: string;
+  durationSeconds?: number;
+  productCount: number;
+  candidateCount: number;
+  pendingCount: number;
+}
+
+export interface LiveProductDto {
+  id: number;
+  keyword: string;
+  description?: string;
+  price: number;
+  announcedAtSeconds?: number;
+  candidateCount: number;
+}
+
+export interface LiveCandidateDto {
+  id: number;
+  keyword: string;
+  liveProductId?: number;
+  clientNameSpoken?: string;
+  commentDisplayName?: string;
+  resolvedClientId?: number;
+  resolvedClientName?: string;
+  proposedAliasPairJson?: string;
+  source: 'Spoken' | 'Comment' | 'SpokenAndComment';
+  status: 'Pending' | 'Confirmed' | 'Ignored';
+}
+
+export interface LiveReviewDto {
+  session: LiveSessionDto;
+  products: LiveProductDto[];
+  candidatesByProduct: { [productId: string]: LiveCandidateDto[] };
+  unmatchedCandidates: LiveCandidateDto[];
+}
+
+export interface ConfirmCandidateRequest {
+  clientId?: number;
+  clientName?: string;
+  productOverride?: string;
+  priceOverride?: number;
+  acceptAlias?: boolean;
+}
+
+export interface ImportLiveRequest {
+  facebookUrl: string;
+  title?: string;
+}
