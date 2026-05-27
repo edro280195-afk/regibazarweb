@@ -186,6 +186,12 @@ type CandidateFilter = 'Pending' | 'Confirmed' | 'Ignored' | 'conflict' | 'all';
               </div>
             } @else {
               <div class="empty-state">Selecciona un pedido detectado.</div>
+              @if (session()?.transcript) {
+                <div class="transcript-box">
+                  <h3>Transcripción Completa</h3>
+                  <pre class="transcript-pre">{{ session()?.transcript }}</pre>
+                </div>
+              }
             }
           </aside>
         </div>
@@ -553,6 +559,30 @@ type CandidateFilter = 'Pending' | 'Confirmed' | 'Ignored' | 'conflict' | 'all';
       color: #7a3d6a;
       font-weight: 700;
       line-height: 1.35;
+    }
+    .transcript-box {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #fce7f3;
+      text-align: left;
+    }
+    .transcript-box h3 {
+      font-size: 0.95rem;
+      color: #831843;
+      margin: 0 0 8px;
+    }
+    .transcript-pre {
+      font-family: monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      background: #fffbfd;
+      border: 1px solid #fbcfe8;
+      border-radius: 12px;
+      padding: 10px;
+      max-height: 350px;
+      overflow-y: auto;
+      color: #4a2040;
+      line-height: 1.4;
     }
     @media (max-width: 1180px) {
       .review-grid { grid-template-columns: 240px 1fr; }

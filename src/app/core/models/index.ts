@@ -303,6 +303,7 @@ export interface LiveSessionDto {
     productCount: number;
     candidateCount: number;
     pendingCount: number;
+    transcript?: string | null;
 }
 
 export interface LiveProductDto {
