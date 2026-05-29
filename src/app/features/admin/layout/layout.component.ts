@@ -520,6 +520,7 @@ export class LayoutComponent {
     const allItems: NavItem[] = [
       { label: 'Dashboard', icon: '🏠', route: '/admin' },
       { label: 'Pedidos', icon: '📦', route: '/admin/orders' },
+      { label: 'Enviar Enlaces', icon: '💌', route: '/admin/send-links' },
       { label: 'Lives', icon: 'LV', route: '/admin/live/import' },
       { label: 'Tandas', icon: '🔄', route: '/admin/tandas' },
       { label: 'Sorteos', icon: '🎉', route: '/admin/raffles' },

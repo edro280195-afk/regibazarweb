@@ -28,6 +28,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/orders/capture-order/capture-order').then(m => m.CaptureOrderComponent)
             },
             {
+                path: 'send-links',
+                loadComponent: () => import('./features/admin/orders/send-links/send-links.component').then(m => m.SendLinksComponent)
+            },
+            {
                 path: 'live/import',
                 loadComponent: () => import('./features/admin/live/live-import.component').then(m => m.LiveImportComponent)
             },
@@ -42,6 +46,10 @@ export const routes: Routes = [
             {
                 path: 'clients/duplicates',
                 loadComponent: () => import('./features/admin/clients/duplicates/duplicates.component').then(m => m.ClientsDuplicatesComponent)
+            },
+            {
+                path: 'clients/facebook-import',
+                loadComponent: () => import('./features/admin/clients/facebook-import/facebook-import.component').then(m => m.FacebookImportComponent)
             },
             {
                 path: 'clients/:id',

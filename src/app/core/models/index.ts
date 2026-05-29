@@ -153,6 +153,7 @@ export interface OrderSummaryDto {
     deliveryRouteId?: number;
     scheduledDeliveryDate?: string;
     clientFacebookProfileUrl?: string;
+    notifiedAt?: string;
 }
 
 export interface PagedResult<T> {
@@ -220,6 +221,43 @@ export type ResolveSuggestedAction = 'use' | 'choose' | 'create';
 export interface ResolveClientResponse {
     candidates: ResolveCandidateDto[];
     suggestedAction: ResolveSuggestedAction;
+}
+
+// ── Importación masiva de Facebook de clientas ──
+
+export interface FacebookImportRow {
+    name: string;
+    facebookUrl: string;
+}
+
+export type FacebookImportStatus = 'matched' | 'review' | 'notfound';
+
+export interface FacebookImportPreviewItem {
+    rowIndex: number;
+    inputName: string;
+    inputUrl: string;
+    urlValid: boolean;
+    status: FacebookImportStatus;
+    suggestedClientId?: number;
+    topScore: number;
+    topAlreadyHasFacebook: boolean;
+    duplicateUrlInBatch: boolean;
+    candidates: ResolveCandidateDto[];
+}
+
+export interface FacebookImportPreviewResponse {
+    items: FacebookImportPreviewItem[];
+}
+
+export interface FacebookImportApplyRow {
+    clientId: number;
+    facebookUrl: string;
+}
+
+export interface FacebookImportApplyResponse {
+    applied: number;
+    skipped: number;
+    errors: string[];
 }
 
 export type ClientAliasSource =

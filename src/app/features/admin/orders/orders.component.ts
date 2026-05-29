@@ -14,6 +14,7 @@ import { BirthdayCouponComponent } from '../../../shared/components/birthday-cou
 import { CouponService } from '../../../core/services/coupon.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
+import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messenger.util';
 
 @Component({
   selector: 'app-orders',
@@ -29,6 +30,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
           </label>
+          <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink text-center align-middle inline-block">💌 Enviar Enlaces</a>
           <a routerLink="/admin/capture" class="btn-coquette btn-pink text-center align-middle inline-block">✨ Nuevo Pedido</a>
         </div>
       </div>
@@ -1045,27 +1047,31 @@ export class OrdersComponent implements OnInit {
     const o = this.selectedOrder();
     if (!o) return;
     const link = o.link.replace('/o/', '/pedido/');
-    const fechaEntrega = o.scheduledDeliveryDate
-      ? this.formatDeliveryDate(o.scheduledDeliveryDate)
-      : 'por confirmar';
-    const fechaLimite = o.scheduledDeliveryDate
-      ? this.formatDeliveryDate(o.scheduledDeliveryDate, -1)
-      : 'por confirmar';
-    const msg = `Hola ${o.clientName}, aqui te dejo tu total de compras ✅🛍️\n${link}\n\nFecha de entrega es el ${fechaEntrega}\nFecha limite para recoger pedido ${fechaLimite}\n\nCualquier duda quedamos al pendiente. ❤️✨`;
+    const msg = buildOrderMessage({
+      clientName: o.clientName,
+      publicLink: link,
+      scheduledDeliveryDate: o.scheduledDeliveryDate,
+      expiresAt: o.expiresAt
+    });
+
     navigator.clipboard.writeText(msg).then(() => {
       this.toast.success('Mensaje copiado 💬 — abre Messenger y pégalo');
     });
-    if (o.clientFacebookProfileUrl) {
-      window.open(o.clientFacebookProfileUrl, '_blank');
-    }
-  }
 
-  private formatDeliveryDate(isoDate: string, offsetDays = 0): string {
-    const d = new Date(isoDate);
-    d.setDate(d.getDate() + offsetDays);
-    const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    return `${dias[d.getDay()]} ${d.getDate()} de ${meses[d.getMonth()]}`;
+    const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
+    if (chatUrl) {
+      window.open(chatUrl, '_blank');
+    } else {
+      this.toast.info('Pega el mensaje en Messenger. Tip: guarda el Facebook de la clienta para abrir su chat directo 💡');
+    }
+
+    // Marcar como notificada (no bloqueante)
+    if (!o.notifiedAt) {
+      this.api.markOrderNotified(o.id, true).subscribe({
+        next: () => this.reloadSelectedOrder(),
+        error: () => { /* silencioso: el envío ya ocurrió */ }
+      });
+    }
   }
 
   sendWaTicket(): void {

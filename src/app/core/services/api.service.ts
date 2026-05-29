@@ -16,7 +16,8 @@ import {
     RecomposeRouteResponse,
     ResolveClientRequest, ResolveClientResponse,
     ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto,
-    ClientMergeAuditDto
+    ClientMergeAuditDto,
+    FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -39,7 +40,7 @@ export class ApiService {
         return this.http.get<OrderSummaryDto[]>(`${this.base}/orders`);
     }
 
-    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string): Observable<PagedResult<OrderSummaryDto>> {
+    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string, salesPeriodId?: number): Observable<PagedResult<OrderSummaryDto>> {
         let params = new HttpParams()
             .set('page', page.toString())
             .set('pageSize', size.toString());
@@ -47,9 +48,14 @@ export class ApiService {
         if (search) params = params.set('search', search);
         if (orderType) params = params.set('type', orderType);
         if (type) params = params.set('type', type);
-        if (startDate) params = params.set('startDate', startDate);
-        if (endDate) params = params.set('endDate', endDate);
+        if (startDate) params = params.set('dateFrom', startDate);
+        if (endDate) params = params.set('dateTo', endDate);
+        if (salesPeriodId != null) params = params.set('salesPeriodId', salesPeriodId.toString());
         return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/paged`, { params });
+    }
+
+    markOrderNotified(id: number, notified: boolean): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${id}/notified`, { notified });
     }
     getOrderStats(): Observable<OrderStatsDto> {
         return this.http.get<OrderStatsDto>(`${this.base}/orders/stats`);
@@ -152,6 +158,15 @@ export class ApiService {
     // ── Resolver multi-señal de clientas ──
     resolveClient(req: ResolveClientRequest): Observable<ResolveClientResponse> {
         return this.http.post<ResolveClientResponse>(`${this.base}/clients/resolve`, req);
+    }
+
+    // ── Importación masiva de Facebook ──
+    facebookImportPreview(rows: FacebookImportRow[]): Observable<FacebookImportPreviewResponse> {
+        return this.http.post<FacebookImportPreviewResponse>(`${this.base}/clients/facebook-import/preview`, { rows });
+    }
+
+    facebookImportApply(rows: FacebookImportApplyRow[]): Observable<FacebookImportApplyResponse> {
+        return this.http.post<FacebookImportApplyResponse>(`${this.base}/clients/facebook-import/apply`, { rows });
     }
 
     getClientAliases(clientId: number): Observable<ClientAliasDto[]> {
