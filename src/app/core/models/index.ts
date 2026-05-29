@@ -152,6 +152,7 @@ export interface OrderSummaryDto {
     alternativeAddress?: string;
     deliveryRouteId?: number;
     scheduledDeliveryDate?: string;
+    clientFacebookProfileUrl?: string;
 }
 
 export interface PagedResult<T> {
@@ -742,6 +743,7 @@ export interface UpdateOrderDetailsRequest {
     deliveryInstructions?: string;
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
+    clientFacebookProfileUrl?: string;
 }
 
 export interface CreateAdminExpenseRequest {

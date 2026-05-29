@@ -251,6 +251,10 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                     <textarea class="input-coquette" [(ngModel)]="editClientData.alternativeAddress" placeholder="Dirección Alternativa" rows="2"
                               appGoogleAutocomplete (placeChanged)="onAltAddressSelected($event)"></textarea>
                     <textarea class="input-coquette" [(ngModel)]="editClientData.deliveryInstructions" placeholder="Instrucciones de entrega (Clienta)" rows="2"></textarea>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#0099FF] text-sm">𝓶</span>
+                      <input class="input-coquette pl-8" [(ngModel)]="editClientData.facebookProfileUrl" placeholder="URL del perfil de Facebook (para Messenger)" />
+                    </div>
                     <select class="input-coquette" [(ngModel)]="editClientData.type">
                       <option value="Nueva">Nueva</option>
                       <option value="Frecuente">Frecuente</option>
@@ -551,8 +555,8 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             
             <div class="flex gap-1.5">
               <button class="w-10 h-10 rounded-2xl bg-purple-50 text-purple-500 hover:bg-purple-100 hover:text-purple-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-purple-100/50" title="Copiar Enlace Público" (click)="copyLink()">🔗</button>
-              <button class="w-10 h-10 rounded-2xl bg-green-50 text-green-500 hover:bg-green-100 hover:text-green-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-green-100/50" title="Ticket WhatsApp" (click)="sendWaTicket()">
-                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.76.45 3.4 1.25 4.84L2 22l5.3-1.15A9.95 9.95 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm4.5 13.5c-.24.68-1.25 1.3-1.8 1.38-.45.06-.98.15-2.82-.6-2.22-.92-3.66-3.17-3.77-3.32-.1-.15-.9-1.2-.9-2.28s.56-1.63.76-1.83c.2-.2.43-.25.58-.25s.3-.02.45-.02c.16-.02.38-.05.6.48.23.55.76 1.83.83 1.95.06.13.1.28.02.48-.08.2-.12.33-.25.48-.12.15-.26.33-.37.45-.13.13-.27.28-.12.53.15.25.66 1.08 1.42 1.75.98.88 1.8 1.15 2.05 1.28.25.13.4.1.55-.07.15-.17.65-.75.83-1.02.17-.26.35-.22.58-.13.22.1 1.42.67 1.67.8.25.13.42.18.47.28.06.1.06.6-.18 1.28z"/></svg>
+              <button class="w-10 h-10 rounded-2xl bg-[#e8f4ff] hover:bg-[#cce4ff] hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-[#b3d5f5]/50" title="Enviar por Messenger" (click)="sendMessenger()">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="#0099FF"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
               </button>
               <button class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-blue-100/50" title="En Camino" (click)="sendWaOnRoute()">🚗</button>
               <button class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-rose-100/50" title="Cobrar" (click)="sendWaPaymentRequest()">💸</button>
@@ -648,7 +652,7 @@ export class OrdersComponent implements OnInit {
 
   // Quick Client Edit
   showClientEdit = signal(false);
-  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '' };
+  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '', facebookProfileUrl: '' };
 
   // Logistics
   packages = signal<OrderPackageDto[]>([]);
@@ -860,7 +864,8 @@ export class OrdersComponent implements OnInit {
           address: ord.clientAddress || '',
           alternativeAddress: ord.alternativeAddress || '',
           deliveryInstructions: ord.deliveryInstructions || '',
-          type: ord.type || 'Nueva'
+          type: ord.type || 'Nueva',
+          facebookProfileUrl: ord.clientFacebookProfileUrl || ''
         };
       }
     }
@@ -888,7 +893,8 @@ export class OrdersComponent implements OnInit {
       ...(trimmedAddress ? { clientAddress: trimmedAddress } : {}),
       alternativeAddress: this.editClientData.alternativeAddress,
       type: this.editClientData.type,
-      deliveryInstructions: this.editClientData.deliveryInstructions
+      deliveryInstructions: this.editClientData.deliveryInstructions,
+      clientFacebookProfileUrl: this.editClientData.facebookProfileUrl
     }).subscribe({
       next: () => {
         this.toast.success('Datos de clienta actualizados 👤💖');
@@ -1033,6 +1039,33 @@ export class OrdersComponent implements OnInit {
     if (!o || !o.link) return;
     const link = o.link.replace('/o/', '/pedido/');
     navigator.clipboard.writeText(link).then(() => this.toast.success('Enlace copiado 🔗'));
+  }
+
+  sendMessenger(): void {
+    const o = this.selectedOrder();
+    if (!o) return;
+    const link = o.link.replace('/o/', '/pedido/');
+    const fechaEntrega = o.scheduledDeliveryDate
+      ? this.formatDeliveryDate(o.scheduledDeliveryDate)
+      : 'por confirmar';
+    const fechaLimite = o.scheduledDeliveryDate
+      ? this.formatDeliveryDate(o.scheduledDeliveryDate, -1)
+      : 'por confirmar';
+    const msg = `Hola ${o.clientName}, aqui te dejo tu total de compras ✅🛍️\n${link}\n\nFecha de entrega es el ${fechaEntrega}\nFecha limite para recoger pedido ${fechaLimite}\n\nCualquier duda quedamos al pendiente. ❤️✨`;
+    navigator.clipboard.writeText(msg).then(() => {
+      this.toast.success('Mensaje copiado 💬 — abre Messenger y pégalo');
+    });
+    if (o.clientFacebookProfileUrl) {
+      window.open(o.clientFacebookProfileUrl, '_blank');
+    }
+  }
+
+  private formatDeliveryDate(isoDate: string, offsetDays = 0): string {
+    const d = new Date(isoDate);
+    d.setDate(d.getDate() + offsetDays);
+    const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    return `${dias[d.getDay()]} ${d.getDate()} de ${meses[d.getMonth()]}`;
   }
 
   sendWaTicket(): void {
