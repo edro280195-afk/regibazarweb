@@ -17,7 +17,8 @@ import {
     ResolveClientRequest, ResolveClientResponse,
     ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto,
     ClientMergeAuditDto,
-    FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse
+    FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse,
+    LoyaltyRewardDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -323,6 +324,14 @@ export class ApiService {
 
     adjustPoints(data: { clientId: number; points: number; reason: string }): Observable<any> {
         return this.http.post(`${this.base}/loyalty/adjust`, data);
+    }
+
+    getLoyaltyRewards(): Observable<LoyaltyRewardDto[]> {
+        return this.http.get<LoyaltyRewardDto[]>(`${this.base}/loyalty/rewards`);
+    }
+
+    redeemLoyaltyReward(clientId: number, orderId: number, rewardId: number): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/loyalty/redeem`, { clientId, orderId, rewardId });
     }
 
     // ── Public Tracking (Client-Facing) ──

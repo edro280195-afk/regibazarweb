@@ -131,7 +131,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <!-- RegiPuntos (Gamification) -->
             <div class="mt-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-100 to-pink-100 px-4 py-1.5 rounded-full border border-pink-200 shadow-sm animate-fade-in-up group cursor-pointer hover:scale-105 transition-transform" title="¡Gana más puntos compartiendo tu foto!">
               <span class="text-lg animate-pulse-slow">💎</span>
-              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} Puntos VIP</span>
+              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} RegiPuntos</span>
             </div>
           </div>
 
@@ -1101,7 +1101,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   regiPuntos = computed(() => {
     const o = this.order();
     if (!o) return 0;
-    return Math.floor((o.total || 0) / 10); // 1 point per $10 MXN spent
+    // Saldo real acumulado de la clienta (viene del backend). Respaldo: estimación por el total.
+    return o.clientPoints ?? Math.floor((o.total || 0) / 10);
   });
   
 

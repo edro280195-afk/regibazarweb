@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus } from '../../../core/models';
+import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
@@ -544,7 +544,43 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
                 </div>
               }
             </div>
-            
+
+            <!-- Canje de RegiPuntos -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-violet-100/60 shadow-sm">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-2">💎 Canjear RegiPuntos</h4>
+                <div class="text-right bg-violet-50/80 px-3 py-1.5 rounded-xl border border-violet-100/50">
+                  <p class="text-[9px] text-violet-400 font-bold uppercase tracking-wider">Saldo clienta</p>
+                  <p class="text-base font-black text-violet-600">{{ selectedOrder()!.clientPoints ?? 0 }} pts</p>
+                </div>
+              </div>
+
+              @if (rewards().length === 0) {
+                <p class="text-[11px] text-pink-400 font-medium">Cargando premios…</p>
+              } @else {
+                <div class="space-y-2">
+                  @for (r of rewards(); track r.id) {
+                    @if (canAfford(r)) {
+                      <button class="w-full flex items-center gap-3 p-3 rounded-2xl border border-violet-100/60 bg-white/70 hover:bg-violet-50 hover:border-violet-200 active:scale-[0.98] transition-all text-left disabled:opacity-50"
+                              [disabled]="redeeming()"
+                              (click)="redeemReward(r)">
+                        <span class="text-2xl shrink-0">{{ r.icon || '🎁' }}</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-black text-violet-900 text-sm leading-tight">{{ r.name }}</p>
+                          <p class="text-[10px] text-violet-400 font-medium truncate">{{ r.description }}</p>
+                        </div>
+                        <span class="shrink-0 text-[11px] font-black text-white bg-gradient-to-r from-violet-500 to-pink-500 px-2.5 py-1 rounded-full">{{ r.pointsCost }} pts</span>
+                      </button>
+                    }
+                  }
+                  @if (!hasAnyAffordable()) {
+                    <p class="text-[11px] text-pink-400 font-medium text-center py-2">Aún no alcanza para ningún premio. ¡Sigue sumando puntos! ✨</p>
+                  }
+                </div>
+                <p class="text-[9px] text-violet-400/80 mt-2 text-center italic">El canje aplica un descuento al pedido y descuenta los puntos. Queda registrado en su historial.</p>
+              }
+            </div>
+
             <div class="h-16"></div>
           </div>
 
@@ -656,6 +692,10 @@ export class OrdersComponent implements OnInit {
   showClientEdit = signal(false);
   editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '', facebookProfileUrl: '' };
 
+  // RegiPuntos (canje)
+  rewards = signal<LoyaltyRewardDto[]>([]);
+  redeeming = signal(false);
+
   // Logistics
   packages = signal<OrderPackageDto[]>([]);
   isLoadingPackages = signal(false);
@@ -672,6 +712,40 @@ export class OrdersComponent implements OnInit {
     this.initSignalR();
     this.api.getSalesPeriods().subscribe({
       next: (periods) => this.salesPeriods.set(periods)
+    });
+    this.api.getLoyaltyRewards().subscribe({
+      next: (r) => this.rewards.set(r),
+      error: () => { /* el catálogo es opcional; no bloquea el panel */ }
+    });
+  }
+
+  /** ¿La clienta del pedido tiene puntos suficientes para este premio? */
+  canAfford(reward: LoyaltyRewardDto): boolean {
+    const points = this.selectedOrder()?.clientPoints ?? 0;
+    return points >= reward.pointsCost;
+  }
+
+  hasAnyAffordable(): boolean {
+    return this.rewards().some(r => this.canAfford(r));
+  }
+
+  redeemReward(reward: LoyaltyRewardDto): void {
+    const o = this.selectedOrder();
+    if (!o || o.clientId == null || this.redeeming()) return;
+    if (!confirm(`¿Canjear "${reward.name}" por ${reward.pointsCost} puntos? Se aplicará como descuento al pedido.`)) return;
+
+    this.redeeming.set(true);
+    this.api.redeemLoyaltyReward(o.clientId, o.id, reward.id).subscribe({
+      next: () => {
+        this.redeeming.set(false);
+        this.toast.success(`Canjeado: ${reward.name} 💎✨`);
+        this.reloadSelectedOrder();
+        this.loadOrders();
+      },
+      error: (err) => {
+        this.redeeming.set(false);
+        this.toast.error(err?.error ?? 'No se pudo canjear');
+      }
     });
   }
 

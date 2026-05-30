@@ -201,11 +201,11 @@ import { AddressEditorV2Component } from '../address-editor-v2/address-editor-v2
                         </h3>
                         <span class="px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm"
                               [ngClass]="{
-                                'bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900': loyalty().tier === 'VIP',
-                                'bg-gradient-to-r from-blue-200 to-cyan-300 text-blue-900': loyalty().tier === 'RisingStar',
-                                'bg-gradient-to-r from-pink-200 to-rose-300 text-pink-900': loyalty().tier === 'Nueva'
+                                'bg-gradient-to-r from-cyan-200 to-violet-300 text-violet-900': loyalty().tierKey === 'diamante',
+                                'bg-gradient-to-r from-pink-200 to-rose-300 text-rose-900': loyalty().tierKey === 'rosegold',
+                                'bg-gradient-to-r from-pink-100 to-pink-200 text-pink-800': loyalty().tierKey === 'pink'
                               }">
-                            {{ loyalty().tier === 'VIP' ? '👑 Nivel VIP' : loyalty().tier === 'RisingStar' ? '🚀 En Ascenso' : '🌸 Nivel Base' }}
+                            {{ loyalty().tier }}
                         </span>
                     </div>
 

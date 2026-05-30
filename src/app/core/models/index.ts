@@ -154,6 +154,7 @@ export interface OrderSummaryDto {
     scheduledDeliveryDate?: string;
     clientFacebookProfileUrl?: string;
     notifiedAt?: string;
+    clientPoints?: number;
 }
 
 export interface PagedResult<T> {
@@ -258,6 +259,20 @@ export interface FacebookImportApplyResponse {
     applied: number;
     skipped: number;
     errors: string[];
+}
+
+// ── RegiPuntos (canje) ──
+
+export type LoyaltyRewardType = 'FixedDiscount' | 'FreeShipping' | 'Gift';
+
+export interface LoyaltyRewardDto {
+    id: number;
+    name: string;
+    description?: string;
+    pointsCost: number;
+    type: LoyaltyRewardType | string;
+    value: number;
+    icon?: string;
 }
 
 export type ClientAliasSource =

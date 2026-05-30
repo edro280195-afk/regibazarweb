@@ -51,7 +51,9 @@
       "Bash(cmd /c \"cd /d C:\\\\Codigos\\\\api\\\\EntregasApi && dotnet restore 2>&1 && dotnet build 2>&1\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Codigos\\\\api\\\\EntregasApi\" -Recurse -Directory)",
       "Bash(Select-Object FullName)",
-      "Bash(dotnet ef *)"
+      "Bash(dotnet ef *)",
+      "Bash(npm run *)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }
