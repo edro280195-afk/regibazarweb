@@ -446,7 +446,6 @@ export class RouteBuilderComponent implements OnInit {
     private mapsPollTimer?: any;
 
     candidates = computed<CandidateRow[]>(() => {
-        const routeId = this.editRouteId();
         const orderRows: CandidateRow[] = this.pendingOrders().map(o => ({
             key: `order:${o.id}`,
             kind: 'Order' as const,
@@ -527,11 +526,10 @@ export class RouteBuilderComponent implements OnInit {
             if (p.polylineEncoded) {
                 this.polylinePath.set(this.decodePolyline(p.polylineEncoded));
             } else {
-                const depot = this.depotPosition()!;
-                const pts = p.stops
-                    .filter(s => s.latitude != null && s.longitude != null)
-                    .map(s => ({ lat: s.latitude!, lng: s.longitude! }));
-                this.polylinePath.set(pts.length > 0 ? [depot, ...pts, depot] : pts);
+                // Backend no devolvió polyline (ej. fallback Haversine).
+                // Usamos DirectionsService del navegador para dibujar calles reales.
+                this.polylinePath.set([]);
+                this.drawDirectionsPolyline(p.stops);
             }
             this.fitMapBounds();
         }, { allowSignalWrites: true });
@@ -712,15 +710,7 @@ export class RouteBuilderComponent implements OnInit {
 
         this.api.getAvailableTandas().subscribe({
             next: (list) => {
-                // In edit mode, also include tandas already in this route
-                if (currentRouteId != null) {
-                    // We already have lockedStops and will pre-select pending tanda deliveries.
-                    // The available-tandas endpoint excludes assigned tandas, but we still need to
-                    // show tandas from this route. We merge them later when the route loads.
-                    this.availableTandas.set(list);
-                } else {
-                    this.availableTandas.set(list);
-                }
+                this.availableTandas.set(list);
                 tandasLoaded = true;
                 done();
             },
@@ -867,6 +857,37 @@ export class RouteBuilderComponent implements OnInit {
             path.push({ lat: lat / 1e5, lng: lng / 1e5 });
         }
         return path;
+    }
+
+    // Dibuja la ruta real por calles usando DirectionsService del navegador.
+    // Se llama cuando el backend no devuelve polylineEncoded (ej. fallback Haversine).
+    private drawDirectionsPolyline(stops: PreviewStopDto[]): void {
+        if (!this.mapsReady() || typeof google === 'undefined' || !google?.maps) return;
+        const depot = this.depotPosition() ?? { lat: 27.4861, lng: -99.5069 };
+        const geocoded = stops.filter(s => s.latitude != null && s.longitude != null);
+        if (geocoded.length === 0) return;
+
+        const destination: google.maps.LatLngLiteral = {
+            lat: geocoded[geocoded.length - 1].latitude!,
+            lng: geocoded[geocoded.length - 1].longitude!
+        };
+        const waypoints = geocoded.slice(0, -1).slice(0, 25).map(s => ({
+            location: { lat: s.latitude!, lng: s.longitude! } as google.maps.LatLngLiteral,
+            stopover: true
+        }));
+
+        new google.maps.DirectionsService().route(
+            { origin: depot, destination, waypoints, travelMode: google.maps.TravelMode.DRIVING },
+            (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
+                if (status === google.maps.DirectionsStatus.OK && result?.routes[0]) {
+                    this.polylinePath.set(
+                        result.routes[0].overview_path.map(
+                            (pt: google.maps.LatLng) => ({ lat: pt.lat(), lng: pt.lng() })
+                        )
+                    );
+                }
+            }
+        );
     }
 
     openAddressPicker(row: CandidateRow, event: Event): void {
