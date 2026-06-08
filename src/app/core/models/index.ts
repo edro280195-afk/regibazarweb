@@ -155,6 +155,8 @@ export interface OrderSummaryDto {
     clientFacebookProfileUrl?: string;
     notifiedAt?: string;
     clientPoints?: number;
+    clientLatitude?: number | null;
+    clientLongitude?: number | null;
 }
 
 export interface PagedResult<T> {

@@ -321,10 +321,21 @@
                     </div>
 
                     <div>
-                        <label class="label-coquette">📍 Dirección Alternativa (Opcional)</label>
+                        <label class="label-coquette">📍 Dirección de entrega (Opcional)</label>
                         <input type="text" class="input-coquette text-lg py-3" [ngModel]="manualAlternativeAddress()"
                             (ngModelChange)="manualAlternativeAddress.set($event)"
-                            placeholder="Ej. Casa de su mamá / Oficina">
+                            placeholder="Ej. Calle Perú 123, Col. Centro">
+                        <label class="mt-2 flex items-start gap-2 text-xs text-pink-700 cursor-pointer">
+                            <input type="checkbox" class="mt-0.5 accent-pink-500"
+                                [checked]="manualAddressOnlyForOrder()"
+                                (change)="manualAddressOnlyForOrder.set($any($event.target).checked)">
+                            <span>
+                                Usar solo para este pedido
+                                <small class="block text-[10px] text-pink-400">
+                                    Déjala desmarcada para guardarla en la clienta y reutilizarla la próxima semana.
+                                </small>
+                            </span>
+                        </label>
                     </div>
 
                     <div>

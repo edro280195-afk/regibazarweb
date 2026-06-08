@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { ClientDto, ManualOrderRequest, OrderType, ExcelUploadResultDto, OrderSummaryDto, PagedResult, ORDER_STATUS_CSS, CommonProductDto } from '../../../../core/models';
+import { normalizeOptionalAddress } from '../../../../core/utils/address.util';
 import { ClientResolverComponent, ClientResolveResult } from './client-resolver/client-resolver.component';
 
 interface LiveCapture {
@@ -87,6 +88,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   manualOrderType = 'Delivery';
   manualClient = signal('');
   manualAlternativeAddress = signal('');
+  manualAddressOnlyForOrder = signal(false);
   manualScheduledDate = signal('');
   manualType = '';
   manualItems: { id: string; productName: string; quantity: number; unitPrice: number }[] = [];
@@ -264,6 +266,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       this.manualType = (exactMatch.ordersCount && exactMatch.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
       this.manualResolvedClientId.set(exactMatch.id);
       this.manualResolvedCanonicalName.set(exactMatch.name);
+      this.manualAlternativeAddress.set(exactMatch.address ?? '');
+      this.manualAddressOnlyForOrder.set(false);
     } else {
       this.autoDetected.set(false);
       this.manualType = ''; // Clear type if no exact match
@@ -271,6 +275,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       if (this.manualResolvedCanonicalName() && this.manualResolvedCanonicalName().toLowerCase() !== this.manualClient().toLowerCase()) {
         this.manualResolvedClientId.set(null);
         this.manualResolvedCanonicalName.set('');
+        this.manualAlternativeAddress.set('');
+        this.manualAddressOnlyForOrder.set(false);
       }
     }
   }
@@ -283,6 +289,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     // Confirmar identidad: el cliente elegido del autocomplete es la clienta canónica.
     this.manualResolvedClientId.set(client.id);
     this.manualResolvedCanonicalName.set(client.name);
+    this.manualAlternativeAddress.set(client.address ?? '');
+    this.manualAddressOnlyForOrder.set(false);
 
     // Auto-focus next field
     setTimeout(() => {
@@ -306,6 +314,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     const candidate = result.matchedCandidate;
     if (candidate) {
       this.manualType = (candidate.ordersCount >= 1) ? 'Frecuente' : (candidate.type || 'Nueva');
+      this.manualAlternativeAddress.set(candidate.address ?? '');
+      this.manualAddressOnlyForOrder.set(false);
       this.toast.success(`Identificada: ${candidate.name} 💖`);
     }
   }
@@ -362,9 +372,14 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     this.error.set('');
 
     const resolvedId = this.manualResolvedClientId();
+    const deliveryAddress = normalizeOptionalAddress(this.manualAlternativeAddress());
     const req: ManualOrderRequest = {
       clientName: this.manualClient().trim(),
-      alternativeAddress: this.manualAlternativeAddress().trim(),
+      ...(deliveryAddress && this.manualAddressOnlyForOrder()
+        ? { alternativeAddress: deliveryAddress }
+        : deliveryAddress
+          ? { clientAddress: deliveryAddress }
+          : {}),
       type: this.manualType || 'Nueva',
       orderType: this.manualOrderType,
       items: this.manualItems.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice })),
@@ -380,6 +395,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
         // Reset manual form securely
         this.manualClient.set('');
         this.manualAlternativeAddress.set('');
+        this.manualAddressOnlyForOrder.set(false);
         this.manualType = '';
         this.autoDetected.set(false);
         this.manualResolvedClientId.set(null);

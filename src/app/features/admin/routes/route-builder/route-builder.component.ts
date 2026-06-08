@@ -6,6 +6,7 @@ import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto } from '../../../../core/models';
+import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
 import { AddressPickerComponent } from '../address-picker/address-picker.component';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
@@ -452,7 +453,7 @@ export class RouteBuilderComponent implements OnInit {
             rawId: o.id,
             clientId: o.clientId,
             clientName: o.clientName,
-            address: o.alternativeAddress ?? o.clientAddress,
+            address: getEffectiveDeliveryAddress(o.clientAddress, o.alternativeAddress),
             hasCoords: this.orderHasCoords(o),
             isTandaPending: false
         }));
@@ -718,8 +719,8 @@ export class RouteBuilderComponent implements OnInit {
         });
     }
 
-    orderHasCoords(o: any): boolean {
-        return !!(o.clientAddress && o.clientAddress.trim().length > 5);
+    orderHasCoords(o: OrderSummaryDto): boolean {
+        return o.clientLatitude != null && o.clientLongitude != null;
     }
 
     toggle(key: StopKey): void {

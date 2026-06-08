@@ -1758,12 +1758,12 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.showAddressPicker.set(false);
     if (!this.pickerOrder) return;
     this.isSavingAddress.set(true);
-    this.api.updateClient(this.pickerOrder.clientId, {
-      name: this.pickerOrder.clientName,
-      address: res.address,
-      tag: this.pickerOrder.tags?.[0] || 'None',
-      type: this.pickerOrder.type || 'Nueva'
-    }).subscribe({
+    this.api.setClientCoordinates(
+      this.pickerOrder.clientId,
+      res.lat,
+      res.lng,
+      res.address
+    ).subscribe({
       next: () => {
         this.toast.success('Ubicación guardada con magia ✨');
         this.pickerOrder.clientAddress = res.address;
