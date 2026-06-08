@@ -383,7 +383,7 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
               <!-- Tanda Actions -->
             <div class="space-y-3">
               <button class="btn-coquette btn-pink w-full justify-center text-[10px] py-3 font-black shadow-lg" (click)="onShuffle()">
-                🎲 Sorteo Aleatorio
+                🎡 Mostrar ruleta de lugares
               </button>
               <button class="btn-coquette btn-purple w-full justify-center text-[10px] py-3 font-black shadow-lg mt-3" (click)="openReorderModal()">
                 🔄 Reordenar Lista
@@ -591,6 +591,7 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
         [customTitle]="tanda()?.name"
         [participants]="rouletteParticipants()"
         [winnerNames]="rouletteWinnerNames()"
+        [turnNumbers]="rouletteTurnNumbers()"
         animationType="roulette"
         (close)="showRoulette.set(false)"
         (startRequested)="handleRouletteStart()"
@@ -740,6 +741,7 @@ export class TandaDetailComponent implements OnInit {
   showRoulette = signal(false);
   rouletteParticipants = signal<{ id: string, name: string }[]>([]);
   rouletteWinnerNames = signal<string[]>([]);
+  rouletteTurnNumbers = signal<number[]>([]);
 
   @ViewChild(RaffleAnimationComponent) raffleComponent?: RaffleAnimationComponent;
 
@@ -857,47 +859,24 @@ export class TandaDetailComponent implements OnInit {
   }
 
   onShuffle() {
-    const participants = this.participants();
-    if (participants.length < 2) {
-      this.toastService.error('Necesitas al menos 2 participantes para sortear 🎀');
+    const participants = [...this.participants()]
+      .sort((a, b) => a.assignedTurn - b.assignedTurn);
+
+    if (participants.length === 0) {
+      this.toastService.error('La tanda no tiene lugares asignados');
       return;
     }
 
-    // Preparamos participantes para la ruleta
     this.rouletteParticipants.set(participants.map(p => ({ id: p.id, name: p.customerName || 'Participante' })));
-    this.rouletteWinnerNames.set([]); // Limpiamos ganador previo
-    
+    this.rouletteWinnerNames.set(participants.map(p => p.customerName || 'Participante'));
+    this.rouletteTurnNumbers.set(participants.map(p => p.assignedTurn));
     this.showRoulette.set(true);
   }
 
   handleRouletteStart() {
-    const t = this.tanda();
-    const participants = this.participants();
-    if (t && participants.length > 0) {
-      // 1. Generamos el orden "literalmente aleatorio" de todos los participantes
-      const shuffled = [...participants].sort(() => Math.random() - 0.5);
-      const shuffledNames = shuffled.map(p => p.customerName || 'Alguien');
-      
-      this.rouletteWinnerNames.set(shuffledNames);
-      
-      // 2. Iniciamos la animación con toda la secuencia.
-      // El componente de ruleta girará, sacará a la #1, permitirá continuar,
-      // la eliminará de la ruleta y girará por la #2, y así sucesivamente.
-      if (this.raffleComponent) {
-        this.raffleComponent.setWinnerAndStart(shuffledNames);
-      }
-
-      // 3. Guardamos silenciosamente este nuevo orden en el backend usando el endpoint de reordenamiento.
-      // Así, si el usuario cierra la ruleta a la mitad o termina de verla, el orden 1 al N ya está guardado.
-      const idsInOrder = shuffled.map(p => p.id);
-      this.tandaService.reorderParticipants(t.id, idsInOrder).subscribe({
-        next: () => {
-          this.loadTanda(t.id);
-        },
-        error: (err) => {
-          this.toastService.error(err.error?.message || 'Error al guardar el sorteo en el servidor');
-        }
-      });
+    const winnerNames = this.rouletteWinnerNames();
+    if (winnerNames.length > 0) {
+      this.raffleComponent?.setWinnerAndStart(winnerNames);
     }
   }
 
@@ -949,7 +928,7 @@ export class TandaDetailComponent implements OnInit {
       this.isEnrolling.set(true);
       this.tandaService.addParticipant({
         tandaId: t.id,
-        customerId: sc.id.toString(),
+        customerId: sc.id,
         assignedTurn: this.enrollTurn,
         variant: this.enrollVariant,
         weeklyAmount: this.enrollWeeklyAmount || undefined

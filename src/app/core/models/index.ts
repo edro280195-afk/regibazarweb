@@ -916,7 +916,7 @@ export interface TandaDto {
 export interface TandaParticipantDto {
     id: string;
     tandaId: string;
-    customerId: string;
+    customerId: number;
     customerName?: string;
     assignedTurn: number;
     weeklyAmount?: number;
@@ -968,11 +968,19 @@ export interface CreateTandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    participants: CreateTandaParticipantDto[];
+}
+
+export interface CreateTandaParticipantDto {
+    customerId: number;
+    assignedTurn: number;
+    variant?: string;
+    weeklyAmount?: number;
 }
 
 export interface AddParticipantDto {
     tandaId: string;
-    customerId: string;
+    customerId: number;
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;

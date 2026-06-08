@@ -11,7 +11,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
-import { AddressPickerComponent } from './address-picker/address-picker.component';
+import { AddressEditorV2Component } from '../clients/address-editor-v2/address-editor-v2.component';
 
 // Base del backend (sin /api) para construir URLs absolutas de imágenes
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
@@ -44,7 +44,7 @@ interface GeocodedOrder extends OrderSummaryDto {
     MapDirectionsRenderer,
     DragDropModule,
     RouteOptimizerComponent,
-    AddressPickerComponent
+    AddressEditorV2Component
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
@@ -563,11 +563,15 @@ interface GeocodedOrder extends OrderSummaryDto {
            MODAL: MAGIC ADDRESS PICKER (UX Overdose)
            ═══════════════════════════════════════════════════ -->
       @if (showAddressPicker()) {
-        <app-address-picker
-          [initialAddress]="pickerInitialAddress"
+        <app-address-editor-v2
+          [clientName]="pickerOrder()?.clientName"
+          [initialAddress]="pickerOrder()?.clientAddress ?? ''"
+          [initialLat]="pickerOrder()?.clientLatitude"
+          [initialLng]="pickerOrder()?.clientLongitude"
+          [initialInstructions]="pickerOrder()?.deliveryInstructions ?? ''"
           (confirm)="onAddressPickerConfirm($event)"
-          (cancel)="showAddressPicker.set(false)">
-        </app-address-picker>
+          (cancel)="closeAddressPicker()">
+        </app-address-editor-v2>
       }
 
       <!-- ═══════════════════════════════════════════════════
@@ -1104,8 +1108,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
   // Magic Address Picker
   showAddressPicker = signal(false);
-  pickerInitialAddress = '';
-  private pickerOrder: any = null;
+  pickerOrder = signal<OrderSummaryDto | null>(null);
   showOptimizerModal = signal(false);
 
   // Search & Filtering
@@ -1748,27 +1751,38 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   // ─── MAGIC ADDRESS PICKER ───
-  openMagicPicker(order: any): void {
-    this.pickerOrder = order;
-    this.pickerInitialAddress = order.clientAddress || '';
+  openMagicPicker(order: OrderSummaryDto): void {
+    this.pickerOrder.set(order);
     this.showAddressPicker.set(true);
   }
 
-  onAddressPickerConfirm(res: { address: string, lat: number, lng: number }): void {
+  closeAddressPicker(): void {
     this.showAddressPicker.set(false);
-    if (!this.pickerOrder) return;
+    this.pickerOrder.set(null);
+  }
+
+  onAddressPickerConfirm(res: { address: string; lat: number; lng: number; deliveryInstructions: string }): void {
+    const order = this.pickerOrder();
+    if (!order?.clientId || this.isSavingAddress()) return;
     this.isSavingAddress.set(true);
     this.api.setClientCoordinates(
-      this.pickerOrder.clientId,
+      order.clientId,
       res.lat,
       res.lng,
-      res.address
+      res.address,
+      res.deliveryInstructions
     ).subscribe({
       next: () => {
         this.toast.success('Ubicación guardada con magia ✨');
-        this.pickerOrder.clientAddress = res.address;
         this.isSavingAddress.set(false);
-        this.pendingOrders.update(list => list.map(o => o.id === this.pickerOrder.id ? { ...o, clientAddress: res.address } : o));
+        this.pendingOrders.update(list => list.map(o => o.id === order.id ? {
+          ...o,
+          clientAddress: res.address,
+          clientLatitude: res.lat,
+          clientLongitude: res.lng,
+          deliveryInstructions: res.deliveryInstructions
+        } : o));
+        this.closeAddressPicker();
       },
       error: () => {
         this.toast.error('Error al guardar ubicación');

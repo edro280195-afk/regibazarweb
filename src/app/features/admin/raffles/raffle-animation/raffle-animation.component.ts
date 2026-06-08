@@ -101,7 +101,7 @@ interface Participant {
                                 @if (spinning()) {
                                     ⚡ ¡MUCHA SUERTE!
                                 } @else {
-                                    ✨ ¡INICIAR SORTEO!
+                                    {{ turnNumbers().length > 0 ? '✨ ¡MOSTRAR LUGARES!' : '✨ ¡INICIAR SORTEO!' }}
                                 }
                             </span>
                         </button>
@@ -116,7 +116,7 @@ interface Participant {
                         <div class="sparkles-bg"></div>
                         <p class="winner-badge">
                            @if (currentWinnerNames().length > 1) {
-                              Turno asignado # {{ currentWinnerIndex() + 1 }}
+                              Lugar asignado # {{ getTurnNumber(currentWinnerIndex()) }}
                            } @else {
                               🏆 ¡TENEMOS GANADORA! 🏆
                            }
@@ -138,12 +138,14 @@ interface Participant {
                     <div class="summary-card">
                         <div class="sparkles-bg"></div>
                         <p class="winner-badge mb-2">✨ RESULTADO FINAL ✨</p>
-                        <h3 class="summary-title mb-6">Todos los lugares han sido asignados</h3>
+                        <h3 class="summary-title mb-6">
+                            {{ turnNumbers().length > 0 ? 'Orden de lugares definido al crear la tanda' : 'Todos los lugares han sido asignados' }}
+                        </h3>
                         
                         <div class="summary-list scrollbar-hide">
                             @for (name of currentWinnerNames(); track $index) {
                                 <div class="summary-item">
-                                    <div class="turn-bubble">#{{ $index + 1 }}</div>
+                                    <div class="turn-bubble">#{{ getTurnNumber($index) }}</div>
                                     <div class="name-label">{{ name }}</div>
                                 </div>
                             }
@@ -564,6 +566,7 @@ interface Participant {
 export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
     participants = input<Participant[]>([]);
     winnerNames = input<string[]>([]);
+    turnNumbers = input<number[]>([]);
     animationType = input<'roulette' | 'slot' | 'elimination' | 'confetti'>('roulette');
     rouletteColors = input<string[]>(['#ec4899', '#be185d', '#831843', '#fbbf24', '#f472b6']);
     isPreview = input<boolean>(false);
@@ -874,10 +877,9 @@ export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
     setWinnerAndStart(winnerNames: string[]) {
         this.currentWinnerNames.set(winnerNames);
         this.currentWinnerIndex.set(0);
-        
-        if (this.activeParticipants().length === 0) {
-            this.activeParticipants.set([...this.participants()]);
-        }
+        this.summaryMode.set(false);
+        this.winner.set(null);
+        this.activeParticipants.set([...this.participants()]);
 
         this.spinForCurrentIndex();
     }
@@ -909,7 +911,15 @@ export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
 
     nextWinner() {
         const lastWinner = this.winner()!.name;
-        const remaining = this.activeParticipants().filter(p => p.name !== lastWinner);
+        let removed = false;
+        const remaining = this.activeParticipants().filter(participant => {
+            if (!removed && participant.name === lastWinner) {
+                removed = true;
+                return false;
+            }
+
+            return true;
+        });
         this.activeParticipants.set(remaining);
         
         this.winner.set(null);
@@ -920,6 +930,10 @@ export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
         setTimeout(() => {
             this.spinForCurrentIndex();
         }, 1500);
+    }
+
+    getTurnNumber(index: number): number {
+        return this.turnNumbers()[index] ?? index + 1;
     }
 
     private spinRouletteFinal(winnerName: string) {

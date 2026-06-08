@@ -901,7 +901,9 @@ export class RaffleDetailComponent implements OnInit, AfterViewInit {
         if (isTanda) {
             this.raffleService.shuffleTandaTurns(this.raffleId, { selectionMethod: 'tandaShuffle' }).subscribe({
                 next: (res) => {
-                    const winnerNames = res.turnAssignments.map((t: any) => t.clientName);
+                    const winnerNames = [...res.turnAssignments]
+                        .sort((a, b) => a.newTurn - b.newTurn)
+                        .map(t => t.clientName);
                     this.animationWinnerNames.set(winnerNames.length > 0 ? winnerNames : ['Tanda']);
                     this.raffleAnim?.setWinnerAndStart(this.animationWinnerNames());
                     this.loadRaffle();

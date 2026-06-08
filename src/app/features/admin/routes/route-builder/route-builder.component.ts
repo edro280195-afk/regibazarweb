@@ -7,7 +7,7 @@ import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto } from '../../../../core/models';
 import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
-import { AddressPickerComponent } from '../address-picker/address-picker.component';
+import { AddressEditorV2Component } from '../../clients/address-editor-v2/address-editor-v2.component';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
@@ -21,6 +21,10 @@ interface CandidateRow {
     clientId?: number;
     clientName: string;
     address?: string;
+    clientAddress?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    deliveryInstructions?: string;
     hasCoords: boolean;
     isTandaPending: boolean;
     tandaName?: string;
@@ -32,7 +36,7 @@ declare const google: any;
 @Component({
     selector: 'app-route-builder',
     standalone: true,
-    imports: [CommonModule, FormsModule, GoogleMap, MapMarker, MapPolyline, AddressPickerComponent],
+    imports: [CommonModule, FormsModule, GoogleMap, MapMarker, MapPolyline, AddressEditorV2Component],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     template: `
     <div class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 p-4 sm:p-6">
@@ -205,10 +209,10 @@ declare const google: any;
                                     <p class="text-[10px] text-pink-400 truncate">📍 {{ row.address }}</p>
                                 }
                             </div>
-                            @if (row.kind === 'Order' && row.clientId) {
+                            @if (row.clientId) {
                                 <button (click)="openAddressPicker(row, $event)"
                                         class="w-7 h-7 rounded-xl bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-sm transition-all shrink-0"
-                                        title="Editar dirección">
+                                        title="Editar ubicación e indicaciones">
                                     📍
                                 </button>
                             }
@@ -367,11 +371,15 @@ declare const google: any;
     </div>
 
     @if (pickingAddressFor(); as row) {
-        <app-address-picker
-            [initialAddress]="row.address ?? ''"
+        <app-address-editor-v2
+            [clientName]="row.clientName"
+            [initialAddress]="row.clientAddress ?? ''"
+            [initialLat]="row.latitude"
+            [initialLng]="row.longitude"
+            [initialInstructions]="row.deliveryInstructions ?? ''"
             (confirm)="onAddressConfirmed($event)"
             (cancel)="pickingAddressFor.set(null)">
-        </app-address-picker>
+        </app-address-editor-v2>
     }
     `,
     styles: []
@@ -454,6 +462,10 @@ export class RouteBuilderComponent implements OnInit {
             clientId: o.clientId,
             clientName: o.clientName,
             address: getEffectiveDeliveryAddress(o.clientAddress, o.alternativeAddress),
+            clientAddress: o.clientAddress,
+            latitude: o.clientLatitude,
+            longitude: o.clientLongitude,
+            deliveryInstructions: o.deliveryInstructions,
             hasCoords: this.orderHasCoords(o),
             isTandaPending: false
         }));
@@ -464,6 +476,10 @@ export class RouteBuilderComponent implements OnInit {
             clientId: t.clientId,
             clientName: t.clientName,
             address: t.clientAddress,
+            clientAddress: t.clientAddress,
+            latitude: t.clientLatitude,
+            longitude: t.clientLongitude,
+            deliveryInstructions: t.deliveryInstructions,
             hasCoords: t.clientLatitude != null && t.clientLongitude != null,
             isTandaPending: true,
             tandaName: t.tandaName,
@@ -896,10 +912,16 @@ export class RouteBuilderComponent implements OnInit {
         this.pickingAddressFor.set(row);
     }
 
-    onAddressConfirmed(result: { address: string; lat: number; lng: number }): void {
+    onAddressConfirmed(result: { address: string; lat: number; lng: number; deliveryInstructions: string }): void {
         const row = this.pickingAddressFor();
         if (!row || !row.clientId) { this.pickingAddressFor.set(null); return; }
-        this.api.setClientCoordinates(row.clientId, result.lat, result.lng, result.address).subscribe({
+        this.api.setClientCoordinates(
+            row.clientId,
+            result.lat,
+            result.lng,
+            result.address,
+            result.deliveryInstructions
+        ).subscribe({
             next: () => {
                 this.toast.success(`📍 Dirección guardada para ${row.clientName}`);
                 this.pickingAddressFor.set(null);

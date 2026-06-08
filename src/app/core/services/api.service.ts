@@ -229,8 +229,19 @@ export class ApiService {
         return this.http.post<BulkGeocodeResultDto[]>(`${this.base}/clients/bulk-geocode`, { clientIds });
     }
 
-    setClientCoordinates(clientId: number, latitude: number, longitude: number, address?: string): Observable<any> {
-        return this.http.post(`${this.base}/clients/${clientId}/set-coordinates`, { latitude, longitude, address });
+    setClientCoordinates(
+        clientId: number,
+        latitude: number,
+        longitude: number,
+        address?: string,
+        deliveryInstructions?: string
+    ): Observable<void> {
+        return this.http.post<void>(`${this.base}/clients/${clientId}/set-coordinates`, {
+            latitude,
+            longitude,
+            address,
+            deliveryInstructions
+        });
     }
 
     deleteRoute(id: number): Observable<any> {

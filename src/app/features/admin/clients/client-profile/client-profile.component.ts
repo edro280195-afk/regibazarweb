@@ -358,17 +358,14 @@ export class ClientProfileComponent implements OnInit {
 
     onAddressConfirmed(result: { address: string; lat: number; lng: number; deliveryInstructions: string }): void {
         const c = this.client()!;
-        this.api.setClientCoordinates(c.id, result.lat, result.lng, result.address).subscribe({
+        this.api.setClientCoordinates(
+            c.id,
+            result.lat,
+            result.lng,
+            result.address,
+            result.deliveryInstructions
+        ).subscribe({
             next: () => {
-                // Save instructions if they changed
-                const instrChanged = result.deliveryInstructions !== (c.deliveryInstructions ?? '');
-                if (instrChanged) {
-                    this.api.updateClient(c.id, {
-                        name: c.name, phone: c.phone ?? '', address: result.address,
-                        tag: c.tag, type: c.type ?? 'Nueva',
-                        deliveryInstructions: result.deliveryInstructions
-                    }).subscribe();
-                }
                 this.toast.success('📍 Ubicación guardada');
                 this.addressEditorOpen.set(false);
                 this.loadClient(c.id);
