@@ -449,11 +449,15 @@ export class ApiService {
         return this.http.post(`${this.base}/driver/${driverToken}/transit/${deliveryId}`, {});
     }
 
-    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[]): Observable<any> {
+    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[], signature?: { svg: string; signedByName?: string }): Observable<any> {
         const fd = new FormData();
         fd.append('notes', notes);
         photos.forEach(p => fd.append('photos', p));
         if (payments) fd.append('payments', JSON.stringify(payments));
+        if (signature?.svg) {
+            fd.append('signatureSvg', signature.svg);
+            if (signature.signedByName) fd.append('signedByName', signature.signedByName);
+        }
         return this.http.post(`${this.base}/driver/${driverToken}/deliver/${deliveryId}`, fd);
     }
 

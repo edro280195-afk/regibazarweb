@@ -157,6 +157,20 @@ export interface OrderSummaryDto {
     clientPoints?: number;
     clientLatitude?: number | null;
     clientLongitude?: number | null;
+    /** Evidencia de entrega (fotos). Solo si status = Delivered. */
+    evidenceUrls?: string[];
+    /** Firma digital de quien recibió (SVG). */
+    signatureSvg?: string;
+    /** Nombre de quien firmó. */
+    signedByName?: string;
+    /** Fecha/hora de la firma. */
+    signedAt?: string;
+    /** Motivo de no entrega. Solo si status = NotDelivered. */
+    failureReason?: string;
+    /** Fecha/hora de entrega real. */
+    deliveredAt?: string;
+    /** Evidencia de no-entrega (fotos del intento fallido). */
+    nonDeliveryEvidenceUrls?: string[];
 }
 
 export interface PagedResult<T> {

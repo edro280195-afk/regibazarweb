@@ -83,6 +83,15 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     deliveryNotes: Record<number, string> = {};
     paymentMethods: Record<number, string> = {};
     photos: Record<number, { file: File; preview: string }[]> = {};
+
+    // ── Signature pad ──
+    signatures: Record<number, { svg: string; name?: string }> = {};
+    signatureModalId = signal(0);
+    signatureName = '';
+    private sigCtx: CanvasRenderingContext2D | null = null;
+    private sigDrawing = false;
+    private sigHasInk = false;
+    @ViewChild('signatureCanvas') signatureCanvasRef?: ElementRef<HTMLCanvasElement>;
     expenseForm = { type: 'Gasolina', amount: null as number | null, notes: '', photo: null as File | null };
 
     private token = '';
@@ -459,15 +468,107 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         const delivery = this.route()?.deliveries?.find((d: any) => d.id === id);
         const due = delivery?.balanceDue ?? delivery?.total ?? 0;
         const payments = method && due > 0 ? [{ amount: due, method }] : undefined;
-        this.api.markDelivered(this.token, id, notes, photoFiles, payments).subscribe({
+        const sig = this.signatures[id];
+        const signature = sig ? { svg: sig.svg, signedByName: sig.name } : undefined;
+        this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature).subscribe({
             next: () => {
                 this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
                 this.photos[id] = []; this.deliveryNotes[id] = '';
+                delete this.signatures[id];
                 this.isDelivering.set(false);
                 this.loadRoute();
             },
             error: () => { this.isDelivering.set(false); }
         });
+    }
+
+    // ── Signature pad methods ──
+    openSignaturePad(deliveryId: number): void {
+        this.signatureModalId.set(deliveryId);
+        this.signatureName = '';
+        this.sigHasInk = false;
+        setTimeout(() => this.initSignaturePad(), 50);
+    }
+
+    closeSignaturePad(): void {
+        this.signatureModalId.set(0);
+        this.sigCtx = null;
+    }
+
+    private initSignaturePad(): void {
+        const canvas = this.signatureCanvasRef?.nativeElement;
+        if (!canvas) return;
+        // Ajustar al tamaño real del display (mejora definición en retina)
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.scale(dpr, dpr);
+        ctx.strokeStyle = '#831843';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        this.sigCtx = ctx;
+    }
+
+    onSignatureStart(ev: PointerEvent): void {
+        if (!this.sigCtx) return;
+        ev.preventDefault();
+        const canvas = this.signatureCanvasRef!.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.sigCtx.beginPath();
+        this.sigCtx.moveTo(ev.clientX - rect.left, ev.clientY - rect.top);
+        this.sigDrawing = true;
+        try { canvas.setPointerCapture(ev.pointerId); } catch {}
+    }
+
+    onSignatureMove(ev: PointerEvent): void {
+        if (!this.sigCtx || !this.sigDrawing) return;
+        ev.preventDefault();
+        const canvas = this.signatureCanvasRef!.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.sigCtx.lineTo(ev.clientX - rect.left, ev.clientY - rect.top);
+        this.sigCtx.stroke();
+        this.sigHasInk = true;
+    }
+
+    onSignatureEnd(): void {
+        this.sigDrawing = false;
+    }
+
+    clearSignaturePad(): void {
+        const canvas = this.signatureCanvasRef?.nativeElement;
+        if (canvas && this.sigCtx) this.sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+        this.sigHasInk = false;
+    }
+
+    signatureHasInk(): boolean { return this.sigHasInk; }
+
+    saveSignaturePad(): void {
+        const id = this.signatureModalId();
+        if (!id || !this.signatureCanvasRef?.nativeElement) return;
+        const svg = this.canvasToSvg(this.signatureCanvasRef.nativeElement);
+        this.signatures[id] = { svg, name: this.signatureName.trim() || undefined };
+        this.closeSignaturePad();
+        this.showToast('✍️ Firma guardada');
+    }
+
+    skipSignaturePad(): void {
+        // No se guarda nada; el botón "Entregar" seguirá funcionando sin firma.
+        this.closeSignaturePad();
+    }
+
+    private canvasToSvg(canvas: HTMLCanvasElement): string {
+        const rect = canvas.getBoundingClientRect();
+        const w = rect.width;
+        const h = rect.height;
+        // Para una entrega real se podría vectorizar; aquí usamos la imagen del
+        // canvas dentro de un <foreignObject> para fidelidad total con un SVG
+        // pequeño (~2-5 KB).
+        const dataUrl = canvas.toDataURL('image/png');
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><img xmlns="http://www.w3.org/1999/xhtml" src="${dataUrl}" style="width:100%;height:100%"/></foreignObject></svg>`;
     }
 
     // ═══ FAIL ═══

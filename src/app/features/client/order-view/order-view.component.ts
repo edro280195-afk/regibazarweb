@@ -7,6 +7,7 @@ import { SignalRService } from '../../../core/services/signalr.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OrderSummaryDto, OrderStatus, ORDER_STATUS_LABELS, ORDER_STATUS_EMOJI } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import confetti from 'canvas-confetti';
@@ -241,16 +242,120 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           <div class="w-1 flex-grow bg-gray-100 rounded-full my-2" [class.bg-pink-300]="step.done"></div>
                         }
                       </div>
-                      <div class="flex-1 pt-1.5">
-                        <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                       <div class="flex-1 pt-1.5">
+                         <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
+                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                       </div>
+                     </div>
+                   }
+                 </div>
+               </div>
+
+              <!-- ═══════════ EVIDENCIA DE ENTREGA ═══════════ -->
+              @if (o.status === 'Delivered') {
+                <div id="delivery-evidence" class="animate-fade-in-up space-y-4">
+                  <div class="bg-gradient-to-br from-emerald-50 via-white to-pink-50 rounded-[2.5rem] p-6 border-2 border-emerald-200 shadow-sm text-center">
+                    <div class="text-5xl mb-2 animate-bounce-subtle">🎉</div>
+                    <h3 class="text-xl font-black text-emerald-700 font-display">¡Tu pedido fue entregado!</h3>
+                    @if (o.deliveredAt) {
+                      <p class="text-xs text-emerald-600/80 font-medium mt-1">
+                        Entregado el {{ o.deliveredAt | date:"EEEE d 'de' MMMM 'a las' h:mm a" }}
+                      </p>
+                    }
+                  </div>
+
+                  <!-- Fotos de evidencia -->
+                  @if (o.evidenceUrls && o.evidenceUrls.length > 0) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                        📸 Fotos de la entrega
+                        <span class="bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full text-[9px]">{{ o.evidenceUrls.length }}</span>
+                      </h4>
+                      <div class="grid grid-cols-3 gap-2">
+                        @for (url of o.evidenceUrls; track url) {
+                          <button (click)="evidenceLightbox.set(url)" class="aspect-square rounded-2xl overflow-hidden border-2 border-pink-100 active:scale-95 transition-transform">
+                            <img [src]="resolveImageUrl(url)" alt="Foto de entrega" class="w-full h-full object-cover">
+                          </button>
+                        }
                       </div>
+                    </div>
+                  } @else {
+                    <div class="bg-white/60 rounded-2xl p-4 border border-dashed border-pink-200 text-center">
+                      <p class="text-xs text-pink-400 font-medium">📷 No se capturaron fotos en la entrega</p>
+                    </div>
+                  }
+
+                  <!-- Firma de quien recibió -->
+                  @if (o.signatureSvg) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3">✍️ Firma de quien recibió</h4>
+                      <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100" [innerHTML]="sanitizeSvg(o.signatureSvg)"></div>
+                      <div class="flex items-center justify-between mt-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <span>👤 {{ o.signedByName || 'Sin nombre' }}</span>
+                        @if (o.signedAt) { <span>{{ o.signedAt | date:'d MMM, h:mm a' }}</span> }
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="bg-white/60 rounded-2xl p-4 border border-dashed border-pink-200 text-center">
+                      <p class="text-xs text-pink-400 font-medium">✍️ No se capturó firma en la entrega</p>
                     </div>
                   }
                 </div>
-              </div>
-            </div>
-          }
+              }
+
+              <!-- ═══════════ PEDIDO NO ENTREGADO ═══════════ -->
+              @if (o.status === 'NotDelivered') {
+                <div id="delivery-failed" class="animate-fade-in-up space-y-4">
+                  <div class="bg-gradient-to-br from-rose-50 via-white to-pink-50 rounded-[2.5rem] p-6 border-2 border-rose-200 shadow-sm text-center">
+                    <div class="text-5xl mb-2">😿</div>
+                    <h3 class="text-xl font-black text-rose-700 font-display">No se pudo entregar tu pedido</h3>
+                    <p class="text-xs text-rose-600/80 font-medium mt-2">No te preocupes, vamos a solucionarlo 💌</p>
+                  </div>
+
+                  <!-- Motivo del repartidor -->
+                  <div class="bg-white/95 rounded-[2.5rem] p-6 border border-rose-100 shadow-sm">
+                    <h4 class="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-3">¿Por qué no se entregó?</h4>
+                    <div class="bg-rose-50/70 border-l-4 border-rose-400 rounded-xl p-4">
+                      <p class="text-sm text-rose-900 font-medium leading-relaxed italic">
+                        "{{ o.failureReason || 'El repartidor no dejó un motivo específico. Contáctanos para saber más.' }}"
+                      </p>
+                    </div>
+                    @if (o.deliveredAt) {
+                      <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-3">
+                        Intento: {{ o.deliveredAt | date:"EEEE d 'de' MMMM 'a las' h:mm a" }}
+                      </p>
+                    }
+                  </div>
+
+                  <!-- Foto de no-entrega si existe -->
+                  @if (o.nonDeliveryEvidenceUrls && o.nonDeliveryEvidenceUrls.length > 0) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-rose-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-3">📸 Evidencia del intento</h4>
+                      <div class="grid grid-cols-3 gap-2">
+                        @for (url of o.nonDeliveryEvidenceUrls; track url) {
+                          <button (click)="evidenceLightbox.set(url)" class="aspect-square rounded-2xl overflow-hidden border-2 border-rose-100 active:scale-95 transition-transform">
+                            <img [src]="resolveImageUrl(url)" alt="Foto del intento" class="w-full h-full object-cover">
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <!-- CTAs de recuperación -->
+                  <div class="grid grid-cols-1 gap-3">
+                    <a [href]="messengerUrl" target="_blank" rel="noopener"
+                       class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-sm py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl">
+                      <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                      💬 ESCRIBIRLE A REGI BAZAR
+                    </a>
+                    <p class="text-center text-xs text-rose-500/80 font-medium px-2">
+                      Te ayudamos a reagendar la entrega lo antes posible 🎀
+                    </p>
+                  </div>
+                </div>
+              }
+             </div>
+           }
 
           @if (activeTab() === 'payment') {
             <!-- ════════════ TAB: PAGAR ════════════ -->
@@ -526,7 +631,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 </h4>
                 
                 @if (isEditingInstructions()) {
-                  <textarea [(ngModel)]="localInstructions" rows="3" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-sm focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
+                  <textarea [(ngModel)]="localInstructions" rows="3" inputmode="text" enterkeyhint="done" style="font-size:16px" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-base focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
                   <div class="flex gap-2 mt-3">
                     <button (click)="saveInstructions()" class="flex-1 bg-pink-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg">Guardar✨</button>
                     <button (click)="isEditingInstructions.set(false)" class="px-4 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest">Cerrar</button>
@@ -606,7 +711,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 <!-- Input -->
                 <div class="p-4 bg-white border-t border-pink-50">
                   <div class="flex gap-2">
-                    <input type="text" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
+                    <input type="text" inputmode="text" enterkeyhint="send" style="font-size:16px" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
                            class="flex-1 bg-pink-50/50 border-2 border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 font-medium"
                            placeholder="Escribe algo... ✨" />
                     <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
@@ -1097,6 +1202,11 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   isPlayingCami = signal(false);
   isLoadingCami = signal(true);
   showCamiBubble = signal(true);
+  /** Llave de localStorage para no repetir el saludo genérico de CAMI en
+   *  visitas subsecuentes al mismo pedido. Una vez por pedido. */
+  private get camiGreetedKey(): string {
+    return `cami_greeted_${this.accessToken}`;
+  }
   // Stratospheric features
   regiPuntos = computed(() => {
     const o = this.order();
@@ -1134,8 +1244,17 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     private api: ApiService,
     private signalr: SignalRService,
     private toast: ToastService,
-    private push: PushNotificationService
+    private push: PushNotificationService,
+    private sanitizer: DomSanitizer
   ) { }
+
+  /** Limpia y sanitiza el SVG de la firma para poder renderizarlo con [innerHTML]. */
+  sanitizeSvg(svg: string): SafeHtml {
+    if (!svg) return '';
+    // El SVG viene del canvas y puede contener data:image/png en base64.
+    // Confiamos en él porque lo generamos nosotros mismos en la app del conductor.
+    return this.sanitizer.bypassSecurityTrustHtml(svg);
+  }
 
   @HostListener('window:scroll', ['$event'])
   onScroll(event: Event) {
@@ -1398,12 +1517,24 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
 
-    this.api.publicGetCamiGreeting(this.accessToken).subscribe({
-      next: (res) => {
-        this.displayCamiMessage(res.message, res.audioBase64);
-      },
-      error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
-    });
+    // CAMI: solo saludamos la primera vez por pedido para minimizar costos
+    // de Gemini. Si ya se saludó en este dispositivo, omitimos la llamada y
+    // ocultamos el indicador de carga. Los saludos proactivos por SignalR
+    // (cuando el repartidor marca InTransit) sí se muestran siempre.
+    const alreadyGreeted = (() => {
+      try { return !!localStorage.getItem(this.camiGreetedKey); } catch { return false; }
+    })();
+    if (alreadyGreeted) {
+      this.isLoadingCami.set(false);
+    } else {
+      this.api.publicGetCamiGreeting(this.accessToken).subscribe({
+        next: (res) => {
+          this.displayCamiMessage(res.message, res.audioBase64);
+          try { localStorage.setItem(this.camiGreetedKey, new Date().toISOString()); } catch {}
+        },
+        error: () => this.isLoadingCami.set(false)
+      });
+    }
   }
 
   loadChat() {
