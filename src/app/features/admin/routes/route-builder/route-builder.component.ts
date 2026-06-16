@@ -250,6 +250,7 @@ declare const google: any;
                             </button>
                         }
                     </div>
+                    <div class="relative">
                     <google-map
                         height="70vh"
                         width="100%"
@@ -300,6 +301,19 @@ declare const google: any;
                             <map-polyline [path]="polylinePath()" [options]="polylineOptions"></map-polyline>
                         }
                     </google-map>
+
+                    <!-- Lazo a mano alzada para touch: rodear pines con el dedo -->
+                    @if (zoneSelectMode() && isTouchDevice) {
+                      <div class="lasso-layer"
+                           (pointerdown)="lassoStart($event)"
+                           (pointermove)="lassoMove($event)"
+                           (pointerup)="lassoEnd($event)"
+                           (pointercancel)="lassoCancel()">
+                        <svg class="lasso-svg"><path [attr.d]="lassoPathD()"></path></svg>
+                        <div class="lasso-hint">Rodea con el dedo a las clientas ✏️</div>
+                      </div>
+                    }
+                    </div>
                 } @else {
                     <div class="flex-1 flex items-center justify-center min-h-[70vh]">
                         <p class="text-pink-400 italic">Cargando mapa...</p>
@@ -417,7 +431,12 @@ declare const google: any;
         </app-address-editor-v2>
     }
     `,
-    styles: []
+    styles: [`
+        .lasso-layer { position:absolute; inset:0; z-index:30; touch-action:none; cursor:crosshair; }
+        .lasso-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+        .lasso-svg path { fill: rgba(236,72,153,0.12); stroke:#ec4899; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; }
+        .lasso-hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(236,72,153,0.92); color:#fff; font-size:11px; font-weight:800; letter-spacing:.02em; padding:6px 12px; border-radius:999px; pointer-events:none; box-shadow:0 4px 12px rgba(236,72,153,.35); white-space:nowrap; }
+    `]
 })
 export class RouteBuilderComponent implements OnInit {
     private api = inject(ApiService);
@@ -466,8 +485,8 @@ export class RouteBuilderComponent implements OnInit {
         gestureHandling: 'greedy'
     };
 
-    /** Dispositivo táctil: en touch dibujamos con círculo (un solo arrastre) en vez de polígono. */
-    private readonly isTouchDevice = typeof window !== 'undefined' &&
+    /** Dispositivo táctil: en touch usamos el lazo a mano alzada; en escritorio, DrawingManager. */
+    readonly isTouchDevice = typeof window !== 'undefined' &&
         ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
     depotMarkerOptions: google.maps.MarkerOptions = {
@@ -499,6 +518,12 @@ export class RouteBuilderComponent implements OnInit {
     private mapInstance?: google.maps.Map;
     private drawingManager?: google.maps.drawing.DrawingManager;
     private zoneOverlays: google.maps.MVCObject[] = [];
+
+    // ── Lazo a mano alzada (touch) ──
+    lassoPathD = signal('');                 // path SVG del trazo en curso
+    private lassoActive = false;
+    private lassoPoints: { x: number; y: number }[] = [];
+    private projectionOverlay?: google.maps.OverlayView; // para convertir pixeles → LatLng
 
     // Pin fantasma para candidatas con coords aún no seleccionadas (para poder encerrarlas).
     // Getter lazy: se evalúa al renderizar (google ya cargado), no en el constructor.
@@ -838,6 +863,13 @@ export class RouteBuilderComponent implements OnInit {
     /** Captura la instancia nativa del mapa cuando Google la inicializa. */
     onMapReady(map: google.maps.Map): void {
         this.mapInstance = map;
+        // OverlayView vacío solo para acceder a la proyección (pixel de pantalla → LatLng).
+        const ov = new google.maps.OverlayView();
+        ov.onAdd = () => {};
+        ov.draw = () => {};
+        ov.onRemove = () => {};
+        ov.setMap(map);
+        this.projectionOverlay = ov;
     }
 
     /** Activa/desactiva el modo de dibujo de zona (polígono / círculo / rectángulo). */
@@ -846,25 +878,90 @@ export class RouteBuilderComponent implements OnInit {
             this.stopDrawing();
             return;
         }
-        if (!this.mapInstance || !google?.maps?.drawing) {
+        if (!this.mapInstance) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            return;
+        }
+
+        // Touch: lazo a mano alzada (overlay propio). La capa con touch-action:none
+        // captura el dedo, así que el mapa no se panea mientras se dibuja.
+        if (this.isTouchDevice) {
+            this.zoneSelectMode.set(true);
+            return;
+        }
+
+        // Escritorio: DrawingManager (polígono / círculo / rectángulo).
+        if (!google?.maps?.drawing) {
             this.toast.show('El mapa aún no está listo', 'error');
             return;
         }
         if (!this.drawingManager) this.initDrawingManager();
-
-        // En touch, el dedo se dedica a trazar el lazo: bloqueamos el paneo del mapa
-        // para que el arrastre no lo mueva (se restaura al terminar). En escritorio se
-        // mantiene 'greedy' porque el polígono se traza con clics, no con arrastre.
-        if (this.isTouchDevice) this.mapInstance.setOptions({ gestureHandling: 'none' });
-
         this.drawingManager!.setMap(this.mapInstance);
-        // En touch arrancamos con círculo (un solo arrastre = lazo). En escritorio, polígono.
-        this.drawingManager!.setDrawingMode(
-            this.isTouchDevice
-                ? google.maps.drawing.OverlayType.CIRCLE
-                : google.maps.drawing.OverlayType.POLYGON
-        );
+        this.drawingManager!.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
         this.zoneSelectMode.set(true);
+    }
+
+    // ── Lazo a mano alzada (touch) ──
+    lassoStart(ev: PointerEvent): void {
+        (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);
+        this.lassoActive = true;
+        this.lassoPoints = [];
+        this.addLassoPoint(ev);
+    }
+
+    lassoMove(ev: PointerEvent): void {
+        if (this.lassoActive) this.addLassoPoint(ev);
+    }
+
+    lassoCancel(): void {
+        this.lassoActive = false;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+    }
+
+    private addLassoPoint(ev: PointerEvent): void {
+        const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+        this.lassoPoints.push({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+        if (this.lassoPoints.length === 0) { this.lassoPathD.set(''); return; }
+        const [first, ...rest] = this.lassoPoints;
+        let d = `M ${first.x.toFixed(1)} ${first.y.toFixed(1)}`;
+        for (const p of rest) d += ` L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+        this.lassoPathD.set(d + ' Z');
+    }
+
+    /** Al soltar el dedo: convierte el trazo a un polígono y selecciona las candidatas adentro. */
+    lassoEnd(ev: PointerEvent): void {
+        if (!this.lassoActive) return;
+        this.lassoActive = false;
+        const pts = this.lassoPoints;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+
+        if (pts.length < 3) { this.stopDrawing(); return; }
+
+        const projection = this.projectionOverlay?.getProjection();
+        if (!projection) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            this.stopDrawing();
+            return;
+        }
+
+        const path: google.maps.LatLngLiteral[] = [];
+        for (const p of pts) {
+            const ll = projection.fromContainerPixelToLatLng(new google.maps.Point(p.x, p.y));
+            if (ll) path.push({ lat: ll.lat(), lng: ll.lng() });
+        }
+        if (path.length < 3) { this.stopDrawing(); return; }
+
+        const polygon = new google.maps.Polygon({
+            ...this.zoneShapeStyle(),
+            paths: path,
+            map: this.mapInstance
+        });
+        this.zoneOverlays.push(polygon);
+        this.hasZones.set(true);
+        this.selectInsideShape(google.maps.drawing.OverlayType.POLYGON, polygon);
+        this.stopDrawing();
     }
 
     private initDrawingManager(): void {
@@ -949,8 +1046,9 @@ export class RouteBuilderComponent implements OnInit {
     private stopDrawing(): void {
         this.drawingManager?.setDrawingMode(null);
         this.zoneSelectMode.set(false);
-        // Restaurar el paneo de un dedo al salir del modo dibujo.
-        this.mapInstance?.setOptions({ gestureHandling: 'greedy' });
+        this.lassoActive = false;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
     }
 
     /** Borra las figuras dibujadas (no des-selecciona; solo limpia el dibujo del mapa). */
