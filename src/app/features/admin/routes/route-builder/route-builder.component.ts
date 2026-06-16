@@ -460,8 +460,15 @@ export class RouteBuilderComponent implements OnInit {
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: true,
-        clickableIcons: false
+        clickableIcons: false,
+        // Un dedo panea el mapa (igual que el resto de la app). Sin esto, Google usa
+        // 'auto' que en móvil con mapa parcial se vuelve 'cooperative' (exige 2 dedos).
+        gestureHandling: 'greedy'
     };
+
+    /** Dispositivo táctil: en touch dibujamos con círculo (un solo arrastre) en vez de polígono. */
+    private readonly isTouchDevice = typeof window !== 'undefined' &&
+        ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
     depotMarkerOptions: google.maps.MarkerOptions = {
         icon: {
@@ -845,8 +852,18 @@ export class RouteBuilderComponent implements OnInit {
         }
         if (!this.drawingManager) this.initDrawingManager();
 
+        // En touch, el dedo se dedica a trazar el lazo: bloqueamos el paneo del mapa
+        // para que el arrastre no lo mueva (se restaura al terminar). En escritorio se
+        // mantiene 'greedy' porque el polígono se traza con clics, no con arrastre.
+        if (this.isTouchDevice) this.mapInstance.setOptions({ gestureHandling: 'none' });
+
         this.drawingManager!.setMap(this.mapInstance);
-        this.drawingManager!.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        // En touch arrancamos con círculo (un solo arrastre = lazo). En escritorio, polígono.
+        this.drawingManager!.setDrawingMode(
+            this.isTouchDevice
+                ? google.maps.drawing.OverlayType.CIRCLE
+                : google.maps.drawing.OverlayType.POLYGON
+        );
         this.zoneSelectMode.set(true);
     }
 
@@ -870,9 +887,11 @@ export class RouteBuilderComponent implements OnInit {
             this.zoneOverlays.push(e.overlay as google.maps.MVCObject);
             this.hasZones.set(true);
             this.selectInsideShape(e.type, e.overlay);
-            // Tras dibujar, salir del modo dibujo (la zona queda pintada como referencia).
+            // Tras dibujar, salir del modo dibujo (la zona queda pintada como referencia)
+            // y devolver el paneo de un dedo al mapa.
             dm.setDrawingMode(null);
             this.zoneSelectMode.set(false);
+            this.mapInstance?.setOptions({ gestureHandling: 'greedy' });
         });
 
         this.drawingManager = dm;
@@ -930,6 +949,8 @@ export class RouteBuilderComponent implements OnInit {
     private stopDrawing(): void {
         this.drawingManager?.setDrawingMode(null);
         this.zoneSelectMode.set(false);
+        // Restaurar el paneo de un dedo al salir del modo dibujo.
+        this.mapInstance?.setOptions({ gestureHandling: 'greedy' });
     }
 
     /** Borra las figuras dibujadas (no des-selecciona; solo limpia el dibujo del mapa). */
