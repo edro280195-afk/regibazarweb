@@ -97,6 +97,26 @@ declare const google: any;
             </div>
         </div>
 
+        <!-- ALERT: optimización aproximada (sin distancias reales de calle) -->
+        @if (isApproxOptimizer()) {
+            <div class="max-w-[1600px] mx-auto mb-4">
+                <div class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 sm:p-5 shadow-sm">
+                    <div class="flex items-start gap-3 sm:gap-4">
+                        <span class="text-2xl sm:text-3xl">📐</span>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-black text-amber-900 mb-1 text-sm sm:text-base">Ruta calculada en modo aproximado</h3>
+                            <p class="text-xs sm:text-sm text-amber-700">
+                                El orden se calculó con distancias en <strong>línea recta</strong>, no por calles reales,
+                                por lo que puede no ser el más eficiente (en una ciudad con sentidos y puentes el orden se ve raro).
+                                Revisa el orden antes de guardar. Si ya activaste las distancias reales de Google y sigues viendo
+                                esto, hay que revisar la configuración del servidor.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         <!-- ALERT: clientas sin coords -->
         @if (selectedWithoutCoords().length > 0) {
             <div class="max-w-[1600px] mx-auto mb-4">
@@ -250,6 +270,7 @@ declare const google: any;
                             </button>
                         }
                     </div>
+                    <div class="relative">
                     <google-map
                         height="70vh"
                         width="100%"
@@ -300,6 +321,19 @@ declare const google: any;
                             <map-polyline [path]="polylinePath()" [options]="polylineOptions"></map-polyline>
                         }
                     </google-map>
+
+                    <!-- Lazo a mano alzada para touch: rodear pines con el dedo -->
+                    @if (zoneSelectMode() && isTouchDevice) {
+                      <div class="lasso-layer"
+                           (pointerdown)="lassoStart($event)"
+                           (pointermove)="lassoMove($event)"
+                           (pointerup)="lassoEnd($event)"
+                           (pointercancel)="lassoCancel()">
+                        <svg class="lasso-svg"><path [attr.d]="lassoPathD()"></path></svg>
+                        <div class="lasso-hint">Rodea con el dedo a las clientas ✏️</div>
+                      </div>
+                    }
+                    </div>
                 } @else {
                     <div class="flex-1 flex items-center justify-center min-h-[70vh]">
                         <p class="text-pink-400 italic">Cargando mapa...</p>
@@ -417,7 +451,12 @@ declare const google: any;
         </app-address-editor-v2>
     }
     `,
-    styles: []
+    styles: [`
+        .lasso-layer { position:absolute; inset:0; z-index:30; touch-action:none; cursor:crosshair; }
+        .lasso-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+        .lasso-svg path { fill: rgba(236,72,153,0.12); stroke:#ec4899; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; }
+        .lasso-hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(236,72,153,0.92); color:#fff; font-size:11px; font-weight:800; letter-spacing:.02em; padding:6px 12px; border-radius:999px; pointer-events:none; box-shadow:0 4px 12px rgba(236,72,153,.35); white-space:nowrap; }
+    `]
 })
 export class RouteBuilderComponent implements OnInit {
     private api = inject(ApiService);
@@ -460,8 +499,15 @@ export class RouteBuilderComponent implements OnInit {
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: true,
-        clickableIcons: false
+        clickableIcons: false,
+        // Un dedo panea el mapa (igual que el resto de la app). Sin esto, Google usa
+        // 'auto' que en móvil con mapa parcial se vuelve 'cooperative' (exige 2 dedos).
+        gestureHandling: 'greedy'
     };
+
+    /** Dispositivo táctil: en touch usamos el lazo a mano alzada; en escritorio, DrawingManager. */
+    readonly isTouchDevice = typeof window !== 'undefined' &&
+        ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
     depotMarkerOptions: google.maps.MarkerOptions = {
         icon: {
@@ -492,6 +538,13 @@ export class RouteBuilderComponent implements OnInit {
     private mapInstance?: google.maps.Map;
     private drawingManager?: google.maps.drawing.DrawingManager;
     private zoneOverlays: google.maps.MVCObject[] = [];
+    private zoneSelectedKeys = new Set<StopKey>(); // claves agregadas por zonas (para poder limpiarlas)
+
+    // ── Lazo a mano alzada (touch) ──
+    lassoPathD = signal('');                 // path SVG del trazo en curso
+    private lassoActive = false;
+    private lassoPoints: { x: number; y: number }[] = [];
+    private projectionOverlay?: google.maps.OverlayView; // para convertir pixeles → LatLng
 
     // Pin fantasma para candidatas con coords aún no seleccionadas (para poder encerrarlas).
     // Getter lazy: se evalúa al renderizar (google ya cargado), no en el constructor.
@@ -816,7 +869,8 @@ export class RouteBuilderComponent implements OnInit {
 
     toggle(key: StopKey): void {
         const next = new Set(this.selected());
-        if (next.has(key)) next.delete(key); else next.add(key);
+        if (next.has(key)) { next.delete(key); this.zoneSelectedKeys.delete(key); }
+        else next.add(key);
         this.selected.set(next);
     }
 
@@ -831,6 +885,13 @@ export class RouteBuilderComponent implements OnInit {
     /** Captura la instancia nativa del mapa cuando Google la inicializa. */
     onMapReady(map: google.maps.Map): void {
         this.mapInstance = map;
+        // OverlayView vacío solo para acceder a la proyección (pixel de pantalla → LatLng).
+        const ov = new google.maps.OverlayView();
+        ov.onAdd = () => {};
+        ov.draw = () => {};
+        ov.onRemove = () => {};
+        ov.setMap(map);
+        this.projectionOverlay = ov;
     }
 
     /** Activa/desactiva el modo de dibujo de zona (polígono / círculo / rectángulo). */
@@ -839,15 +900,90 @@ export class RouteBuilderComponent implements OnInit {
             this.stopDrawing();
             return;
         }
-        if (!this.mapInstance || !google?.maps?.drawing) {
+        if (!this.mapInstance) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            return;
+        }
+
+        // Touch: lazo a mano alzada (overlay propio). La capa con touch-action:none
+        // captura el dedo, así que el mapa no se panea mientras se dibuja.
+        if (this.isTouchDevice) {
+            this.zoneSelectMode.set(true);
+            return;
+        }
+
+        // Escritorio: DrawingManager (polígono / círculo / rectángulo).
+        if (!google?.maps?.drawing) {
             this.toast.show('El mapa aún no está listo', 'error');
             return;
         }
         if (!this.drawingManager) this.initDrawingManager();
-
         this.drawingManager!.setMap(this.mapInstance);
         this.drawingManager!.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
         this.zoneSelectMode.set(true);
+    }
+
+    // ── Lazo a mano alzada (touch) ──
+    lassoStart(ev: PointerEvent): void {
+        (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);
+        this.lassoActive = true;
+        this.lassoPoints = [];
+        this.addLassoPoint(ev);
+    }
+
+    lassoMove(ev: PointerEvent): void {
+        if (this.lassoActive) this.addLassoPoint(ev);
+    }
+
+    lassoCancel(): void {
+        this.lassoActive = false;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+    }
+
+    private addLassoPoint(ev: PointerEvent): void {
+        const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+        this.lassoPoints.push({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+        if (this.lassoPoints.length === 0) { this.lassoPathD.set(''); return; }
+        const [first, ...rest] = this.lassoPoints;
+        let d = `M ${first.x.toFixed(1)} ${first.y.toFixed(1)}`;
+        for (const p of rest) d += ` L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+        this.lassoPathD.set(d + ' Z');
+    }
+
+    /** Al soltar el dedo: convierte el trazo a un polígono y selecciona las candidatas adentro. */
+    lassoEnd(ev: PointerEvent): void {
+        if (!this.lassoActive) return;
+        this.lassoActive = false;
+        const pts = this.lassoPoints;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+
+        if (pts.length < 3) { this.stopDrawing(); return; }
+
+        const projection = this.projectionOverlay?.getProjection();
+        if (!projection) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            this.stopDrawing();
+            return;
+        }
+
+        const path: google.maps.LatLngLiteral[] = [];
+        for (const p of pts) {
+            const ll = projection.fromContainerPixelToLatLng(new google.maps.Point(p.x, p.y));
+            if (ll) path.push({ lat: ll.lat(), lng: ll.lng() });
+        }
+        if (path.length < 3) { this.stopDrawing(); return; }
+
+        const polygon = new google.maps.Polygon({
+            ...this.zoneShapeStyle(),
+            paths: path,
+            map: this.mapInstance
+        });
+        this.zoneOverlays.push(polygon);
+        this.hasZones.set(true);
+        this.selectInsideShape(google.maps.drawing.OverlayType.POLYGON, polygon);
+        this.stopDrawing();
     }
 
     private initDrawingManager(): void {
@@ -870,9 +1006,11 @@ export class RouteBuilderComponent implements OnInit {
             this.zoneOverlays.push(e.overlay as google.maps.MVCObject);
             this.hasZones.set(true);
             this.selectInsideShape(e.type, e.overlay);
-            // Tras dibujar, salir del modo dibujo (la zona queda pintada como referencia).
+            // Tras dibujar, salir del modo dibujo (la zona queda pintada como referencia)
+            // y devolver el paneo de un dedo al mapa.
             dm.setDrawingMode(null);
             this.zoneSelectMode.set(false);
+            this.mapInstance?.setOptions({ gestureHandling: 'greedy' });
         });
 
         this.drawingManager = dm;
@@ -915,6 +1053,7 @@ export class RouteBuilderComponent implements OnInit {
             if (next.has(c.key)) continue;
             if (inside(c.latitude, c.longitude)) {
                 next.add(c.key);
+                this.zoneSelectedKeys.add(c.key);
                 added++;
             }
         }
@@ -930,13 +1069,24 @@ export class RouteBuilderComponent implements OnInit {
     private stopDrawing(): void {
         this.drawingManager?.setDrawingMode(null);
         this.zoneSelectMode.set(false);
+        this.lassoActive = false;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
     }
 
-    /** Borra las figuras dibujadas (no des-selecciona; solo limpia el dibujo del mapa). */
+    /** Borra las figuras dibujadas y des-selecciona SOLO las clientas que agregaron esas zonas
+     *  (las elegidas a mano se conservan). */
     clearZones(): void {
         for (const ov of this.zoneOverlays) (ov as any).setMap?.(null);
         this.zoneOverlays = [];
         this.hasZones.set(false);
+
+        if (this.zoneSelectedKeys.size > 0) {
+            const next = new Set(this.selected());
+            for (const k of this.zoneSelectedKeys) next.delete(k);
+            this.selected.set(next);
+            this.zoneSelectedKeys.clear();
+        }
         this.stopDrawing();
     }
 
