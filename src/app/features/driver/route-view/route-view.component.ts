@@ -97,9 +97,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     private token = '';
     mapInitialized = false;
     map: any;
-    directionsService: any;
-    directionsRenderer: any;
-    fullRouteRenderer: any;
+    routePolyline: any;
+    fullRoutePolyline: any;
     markers: any[] = [];
 
     // Navigation Overlay Signals
@@ -296,21 +295,31 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         return R * c;
     }
 
-    // Calls DirectionsService to draw the route line to the next pending stop.
-    // Kept separate from plotRoute so GPS updates don't redraw markers or change viewport.
+    private formatMeters(meters: number): string {
+        return meters < 1000
+            ? `${Math.round(meters)} m aprox.`
+            : `${(meters / 1000).toFixed(1)} km aprox.`;
+    }
+
+    private formatApproxEta(meters: number): string {
+        const minutes = Math.max(1, Math.round((meters / 1000) / 25 * 60));
+        return `${minutes} min aprox.`;
+    }
+
+    // Dibuja una ruta aproximada sin pedir rutas reales en cada movimiento.
     private updateRouteDirection(forceCalc = false): void {
         const r = this.route();
         const pos = this.gps.lastPosition();
-        if (!pos || !this.map || !r || !this.directionsService) return;
+        if (!pos || !this.map || !r) return;
         const pending = r.deliveries.filter((d: any) => d.status !== 'Delivered' && d.status !== 'NotDelivered' && d.latitude);
         if (!pending.length) {
-            if (this.directionsRenderer) this.directionsRenderer.setDirections({ routes: [] });
-            if (this.fullRouteRenderer) this.fullRouteRenderer.setDirections({ routes: [] });
+            this.routePolyline?.setMap(null);
+            this.fullRoutePolyline?.setMap(null);
             return;
         }
 
-        const origin = new google.maps.LatLng(pos.lat, pos.lng);
-        const dest = new google.maps.LatLng(pending[0].latitude, pending[0].longitude);
+        const origin = { lat: pos.lat, lng: pos.lng };
+        const dest = { lat: pending[0].latitude, lng: pending[0].longitude };
 
         // Update Overlay UI
         this.navNextAddress.set(pending[0].alternativeAddress || pending[0].address || pending[0].clientAddress || 'Sin dirección');
@@ -320,7 +329,6 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         // We removed the aggressive fitBounds to ensure the driver stays centered in the view, 
         // as watchPosition already calls map.panTo(driverLocation) every second.
 
-        // Throttle API usage
         const distMoved = this.getDistance(pos.lat, pos.lng, this.lastRouteCalcLat, this.lastRouteCalcLng);
         if (!forceCalc && pending[0].id === this.lastRouteCalcDestId && distMoved < 50) return;
 
@@ -328,47 +336,33 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         this.lastRouteCalcLng = pos.lng;
         this.lastRouteCalcDestId = pending[0].id;
 
-        // 1. NEON ROUTE (Next Leg)
-        this.directionsService.route(
-            { origin, destination: dest, travelMode: google.maps.TravelMode.DRIVING },
-            (result: any, status: string) => {
-                if (status === 'OK') {
-                    this.directionsRenderer.setOptions({
-                        polylineOptions: { strokeColor: '#f472b6', strokeWeight: 6, strokeOpacity: 0.9 }
-                    });
-                    this.directionsRenderer.setDirections(result);
-                    const leg = result.routes[0].legs[0];
-                    if (leg && leg.duration && leg.distance) {
-                        this.navEta.set(leg.duration.text);
-                        this.navDistance.set(leg.distance.text);
-                    }
-                } else {
-                    console.warn('[RouteView] DirectionsService status:', status);
-                    this.navEta.set('');
-                    this.navDistance.set('');
-                }
-            }
-        );
+        const metersToNext = this.getDistance(origin.lat, origin.lng, dest.lat, dest.lng);
+        this.navDistance.set(this.formatMeters(metersToNext));
+        this.navEta.set(this.formatApproxEta(metersToNext));
+        this.routePolyline?.setMap(null);
+        this.routePolyline = new google.maps.Polyline({
+            path: [origin, dest],
+            map: this.map,
+            strokeColor: '#f472b6',
+            strokeWeight: 6,
+            strokeOpacity: 0.9
+        });
 
-        // 2. PREDICTIVE MULTI-ROUTING (Faded full day route for context)
         if (pending.length > 1) {
-            const waypoints = pending.slice(0, Math.min(pending.length - 1, 20)).map((d: any) => ({
-                location: new google.maps.LatLng(d.latitude, d.longitude),
-                stopover: true
-            }));
-            const finalDest = pending[Math.min(pending.length - 1, 20)];
-            const fullDest = new google.maps.LatLng(finalDest.latitude, finalDest.longitude);
-
-            this.directionsService.route(
-                { origin, destination: fullDest, waypoints, travelMode: google.maps.TravelMode.DRIVING },
-                (result: any, status: string) => {
-                    if (status === 'OK') {
-                        this.fullRouteRenderer.setDirections(result);
-                    }
-                }
-            );
+            const fullPath = [
+                origin,
+                ...pending.slice(0, 21).map((d: any) => ({ lat: d.latitude, lng: d.longitude }))
+            ];
+            this.fullRoutePolyline?.setMap(null);
+            this.fullRoutePolyline = new google.maps.Polyline({
+                path: fullPath,
+                map: this.map,
+                strokeColor: '#a1a1aa',
+                strokeWeight: 3,
+                strokeOpacity: 0.4
+            });
         } else {
-            if (this.fullRouteRenderer) this.fullRouteRenderer.setDirections({ routes: [] });
+            this.fullRoutePolyline?.setMap(null);
         }
     }
 
@@ -380,18 +374,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             this.map = new google.maps.Map(this.mapEl.nativeElement, {
                 center: { lat: 27.48, lng: -99.50 }, zoom: 13, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy'
             });
-            this.directionsService = new google.maps.DirectionsService();
-            this.directionsRenderer = new google.maps.DirectionsRenderer({
-                map: this.map, suppressMarkers: true,
-                polylineOptions: { strokeColor: '#db2777', strokeWeight: 4, strokeOpacity: 0.8 }
-            });
-            this.fullRouteRenderer = new google.maps.DirectionsRenderer({
-                map: this.map, suppressMarkers: true,
-                polylineOptions: { strokeColor: '#a1a1aa', strokeWeight: 3, strokeOpacity: 0.4 }
-            });
         }
-        // Geocode any deliveries that lack coordinates (they are not persisted by the backend)
-        await this.geocodeDeliveries(route);
         this.plotRoute(route);
         this.updateRouteDirection(true);
     }

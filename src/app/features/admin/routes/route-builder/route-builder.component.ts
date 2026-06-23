@@ -54,7 +54,7 @@ declare const google: any;
                     <p class="text-pink-400 text-xs sm:text-sm">
                         {{ isEditMode()
                             ? 'Modifica las paradas pendientes. Las ya entregadas quedan fijas.'
-                            : 'Selecciona y la ruta se calcula sola con Google Routes.' }}
+                            : 'Selecciona y la ruta se calcula sola sin costo.' }}
                     </p>
                 </div>
                 <button (click)="save()"
@@ -640,10 +640,10 @@ export class RouteBuilderComponent implements OnInit {
     optimizerLabel = computed(() => {
         const src = this.preview()?.optimizerSource;
         if (!src) return '—';
-        if (src === 'distance-matrix+2opt') return '🎯 Distancias reales';
-        if (src === 'haversine+2opt') return '↪️ Aproximado';
-        if (src === 'google-routes-v2') return '🎯 Google Routes';
-        if (src === 'haversine-fallback') return '↪️ Aproximado';
+        if (src === 'distance-matrix+2opt') return 'Aprox. sin costo';
+        if (src === 'haversine+2opt') return 'Aprox. sin costo';
+        if (src === 'google-routes-v2') return 'Ruta por calles';
+        if (src === 'haversine-fallback') return 'Aprox. sin costo';
         if (src === 'no-coords') return '⚠️ Sin coords';
         return src;
     });
@@ -671,10 +671,8 @@ export class RouteBuilderComponent implements OnInit {
             if (p.polylineEncoded) {
                 this.polylinePath.set(this.decodePolyline(p.polylineEncoded));
             } else {
-                // Backend no devolvió polyline (ej. fallback Haversine).
-                // Usamos DirectionsService del navegador para dibujar calles reales.
-                this.polylinePath.set([]);
-                this.drawDirectionsPolyline(p.stops);
+                // Backend no devolvio polyline real; dibujamos linea aproximada sin costo.
+                this.polylinePath.set(this.buildApproxPolyline(p.stops));
             }
             this.fitMapBounds();
         }, { allowSignalWrites: true });
@@ -1215,35 +1213,15 @@ export class RouteBuilderComponent implements OnInit {
         return path;
     }
 
-    // Dibuja la ruta real por calles usando DirectionsService del navegador.
-    // Se llama cuando el backend no devuelve polylineEncoded (ej. fallback Haversine).
-    private drawDirectionsPolyline(stops: PreviewStopDto[]): void {
-        if (!this.mapsReady() || typeof google === 'undefined' || !google?.maps) return;
+    // Dibuja la ruta aproximada sin pedir rutas reales al navegador.
+    private buildApproxPolyline(stops: PreviewStopDto[]): google.maps.LatLngLiteral[] {
         const depot = this.depotPosition() ?? { lat: 27.4861, lng: -99.5069 };
         const geocoded = stops.filter(s => s.latitude != null && s.longitude != null);
-        if (geocoded.length === 0) return;
-
-        const destination: google.maps.LatLngLiteral = {
-            lat: geocoded[geocoded.length - 1].latitude!,
-            lng: geocoded[geocoded.length - 1].longitude!
-        };
-        const waypoints = geocoded.slice(0, -1).slice(0, 25).map(s => ({
-            location: { lat: s.latitude!, lng: s.longitude! } as google.maps.LatLngLiteral,
-            stopover: true
-        }));
-
-        new google.maps.DirectionsService().route(
-            { origin: depot, destination, waypoints, travelMode: google.maps.TravelMode.DRIVING },
-            (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
-                if (status === google.maps.DirectionsStatus.OK && result?.routes[0]) {
-                    this.polylinePath.set(
-                        result.routes[0].overview_path.map(
-                            (pt: google.maps.LatLng) => ({ lat: pt.lat(), lng: pt.lng() })
-                        )
-                    );
-                }
-            }
-        );
+        if (geocoded.length === 0) return [];
+        return [
+            depot,
+            ...geocoded.map(s => ({ lat: s.latitude!, lng: s.longitude! }))
+        ];
     }
 
     openAddressPicker(row: CandidateRow, event: Event): void {

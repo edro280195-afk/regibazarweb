@@ -1233,8 +1233,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   // --- MAP STEROIDS ---
   private mapInitialized = false;
   private map: any;
-  private directionsService: any;
-  private directionsRenderer: any;
+  private routePolyline: any;
   private driverMarker: any;
   private geofenceCircle: any;
   private geofenceTriggered = false;
@@ -1495,12 +1494,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
         // Initialize Map if active route and it is their exact turn.
-        // Geocode client address first if coordinates are missing from the backend response.
         if ((data.status === 'InRoute' || data.status === 'InTransit') && data.deliveriesAhead === 0) {
-          if (!data.clientLatitude && data.clientAddress) {
-            this.geocodeClientAddress(data.clientAddress);
-          } else {
-            // Give Angular a frame to render the map div before init
+          if (data.clientLatitude || this.clientCoords()?.lat) {
             setTimeout(() => this.initMap(), 300);
           }
           // Reset geofence trigger if route loaded fresh
@@ -1758,19 +1753,6 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       styles: this.getCoquetteMapStyles() // Custom cute map theme
     });
 
-    this.directionsService = new (window as any).google.maps.DirectionsService();
-
-    // We will render the polyline ourselves, but hide default markers
-    this.directionsRenderer = new (window as any).google.maps.DirectionsRenderer({
-      map: this.map,
-      suppressMarkers: true,
-      polylineOptions: {
-        strokeColor: '#db2777', // Magenta pink
-        strokeWeight: 5,
-        strokeOpacity: 0.8
-      }
-    });
-
     this.mapInitialized = true;
     this.updateMap();
   }
@@ -1868,27 +1850,20 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       this.animateMarker(this.driverMarker, this.driverMarker.getPosition(), origin, heading);
     }
 
-    // Calculate Route and ETA
-    this.directionsService.route({
-      origin: origin,
-      destination: dest,
-      travelMode: (window as any).google.maps.TravelMode.DRIVING
-    }, (result: any, status: string) => {
-      if (status === 'OK') {
-        this.directionsRenderer.setDirections(result);
-
-        const leg = result.routes[0].legs[0];
-        if (leg && leg.duration) {
-          this.etaText.set(leg.duration.text);
-        }
-
-        // Frame the map smoothly (pan/fit)
-        const bounds = new (window as any).google.maps.LatLngBounds();
-        bounds.extend(origin);
-        bounds.extend(dest);
-        this.map.fitBounds(bounds, { top: 30, bottom: 40, left: 20, right: 20 });
-      }
+    this.etaText.set(this.formatApproxEta(distMeters));
+    this.routePolyline?.setMap(null);
+    this.routePolyline = new (window as any).google.maps.Polyline({
+      path: [origin, dest],
+      map: this.map,
+      strokeColor: '#db2777',
+      strokeWeight: 5,
+      strokeOpacity: 0.8
     });
+
+    const bounds = new (window as any).google.maps.LatLngBounds();
+    bounds.extend(origin);
+    bounds.extend(dest);
+    this.map.fitBounds(bounds, { top: 30, bottom: 40, left: 20, right: 20 });
   }
 
   // --- MAP MATH UTILS ---
@@ -1899,6 +1874,11 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  }
+
+  private formatApproxEta(meters: number): string {
+    const minutes = Math.max(1, Math.round((meters / 1000) / 25 * 60));
+    return `${minutes} min aprox.`;
   }
 
   private getHeading(lat1: number, lng1: number, lat2: number, lng2: number): number {

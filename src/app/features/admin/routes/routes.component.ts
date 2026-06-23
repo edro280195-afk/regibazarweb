@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, signal, computed, HostListener, CUSTOM_ELEMENTS_SCHEMA, inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe, KeyValuePipe } from '@angular/common';
-import { GoogleMap, MapMarker, MapDirectionsRenderer } from '@angular/google-maps';
+import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -41,7 +41,7 @@ interface GeocodedOrder extends OrderSummaryDto {
     RouterLink,
     GoogleMap,
     MapMarker,
-    MapDirectionsRenderer,
+    MapPolyline,
     DragDropModule,
     RouteOptimizerComponent,
     AddressEditorV2Component
@@ -741,8 +741,8 @@ interface GeocodedOrder extends OrderSummaryDto {
                   <map-marker [position]="entry.value" [options]="driverMarkerOptions"></map-marker>
                 }
 
-                @if (mapDirections(); as dirs) {
-                  <map-directions-renderer [directions]="dirs" [options]="directionsRenderOpts"></map-directions-renderer>
+                @if (mapPolylinePath().length > 0) {
+                  <map-polyline [path]="mapPolylinePath()" [options]="mapPolylineOptions"></map-polyline>
                 }
               </google-map>
 
@@ -1127,7 +1127,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   showMapModal = signal(false);
   mapRoute = signal<RouteDto | null>(null);
   mapDeliveries: RouteDeliveryDto[] = [];
-  mapDirections = signal<google.maps.DirectionsResult | undefined>(undefined);
+  mapPolylinePath = signal<google.maps.LatLngLiteral[]>([]);
   plottingMap = signal(false);
   @ViewChild(GoogleMap) googleMap!: GoogleMap;
 
@@ -1161,9 +1161,11 @@ export class RoutesComponent implements OnInit, OnDestroy {
     ]
   };
   baseMarkerOpts: google.maps.MarkerOptions = { title: 'Base' };
-  directionsRenderOpts: google.maps.DirectionsRendererOptions = {
-    suppressMarkers: true,
-    polylineOptions: { strokeColor: '#ec4899', strokeWeight: 5, strokeOpacity: 0.8 }
+  mapPolylineOptions: google.maps.PolylineOptions = {
+    strokeColor: '#ec4899',
+    strokeWeight: 5,
+    strokeOpacity: 0.75,
+    clickable: false
   };
 
   // Corte Modal
@@ -2207,7 +2209,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   openMap(route: RouteDto): void {
     this.mapRoute.set(route);
     this.mapDeliveries = route.deliveries;
-    this.mapDirections.set(undefined);
+    this.mapPolylinePath.set([]);
     this.showMapModal.set(true);
 
     // Try to center on device GPS first
@@ -2220,6 +2222,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   closeMap(): void {
     this.showMapModal.set(false);
     this.mapRoute.set(null);
+    this.mapPolylinePath.set([]);
   }
 
   getDeliveryMarkerOpts(d: RouteDeliveryDto): google.maps.MarkerOptions {
@@ -2239,33 +2242,16 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.plottingMap.set(true);
     const sorted = [...route.deliveries].sort((a, b) => a.sortOrder - b.sortOrder);
     const path: google.maps.LatLngLiteral[] = [this.mapCenter];
-    const waypoints: google.maps.DirectionsWaypoint[] = [];
 
     for (const d of sorted) {
-      let lat = d.latitude;
-      let lng = d.longitude;
-      if (!lat || !lng) {
-        const coords = await this.geocodeAddress(d.clientAddress || '');
-        if (coords) { lat = coords.lat; lng = coords.lng; d.latitude = lat; d.longitude = lng; }
-      }
+      const lat = d.latitude;
+      const lng = d.longitude;
       if (lat && lng) {
-        waypoints.push({ location: { lat, lng }, stopover: true });
         path.push({ lat, lng });
       }
     }
 
-    if (path.length > 1) {
-      const ds = new google.maps.DirectionsService();
-      ds.route({
-        origin: path[0], destination: path[path.length - 1],
-        waypoints: waypoints.slice(0, -1),
-        optimizeWaypoints: false, travelMode: google.maps.TravelMode.DRIVING
-      }, (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          this.mapDirections.set(result);
-        }
-      });
-    }
+    this.mapPolylinePath.set(path.length > 1 ? path : []);
 
     this.plottingMap.set(false);
     setTimeout(() => {
