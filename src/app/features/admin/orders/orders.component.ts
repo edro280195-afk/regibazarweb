@@ -7,13 +7,14 @@ import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus } from '../../../core/models';
+import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
 import { CouponService } from '../../../core/services/coupon.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
+import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messenger.util';
 
 @Component({
   selector: 'app-orders',
@@ -29,6 +30,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
           </label>
+          <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink text-center align-middle inline-block">💌 Enviar Enlaces</a>
           <a routerLink="/admin/capture" class="btn-coquette btn-pink text-center align-middle inline-block">✨ Nuevo Pedido</a>
         </div>
       </div>
@@ -251,6 +253,10 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                     <textarea class="input-coquette" [(ngModel)]="editClientData.alternativeAddress" placeholder="Dirección Alternativa" rows="2"
                               appGoogleAutocomplete (placeChanged)="onAltAddressSelected($event)"></textarea>
                     <textarea class="input-coquette" [(ngModel)]="editClientData.deliveryInstructions" placeholder="Instrucciones de entrega (Clienta)" rows="2"></textarea>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#0099FF] text-sm">𝓶</span>
+                      <input class="input-coquette pl-8" [(ngModel)]="editClientData.facebookProfileUrl" placeholder="URL del perfil de Facebook (para Messenger)" />
+                    </div>
                     <select class="input-coquette" [(ngModel)]="editClientData.type">
                       <option value="Nueva">Nueva</option>
                       <option value="Frecuente">Frecuente</option>
@@ -538,7 +544,43 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                 </div>
               }
             </div>
-            
+
+            <!-- Canje de RegiPuntos -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-violet-100/60 shadow-sm">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-2">💎 Canjear RegiPuntos</h4>
+                <div class="text-right bg-violet-50/80 px-3 py-1.5 rounded-xl border border-violet-100/50">
+                  <p class="text-[9px] text-violet-400 font-bold uppercase tracking-wider">Saldo clienta</p>
+                  <p class="text-base font-black text-violet-600">{{ selectedOrder()!.clientPoints ?? 0 }} pts</p>
+                </div>
+              </div>
+
+              @if (rewards().length === 0) {
+                <p class="text-[11px] text-pink-400 font-medium">Cargando premios…</p>
+              } @else {
+                <div class="space-y-2">
+                  @for (r of rewards(); track r.id) {
+                    @if (canAfford(r)) {
+                      <button class="w-full flex items-center gap-3 p-3 rounded-2xl border border-violet-100/60 bg-white/70 hover:bg-violet-50 hover:border-violet-200 active:scale-[0.98] transition-all text-left disabled:opacity-50"
+                              [disabled]="redeeming()"
+                              (click)="redeemReward(r)">
+                        <span class="text-2xl shrink-0">{{ r.icon || '🎁' }}</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-black text-violet-900 text-sm leading-tight">{{ r.name }}</p>
+                          <p class="text-[10px] text-violet-400 font-medium truncate">{{ r.description }}</p>
+                        </div>
+                        <span class="shrink-0 text-[11px] font-black text-white bg-gradient-to-r from-violet-500 to-pink-500 px-2.5 py-1 rounded-full">{{ r.pointsCost }} pts</span>
+                      </button>
+                    }
+                  }
+                  @if (!hasAnyAffordable()) {
+                    <p class="text-[11px] text-pink-400 font-medium text-center py-2">Aún no alcanza para ningún premio. ¡Sigue sumando puntos! ✨</p>
+                  }
+                </div>
+                <p class="text-[9px] text-violet-400/80 mt-2 text-center italic">El canje aplica un descuento al pedido y descuenta los puntos. Queda registrado en su historial.</p>
+              }
+            </div>
+
             <div class="h-16"></div>
           </div>
 
@@ -551,8 +593,8 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             
             <div class="flex gap-1.5">
               <button class="w-10 h-10 rounded-2xl bg-purple-50 text-purple-500 hover:bg-purple-100 hover:text-purple-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-purple-100/50" title="Copiar Enlace Público" (click)="copyLink()">🔗</button>
-              <button class="w-10 h-10 rounded-2xl bg-green-50 text-green-500 hover:bg-green-100 hover:text-green-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-green-100/50" title="Ticket WhatsApp" (click)="sendWaTicket()">
-                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.76.45 3.4 1.25 4.84L2 22l5.3-1.15A9.95 9.95 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm4.5 13.5c-.24.68-1.25 1.3-1.8 1.38-.45.06-.98.15-2.82-.6-2.22-.92-3.66-3.17-3.77-3.32-.1-.15-.9-1.2-.9-2.28s.56-1.63.76-1.83c.2-.2.43-.25.58-.25s.3-.02.45-.02c.16-.02.38-.05.6.48.23.55.76 1.83.83 1.95.06.13.1.28.02.48-.08.2-.12.33-.25.48-.12.15-.26.33-.37.45-.13.13-.27.28-.12.53.15.25.66 1.08 1.42 1.75.98.88 1.8 1.15 2.05 1.28.25.13.4.1.55-.07.15-.17.65-.75.83-1.02.17-.26.35-.22.58-.13.22.1 1.42.67 1.67.8.25.13.42.18.47.28.06.1.06.6-.18 1.28z"/></svg>
+              <button class="w-10 h-10 rounded-2xl bg-[#e8f4ff] hover:bg-[#cce4ff] hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-[#b3d5f5]/50" title="Enviar por Messenger" (click)="sendMessenger()">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="#0099FF"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
               </button>
               <button class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-blue-100/50" title="En Camino" (click)="sendWaOnRoute()">🚗</button>
               <button class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-rose-100/50" title="Cobrar" (click)="sendWaPaymentRequest()">💸</button>
@@ -648,7 +690,11 @@ export class OrdersComponent implements OnInit {
 
   // Quick Client Edit
   showClientEdit = signal(false);
-  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '' };
+  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '', facebookProfileUrl: '' };
+
+  // RegiPuntos (canje)
+  rewards = signal<LoyaltyRewardDto[]>([]);
+  redeeming = signal(false);
 
   // Logistics
   packages = signal<OrderPackageDto[]>([]);
@@ -666,6 +712,40 @@ export class OrdersComponent implements OnInit {
     this.initSignalR();
     this.api.getSalesPeriods().subscribe({
       next: (periods) => this.salesPeriods.set(periods)
+    });
+    this.api.getLoyaltyRewards().subscribe({
+      next: (r) => this.rewards.set(r),
+      error: () => { /* el catálogo es opcional; no bloquea el panel */ }
+    });
+  }
+
+  /** ¿La clienta del pedido tiene puntos suficientes para este premio? */
+  canAfford(reward: LoyaltyRewardDto): boolean {
+    const points = this.selectedOrder()?.clientPoints ?? 0;
+    return points >= reward.pointsCost;
+  }
+
+  hasAnyAffordable(): boolean {
+    return this.rewards().some(r => this.canAfford(r));
+  }
+
+  redeemReward(reward: LoyaltyRewardDto): void {
+    const o = this.selectedOrder();
+    if (!o || o.clientId == null || this.redeeming()) return;
+    if (!confirm(`¿Canjear "${reward.name}" por ${reward.pointsCost} puntos? Se aplicará como descuento al pedido.`)) return;
+
+    this.redeeming.set(true);
+    this.api.redeemLoyaltyReward(o.clientId, o.id, reward.id).subscribe({
+      next: () => {
+        this.redeeming.set(false);
+        this.toast.success(`Canjeado: ${reward.name} 💎✨`);
+        this.reloadSelectedOrder();
+        this.loadOrders();
+      },
+      error: (err) => {
+        this.redeeming.set(false);
+        this.toast.error(err?.error ?? 'No se pudo canjear');
+      }
     });
   }
 
@@ -860,7 +940,8 @@ export class OrdersComponent implements OnInit {
           address: ord.clientAddress || '',
           alternativeAddress: ord.alternativeAddress || '',
           deliveryInstructions: ord.deliveryInstructions || '',
-          type: ord.type || 'Nueva'
+          type: ord.type || 'Nueva',
+          facebookProfileUrl: ord.clientFacebookProfileUrl || ''
         };
       }
     }
@@ -888,7 +969,8 @@ export class OrdersComponent implements OnInit {
       ...(trimmedAddress ? { clientAddress: trimmedAddress } : {}),
       alternativeAddress: this.editClientData.alternativeAddress,
       type: this.editClientData.type,
-      deliveryInstructions: this.editClientData.deliveryInstructions
+      deliveryInstructions: this.editClientData.deliveryInstructions,
+      clientFacebookProfileUrl: this.editClientData.facebookProfileUrl
     }).subscribe({
       next: () => {
         this.toast.success('Datos de clienta actualizados 👤💖');
@@ -1033,6 +1115,37 @@ export class OrdersComponent implements OnInit {
     if (!o || !o.link) return;
     const link = o.link.replace('/o/', '/pedido/');
     navigator.clipboard.writeText(link).then(() => this.toast.success('Enlace copiado 🔗'));
+  }
+
+  sendMessenger(): void {
+    const o = this.selectedOrder();
+    if (!o) return;
+    const link = o.link.replace('/o/', '/pedido/');
+    const msg = buildOrderMessage({
+      clientName: o.clientName,
+      publicLink: link,
+      scheduledDeliveryDate: o.scheduledDeliveryDate,
+      expiresAt: o.expiresAt
+    });
+
+    navigator.clipboard.writeText(msg).then(() => {
+      this.toast.success('Mensaje copiado 💬 — abre Messenger y pégalo');
+    });
+
+    const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
+    if (chatUrl) {
+      window.open(chatUrl, '_blank');
+    } else {
+      this.toast.info('Pega el mensaje en Messenger. Tip: guarda el Facebook de la clienta para abrir su chat directo 💡');
+    }
+
+    // Marcar como notificada (no bloqueante)
+    if (!o.notifiedAt) {
+      this.api.markOrderNotified(o.id, true).subscribe({
+        next: () => this.reloadSelectedOrder(),
+        error: () => { /* silencioso: el envío ya ocurrió */ }
+      });
+    }
   }
 
   sendWaTicket(): void {

@@ -152,6 +152,25 @@ export interface OrderSummaryDto {
     alternativeAddress?: string;
     deliveryRouteId?: number;
     scheduledDeliveryDate?: string;
+    clientFacebookProfileUrl?: string;
+    notifiedAt?: string;
+    clientPoints?: number;
+    clientLatitude?: number | null;
+    clientLongitude?: number | null;
+    /** Evidencia de entrega (fotos). Solo si status = Delivered. */
+    evidenceUrls?: string[];
+    /** Firma digital de quien recibió (SVG). */
+    signatureSvg?: string;
+    /** Nombre de quien firmó. */
+    signedByName?: string;
+    /** Fecha/hora de la firma. */
+    signedAt?: string;
+    /** Motivo de no entrega. Solo si status = NotDelivered. */
+    failureReason?: string;
+    /** Fecha/hora de entrega real. */
+    deliveredAt?: string;
+    /** Evidencia de no-entrega (fotos del intento fallido). */
+    nonDeliveryEvidenceUrls?: string[];
 }
 
 export interface PagedResult<T> {
@@ -221,6 +240,57 @@ export interface ResolveClientResponse {
     suggestedAction: ResolveSuggestedAction;
 }
 
+// ── Importación masiva de Facebook de clientas ──
+
+export interface FacebookImportRow {
+    name: string;
+    facebookUrl: string;
+}
+
+export type FacebookImportStatus = 'matched' | 'review' | 'notfound';
+
+export interface FacebookImportPreviewItem {
+    rowIndex: number;
+    inputName: string;
+    inputUrl: string;
+    urlValid: boolean;
+    status: FacebookImportStatus;
+    suggestedClientId?: number;
+    topScore: number;
+    topAlreadyHasFacebook: boolean;
+    duplicateUrlInBatch: boolean;
+    candidates: ResolveCandidateDto[];
+}
+
+export interface FacebookImportPreviewResponse {
+    items: FacebookImportPreviewItem[];
+}
+
+export interface FacebookImportApplyRow {
+    clientId: number;
+    facebookUrl: string;
+}
+
+export interface FacebookImportApplyResponse {
+    applied: number;
+    skipped: number;
+    errors: string[];
+}
+
+// ── RegiPuntos (canje) ──
+
+export type LoyaltyRewardType = 'FixedDiscount' | 'FreeShipping' | 'Gift';
+
+export interface LoyaltyRewardDto {
+    id: number;
+    name: string;
+    description?: string;
+    pointsCost: number;
+    type: LoyaltyRewardType | string;
+    value: number;
+    icon?: string;
+}
+
 export type ClientAliasSource =
     | 'Unknown'
     | 'ManualConfirm'
@@ -258,6 +328,20 @@ export interface DuplicateSuggestionDto {
     confidence: number;
 }
 
+export interface ClientMergeAuditDto {
+    id: number;
+    sourceClientId: number;
+    sourceName: string;
+    targetClientId: number;
+    targetName: string;
+    mode: 'Manual' | 'Auto';
+    reason?: string;
+    confidence: number;
+    ordersMoved: number;
+    aliasesMoved: number;
+    mergedAt: string;
+}
+
 // Captura asistida por video de lives
 export type LiveSessionStatus =
     | 'Queued'
@@ -289,6 +373,7 @@ export interface LiveSessionDto {
     productCount: number;
     candidateCount: number;
     pendingCount: number;
+    transcript?: string | null;
 }
 
 export interface LiveProductDto {
@@ -727,6 +812,7 @@ export interface UpdateOrderDetailsRequest {
     deliveryInstructions?: string;
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
+    clientFacebookProfileUrl?: string;
 }
 
 export interface CreateAdminExpenseRequest {
@@ -806,6 +892,16 @@ export interface CamiGreetingResponse {
     audioBase64?: string;
 }
 
+export interface CamiProactiveSuggestionDto {
+    kind: string;
+    icon: string;
+    title: string;
+    detail: string;
+    actionLabel: string;
+    actionRoute: string;
+    priority: number;
+}
+
 // ── Tandas ──
 export interface TandaProductDto {
     id: string;
@@ -834,9 +930,10 @@ export interface TandaDto {
 export interface TandaParticipantDto {
     id: string;
     tandaId: string;
-    customerId: string;
+    customerId: number;
     customerName?: string;
     assignedTurn: number;
+    weeklyAmount?: number;
     isDelivered: boolean;
     deliveryDate?: string;
     status: string; // Active, Delinquent, Completed
@@ -867,8 +964,10 @@ export interface TandaViewDto {
 }
 
 export interface TandaParticipantViewDto {
+    id: string;
     name: string;
     assignedTurn: number;
+    weeklyAmount?: number;
     hasPaidCurrentWeek: boolean;
     paidWeeks: number[];
     isWinnerThisWeek: boolean;
@@ -883,13 +982,22 @@ export interface CreateTandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    participants: CreateTandaParticipantDto[];
+}
+
+export interface CreateTandaParticipantDto {
+    customerId: number;
+    assignedTurn: number;
+    variant?: string;
+    weeklyAmount?: number;
 }
 
 export interface AddParticipantDto {
     tandaId: string;
-    customerId: string;
+    customerId: number;
     assignedTurn: number;
     variant?: string;
+    weeklyAmount?: number;
 }
 
 export interface RegisterPaymentDto {
@@ -1074,3 +1182,4 @@ export interface TandaShuffleResultDto {
     turnAssignments: TandaTurnAssignmentDto[];
     shuffleDate: string;
 }
+

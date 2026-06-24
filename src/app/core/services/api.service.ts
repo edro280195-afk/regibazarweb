@@ -10,12 +10,15 @@ import {
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
     AiParsedOrder, AiInsight,
-    CamiMessage, CamiChatRequest, CamiChatResponse,
+    CamiMessage, CamiChatRequest, CamiChatResponse, CamiProactiveSuggestionDto,
     AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse,
     AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto,
     RecomposeRouteResponse,
     ResolveClientRequest, ResolveClientResponse,
-    ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto
+    ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto,
+    ClientMergeAuditDto,
+    FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse,
+    LoyaltyRewardDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -38,7 +41,7 @@ export class ApiService {
         return this.http.get<OrderSummaryDto[]>(`${this.base}/orders`);
     }
 
-    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string): Observable<PagedResult<OrderSummaryDto>> {
+    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string, salesPeriodId?: number): Observable<PagedResult<OrderSummaryDto>> {
         let params = new HttpParams()
             .set('page', page.toString())
             .set('pageSize', size.toString());
@@ -46,10 +49,22 @@ export class ApiService {
         if (search) params = params.set('search', search);
         if (orderType) params = params.set('type', orderType);
         if (type) params = params.set('type', type);
-        if (startDate) params = params.set('startDate', startDate);
-        if (endDate) params = params.set('endDate', endDate);
+        if (startDate) params = params.set('dateFrom', startDate);
+        if (endDate) params = params.set('dateTo', endDate);
+        if (salesPeriodId != null) params = params.set('salesPeriodId', salesPeriodId.toString());
         return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/paged`, { params });
     }
+
+    markOrderNotified(id: number, notified: boolean): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${id}/notified`, { notified });
+    }
+
+    getUnpaidOrders(salesPeriodId?: number): Observable<OrderSummaryDto[]> {
+        let params = new HttpParams();
+        if (salesPeriodId != null) params = params.set('salesPeriodId', salesPeriodId.toString());
+        return this.http.get<OrderSummaryDto[]>(`${this.base}/orders/unpaid`, { params });
+    }
+
     getOrderStats(): Observable<OrderStatsDto> {
         return this.http.get<OrderStatsDto>(`${this.base}/orders/stats`);
     }
@@ -153,6 +168,15 @@ export class ApiService {
         return this.http.post<ResolveClientResponse>(`${this.base}/clients/resolve`, req);
     }
 
+    // ── Importación masiva de Facebook ──
+    facebookImportPreview(rows: FacebookImportRow[]): Observable<FacebookImportPreviewResponse> {
+        return this.http.post<FacebookImportPreviewResponse>(`${this.base}/clients/facebook-import/preview`, { rows });
+    }
+
+    facebookImportApply(rows: FacebookImportApplyRow[]): Observable<FacebookImportApplyResponse> {
+        return this.http.post<FacebookImportApplyResponse>(`${this.base}/clients/facebook-import/apply`, { rows });
+    }
+
     getClientAliases(clientId: number): Observable<ClientAliasDto[]> {
         return this.http.get<ClientAliasDto[]>(`${this.base}/clients/${clientId}/aliases`);
     }
@@ -172,6 +196,10 @@ export class ApiService {
     getDuplicateSuggestions(limit: number = 50): Observable<DuplicateSuggestionDto[]> {
         const params = new HttpParams().set('limit', limit.toString());
         return this.http.get<DuplicateSuggestionDto[]>(`${this.base}/clients/duplicate-suggestions`, { params });
+    }
+
+    getClientMergeAudits(take: number = 50): Observable<ClientMergeAuditDto[]> {
+        return this.http.get<ClientMergeAuditDto[]>(`${this.base}/clients/merge-audits?take=${take}`);
     }
 
     // ── Routes ──
@@ -201,8 +229,19 @@ export class ApiService {
         return this.http.post<BulkGeocodeResultDto[]>(`${this.base}/clients/bulk-geocode`, { clientIds });
     }
 
-    setClientCoordinates(clientId: number, latitude: number, longitude: number, address?: string): Observable<any> {
-        return this.http.post(`${this.base}/clients/${clientId}/set-coordinates`, { latitude, longitude, address });
+    setClientCoordinates(
+        clientId: number,
+        latitude: number,
+        longitude: number,
+        address?: string,
+        deliveryInstructions?: string
+    ): Observable<void> {
+        return this.http.post<void>(`${this.base}/clients/${clientId}/set-coordinates`, {
+            latitude,
+            longitude,
+            address,
+            deliveryInstructions
+        });
     }
 
     deleteRoute(id: number): Observable<any> {
@@ -298,6 +337,14 @@ export class ApiService {
         return this.http.post(`${this.base}/loyalty/adjust`, data);
     }
 
+    getLoyaltyRewards(): Observable<LoyaltyRewardDto[]> {
+        return this.http.get<LoyaltyRewardDto[]>(`${this.base}/loyalty/rewards`);
+    }
+
+    redeemLoyaltyReward(clientId: number, orderId: number, rewardId: number): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/loyalty/redeem`, { clientId, orderId, rewardId });
+    }
+
     // ── Public Tracking (Client-Facing) ──
     publicGetOrder(accessToken: string): Observable<any> {
         return this.http.get(`${this.base}/pedido/${accessToken}`);
@@ -377,6 +424,10 @@ export class ApiService {
         return this.http.get<Array<{ type: string; message: string; icon: string; relatedId?: number }>>(`${this.base}/cami/alerts`);
     }
 
+    getCamiProactiveSuggestions(): Observable<CamiProactiveSuggestionDto[]> {
+        return this.http.get<CamiProactiveSuggestionDto[]>(`${this.base}/cami/proactive-suggestions`);
+    }
+
     // ── Driver (Repartidor) ──
     getDriverRoute(driverToken: string): Observable<any> {
         return this.http.get(`${this.base}/driver/${driverToken}`);
@@ -398,11 +449,15 @@ export class ApiService {
         return this.http.post(`${this.base}/driver/${driverToken}/transit/${deliveryId}`, {});
     }
 
-    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[]): Observable<any> {
+    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[], signature?: { svg: string; signedByName?: string }): Observable<any> {
         const fd = new FormData();
         fd.append('notes', notes);
         photos.forEach(p => fd.append('photos', p));
         if (payments) fd.append('payments', JSON.stringify(payments));
+        if (signature?.svg) {
+            fd.append('signatureSvg', signature.svg);
+            if (signature.signedByName) fd.append('signedByName', signature.signedByName);
+        }
         return this.http.post(`${this.base}/driver/${driverToken}/deliver/${deliveryId}`, fd);
     }
 

@@ -7,6 +7,7 @@ import { SignalRService } from '../../../core/services/signalr.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OrderSummaryDto, OrderStatus, ORDER_STATUS_LABELS, ORDER_STATUS_EMOJI } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import confetti from 'canvas-confetti';
@@ -131,7 +132,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <!-- RegiPuntos (Gamification) -->
             <div class="mt-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-100 to-pink-100 px-4 py-1.5 rounded-full border border-pink-200 shadow-sm animate-fade-in-up group cursor-pointer hover:scale-105 transition-transform" title="¡Gana más puntos compartiendo tu foto!">
               <span class="text-lg animate-pulse-slow">💎</span>
-              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} Puntos VIP</span>
+              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} RegiPuntos</span>
             </div>
           </div>
 
@@ -241,16 +242,120 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           <div class="w-1 flex-grow bg-gray-100 rounded-full my-2" [class.bg-pink-300]="step.done"></div>
                         }
                       </div>
-                      <div class="flex-1 pt-1.5">
-                        <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                       <div class="flex-1 pt-1.5">
+                         <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
+                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                       </div>
+                     </div>
+                   }
+                 </div>
+               </div>
+
+              <!-- ═══════════ EVIDENCIA DE ENTREGA ═══════════ -->
+              @if (o.status === 'Delivered') {
+                <div id="delivery-evidence" class="animate-fade-in-up space-y-4">
+                  <div class="bg-gradient-to-br from-emerald-50 via-white to-pink-50 rounded-[2.5rem] p-6 border-2 border-emerald-200 shadow-sm text-center">
+                    <div class="text-5xl mb-2 animate-bounce-subtle">🎉</div>
+                    <h3 class="text-xl font-black text-emerald-700 font-display">¡Tu pedido fue entregado!</h3>
+                    @if (o.deliveredAt) {
+                      <p class="text-xs text-emerald-600/80 font-medium mt-1">
+                        Entregado el {{ o.deliveredAt | date:"EEEE d 'de' MMMM 'a las' h:mm a" }}
+                      </p>
+                    }
+                  </div>
+
+                  <!-- Fotos de evidencia -->
+                  @if (o.evidenceUrls && o.evidenceUrls.length > 0) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                        📸 Fotos de la entrega
+                        <span class="bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full text-[9px]">{{ o.evidenceUrls.length }}</span>
+                      </h4>
+                      <div class="grid grid-cols-3 gap-2">
+                        @for (url of o.evidenceUrls; track url) {
+                          <button (click)="evidenceLightbox.set(url)" class="aspect-square rounded-2xl overflow-hidden border-2 border-pink-100 active:scale-95 transition-transform">
+                            <img [src]="resolveImageUrl(url)" alt="Foto de entrega" class="w-full h-full object-cover">
+                          </button>
+                        }
                       </div>
+                    </div>
+                  } @else {
+                    <div class="bg-white/60 rounded-2xl p-4 border border-dashed border-pink-200 text-center">
+                      <p class="text-xs text-pink-400 font-medium">📷 No se capturaron fotos en la entrega</p>
+                    </div>
+                  }
+
+                  <!-- Firma de quien recibió -->
+                  @if (o.signatureSvg) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3">✍️ Firma de quien recibió</h4>
+                      <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100" [innerHTML]="sanitizeSvg(o.signatureSvg)"></div>
+                      <div class="flex items-center justify-between mt-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <span>👤 {{ o.signedByName || 'Sin nombre' }}</span>
+                        @if (o.signedAt) { <span>{{ o.signedAt | date:'d MMM, h:mm a' }}</span> }
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="bg-white/60 rounded-2xl p-4 border border-dashed border-pink-200 text-center">
+                      <p class="text-xs text-pink-400 font-medium">✍️ No se capturó firma en la entrega</p>
                     </div>
                   }
                 </div>
-              </div>
-            </div>
-          }
+              }
+
+              <!-- ═══════════ PEDIDO NO ENTREGADO ═══════════ -->
+              @if (o.status === 'NotDelivered') {
+                <div id="delivery-failed" class="animate-fade-in-up space-y-4">
+                  <div class="bg-gradient-to-br from-rose-50 via-white to-pink-50 rounded-[2.5rem] p-6 border-2 border-rose-200 shadow-sm text-center">
+                    <div class="text-5xl mb-2">😿</div>
+                    <h3 class="text-xl font-black text-rose-700 font-display">No se pudo entregar tu pedido</h3>
+                    <p class="text-xs text-rose-600/80 font-medium mt-2">No te preocupes, vamos a solucionarlo 💌</p>
+                  </div>
+
+                  <!-- Motivo del repartidor -->
+                  <div class="bg-white/95 rounded-[2.5rem] p-6 border border-rose-100 shadow-sm">
+                    <h4 class="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-3">¿Por qué no se entregó?</h4>
+                    <div class="bg-rose-50/70 border-l-4 border-rose-400 rounded-xl p-4">
+                      <p class="text-sm text-rose-900 font-medium leading-relaxed italic">
+                        "{{ o.failureReason || 'El repartidor no dejó un motivo específico. Contáctanos para saber más.' }}"
+                      </p>
+                    </div>
+                    @if (o.deliveredAt) {
+                      <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-3">
+                        Intento: {{ o.deliveredAt | date:"EEEE d 'de' MMMM 'a las' h:mm a" }}
+                      </p>
+                    }
+                  </div>
+
+                  <!-- Foto de no-entrega si existe -->
+                  @if (o.nonDeliveryEvidenceUrls && o.nonDeliveryEvidenceUrls.length > 0) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-rose-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-3">📸 Evidencia del intento</h4>
+                      <div class="grid grid-cols-3 gap-2">
+                        @for (url of o.nonDeliveryEvidenceUrls; track url) {
+                          <button (click)="evidenceLightbox.set(url)" class="aspect-square rounded-2xl overflow-hidden border-2 border-rose-100 active:scale-95 transition-transform">
+                            <img [src]="resolveImageUrl(url)" alt="Foto del intento" class="w-full h-full object-cover">
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <!-- CTAs de recuperación -->
+                  <div class="grid grid-cols-1 gap-3">
+                    <a [href]="messengerUrl" target="_blank" rel="noopener"
+                       class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-sm py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl">
+                      <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                      💬 ESCRIBIRLE A REGI BAZAR
+                    </a>
+                    <p class="text-center text-xs text-rose-500/80 font-medium px-2">
+                      Te ayudamos a reagendar la entrega lo antes posible 🎀
+                    </p>
+                  </div>
+                </div>
+              }
+             </div>
+           }
 
           @if (activeTab() === 'payment') {
             <!-- ════════════ TAB: PAGAR ════════════ -->
@@ -526,7 +631,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 </h4>
                 
                 @if (isEditingInstructions()) {
-                  <textarea [(ngModel)]="localInstructions" rows="3" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-sm focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
+                  <textarea [(ngModel)]="localInstructions" rows="3" inputmode="text" enterkeyhint="done" style="font-size:16px" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-base focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
                   <div class="flex gap-2 mt-3">
                     <button (click)="saveInstructions()" class="flex-1 bg-pink-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg">Guardar✨</button>
                     <button (click)="isEditingInstructions.set(false)" class="px-4 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest">Cerrar</button>
@@ -606,7 +711,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 <!-- Input -->
                 <div class="p-4 bg-white border-t border-pink-50">
                   <div class="flex gap-2">
-                    <input type="text" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
+                    <input type="text" inputmode="text" enterkeyhint="send" style="font-size:16px" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
                            class="flex-1 bg-pink-50/50 border-2 border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 font-medium"
                            placeholder="Escribe algo... ✨" />
                     <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
@@ -931,10 +1036,10 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const h = this.tourHole();
     const wW = window.innerWidth;
     const wH = window.innerHeight;
-    
+
     // Outer Rectangle (Screen)
     const d0 = `M 0 0 H ${wW} V ${wH} H 0 Z`;
-    
+
     // Inner Rounded Rectangle (Hole with padding and radius)
     const padding = 10;
     const x = h.left - padding;
@@ -944,18 +1049,18 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const r = h.radius || 24;
 
     const d1 = `M ${x} ${y + r} ` +
-               `A ${r} ${r} 0 0 1 ${x + r} ${y} ` +
-               `H ${x + w - r} ` +
-               `A ${r} ${r} 0 0 1 ${x + w} ${y + r} ` +
-               `V ${y + height - r} ` +
-               `A ${r} ${r} 0 0 1 ${x + w - r} ${y + height} ` +
-               `H ${x + r} ` +
-               `A ${r} ${r} 0 0 1 ${x} ${y + height - r} ` +
-               `Z`;
-               
+      `A ${r} ${r} 0 0 1 ${x + r} ${y} ` +
+      `H ${x + w - r} ` +
+      `A ${r} ${r} 0 0 1 ${x + w} ${y + r} ` +
+      `V ${y + height - r} ` +
+      `A ${r} ${r} 0 0 1 ${x + w - r} ${y + height} ` +
+      `H ${x + r} ` +
+      `A ${r} ${r} 0 0 1 ${x} ${y + height - r} ` +
+      `Z`;
+
     return `${d0} ${d1}`;
   });
-  
+
   dynamicTourSteps = computed(() => {
     const o = this.order();
     if (!o) return [];
@@ -978,7 +1083,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Status Tab Specifics
     if (o.status === 'InRoute' || o.status === 'InTransit') {
-       steps.push({ target: '#nav-tabs', msg: 'En "Estado" podrás seguir al repartidor en tiempo real y ver cuántas entregas faltan. 🚗💨', tab: 'status' });
+      steps.push({ target: '#nav-tabs', msg: 'En "Estado" podrás seguir al repartidor en tiempo real y ver cuántas entregas faltan. 🚗💨', tab: 'status' });
     }
 
     // Chat Step (New FAB)
@@ -1026,7 +1131,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         if (!this.tourActive()) {
           this.startTour();
         }
-      }, 800); 
+      }, 800);
     }
   }
 
@@ -1043,24 +1148,24 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       if (forceTabSwitch && step.tab && this.activeTab() !== step.tab) {
         this.activeTab.set(step.tab);
         // Wait for Angular change detection and DOM update
-        setTimeout(() => this.updateHole(false), 300); 
+        setTimeout(() => this.updateHole(false), 300);
         return;
       }
 
       // Root Fix: Exhaustive Element Search
       const el = document.querySelector(step.target) as HTMLElement;
-      
+
       if (el) {
         const calculateCoordinates = () => {
           const rect = el.getBoundingClientRect();
-          
+
           // Debugging logging if needed (internal)
           // console.log(`[Tour] Highlight target ${step.target}:`, rect);
 
           // If element is not actually visible or in layout (dimensions 0), retry
           if (rect.width === 0 && rect.height === 0) {
-             setTimeout(() => this.updateHole(false), 200);
-             return;
+            setTimeout(() => this.updateHole(false), 200);
+            return;
           }
 
           this.tourPlacement.set(rect.top > window.innerHeight / 2 ? 'top' : 'bottom');
@@ -1085,7 +1190,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       } else {
         // Fallback: If element not found, retry once or highlight safe area
         if (forceTabSwitch) {
-           setTimeout(() => this.updateHole(false), 500);
+          setTimeout(() => this.updateHole(false), 500);
         }
       }
     });
@@ -1097,13 +1202,19 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   isPlayingCami = signal(false);
   isLoadingCami = signal(true);
   showCamiBubble = signal(true);
+  /** Llave de localStorage para no repetir el saludo genérico de CAMI en
+   *  visitas subsecuentes al mismo pedido. Una vez por pedido. */
+  private get camiGreetedKey(): string {
+    return `cami_greeted_${this.accessToken}`;
+  }
   // Stratospheric features
   regiPuntos = computed(() => {
     const o = this.order();
     if (!o) return 0;
-    return Math.floor((o.total || 0) / 10); // 1 point per $10 MXN spent
+    // Saldo real acumulado de la clienta (viene del backend). Respaldo: estimación por el total.
+    return o.clientPoints ?? Math.floor((o.total || 0) / 10);
   });
-  
+
 
 
 
@@ -1122,8 +1233,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   // --- MAP STEROIDS ---
   private mapInitialized = false;
   private map: any;
-  private directionsService: any;
-  private directionsRenderer: any;
+  private routePolyline: any;
   private driverMarker: any;
   private geofenceCircle: any;
   private geofenceTriggered = false;
@@ -1133,8 +1243,17 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     private api: ApiService,
     private signalr: SignalRService,
     private toast: ToastService,
-    private push: PushNotificationService
+    private push: PushNotificationService,
+    private sanitizer: DomSanitizer
   ) { }
+
+  /** Limpia y sanitiza el SVG de la firma para poder renderizarlo con [innerHTML]. */
+  sanitizeSvg(svg: string): SafeHtml {
+    if (!svg) return '';
+    // El SVG viene del canvas y puede contener data:image/png en base64.
+    // Confiamos en él porque lo generamos nosotros mismos en la app del conductor.
+    return this.sanitizer.bypassSecurityTrustHtml(svg);
+  }
 
   @HostListener('window:scroll', ['$event'])
   onScroll(event: Event) {
@@ -1273,12 +1392,12 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.signalr.clientChatUpdate$.subscribe((msg) => {
       this.chatMessages.update(msgs => {
-         if (msgs.find(m => m.id === msg.id)) return msgs;
-         return [...msgs, msg];
+        if (msgs.find(m => m.id === msg.id)) return msgs;
+        return [...msgs, msg];
       });
       if (!this.isChatOpen()) {
-         this.unreadMessages.set(true);
-         this.showToast('¡Escribieron en tu chat! 💬💌');
+        this.unreadMessages.set(true);
+        this.showToast('¡Escribieron en tu chat! 💬💌');
       }
       this.scrollToBottomChat();
     });
@@ -1375,12 +1494,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
         // Initialize Map if active route and it is their exact turn.
-        // Geocode client address first if coordinates are missing from the backend response.
         if ((data.status === 'InRoute' || data.status === 'InTransit') && data.deliveriesAhead === 0) {
-          if (!data.clientLatitude && data.clientAddress) {
-            this.geocodeClientAddress(data.clientAddress);
-          } else {
-            // Give Angular a frame to render the map div before init
+          if (data.clientLatitude || this.clientCoords()?.lat) {
             setTimeout(() => this.initMap(), 300);
           }
           // Reset geofence trigger if route loaded fresh
@@ -1397,48 +1512,60 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
 
-    this.api.publicGetCamiGreeting(this.accessToken).subscribe({
-      next: (res) => {
-        this.displayCamiMessage(res.message, res.audioBase64);
-      },
-      error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
-    });
+    // CAMI: solo saludamos la primera vez por pedido para minimizar costos
+    // de Gemini. Si ya se saludó en este dispositivo, omitimos la llamada y
+    // ocultamos el indicador de carga. Los saludos proactivos por SignalR
+    // (cuando el repartidor marca InTransit) sí se muestran siempre.
+    const alreadyGreeted = (() => {
+      try { return !!localStorage.getItem(this.camiGreetedKey); } catch { return false; }
+    })();
+    if (alreadyGreeted) {
+      this.isLoadingCami.set(false);
+    } else {
+      this.api.publicGetCamiGreeting(this.accessToken).subscribe({
+        next: (res) => {
+          this.displayCamiMessage(res.message, res.audioBase64);
+          try { localStorage.setItem(this.camiGreetedKey, new Date().toISOString()); } catch { }
+        },
+        error: () => this.isLoadingCami.set(false)
+      });
+    }
   }
 
   loadChat() {
-     this.api.publicGetChat(this.accessToken).subscribe(msgs => {
-        this.chatMessages.set(msgs);
-        this.scrollToBottomChat();
-     });
+    this.api.publicGetChat(this.accessToken).subscribe(msgs => {
+      this.chatMessages.set(msgs);
+      this.scrollToBottomChat();
+    });
   }
 
   sendChatMessage() {
-     if (!this.newChatMessage.trim() || this.sendingChat()) return;
-     this.sendingChat.set(true);
-     this.api.publicSendChatMessage(this.accessToken, this.newChatMessage).subscribe({
-        next: (msg) => {
-           this.chatMessages.update(msgs => {
-              if (msgs.find(m => m.id === msg.id)) return msgs;
-              return [...msgs, msg];
-           });
-           this.newChatMessage = '';
-           this.sendingChat.set(false);
-           this.scrollToBottomChat();
-        },
-        error: () => {
-           this.sendingChat.set(false);
-           this.showToast('No se pudo enviar el mensaje. 😿');
-        }
-     });
+    if (!this.newChatMessage.trim() || this.sendingChat()) return;
+    this.sendingChat.set(true);
+    this.api.publicSendChatMessage(this.accessToken, this.newChatMessage).subscribe({
+      next: (msg) => {
+        this.chatMessages.update(msgs => {
+          if (msgs.find(m => m.id === msg.id)) return msgs;
+          return [...msgs, msg];
+        });
+        this.newChatMessage = '';
+        this.sendingChat.set(false);
+        this.scrollToBottomChat();
+      },
+      error: () => {
+        this.sendingChat.set(false);
+        this.showToast('No se pudo enviar el mensaje. 😿');
+      }
+    });
   }
 
   scrollToBottomChat() {
-     setTimeout(() => {
-        const box = document.getElementById('modal-chat-box');
-        if (box) {
-           box.scrollTop = box.scrollHeight;
-        }
-     }, 100);
+    setTimeout(() => {
+      const box = document.getElementById('modal-chat-box');
+      if (box) {
+        box.scrollTop = box.scrollHeight;
+      }
+    }, 100);
   }
 
   confirmOrder(event?: MouseEvent | TouchEvent) {
@@ -1626,19 +1753,6 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       styles: this.getCoquetteMapStyles() // Custom cute map theme
     });
 
-    this.directionsService = new (window as any).google.maps.DirectionsService();
-
-    // We will render the polyline ourselves, but hide default markers
-    this.directionsRenderer = new (window as any).google.maps.DirectionsRenderer({
-      map: this.map,
-      suppressMarkers: true,
-      polylineOptions: {
-        strokeColor: '#db2777', // Magenta pink
-        strokeWeight: 5,
-        strokeOpacity: 0.8
-      }
-    });
-
     this.mapInitialized = true;
     this.updateMap();
   }
@@ -1736,27 +1850,20 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       this.animateMarker(this.driverMarker, this.driverMarker.getPosition(), origin, heading);
     }
 
-    // Calculate Route and ETA
-    this.directionsService.route({
-      origin: origin,
-      destination: dest,
-      travelMode: (window as any).google.maps.TravelMode.DRIVING
-    }, (result: any, status: string) => {
-      if (status === 'OK') {
-        this.directionsRenderer.setDirections(result);
-
-        const leg = result.routes[0].legs[0];
-        if (leg && leg.duration) {
-          this.etaText.set(leg.duration.text);
-        }
-
-        // Frame the map smoothly (pan/fit)
-        const bounds = new (window as any).google.maps.LatLngBounds();
-        bounds.extend(origin);
-        bounds.extend(dest);
-        this.map.fitBounds(bounds, { top: 30, bottom: 40, left: 20, right: 20 });
-      }
+    this.etaText.set(this.formatApproxEta(distMeters));
+    this.routePolyline?.setMap(null);
+    this.routePolyline = new (window as any).google.maps.Polyline({
+      path: [origin, dest],
+      map: this.map,
+      strokeColor: '#db2777',
+      strokeWeight: 5,
+      strokeOpacity: 0.8
     });
+
+    const bounds = new (window as any).google.maps.LatLngBounds();
+    bounds.extend(origin);
+    bounds.extend(dest);
+    this.map.fitBounds(bounds, { top: 30, bottom: 40, left: 20, right: 20 });
   }
 
   // --- MAP MATH UTILS ---
@@ -1767,6 +1874,11 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  }
+
+  private formatApproxEta(meters: number): string {
+    const minutes = Math.max(1, Math.round((meters / 1000) / 25 * 60));
+    return `${minutes} min aprox.`;
   }
 
   private getHeading(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -1883,9 +1995,9 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         return;
       }
       const script = document.createElement('script');
-      script.id  = 'mp-sdk-script';
+      script.id = 'mp-sdk-script';
       script.src = 'https://sdk.mercadopago.com/js/v2';
-      script.onload  = () => resolve();
+      script.onload = () => resolve();
       script.onerror = () => reject(new Error('No se pudo cargar el SDK de Mercado Pago'));
       document.body.appendChild(script);
     });
@@ -1915,13 +2027,13 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       iframe: true,
       form: {
         id: 'mp-card-form',
-        cardNumber:     { id: 'mp-cardNumber',     placeholder: 'Número de tarjeta' },
+        cardNumber: { id: 'mp-cardNumber', placeholder: 'Número de tarjeta' },
         expirationDate: { id: 'mp-expirationDate', placeholder: 'MM/AA' },
-        securityCode:   { id: 'mp-securityCode',   placeholder: 'CVV' },
+        securityCode: { id: 'mp-securityCode', placeholder: 'CVV' },
         cardholderName: { id: 'mp-cardholderName', placeholder: 'Nombre en la tarjeta' },
-        issuer:         { id: 'mp-issuer',         placeholder: 'Banco emisor' },
-        installments:   { id: 'mp-installments',   placeholder: 'Cuotas' },
-        cardholderEmail:{ id: 'mp-cardholderEmail',placeholder: 'Email (para tu comprobante)' },
+        issuer: { id: 'mp-issuer', placeholder: 'Banco emisor' },
+        installments: { id: 'mp-installments', placeholder: 'Cuotas' },
+        cardholderEmail: { id: 'mp-cardholderEmail', placeholder: 'Email (para tu comprobante)' },
       },
       callbacks: {
         onFormMounted: (error: any) => {
@@ -1958,10 +2070,10 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.mpProcessing.set(true);
 
     this.api.publicCardPayment(this.accessToken, {
-      cardToken:       data.token,
+      cardToken: data.token,
       paymentMethodId: data.paymentMethodId,
-      issuerId:        data.issuerId ?? null,
-      installments:    Number(data.installments) || 1
+      issuerId: data.issuerId ?? null,
+      installments: Number(data.installments) || 1
     }).subscribe({
       next: (result) => {
         this.mpProcessing.set(false);
@@ -1970,8 +2082,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         if (result.status === 'approved') {
           this.mpReceipt.set({
             amount: result.amount,
-            date:   new Date(),
-            ref:    result.paymentId ? `MP-${result.paymentId}` : '—'
+            date: new Date(),
+            ref: result.paymentId ? `MP-${result.paymentId}` : '—'
           });
           this.fireConfetti('celebration');
           this.order.update(o => o
@@ -2234,31 +2346,31 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private startCountdown(expiresAt: string) {
     if (this.countdownInterval) clearInterval(this.countdownInterval);
-    
+
     const targetDate = new Date(expiresAt).getTime();
-    
+
     const update = () => {
       const now = new Date().getTime();
       const distance = targetDate - now;
-      
+
       if (distance < 0) {
         this.countdownText.set('¡Llegó el gran día! 🎀');
         clearInterval(this.countdownInterval);
         return;
       }
-      
+
       const days = Math.floor(distance / (1000 * 60 * 60 * 24));
       const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-      
+
       let text = '';
       if (days > 0) text += `${days}d `;
       text += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      
+
       this.countdownText.set(text);
     };
-    
+
     update();
     this.countdownInterval = setInterval(update, 1000);
   }

@@ -48,7 +48,14 @@
       "Bash(grep -r \"EntregasApi\\\\|api/Services\\\\|Controllers\" /c/Codigos/regibazar-web --include=*.ts --include=*.md --include=*.json)",
       "Bash(dotnet restore:*)",
       "Bash(powershell -Command \"cd 'C:\\\\Codigos\\\\api\\\\EntregasApi'; dotnet restore; dotnet build 2>&1 | Select-Object -Last 25\")",
-      "Bash(cmd /c \"cd /d C:\\\\Codigos\\\\api\\\\EntregasApi && dotnet restore 2>&1 && dotnet build 2>&1\")"
+      "Bash(cmd /c \"cd /d C:\\\\Codigos\\\\api\\\\EntregasApi && dotnet restore 2>&1 && dotnet build 2>&1\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Codigos\\\\api\\\\EntregasApi\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(dotnet ef *)",
+      "Bash(npm run *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(xargs cat)",
+      "PowerShell(head -30)"
     ]
   }
 }

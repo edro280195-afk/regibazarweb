@@ -168,7 +168,7 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                             } @else {
                               <button (click)="openPaymentModal(p, w)" 
                                       class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
-                                {{ t.weeklyAmount }}
+                                {{ getParticipantWeeklyAmount(p) }}
                               </button>
                             }
                           </td>
@@ -368,6 +368,10 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                           <input type="number" [(ngModel)]="enrollTurn" class="input-coquette py-1.5 text-xs text-center font-black" min="1" [max]="t.totalWeeks" />
                         </div>
                       </div>
+                      <div>
+                        <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Abono Semanal (vacío = usar {{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }})</label>
+                        <input type="number" [(ngModel)]="enrollWeeklyAmount" class="input-coquette py-1.5 text-xs font-bold" placeholder="Ej. 350" />
+                      </div>
                       <button (click)="onAddParticipant()" [disabled]="isEnrolling()" class="btn-coquette btn-pink w-full py-3 text-[10px] font-black shadow-md">
                         @if (isEnrolling()) { <span class="animate-spin italic">⌛</span> } @else { Inscribir en Tanda 🎀 }
                       </button>
@@ -379,7 +383,7 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
               <!-- Tanda Actions -->
             <div class="space-y-3">
               <button class="btn-coquette btn-pink w-full justify-center text-[10px] py-3 font-black shadow-lg" (click)="onShuffle()">
-                🎲 Sorteo Aleatorio
+                🎡 Mostrar ruleta de lugares
               </button>
               <button class="btn-coquette btn-purple w-full justify-center text-[10px] py-3 font-black shadow-lg mt-3" (click)="openReorderModal()">
                 🔄 Reordenar Lista
@@ -410,7 +414,7 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                 
                 <div class="flex items-end justify-center gap-1">
                   <p class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500 font-display">
-                    {{ tanda()?.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                    {{ getParticipantWeeklyAmount(activePayment()!.participant) | currency:'MXN':'symbol-narrow':'1.0-0' }}
                   </p>
                   <span class="text-pink-400 text-[10px] font-medium uppercase mb-2">/ Sem {{ activePayment()?.week }}</span>
                 </div>
@@ -587,6 +591,7 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
         [customTitle]="tanda()?.name"
         [participants]="rouletteParticipants()"
         [winnerNames]="rouletteWinnerNames()"
+        [turnNumbers]="rouletteTurnNumbers()"
         animationType="roulette"
         (close)="showRoulette.set(false)"
         (startRequested)="handleRouletteStart()"
@@ -725,6 +730,7 @@ export class TandaDetailComponent implements OnInit {
   selectedClient = signal<ClientDto | null>(null);
   enrollTurn = 1;
   enrollVariant = '';
+  enrollWeeklyAmount?: number;
   isEnrolling = signal(false);
 
   // Reordenamiento y Sorteo
@@ -735,6 +741,7 @@ export class TandaDetailComponent implements OnInit {
   showRoulette = signal(false);
   rouletteParticipants = signal<{ id: string, name: string }[]>([]);
   rouletteWinnerNames = signal<string[]>([]);
+  rouletteTurnNumbers = signal<number[]>([]);
 
   @ViewChild(RaffleAnimationComponent) raffleComponent?: RaffleAnimationComponent;
 
@@ -817,6 +824,10 @@ export class TandaDetailComponent implements OnInit {
     return participant.payments?.some(p => p.weekNumber === week) || false;
   }
 
+  getParticipantWeeklyAmount(p: TandaParticipantDto): number {
+    return p.weeklyAmount ?? this.tanda()?.weeklyAmount ?? 0;
+  }
+
   onClientSearch(term: string) {
     this.clientSearch.set(term);
     this.showSuggestions.set(true);
@@ -848,47 +859,24 @@ export class TandaDetailComponent implements OnInit {
   }
 
   onShuffle() {
-    const participants = this.participants();
-    if (participants.length < 2) {
-      this.toastService.error('Necesitas al menos 2 participantes para sortear 🎀');
+    const participants = [...this.participants()]
+      .sort((a, b) => a.assignedTurn - b.assignedTurn);
+
+    if (participants.length === 0) {
+      this.toastService.error('La tanda no tiene lugares asignados');
       return;
     }
 
-    // Preparamos participantes para la ruleta
     this.rouletteParticipants.set(participants.map(p => ({ id: p.id, name: p.customerName || 'Participante' })));
-    this.rouletteWinnerNames.set([]); // Limpiamos ganador previo
-    
+    this.rouletteWinnerNames.set(participants.map(p => p.customerName || 'Participante'));
+    this.rouletteTurnNumbers.set(participants.map(p => p.assignedTurn));
     this.showRoulette.set(true);
   }
 
   handleRouletteStart() {
-    const t = this.tanda();
-    const participants = this.participants();
-    if (t && participants.length > 0) {
-      // 1. Generamos el orden "literalmente aleatorio" de todos los participantes
-      const shuffled = [...participants].sort(() => Math.random() - 0.5);
-      const shuffledNames = shuffled.map(p => p.customerName || 'Alguien');
-      
-      this.rouletteWinnerNames.set(shuffledNames);
-      
-      // 2. Iniciamos la animación con toda la secuencia.
-      // El componente de ruleta girará, sacará a la #1, permitirá continuar,
-      // la eliminará de la ruleta y girará por la #2, y así sucesivamente.
-      if (this.raffleComponent) {
-        this.raffleComponent.setWinnerAndStart(shuffledNames);
-      }
-
-      // 3. Guardamos silenciosamente este nuevo orden en el backend usando el endpoint de reordenamiento.
-      // Así, si el usuario cierra la ruleta a la mitad o termina de verla, el orden 1 al N ya está guardado.
-      const idsInOrder = shuffled.map(p => p.id);
-      this.tandaService.reorderParticipants(t.id, idsInOrder).subscribe({
-        next: () => {
-          this.loadTanda(t.id);
-        },
-        error: (err) => {
-          this.toastService.error(err.error?.message || 'Error al guardar el sorteo en el servidor');
-        }
-      });
+    const winnerNames = this.rouletteWinnerNames();
+    if (winnerNames.length > 0) {
+      this.raffleComponent?.setWinnerAndStart(winnerNames);
     }
   }
 
@@ -930,6 +918,7 @@ export class TandaDetailComponent implements OnInit {
     this.selectedSuggestionIdx.set(-1);
     this.enrollTurn = this.participants().length + 1;
     this.enrollVariant = '';
+    this.enrollWeeklyAmount = undefined;
   }
 
   onAddParticipant() {
@@ -939,15 +928,17 @@ export class TandaDetailComponent implements OnInit {
       this.isEnrolling.set(true);
       this.tandaService.addParticipant({
         tandaId: t.id,
-        customerId: sc.id.toString(),
+        customerId: sc.id,
         assignedTurn: this.enrollTurn,
-        variant: this.enrollVariant
+        variant: this.enrollVariant,
+        weeklyAmount: this.enrollWeeklyAmount || undefined
       }).subscribe({
         next: () => {
           this.toastService.success(`${sc.name} inscrita con éxito ✨`);
           this.loadTanda(t.id);
           this.selectedClient.set(null);
           this.enrollVariant = '';
+          this.enrollWeeklyAmount = undefined;
           this.isEnrolling.set(false);
         },
         error: (err) => {
@@ -993,7 +984,7 @@ export class TandaDetailComponent implements OnInit {
       this.tandaService.registerPayment({
         participantId: pay.participant.id,
         weekNumber: pay.week,
-        amountPaid: t.weeklyAmount
+        amountPaid: this.getParticipantWeeklyAmount(pay.participant)
       }).subscribe({
         next: () => {
           this.toastService.success('Abono registrado correctamente 💅');

@@ -157,11 +157,15 @@
     border: none;
     outline: none;
     background: transparent;
-    font-size: 1.1rem;
+    font-size: 16px; /* iOS Safari: nunca < 16px para evitar zoom al enfocar */
     font-weight: 600;
     color: #831843;
     padding: 0.8rem 0.5rem;
     font-family: var(--font-body);
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0.75rem;
+    touch-action: manipulation;
 }
 .turbo-input::placeholder {
     color: #f9a8d4;

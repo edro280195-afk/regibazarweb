@@ -224,12 +224,12 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           <div class="text-3xl">🏦</div>
                           <div>
                             <h4 class="font-black text-blue-900 text-xs leading-tight uppercase tracking-widest">Transferencia</h4>
-                            <span class="text-[10px] font-bold text-blue-600 uppercase">Citibanamex</span>
+                            <span class="text-[10px] font-bold text-blue-600 uppercase">MercadoPago</span>
                           </div>
                         </div>
-                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10 cursor-pointer active:scale-95 transition-all" (click)="copyText('5256786137583898')">
-                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Número de Tarjeta</p>
-                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">5256 7861 3758 3898</p>
+                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10 cursor-pointer active:scale-95 transition-all" (click)="copyText('722969017661718376')">
+                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Cuenta CLABE</p>
+                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">722969017661718376</p>
                         </div>
                         <p class="text-[9px] text-blue-700/80 text-center font-black uppercase">A nombre de: Yazmin Vara ✨</p>
                       </div>
@@ -425,7 +425,7 @@ export class TandaViewComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private tandaService = inject(TandaService);
   private api = inject(ApiService);
-  
+
   tanda = signal<any | null>(null);
   loading = signal(true);
   error = signal(false);
@@ -434,7 +434,7 @@ export class TandaViewComponent implements OnInit {
 
   activeTab = signal<'summary' | 'transparency'>('summary');
   paymentTab = signal<'transfer' | 'cash' | 'oxxo' | 'card'>('transfer');
-  
+
   // Mercado Pago Signals
   mp: any;
   cardFormInstance: any;
@@ -450,21 +450,21 @@ export class TandaViewComponent implements OnInit {
     const t = this.tanda();
     if (!t) return BASE_MESSENGER_URL;
     let ref = `tanda_${t.id}`;
-    
+
     // Si ya seleccionó quién es, lo incluimos en el ref para que sepas quién te escribe
     const pId = this.selectedParticipantId();
     if (pId) {
       const p = t.participants.find((x: any) => x.id === pId);
       if (p) ref += `_cli_${p.name.replace(/\s/g, '_')}`;
     }
-    
+
     return `${BASE_MESSENGER_URL}?ref=${ref}`;
   }
 
   toastVisible = signal(false);
   toastMessage = signal('');
   private toastTimeout: any;
-  
+
   isWinnerThisWeek = computed(() => {
     const t = this.tanda();
     if (!t) return false;
@@ -473,12 +473,12 @@ export class TandaViewComponent implements OnInit {
     // pero para demos mostramos si alguna participante tiene su turno esta semana.
     // Pero el usuario pidió "vista de la clienta", así que por ahora lo dejamos genérico o 
     // basado en URL si pasamos el participantId.
-    return false; 
+    return false;
   });
 
   @HostListener('window:scroll', ['$event'])
-  onScroll(event?: any) { 
-    this.scrollY.set(window.scrollY); 
+  onScroll(event?: any) {
+    this.scrollY.set(window.scrollY);
   }
 
   copyText(val: string) {
@@ -557,7 +557,7 @@ export class TandaViewComponent implements OnInit {
         return;
       }
     }
-    
+
     // Give Angular time to render the form container
     setTimeout(() => {
       const formEl = document.getElementById('mp-card-form');
@@ -585,7 +585,7 @@ export class TandaViewComponent implements OnInit {
       console.warn('⚠️ Card form already mounted');
       return;
     }
-    
+
     const formEl = document.getElementById('mp-card-form');
     if (!formEl) {
       console.error('❌ Cannot mount: Form element missing');
@@ -701,18 +701,18 @@ export class TandaViewComponent implements OnInit {
 
   getDeliveryDate(startDate: string, turn: number): Date {
     if (!startDate) return new Date();
-    
+
     // Extraemos las partes de la fecha (YYYY-MM-DD)
     const datePart = startDate.split('T')[0];
     const parts = datePart.split('-');
-    
+
     // Forzamos el parseo local para evitar saltos de día por UTC
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
-    
+
     const date = new Date(year, month, day, 12, 0, 0); // 12:00 PM local para ser súper seguros
-    
+
     // Sumamos las semanas según el turno
     date.setDate(date.getDate() + (turn - 1) * 7);
 

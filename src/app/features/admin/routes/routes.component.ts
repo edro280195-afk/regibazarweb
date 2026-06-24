@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, signal, computed, HostListener, CUSTOM_ELEMENTS_SCHEMA, inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe, KeyValuePipe } from '@angular/common';
-import { GoogleMap, MapMarker, MapDirectionsRenderer } from '@angular/google-maps';
+import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -11,7 +11,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
-import { AddressPickerComponent } from './address-picker/address-picker.component';
+import { AddressEditorV2Component } from '../clients/address-editor-v2/address-editor-v2.component';
 
 // Base del backend (sin /api) para construir URLs absolutas de imágenes
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
@@ -41,10 +41,10 @@ interface GeocodedOrder extends OrderSummaryDto {
     RouterLink,
     GoogleMap,
     MapMarker,
-    MapDirectionsRenderer,
+    MapPolyline,
     DragDropModule,
     RouteOptimizerComponent,
-    AddressPickerComponent
+    AddressEditorV2Component
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
@@ -563,11 +563,15 @@ interface GeocodedOrder extends OrderSummaryDto {
            MODAL: MAGIC ADDRESS PICKER (UX Overdose)
            ═══════════════════════════════════════════════════ -->
       @if (showAddressPicker()) {
-        <app-address-picker
-          [initialAddress]="pickerInitialAddress"
+        <app-address-editor-v2
+          [clientName]="pickerOrder()?.clientName"
+          [initialAddress]="pickerOrder()?.clientAddress ?? ''"
+          [initialLat]="pickerOrder()?.clientLatitude"
+          [initialLng]="pickerOrder()?.clientLongitude"
+          [initialInstructions]="pickerOrder()?.deliveryInstructions ?? ''"
           (confirm)="onAddressPickerConfirm($event)"
-          (cancel)="showAddressPicker.set(false)">
-        </app-address-picker>
+          (cancel)="closeAddressPicker()">
+        </app-address-editor-v2>
       }
 
       <!-- ═══════════════════════════════════════════════════
@@ -737,8 +741,8 @@ interface GeocodedOrder extends OrderSummaryDto {
                   <map-marker [position]="entry.value" [options]="driverMarkerOptions"></map-marker>
                 }
 
-                @if (mapDirections(); as dirs) {
-                  <map-directions-renderer [directions]="dirs" [options]="directionsRenderOpts"></map-directions-renderer>
+                @if (mapPolylinePath().length > 0) {
+                  <map-polyline [path]="mapPolylinePath()" [options]="mapPolylineOptions"></map-polyline>
                 }
               </google-map>
 
@@ -1104,8 +1108,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
   // Magic Address Picker
   showAddressPicker = signal(false);
-  pickerInitialAddress = '';
-  private pickerOrder: any = null;
+  pickerOrder = signal<OrderSummaryDto | null>(null);
   showOptimizerModal = signal(false);
 
   // Search & Filtering
@@ -1124,7 +1127,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   showMapModal = signal(false);
   mapRoute = signal<RouteDto | null>(null);
   mapDeliveries: RouteDeliveryDto[] = [];
-  mapDirections = signal<google.maps.DirectionsResult | undefined>(undefined);
+  mapPolylinePath = signal<google.maps.LatLngLiteral[]>([]);
   plottingMap = signal(false);
   @ViewChild(GoogleMap) googleMap!: GoogleMap;
 
@@ -1158,9 +1161,11 @@ export class RoutesComponent implements OnInit, OnDestroy {
     ]
   };
   baseMarkerOpts: google.maps.MarkerOptions = { title: 'Base' };
-  directionsRenderOpts: google.maps.DirectionsRendererOptions = {
-    suppressMarkers: true,
-    polylineOptions: { strokeColor: '#ec4899', strokeWeight: 5, strokeOpacity: 0.8 }
+  mapPolylineOptions: google.maps.PolylineOptions = {
+    strokeColor: '#ec4899',
+    strokeWeight: 5,
+    strokeOpacity: 0.75,
+    clickable: false
   };
 
   // Corte Modal
@@ -1748,27 +1753,38 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   // ─── MAGIC ADDRESS PICKER ───
-  openMagicPicker(order: any): void {
-    this.pickerOrder = order;
-    this.pickerInitialAddress = order.clientAddress || '';
+  openMagicPicker(order: OrderSummaryDto): void {
+    this.pickerOrder.set(order);
     this.showAddressPicker.set(true);
   }
 
-  onAddressPickerConfirm(res: { address: string, lat: number, lng: number }): void {
+  closeAddressPicker(): void {
     this.showAddressPicker.set(false);
-    if (!this.pickerOrder) return;
+    this.pickerOrder.set(null);
+  }
+
+  onAddressPickerConfirm(res: { address: string; lat: number; lng: number; deliveryInstructions: string }): void {
+    const order = this.pickerOrder();
+    if (!order?.clientId || this.isSavingAddress()) return;
     this.isSavingAddress.set(true);
-    this.api.updateClient(this.pickerOrder.clientId, {
-      name: this.pickerOrder.clientName,
-      address: res.address,
-      tag: this.pickerOrder.tags?.[0] || 'None',
-      type: this.pickerOrder.type || 'Nueva'
-    }).subscribe({
+    this.api.setClientCoordinates(
+      order.clientId,
+      res.lat,
+      res.lng,
+      res.address,
+      res.deliveryInstructions
+    ).subscribe({
       next: () => {
         this.toast.success('Ubicación guardada con magia ✨');
-        this.pickerOrder.clientAddress = res.address;
         this.isSavingAddress.set(false);
-        this.pendingOrders.update(list => list.map(o => o.id === this.pickerOrder.id ? { ...o, clientAddress: res.address } : o));
+        this.pendingOrders.update(list => list.map(o => o.id === order.id ? {
+          ...o,
+          clientAddress: res.address,
+          clientLatitude: res.lat,
+          clientLongitude: res.lng,
+          deliveryInstructions: res.deliveryInstructions
+        } : o));
+        this.closeAddressPicker();
       },
       error: () => {
         this.toast.error('Error al guardar ubicación');
@@ -2193,7 +2209,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   openMap(route: RouteDto): void {
     this.mapRoute.set(route);
     this.mapDeliveries = route.deliveries;
-    this.mapDirections.set(undefined);
+    this.mapPolylinePath.set([]);
     this.showMapModal.set(true);
 
     // Try to center on device GPS first
@@ -2206,6 +2222,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   closeMap(): void {
     this.showMapModal.set(false);
     this.mapRoute.set(null);
+    this.mapPolylinePath.set([]);
   }
 
   getDeliveryMarkerOpts(d: RouteDeliveryDto): google.maps.MarkerOptions {
@@ -2225,33 +2242,16 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.plottingMap.set(true);
     const sorted = [...route.deliveries].sort((a, b) => a.sortOrder - b.sortOrder);
     const path: google.maps.LatLngLiteral[] = [this.mapCenter];
-    const waypoints: google.maps.DirectionsWaypoint[] = [];
 
     for (const d of sorted) {
-      let lat = d.latitude;
-      let lng = d.longitude;
-      if (!lat || !lng) {
-        const coords = await this.geocodeAddress(d.clientAddress || '');
-        if (coords) { lat = coords.lat; lng = coords.lng; d.latitude = lat; d.longitude = lng; }
-      }
+      const lat = d.latitude;
+      const lng = d.longitude;
       if (lat && lng) {
-        waypoints.push({ location: { lat, lng }, stopover: true });
         path.push({ lat, lng });
       }
     }
 
-    if (path.length > 1) {
-      const ds = new google.maps.DirectionsService();
-      ds.route({
-        origin: path[0], destination: path[path.length - 1],
-        waypoints: waypoints.slice(0, -1),
-        optimizeWaypoints: false, travelMode: google.maps.TravelMode.DRIVING
-      }, (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          this.mapDirections.set(result);
-        }
-      });
-    }
+    this.mapPolylinePath.set(path.length > 1 ? path : []);
 
     this.plottingMap.set(false);
     setTimeout(() => {
