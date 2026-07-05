@@ -523,6 +523,10 @@ export class ApiService {
         return this.http.delete(`${this.base}/routes/${routeId}/remove-tanda/${tandaParticipantId}`);
     }
 
+    updateDeliveryNotes(routeId: number, deliveryId: number, notes: string | null): Observable<any> {
+        return this.http.patch(`${this.base}/routes/${routeId}/deliveries/${deliveryId}/notes`, { notes });
+    }
+
     recomposeRoute(routeId: number, orderIds: number[], tandaParticipantIds?: string[]): Observable<RecomposeRouteResponse> {
         return this.http.put<RecomposeRouteResponse>(`${this.base}/routes/${routeId}/recompose`, {
             orderIds,
