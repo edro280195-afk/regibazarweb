@@ -743,6 +743,12 @@ export interface ManualOrderRequest {
      *  salta el lookup por nombre y usa este ID, agregando el clientName tecleado
      *  como alias automáticamente si difiere del nombre canónico. */
     clientId?: number;
+    /** Id del pedido abierto al que la dueña eligió agregar los artículos. Cuando
+     *  viene, el backend fusiona contra ese pedido en lugar de crear uno nuevo. */
+    targetOrderId?: number;
+    /** Si es true, se crea siempre un pedido nuevo aunque la clienta tenga pedidos
+     *  abiertos (la dueña eligió "nuevo pedido"). Desactiva el auto-merge. */
+    forceNew?: boolean;
 }
 
 export interface LoginRequest {
