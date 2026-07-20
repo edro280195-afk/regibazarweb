@@ -130,6 +130,35 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
                       🚚 Entrega: {{ order.scheduledDeliveryDate | date:'dd MMM yyyy' }}
                     </p>
                   }
+
+                  <!-- 🛍️ Bolsas: badge + quick-set inline -->
+                  <div class="mt-2.5">
+                    @if (bagsEditFor() === order.id) {
+                      <div class="bg-pink-50/70 rounded-xl p-2 border border-pink-200 flex flex-wrap gap-1.5 items-center animate-[fadeIn_.15s_ease]">
+                        <span class="text-[9px] font-black text-pink-500 uppercase w-full mb-0.5">🛍️ ¿Cuántas bolsas?</span>
+                        @for (n of [1,2,3,4,5]; track n) {
+                          <button class="w-7 h-7 rounded-lg font-black text-xs bg-white text-pink-500 border border-pink-100 hover:bg-pink-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
+                                  [disabled]="savingQuickBags()" (click)="saveQuickBags(order, n)">{{ n }}</button>
+                        }
+                        <button class="w-7 h-7 rounded-lg font-black text-sm bg-white text-pink-500 border border-pink-100 hover:bg-pink-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
+                                [disabled]="savingQuickBags()" (click)="saveQuickBags(order, 6)">＋</button>
+                        <button class="px-2 h-7 rounded-lg font-bold text-[10px] bg-white text-purple-500 border border-purple-100 hover:bg-purple-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
+                                [disabled]="savingQuickBags()" (click)="saveQuickBags(order, 0)">Sin bolsas</button>
+                        <button class="px-2 h-7 rounded-lg font-bold text-[10px] text-pink-300 hover:text-pink-500 transition-all ml-auto"
+                                [disabled]="savingQuickBags()" (click)="bagsEditFor.set(null)">✕</button>
+                      </div>
+                    } @else if (order.packagesConfirmed) {
+                      <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-all"
+                              (click)="bagsEditFor.set(order.id)" title="Editar bolsas">
+                        🛍️ {{ (order.totalPackages ?? 0) === 0 ? 'Sin bolsas' : order.totalPackages + ' bolsa' + (order.totalPackages === 1 ? '' : 's') }}
+                      </button>
+                    } @else {
+                      <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-500 border border-rose-200 hover:bg-rose-100 transition-all animate-pulse-pink"
+                              (click)="bagsEditFor.set(order.id)" title="Agregar bolsas">
+                        🛍️ ¿Cuántas bolsas?
+                      </button>
+                    }
+                  </div>
                 </div>
 
                 <!-- Financials & Progress -->
@@ -666,6 +695,10 @@ export class OrdersComponent implements OnInit {
   orderTypeFilter = '';
   typeFilter = '';
   selectedOrder = signal<OrderSummaryDto | null>(null);
+
+  // 🛍️ Quick-set de bolsas desde la tarjeta del Kanban (id del pedido en edición inline)
+  bagsEditFor = signal<number | null>(null);
+  savingQuickBags = signal(false);
 
   paymentAmount = 0;
   paymentMethod = 'Efectivo';
@@ -1211,6 +1244,24 @@ export class OrdersComponent implements OnInit {
       error: () => {
         this.toast.error('Error al generar bolsas');
         this.isLoadingPackages.set(false);
+      }
+    });
+  }
+
+  /** 🛍️ Quick-set de bolsas desde la tarjeta del Kanban. count = 0 => "va sin bolsas". */
+  saveQuickBags(order: OrderSummaryDto, count: number) {
+    if (this.savingQuickBags()) return;
+    this.savingQuickBags.set(true);
+    this.api.setPackages(order.id, count, true).subscribe({
+      next: (updated) => {
+        this.orders.update(list => list.map(o => o.id === updated.id ? updated : o));
+        this.savingQuickBags.set(false);
+        this.bagsEditFor.set(null);
+        this.toast.success(count === 0 ? 'Marcado sin bolsas 🛍️' : `${count} bolsa${count === 1 ? '' : 's'} guardada${count === 1 ? '' : 's'} 🛍️`);
+      },
+      error: () => {
+        this.savingQuickBags.set(false);
+        this.toast.error('No se pudieron guardar las bolsas 🥺');
       }
     });
   }

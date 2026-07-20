@@ -157,6 +157,10 @@ export interface OrderSummaryDto {
     clientPoints?: number;
     clientLatitude?: number | null;
     clientLongitude?: number | null;
+    /** Número de bolsas del pedido. null = aún no capturado. */
+    totalPackages?: number | null;
+    /** True cuando ya se resolvió el tema de bolsas (número puesto o "va sin bolsas"). */
+    packagesConfirmed?: boolean;
     /** Evidencia de entrega (fotos). Solo si status = Delivered. */
     evidenceUrls?: string[];
     /** Firma digital de quien recibió (SVG). */
@@ -749,6 +753,12 @@ export interface ManualOrderRequest {
     /** Si es true, se crea siempre un pedido nuevo aunque la clienta tenga pedidos
      *  abiertos (la dueña eligió "nuevo pedido"). Desactiva el auto-merge. */
     forceNew?: boolean;
+    /** Número de bolsas capturado en el alta. undefined/null = "no sé todavía"
+     *  (el pedido queda como bolsas pendientes). Un número (incluido 0 = "va sin
+     *  bolsas") marca packagesConfirmed = true. */
+    totalPackages?: number | null;
+    /** True cuando la dueña resolvió el tema de bolsas al capturar. */
+    packagesConfirmed?: boolean;
 }
 
 export interface LoginRequest {
@@ -819,6 +829,10 @@ export interface UpdateOrderDetailsRequest {
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
     clientFacebookProfileUrl?: string;
+    /** Número de bolsas. Si viene, marca packagesConfirmed = true en el backend. */
+    totalPackages?: number | null;
+    /** Confirmación explícita de bolsas (permite "va sin bolsas" con totalPackages = 0). */
+    packagesConfirmed?: boolean;
 }
 
 export interface CreateAdminExpenseRequest {

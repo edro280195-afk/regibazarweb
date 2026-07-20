@@ -110,6 +110,12 @@ export class ApiService {
         return this.http.post<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/generate`, data);
     }
 
+    /** Set rápido del número de bolsas. totalPackages = 0 con confirmed = true = "va sin bolsas".
+     *  totalPackages = null con confirmed = false lo regresa a pendiente. */
+    setPackages(orderId: number, totalPackages: number | null, confirmed: boolean = true): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${orderId}/packages`, { totalPackages, confirmed });
+    }
+
     addPayment(orderId: number, payment: AddPaymentRequest): Observable<OrderPaymentDto> {
         return this.http.post<OrderPaymentDto>(`${this.base}/orders/${orderId}/payments`, payment);
     }
