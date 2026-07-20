@@ -73,6 +73,15 @@ export class ApiService {
         return this.http.post<OrderSummaryDto>(`${this.base}/orders/manual`, order);
     }
 
+    /** Pedidos abiertos (cualquier estado distinto a Cancelado) de una clienta, con sus
+     *  artículos. Se usa para preguntar si crear pedido nuevo o agregar a uno existente. */
+    getClientOpenOrders(clientId?: number, name?: string): Observable<OrderSummaryDto[]> {
+        let params = new HttpParams();
+        if (clientId != null) params = params.set('clientId', String(clientId));
+        if (name) params = params.set('name', name);
+        return this.http.get<OrderSummaryDto[]>(`${this.base}/orders/open`, { params });
+    }
+
     parseLiveText(text: string, currentState: AiParsedOrder[]): Observable<AiParsedOrder[]> {
         return this.http.post<AiParsedOrder[]>(`${this.base}/orders/parse-live`, { text, currentState });
     }
@@ -103,6 +112,12 @@ export class ApiService {
 
     generatePackages(orderId: number, data: GeneratePackagesRequest): Observable<OrderPackageDto[]> {
         return this.http.post<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/generate`, data);
+    }
+
+    /** Set rápido del número de bolsas. totalPackages = 0 con confirmed = true = "va sin bolsas".
+     *  totalPackages = null con confirmed = false lo regresa a pendiente. */
+    setPackages(orderId: number, totalPackages: number | null, confirmed: boolean = true): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${orderId}/packages`, { totalPackages, confirmed });
     }
 
     addPayment(orderId: number, payment: AddPaymentRequest): Observable<OrderPaymentDto> {
@@ -525,6 +540,10 @@ export class ApiService {
 
     removeTandaFromRoute(routeId: number, tandaParticipantId: string): Observable<any> {
         return this.http.delete(`${this.base}/routes/${routeId}/remove-tanda/${tandaParticipantId}`);
+    }
+
+    updateDeliveryNotes(routeId: number, deliveryId: number, notes: string | null): Observable<any> {
+        return this.http.patch(`${this.base}/routes/${routeId}/deliveries/${deliveryId}/notes`, { notes });
     }
 
     recomposeRoute(routeId: number, orderIds: number[], tandaParticipantIds?: string[]): Observable<RecomposeRouteResponse> {
