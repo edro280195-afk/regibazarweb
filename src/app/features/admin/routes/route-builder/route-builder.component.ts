@@ -8,7 +8,7 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto } from '../../../../core/models';
 import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
 import { AddressEditorV2Component } from '../../clients/address-editor-v2/address-editor-v2.component';
-import { Subject } from 'rxjs';
+import { Subject, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
 type StopKey = string; // "order:42" | "tanda:guid"
@@ -450,6 +450,59 @@ declare const google: any;
             (cancel)="pickingAddressFor.set(null)">
         </app-address-editor-v2>
     }
+
+    <!-- 🛍️ Puerta de bolsas: aparece si intentas armar la ruta con pedidos sin bolsas -->
+    @if (bagsGate(); as gate) {
+        <div class="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" (click)="cancelBagsGate()">
+            <div class="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col" (click)="$event.stopPropagation()">
+                <div class="p-5 border-b border-pink-100">
+                    <h3 class="text-lg font-black text-pink-700 flex items-center gap-2">🛍️ Faltan bolsas</h3>
+                    <p class="text-sm text-pink-400 mt-1">Antes de mandar a ruta, dime cuántas bolsas lleva cada pedido. Si de plano no lleva, pon <b>Sin bolsas</b>.</p>
+                </div>
+                <div class="p-5 overflow-y-auto space-y-3 grow">
+                    @for (o of gate; track o.id) {
+                        <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold text-pink-900 text-sm">{{ o.clientName }}</span>
+                                @if (o.count === null) {
+                                    <span class="text-[10px] text-rose-400 font-bold bg-rose-50 px-2 py-0.5 rounded-full">Falta</span>
+                                } @else if (o.count === 0) {
+                                    <span class="text-[10px] text-purple-500 font-bold bg-purple-50 px-2 py-0.5 rounded-full">Sin bolsas</span>
+                                } @else {
+                                    <span class="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">{{ o.count }} ✓</span>
+                                }
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 items-center">
+                                @for (n of [1,2,3,4,5]; track n) {
+                                    <button type="button" class="w-9 h-9 rounded-lg font-black text-sm transition-all active:scale-90"
+                                        [class]="o.count === n ? 'bg-pink-500 text-white shadow' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
+                                        (click)="setGateBags(o.id, n)">{{ n }}</button>
+                                }
+                                <button type="button" class="w-9 h-9 rounded-lg font-black text-base transition-all active:scale-90"
+                                    [class]="(o.count ?? 0) > 5 ? 'bg-pink-500 text-white shadow' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
+                                    (click)="bumpGateBags(o.id)">＋</button>
+                                <button type="button" class="px-2.5 h-9 rounded-lg font-bold text-xs transition-all active:scale-90"
+                                    [class]="o.count === 0 ? 'bg-purple-500 text-white shadow' : 'bg-white text-purple-500 border border-purple-100 hover:bg-purple-50'"
+                                    (click)="setGateBags(o.id, 0)">Sin bolsas</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="p-5 border-t border-pink-100 space-y-2">
+                    <button type="button" class="btn-coquette btn-pink w-full py-3 font-black disabled:opacity-50"
+                        [disabled]="!allGateResolved() || savingGate()"
+                        (click)="confirmGateAndSave()">
+                        @if (savingGate()) { <span class="spinner mr-2"></span> Guardando... }
+                        @else { Confirmar bolsas y mandar a ruta ✨ }
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-purple-500 bg-purple-50 hover:bg-purple-100 transition-all" (click)="allGateNoBags()">Todas van sin bolsas</button>
+                        <button type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-pink-400 bg-pink-50 hover:bg-pink-100 transition-all" (click)="cancelBagsGate()">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
     `,
     styles: [`
         .lasso-layer { position:absolute; inset:0; z-index:30; touch-action:none; cursor:crosshair; }
@@ -488,6 +541,14 @@ export class RouteBuilderComponent implements OnInit {
     saving = signal(false);
     geocodingNow = signal(false);
     pickingAddressFor = signal<CandidateRow | null>(null);
+
+    // 🛍️ Puerta de bolsas: pedidos que el backend rechazó por no tener bolsas capturadas.
+    bagsGate = signal<{ id: number; clientName: string; count: number | null }[] | null>(null);
+    savingGate = signal(false);
+    allGateResolved = computed(() => {
+        const g = this.bagsGate();
+        return !!g && g.length > 0 && g.every(o => o.count !== null);
+    });
 
     mapsReady = signal(typeof google !== 'undefined' && !!google?.maps);
     mapCenter = signal<google.maps.LatLngLiteral>({ lat: 27.4861, lng: -99.5069 });
@@ -1192,10 +1253,55 @@ export class RouteBuilderComponent implements OnInit {
                 },
                 error: (err) => {
                     this.saving.set(false);
+                    if (this.tryOpenBagsGate(err)) return;
                     this.toast.error(err.error?.message || 'Error al guardar la ruta');
                 }
             });
         }
+    }
+
+    // ── 🛍️ Puerta de bolsas ──
+
+    /** Si el backend rechazó por bolsas faltantes, abre el resolver y devuelve true. */
+    private tryOpenBagsGate(err: any): boolean {
+        const e = err?.error;
+        if (e?.code === 'PACKAGES_REQUIRED' && Array.isArray(e?.orders)) {
+            this.bagsGate.set(e.orders.map((o: any) => ({ id: o.id, clientName: o.clientName, count: null })));
+            return true;
+        }
+        return false;
+    }
+
+    setGateBags(id: number, count: number | null): void {
+        this.bagsGate.update(g => g ? g.map(o => o.id === id ? { ...o, count } : o) : g);
+    }
+
+    bumpGateBags(id: number): void {
+        this.bagsGate.update(g => g ? g.map(o =>
+            o.id === id ? { ...o, count: (o.count && o.count > 0 ? o.count : 5) + 1 } : o) : g);
+    }
+
+    allGateNoBags(): void {
+        this.bagsGate.update(g => g ? g.map(o => ({ ...o, count: 0 })) : g);
+    }
+
+    cancelBagsGate(): void { this.bagsGate.set(null); }
+
+    confirmGateAndSave(): void {
+        const g = this.bagsGate();
+        if (!g || !this.allGateResolved()) return;
+        this.savingGate.set(true);
+        forkJoin(g.map(o => this.api.setPackages(o.id, o.count, true))).subscribe({
+            next: () => {
+                this.savingGate.set(false);
+                this.bagsGate.set(null);
+                this.save(); // reintenta: ahora todas tienen bolsas confirmadas
+            },
+            error: () => {
+                this.savingGate.set(false);
+                this.toast.error('No se pudieron guardar las bolsas. Intenta de nuevo 🥺');
+            }
+        });
     }
 
     private decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
