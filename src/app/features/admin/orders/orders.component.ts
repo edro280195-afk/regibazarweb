@@ -26,15 +26,21 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
   template: `
     <div class="space-y-6">
       <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-4 animate-slide-down">
+      <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between animate-slide-down">
         <h1 class="text-2xl font-bold text-pink-900">📦 Pedidos</h1>
-        <div class="flex gap-2">
-          <label class="btn-coquette btn-outline-pink cursor-pointer">
+        <div class="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+          <label class="btn-coquette btn-outline-pink min-w-0 cursor-pointer justify-center px-2 py-2 text-[10px] sm:px-4 sm:text-sm" aria-label="Importar pedidos desde Excel">
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
           </label>
-          <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink text-center align-middle inline-block">💌 Enviar Enlaces</a>
-          <a routerLink="/admin/capture" class="btn-coquette btn-pink text-center align-middle inline-block">✨ Nuevo Pedido</a>
+          <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Enviar enlaces">
+            <span class="sm:hidden">💌 Enlaces</span>
+            <span class="hidden sm:inline">💌 Enviar Enlaces</span>
+          </a>
+          <a routerLink="/admin/capture" class="btn-coquette btn-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Crear nuevo pedido">
+            <span class="sm:hidden">✨ Nuevo</span>
+            <span class="hidden sm:inline">✨ Nuevo Pedido</span>
+          </a>
         </div>
       </div>
 
