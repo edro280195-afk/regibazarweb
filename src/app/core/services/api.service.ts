@@ -81,12 +81,16 @@ export class ApiService {
         return this.http.post<OrderSummaryDto>(`${this.base}/orders/${id}/apply-birthday-discount`, {});
     }
 
-    updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<any> {
-        return this.http.put(`${this.base}/orders/${id}`, data);
+    updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<void> {
+        return this.http.put<void>(`${this.base}/orders/${id}`, data);
     }
 
-    updateOrderStatus(id: number, data: { status?: string; orderType?: string; postponedAt?: string; postponedNote?: string }): Observable<any> {
-        return this.http.patch(`${this.base}/orders/${id}/status`, data);
+    updateOrderStatus(id: number, data: { status?: string; orderType?: string; postponedAt?: string; postponedNote?: string }): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${id}/status`, data);
+    }
+
+    releaseOrderForRoute(id: number): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/orders/${id}/release-for-route`, {});
     }
 
     deleteOrder(id: number): Observable<any> {

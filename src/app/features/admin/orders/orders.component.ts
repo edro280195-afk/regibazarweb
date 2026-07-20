@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
+import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
@@ -16,10 +16,13 @@ import { SignalRService } from '../../../core/services/signalr.service';
 import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
 import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messenger.util';
 
+type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
+
 @Component({
   selector: 'app-orders',
   standalone: true,
   imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink, BirthdayCouponComponent, GoogleAutocompleteDirective],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -228,7 +231,7 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
       @if (selectedOrder() && drawerOpen()) {
         <div class="fixed inset-0 z-[90] bg-gradient-to-r from-pink-900/10 to-pink-800/20 backdrop-blur-[6px] transition-opacity" (click)="closeDrawer()"></div>
         
-        <div class="fixed inset-y-0 right-0 z-[100] w-full md:w-[520px] lg:w-[620px] bg-gradient-to-b from-white via-pink-50/20 to-rose-50/30 backdrop-blur-2xl shadow-[-20px_0_60px_-10px_rgba(236,72,153,0.15)] transform transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex flex-col rounded-l-[2rem] overflow-hidden border-l border-pink-100/30"
+        <aside role="dialog" aria-modal="true" aria-label="Detalle del pedido" class="fixed inset-y-0 right-0 z-[100] w-full md:w-[560px] lg:w-[680px] bg-gradient-to-b from-white via-pink-50/20 to-rose-50/30 backdrop-blur-2xl shadow-[-20px_0_60px_-10px_rgba(236,72,153,0.15)] transform transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex flex-col rounded-l-[2rem] overflow-hidden border-l border-pink-100/30"
              [class.translate-x-0]="drawerOpen()" [class.translate-x-full]="!drawerOpen()">
              
           <!-- Header -->
@@ -272,41 +275,70 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
             <button class="w-9 h-9 flex shrink-0 items-center justify-center rounded-full bg-white/80 text-pink-400 hover:bg-pink-100 hover:text-pink-600 transition-all shadow-sm border border-pink-100/50 ml-4" (click)="closeDrawer()">✕</button>
           </div>
 
-          <!-- Scrollable Body -->
-          <div class="flex-1 overflow-y-auto w-full px-6 py-5 space-y-5 scrollbar-hide">
-            
-            <!-- Visual Pipeline (Status) -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
-              <h4 class="text-xs font-black text-pink-600 mb-3 uppercase tracking-widest flex items-center gap-2">🎀 Estatus del Pedido</h4>
-              <div class="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-hide py-1">
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-md shadow-amber-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-amber-50 hover:text-amber-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Pending')">{{ getStatusLabel('Pending') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
-                
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Confirmed' ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-md shadow-pink-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-pink-50 hover:text-pink-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Confirmed')">{{ getStatusLabel('Confirmed') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
-                
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-md shadow-blue-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-blue-50 hover:text-blue-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Shipped')">{{ getStatusLabel('Shipped') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
+          <nav class="px-4 sm:px-6 py-3 bg-white/70 border-b border-pink-100/60 grid grid-cols-4 gap-1.5" aria-label="Secciones del pedido">
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'summary' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'summary'" (click)="setDrawerTab('summary')">Resumen</button>
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'items' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'items'" (click)="setDrawerTab('items')">Artículos <span class="opacity-80">{{ selectedOrder()!.itemsCount }}</span></button>
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'delivery' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'delivery'" (click)="setDrawerTab('delivery')">Entrega</button>
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'payment' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'payment'" (click)="setDrawerTab('payment')">Cobro</button>
+          </nav>
 
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'InRoute' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-md shadow-indigo-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-indigo-50 hover:text-indigo-600'"
+          <!-- Scrollable Body -->
+          <div class="flex-1 overflow-y-auto w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4 scrollbar-hide">
+            
+            <!-- Resumen -->
+            @if (drawerTab() === 'summary') {
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest">🎀 Estatus del pedido</h4>
+                  <p class="text-[10px] text-pink-400 mt-1">Selecciona el estado actual; se guarda al instante.</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-pink-50 text-pink-600 text-[10px] font-black border border-pink-100">{{ getStatusLabel(selectedOrder()!.status) }}</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-amber-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'Pending')">{{ getStatusLabel('Pending') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Confirmed' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-pink-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'Confirmed')">{{ getStatusLabel('Confirmed') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Shipped' ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-violet-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'Shipped')">{{ getStatusLabel('Shipped') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'InRoute' ? 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-fuchsia-50'"
                         (click)="updateStatus(selectedOrder()!.id, 'InRoute')">{{ getStatusLabel('InRoute') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
-                
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-md shadow-emerald-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-emerald-50 hover:text-emerald-600'"
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Delivered' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-purple-50'"
                         (click)="updateStatus(selectedOrder()!.id, 'Delivered')">{{ getStatusLabel('Delivered') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'NotDelivered' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-rose-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'NotDelivered')">{{ getStatusLabel('NotDelivered') }}</button>
               </div>
             </div>
 
+            @if (selectedOrder()!.status === 'NotDelivered') {
+              <div class="rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div class="flex-1">
+                  <p class="text-sm font-black text-rose-700">Esta entrega no se completó</p>
+                  <p class="text-[11px] text-rose-500 mt-0.5">Libérala para que vuelva a aparecer al crear una nueva ruta.</p>
+                </div>
+                <button type="button" class="btn-coquette btn-pink py-2 px-4 text-xs shrink-0" (click)="releaseOrderForRoute()">Preparar reintento</button>
+              </div>
+            }
+            }
+
             <!-- Delivery & Period Toggles -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm grid grid-cols-2 gap-5">
+            @if (drawerTab() === 'delivery') {
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-pink-900 mb-2 uppercase">Tipo de Entrega</label>
                 <div class="flex bg-pink-50/50 p-1 rounded-xl border border-pink-100 shadow-inner">
@@ -365,7 +397,7 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
             </div>
 
             <!-- Shipping Cost Editor -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm flex items-center justify-between">
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p class="text-[10px] font-black text-pink-500 uppercase tracking-widest flex items-center gap-1">🚚 Costo de Envío</p>
                 <p class="text-sm font-bold text-pink-900 mt-1">Actual: {{ selectedOrder()!.shippingCost | currency:'MXN':'symbol-narrow' }}</p>
@@ -382,67 +414,63 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
               </div>
             </div>
 
-            <!-- Order Items -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
-              <div class="flex items-center justify-between mb-4">
-                <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🛍️ Productos ({{ selectedOrder()!.itemsCount }})</h4>
-              </div>
-              
-              <div class="space-y-3" [class.opacity-50]="isProcessingItem()" [class.pointer-events-none]="isProcessingItem()">
-                @for (item of selectedOrder()!.items; track item.id) {
-                  <div class="group/item bg-white/80 rounded-2xl p-4 border border-pink-100/30 shadow-[0_2px_10px_-4px_rgba(244,114,182,0.1)] hover:shadow-[0_8px_25px_-5px_rgba(244,114,182,0.2)] hover:border-pink-200/60 transition-all duration-300 flex flex-col gap-3 relative overflow-hidden focus-within:ring-2 focus-within:ring-pink-300 focus-within:border-pink-400">
-                    <div class="absolute inset-0 bg-gradient-to-r from-pink-50/0 via-white/50 to-pink-50/0 opacity-0 group-hover/item:opacity-100 transition-opacity pointer-events-none"></div>
-                    
-                    <div class="flex justify-between items-start relative z-10">
-                      <div class="flex-1 mr-4">
-                        <input type="text" [(ngModel)]="item.productName" 
-                               (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
-                               class="w-full bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-pink-50/60 transition-all font-black text-pink-900 text-sm appearance-none outline-none ring-0 placeholder-pink-300 px-1 py-0.5 rounded-t-sm" 
-                               placeholder="Nombre del producto...">
-                        <span class="text-[9px] text-pink-400 ml-1 opacity-0 group-focus-within/item:opacity-100 transition-opacity">✏️ Enter para guardar</span>
-                      </div>
-                      <button class="text-pink-200 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-all shrink-0" (click)="removeItem(item.id)" title="Eliminar producto">🗑️</button>
-                    </div>
-                    
-                    <div class="flex items-center justify-between relative z-10 bg-pink-50/30 p-2 rounded-xl">
-                      <div class="flex items-center bg-white rounded-xl border border-pink-100/50 shadow-sm hover:shadow-md transition-shadow">
-                        <button class="w-8 h-8 text-pink-500 hover:bg-pink-100 rounded-l-xl font-black transition-colors flex justify-center items-center active:bg-pink-200" (click)="updateItemQty(item.id, item.quantity - 1, item.productName, item.unitPrice)">−</button>
-                        <span class="w-10 h-full font-black text-pink-900 flex justify-center items-center text-sm border-x border-pink-50 bg-pink-50/30">{{ item.quantity }}</span>
-                        <button class="w-8 h-8 text-pink-500 hover:bg-pink-100 rounded-r-xl font-black transition-colors flex justify-center items-center active:bg-pink-200" (click)="updateItemQty(item.id, item.quantity + 1, item.productName, item.unitPrice)">+</button>
-                      </div>
-                      
-                      <div class="text-right">
-                        <div class="flex items-center justify-end gap-1 mb-0.5">
-                          <input type="number" [(ngModel)]="item.unitPrice" step="0.5"
-                                 (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
-                                 class="w-20 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-white transition-all text-xs text-pink-500 font-bold text-right outline-none ring-0 p-0 m-0">
-                          <span class="text-[10px] text-pink-400 font-medium">c/u</span>
-                        </div>
-                        <p class="font-black text-pink-700 text-base leading-none">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</p>
-                      </div>
-                    </div>
+            }
+
+            <!-- Artículos -->
+            @if (drawerTab() === 'items') {
+              <section class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm" aria-label="Artículos del pedido">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🛍️ Artículos ({{ selectedOrder()!.itemsCount }})</h4>
+                    <p class="text-[10px] text-pink-400 mt-1">Todo el pedido en una lista corta y fácil de editar.</p>
+                  </div>
+                  <button type="button" class="text-xs font-black text-pink-600 hover:text-pink-800 px-2 py-1 rounded-lg hover:bg-pink-50" (click)="toggleNewItemForm()">
+                    {{ showNewItemForm() ? 'Cancelar' : '+ Agregar' }}
+                  </button>
+                </div>
+
+                @if (showNewItemForm()) {
+                  <div class="mb-3 p-3 rounded-xl bg-pink-50/70 border border-pink-100 grid grid-cols-1 sm:grid-cols-[1fr_96px_72px_58px] gap-2 items-center">
+                    <input type="text" class="input-coquette py-2 text-sm" placeholder="Nombre del artículo" [(ngModel)]="newItemName">
+                    <input type="number" class="input-coquette py-2 px-2 text-sm" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
+                    <input type="number" class="input-coquette py-2 px-2 text-sm text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
+                    <button class="btn-coquette btn-pink py-2 px-2 text-xs" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">Agregar</button>
                   </div>
                 }
 
-                <!-- Add New Item Row -->
-                <div class="bg-gradient-to-tr from-pink-50/40 to-rose-50/30 rounded-2xl p-4 border-2 border-dashed border-pink-200/50 mt-4 hover:border-pink-300/50 transition-colors">
-                  <p class="text-xs font-black text-pink-500 mb-3 flex items-center gap-1">✨ Agregar artículo</p>
-                  <div class="flex flex-col gap-2">
-                    <input type="text" class="input-coquette py-2 text-sm" placeholder="Nombre completo del producto" [(ngModel)]="newItemName">
-                    <div class="grid grid-cols-[1fr_70px_60px] gap-2 items-center">
-                      <div class="relative min-w-0">
-                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-pink-400 font-bold">$</span>
-                        <input type="number" class="input-coquette py-2 pl-8 pr-2 text-sm w-full" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
+                <div class="divide-y divide-pink-100/80" [class.opacity-50]="isProcessingItem()" [class.pointer-events-none]="isProcessingItem()">
+                  @for (item of visibleOrderItems(); track item.id) {
+                    <div class="py-3 first:pt-1">
+                      <div class="flex items-center gap-2">
+                        <input type="text" [(ngModel)]="item.productName"
+                               (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
+                               class="min-w-0 flex-1 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-pink-50/60 transition-all font-bold text-pink-900 text-sm outline-none px-1 py-1"
+                               placeholder="Nombre del artículo">
+                        <button type="button" class="w-8 h-8 rounded-full text-pink-300 hover:text-rose-500 hover:bg-rose-50 transition-all shrink-0" (click)="removeItem(item.id)" [attr.aria-label]="'Eliminar ' + item.productName">🗑️</button>
                       </div>
-                      <input type="number" class="input-coquette py-2 px-1 text-sm w-full text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
-                      <button class="btn-coquette btn-pink px-0 text-center shadow-md hover:shadow-lg transition-all" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">OK</button>
+                      <div class="mt-2 flex items-center justify-between gap-3">
+                        <div class="inline-flex items-center rounded-xl border border-pink-100 bg-white overflow-hidden">
+                          <button type="button" class="w-8 h-8 text-pink-500 hover:bg-pink-50 font-black" (click)="updateItemQty(item.id, item.quantity - 1, item.productName, item.unitPrice)" [attr.aria-label]="'Reducir ' + item.productName">−</button>
+                          <span class="w-8 text-center text-sm font-black text-pink-900 border-x border-pink-100">{{ item.quantity }}</span>
+                          <button type="button" class="w-8 h-8 text-pink-500 hover:bg-pink-50 font-black" (click)="updateItemQty(item.id, item.quantity + 1, item.productName, item.unitPrice)" [attr.aria-label]="'Aumentar ' + item.productName">+</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <label class="text-[10px] text-pink-400">$ <input type="number" [(ngModel)]="item.unitPrice" step="0.5" (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)" class="w-16 bg-transparent border-b border-pink-100 focus:border-pink-400 text-right text-xs font-bold text-pink-600 outline-none"> c/u</label>
+                          <span class="min-w-16 text-right font-black text-pink-700 text-sm">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  }
                 </div>
-              </div>
-            </div>
+
+                @if (hasHiddenOrderItems()) {
+                  <button type="button" class="mt-3 w-full py-2 rounded-xl text-xs font-black text-pink-500 hover:bg-pink-50 transition-colors" (click)="showRemainingOrderItems()">Ver {{ hiddenOrderItemsCount() }} artículo(s) más</button>
+                }
+              </section>
+            }
 
             <!-- Logística (Bolsas Anti-Pérdidas) -->
+            @if (drawerTab() === 'delivery') {
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm mb-5">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🏷️ Logística y Etiquetas</h4>
@@ -486,8 +514,10 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
                 </div>
               }
             </div>
+            }
 
             <!-- Quick Payments -->
+            @if (drawerTab() === 'payment') {
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">💰 Cobros Express</h4>
@@ -512,17 +542,17 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
               
               <div class="grid grid-cols-3 gap-2 mt-3">
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-                        [class]="paymentMethod === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-md shadow-emerald-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-emerald-50 hover:text-emerald-600'"
+                        [class]="paymentMethod === 'Efectivo' ? 'bg-rose-50 border-rose-200 text-rose-700 shadow-md shadow-rose-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-rose-50 hover:text-rose-600'"
                         (click)="paymentMethod = 'Efectivo'; addPayment()">
                   <span class="text-xl">💵</span> <span class="text-[10px]">Efectivo</span>
                 </button>
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-                        [class]="paymentMethod === 'Transferencia' ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-md shadow-blue-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-blue-50 hover:text-blue-600'"
+                        [class]="paymentMethod === 'Transferencia' ? 'bg-violet-50 border-violet-200 text-violet-700 shadow-md shadow-violet-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-violet-50 hover:text-violet-600'"
                         (click)="paymentMethod = 'Transferencia'; addPayment()">
                   <span class="text-xl">🏦</span> <span class="text-[10px]">Transf.</span>
                 </button>
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-                        [class]="paymentMethod === 'Tarjeta' ? 'bg-purple-50 border-purple-200 text-purple-700 shadow-md shadow-purple-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-purple-50 hover:text-purple-600'"
+                        [class]="paymentMethod === 'Tarjeta' ? 'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-700 shadow-md shadow-fuchsia-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-fuchsia-50 hover:text-fuchsia-600'"
                         (click)="paymentMethod = 'Tarjeta'; addPayment()">
                   <span class="text-xl">💳</span> <span class="text-[10px]">Tarjeta</span>
                 </button>
@@ -580,6 +610,7 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
                 <p class="text-[9px] text-violet-400/80 mt-2 text-center italic">El canje aplica un descuento al pedido y descuenta los puntos. Queda registrado en su historial.</p>
               }
             </div>
+            }
 
             <div class="h-16"></div>
           </div>
@@ -601,7 +632,7 @@ import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messe
               <button class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 hover:bg-amber-100 hover:text-amber-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-amber-100/50" title="Regalo Cumpleaños 🎂" (click)="applyBirthdayGift()">🎁</button>
             </div>
           </div>
-        </div>
+        </aside>
       }
 
       <!-- Hidden Coupon for Capture -->
@@ -681,6 +712,9 @@ export class OrdersComponent implements OnInit {
 
   // Drawer State
   drawerOpen = signal(false);
+  drawerTab = signal<OrderDrawerTab>('items');
+  showNewItemForm = signal(false);
+  showAllOrderItems = signal(false);
   newItemName = '';
   newItemQty = 1;
   newItemPrice = 0;
@@ -807,6 +841,13 @@ export class OrdersComponent implements OnInit {
   }
 
   updateStatus(id: number, status: string): void {
+    if (this.selectedOrder()?.id === id
+      && this.selectedOrder()?.status === 'NotDelivered'
+      && status === 'Pending') {
+      this.releaseOrderForRoute();
+      return;
+    }
+
     // Status Morph Animation Start
     const badge = document.querySelector(`.status-badge[data-id="${id}"]`);
     if (badge) {
@@ -819,9 +860,11 @@ export class OrdersComponent implements OnInit {
     }
 
     this.api.updateOrderStatus(id, { status }).subscribe({
-      next: () => {
+      next: (updatedOrder) => {
+        if (this.selectedOrder()?.id === id) {
+          this.selectedOrder.set(updatedOrder);
+        }
         this.loadOrders();
-        // Assuming ORDER_STATUS_LABELS is defined elsewhere or getStatusLabel can be used
         this.toast.success(`Estado actualizado a ${this.getStatusLabel(status)} ✨`);
       },
       error: () => this.toast.error('Error al actualizar estado')
@@ -842,6 +885,9 @@ export class OrdersComponent implements OnInit {
     this.loadPackages(order.id);
     this.paymentAmount = 0;
     this.paymentDate = this.getTodayLocal(); // Pre-llenar con hoy
+    this.drawerTab.set('items');
+    this.showNewItemForm.set(false);
+    this.showAllOrderItems.set(false);
     this.drawerOpen.set(true);
     this.resetNewItemForm();
     // Lock body scroll for mobile
@@ -854,6 +900,52 @@ export class OrdersComponent implements OnInit {
     // Unlock body scroll
     document.body.style.overflow = '';
     setTimeout(() => this.selectedOrder.set(null), 500);
+  }
+
+  setDrawerTab(tab: OrderDrawerTab): void {
+    this.drawerTab.set(tab);
+  }
+
+  toggleNewItemForm(): void {
+    this.showNewItemForm.update(value => !value);
+  }
+
+  visibleOrderItems(): OrderItemDto[] {
+    const items = this.selectedOrder()?.items ?? [];
+    return this.showAllOrderItems() ? items : items.slice(0, 6);
+  }
+
+  hasHiddenOrderItems(): boolean {
+    const items = this.selectedOrder()?.items ?? [];
+    return !this.showAllOrderItems() && items.length > 6;
+  }
+
+  hiddenOrderItemsCount(): number {
+    const items = this.selectedOrder()?.items ?? [];
+    return Math.max(0, items.length - 6);
+  }
+
+  showRemainingOrderItems(): void {
+    this.showAllOrderItems.set(true);
+  }
+
+  releaseOrderForRoute(): void {
+    const order = this.selectedOrder();
+    if (!order || order.status !== 'NotDelivered') return;
+    if (!confirm(`¿Preparar el pedido #${order.id} para volverlo a agregar a una ruta?`)) return;
+
+    this.api.releaseOrderForRoute(order.id).subscribe({
+      next: (updatedOrder) => {
+        this.selectedOrder.set(updatedOrder);
+        this.orders.update(list => list.map(item => item.id === updatedOrder.id ? updatedOrder : item));
+        this.drawerTab.set('summary');
+        this.toast.success('Pedido liberado y listo para una nueva ruta ✨');
+        this.loadOrders();
+      },
+      error: (error: { error?: string }) => {
+        this.toast.error(error.error ?? 'No se pudo preparar el pedido para reintento');
+      }
+    });
   }
 
   resetNewItemForm(): void {
@@ -995,6 +1087,7 @@ export class OrdersComponent implements OnInit {
       next: () => {
         this.toast.success('Producto agregado 🛍️');
         this.resetNewItemForm();
+        this.showNewItemForm.set(false);
         this.reloadSelectedOrder();
         this.loadOrders();
         this.isProcessingItem.set(false);
