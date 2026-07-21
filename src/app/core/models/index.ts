@@ -773,6 +773,73 @@ export interface LoginResponse {
     expiresAt: string;
 }
 
+// ── Inventario físico / cajas NFC ──
+export interface InventoryBoxSummaryDto {
+    id: string;
+    code: string;
+    name: string;
+    location: string | null;
+    isNfcBound: boolean;
+    articleTypesCount: number;
+    totalUnits: number;
+    updatedAt: string;
+}
+
+export interface InventoryItemDto {
+    id: string;
+    name: string;
+    variant: string | null;
+    barcode: string | null;
+    quantity: number;
+    updatedAt: string;
+}
+
+export interface InventoryMovementDto {
+    id: string;
+    inventoryItemId: string | null;
+    itemName: string | null;
+    type: string;
+    quantityDelta: number;
+    quantityAfter: number;
+    note: string | null;
+    performedBy: string;
+    occurredAt: string;
+}
+
+export interface InventoryBoxDto extends Omit<InventoryBoxSummaryDto, 'articleTypesCount' | 'totalUnits'> {
+    nfcUrl: string;
+    items: InventoryItemDto[];
+    movements: InventoryMovementDto[];
+    createdAt: string;
+}
+
+export interface CreateInventoryBoxDto {
+    code: string;
+    name: string;
+    location?: string | null;
+}
+
+export interface CreateInventoryItemDto {
+    name: string;
+    variant?: string | null;
+    barcode?: string | null;
+    quantity: number;
+    note?: string | null;
+}
+
+export interface AdjustInventoryItemDto {
+    quantityDelta: number;
+    note?: string | null;
+}
+
+export interface TransferInventoryItemsDto {
+    sourceBoxId: string;
+    destinationBoxId: string;
+    itemId: string;
+    quantity: number;
+    note?: string | null;
+}
+
 export interface CommonProductDto {
     name: string;
     count: number;

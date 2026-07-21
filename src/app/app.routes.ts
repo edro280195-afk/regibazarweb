@@ -24,6 +24,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/orders/orders.component').then(m => m.OrdersComponent)
             },
             {
+                path: 'inventory',
+                loadComponent: () => import('./features/admin/inventory/inventory.component').then(m => m.InventoryComponent)
+            },
+            {
                 path: 'capture',
                 loadComponent: () => import('./features/admin/orders/capture-order/capture-order').then(m => m.CaptureOrderComponent)
             },
@@ -121,6 +125,10 @@ export const routes: Routes = [
     {
         path: 'pedido/:token',
         loadComponent: () => import('./features/client/order-view/order-view.component').then(m => m.OrderViewComponent)
+    },
+    {
+        path: 'caja/:token',
+        loadComponent: () => import('./features/client/inventory-tag-redirect/inventory-tag-redirect.component').then(m => m.InventoryTagRedirectComponent)
     },
     {
         path: 'live/:id',

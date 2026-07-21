@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 
@@ -104,6 +104,7 @@ import { ToastService } from '../../../core/services/toast.service';
 export class LoginComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private toast = inject(ToastService);
 
   email = '';
@@ -126,10 +127,15 @@ export class LoginComponent {
         this.auth.handleLoginSuccess(res);
         this.toast.success('¡Bienvenida, ' + res.name + '! 💖');
         
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        const canReturnToInventory = returnUrl?.startsWith('/admin/inventory');
+
         if (res.role === 'Driver') {
           this.router.navigate(['/admin/routes']);
         } else if (res.role === 'Scaner') {
           this.router.navigate(['/pos']);
+        } else if (canReturnToInventory && returnUrl) {
+          this.router.navigateByUrl(returnUrl);
         } else {
           this.router.navigate(['/admin']);
         }

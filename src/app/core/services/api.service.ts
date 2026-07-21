@@ -18,7 +18,9 @@ import {
     ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto,
     ClientMergeAuditDto,
     FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse,
-    LoyaltyRewardDto
+    LoyaltyRewardDto,
+    InventoryBoxSummaryDto, InventoryBoxDto, CreateInventoryBoxDto,
+    CreateInventoryItemDto, AdjustInventoryItemDto, TransferInventoryItemsDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +31,41 @@ export class ApiService {
 
     getApiUrl(): string {
         return this.base;
+    }
+
+    // ── Inventario físico / cajas NFC ──
+    getInventoryBoxes(search?: string): Observable<InventoryBoxSummaryDto[]> {
+        let params = new HttpParams();
+        if (search?.trim()) params = params.set('search', search.trim());
+        return this.http.get<InventoryBoxSummaryDto[]>(`${this.base}/inventory/boxes`, { params });
+    }
+
+    getInventoryBox(id: string): Observable<InventoryBoxDto> {
+        return this.http.get<InventoryBoxDto>(`${this.base}/inventory/boxes/${id}`);
+    }
+
+    getInventoryBoxByToken(token: string): Observable<InventoryBoxDto> {
+        return this.http.get<InventoryBoxDto>(`${this.base}/inventory/boxes/by-token/${encodeURIComponent(token)}`);
+    }
+
+    createInventoryBox(request: CreateInventoryBoxDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/boxes`, request);
+    }
+
+    updateInventoryBox(id: string, request: CreateInventoryBoxDto): Observable<InventoryBoxDto> {
+        return this.http.put<InventoryBoxDto>(`${this.base}/inventory/boxes/${id}`, request);
+    }
+
+    addInventoryItem(boxId: string, request: CreateInventoryItemDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/boxes/${boxId}/items`, request);
+    }
+
+    adjustInventoryItem(itemId: string, request: AdjustInventoryItemDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/items/${itemId}/adjust`, request);
+    }
+
+    transferInventoryItems(request: TransferInventoryItemsDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/transfers`, request);
     }
 
     // ── Dashboard ──
