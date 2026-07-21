@@ -20,7 +20,12 @@ import {
     FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse,
     LoyaltyRewardDto,
     InventoryBoxSummaryDto, InventoryBoxDto, CreateInventoryBoxDto,
-    CreateInventoryItemDto, AdjustInventoryItemDto, TransferInventoryItemsDto
+    CreateInventoryItemDto, AdjustInventoryItemDto, TransferInventoryItemsDto,
+    InventoryBarcodeMatchDto, CompleteInventoryCountDto,
+    LabelTemplateSummaryDto, LabelTemplateDetailDto, CreateLabelTemplateDto,
+    UpdateLabelTemplateDto, SaveLabelTemplateDraftDto, SaveLabelTemplateDraftResultDto,
+    PublishLabelTemplateResultDto, LabelAssetDto, LabelPrintContextDto,
+    CreateLabelPrintEventDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -66,6 +71,94 @@ export class ApiService {
 
     transferInventoryItems(request: TransferInventoryItemsDto): Observable<InventoryBoxDto> {
         return this.http.post<InventoryBoxDto>(`${this.base}/inventory/transfers`, request);
+    }
+
+    getInventoryItemsByBarcode(barcode: string): Observable<InventoryBarcodeMatchDto[]> {
+        return this.http.get<InventoryBarcodeMatchDto[]>(`${this.base}/inventory/items/by-barcode/${encodeURIComponent(barcode)}`);
+    }
+
+    completeInventoryCount(boxId: string, request: CompleteInventoryCountDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/boxes/${boxId}/counts`, request);
+    }
+
+    getLabelTemplates(includeArchived = false): Observable<LabelTemplateSummaryDto[]> {
+        const params = includeArchived ? new HttpParams().set('includeArchived', 'true') : undefined;
+        return this.http.get<LabelTemplateSummaryDto[]>(`${this.base}/label-templates`, { params });
+    }
+
+    getLabelTemplate(id: string): Observable<LabelTemplateDetailDto> {
+        return this.http.get<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}`);
+    }
+
+    createLabelTemplate(request: CreateLabelTemplateDto): Observable<LabelTemplateDetailDto> {
+        return this.http.post<LabelTemplateDetailDto>(`${this.base}/label-templates`, request);
+    }
+
+    updateLabelTemplate(id: string, request: UpdateLabelTemplateDto): Observable<LabelTemplateDetailDto> {
+        return this.http.put<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}`, request);
+    }
+
+    saveLabelTemplateDraft(id: string, request: SaveLabelTemplateDraftDto): Observable<SaveLabelTemplateDraftResultDto> {
+        return this.http.put<SaveLabelTemplateDraftResultDto>(`${this.base}/label-templates/${id}/draft`, request);
+    }
+
+    publishLabelTemplate(id: string, expectedRevision: number): Observable<PublishLabelTemplateResultDto> {
+        return this.http.post<PublishLabelTemplateResultDto>(`${this.base}/label-templates/${id}/publish`, { expectedRevision });
+    }
+
+    restoreLabelTemplateVersion(id: string, versionId: string, expectedRevision: number): Observable<SaveLabelTemplateDraftResultDto> {
+        return this.http.post<SaveLabelTemplateDraftResultDto>(
+            `${this.base}/label-templates/${id}/versions/${versionId}/restore`,
+            { expectedRevision }
+        );
+    }
+
+    duplicateLabelTemplate(id: string): Observable<LabelTemplateDetailDto> {
+        return this.http.post<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}/duplicate`, {});
+    }
+
+    setDefaultLabelTemplate(id: string): Observable<LabelTemplateDetailDto> {
+        return this.http.post<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}/default`, {});
+    }
+
+    archiveLabelTemplate(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.base}/label-templates/${id}`);
+    }
+
+    getLabelAssets(includeArchived = false): Observable<LabelAssetDto[]> {
+        const params = includeArchived ? new HttpParams().set('includeArchived', 'true') : undefined;
+        return this.http.get<LabelAssetDto[]>(`${this.base}/label-templates/assets`, { params });
+    }
+
+    uploadLabelAsset(file: File, name?: string): Observable<LabelAssetDto> {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (name?.trim()) formData.append('name', name.trim());
+        return this.http.post<LabelAssetDto>(`${this.base}/label-templates/assets`, formData);
+    }
+
+    renameLabelAsset(id: string, name: string): Observable<LabelAssetDto> {
+        return this.http.put<LabelAssetDto>(`${this.base}/label-templates/assets/${id}`, { name });
+    }
+
+    archiveLabelAsset(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.base}/label-templates/assets/${id}`);
+    }
+
+    getBoxLabelPrintContext(templateId: string, boxId: string): Observable<LabelPrintContextDto> {
+        return this.http.get<LabelPrintContextDto>(`${this.base}/label-print-jobs/${templateId}/boxes/${boxId}`);
+    }
+
+    getItemLabelPrintContext(templateId: string, itemId: string): Observable<LabelPrintContextDto> {
+        return this.http.get<LabelPrintContextDto>(`${this.base}/label-print-jobs/${templateId}/items/${itemId}`);
+    }
+
+    getPackageLabelPrintContext(templateId: string, packageId: string): Observable<LabelPrintContextDto> {
+        return this.http.get<LabelPrintContextDto>(`${this.base}/label-print-jobs/${templateId}/packages/${packageId}`);
+    }
+
+    createLabelPrintEvent(request: CreateLabelPrintEventDto): Observable<void> {
+        return this.http.post<void>(`${this.base}/label-print-jobs/events`, request);
     }
 
     // ── Dashboard ──

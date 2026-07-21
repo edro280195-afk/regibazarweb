@@ -3,14 +3,17 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import * as QRCode from 'qrcode';
 import {
-  CreateInventoryBoxDto,
-  CreateInventoryItemDto,
+    CreateInventoryBoxDto,
+    CreateInventoryItemDto,
+    CompleteInventoryCountDto,
   InventoryBoxDto,
   InventoryBoxSummaryDto,
   InventoryItemDto
 } from '../../../core/models';
 import { ApiService } from '../../../core/services/api.service';
+import { LabelPrintService } from '../../../core/services/label-print.service';
 import { ToastService } from '../../../core/services/toast.service';
 
 interface NdefRecordLike {
@@ -117,11 +120,15 @@ interface NfcBrowserWindow extends Window {
                 <b>Etiqueta de esta caja</b>
                 <p>{{ box.isNfcBound ? 'Esta caja ya responde al acercar el celular.' : 'Copia esta liga y escríbela desde la app Android.' }}</p>
               </div>
-              <button type="button" class="link-button" (click)="copyNfcUrl(box.nfcUrl)">Copiar liga NFC</button>
+              <div class="label-actions">
+                <button type="button" class="link-button" (click)="copyNfcUrl(box.nfcUrl)">Copiar liga NFC</button>
+                <button type="button" class="link-button" (click)="openQrLabel(box)">Ver QR imprimible</button>
+              </div>
             </div>
 
             <div class="detail-actions">
               <button type="button" class="primary-button" (click)="showItemForm.set(!showItemForm())">＋ Agregar artículo</button>
+              <button type="button" class="secondary-button" (click)="openCount(box)" [disabled]="box.items.length === 0">Conteo físico</button>
               <button type="button" class="secondary-button" (click)="showHistory.set(!showHistory())">{{ showHistory() ? 'Ver artículos' : 'Ver historial' }}</button>
             </div>
 
@@ -150,11 +157,14 @@ interface NfcBrowserWindow extends Window {
               <div class="items-list">
                 @for (item of box.items; track item.id) {
                   <article class="item-row">
-                    <div class="item-copy"><b>{{ item.name }}</b><small>{{ item.variant || 'Sin variante' }}@if (item.barcode) { · {{ item.barcode }} }</small></div>
+                    <div class="item-copy"><b>{{ item.name }}</b><small>{{ item.variant || 'Sin variante' }} · {{ item.barcode || item.labelCode }}</small></div>
+                    <div class="item-actions">
+                    <button type="button" class="plain-button label-item-button" (click)="printItemLabel(item)">Etiqueta</button>
                     <div class="quantity-control" aria-label="Cantidad de {{ item.name }}">
                       <button type="button" aria-label="Sacar una pieza" (click)="adjustItem(box, item, -1)" [disabled]="item.quantity === 0 || isSaving()">−</button>
                       <strong>{{ item.quantity }}</strong>
                       <button type="button" aria-label="Agregar una pieza" (click)="adjustItem(box, item, 1)" [disabled]="isSaving()">＋</button>
+                    </div>
                     </div>
                     <button type="button" class="move-button" (click)="openTransfer(item)">Mover</button>
                   </article>
@@ -192,6 +202,41 @@ interface NfcBrowserWindow extends Window {
           </form>
         </div>
       }
+
+      @if (countBox(); as box) {
+        <div class="modal-backdrop" (click)="closeCount()">
+          <form class="modal-card count-modal" (ngSubmit)="completeCount(box)" (click)="$event.stopPropagation()">
+            <span class="modal-emoji">🧮</span>
+            <h3>Conteo físico · {{ box.code }}</h3>
+            <p>Cuenta todo lo que hay en la caja. Sólo se guardarán las diferencias con su historial.</p>
+            <div class="count-list">
+              @for (item of box.items; track item.id) {
+                <label class="count-row">
+                  <span><b>{{ item.name }}</b><small>{{ item.variant || 'Sin variante' }} · Sistema: {{ item.quantity }}</small></span>
+                  <input [(ngModel)]="countDraft[item.id]" [name]="'count-' + item.id" type="number" min="0" step="1" required />
+                </label>
+              }
+            </div>
+            <label>Nota del conteo<input [(ngModel)]="countNote" name="countNote" maxlength="300" placeholder="Ej. Conteo semanal" /></label>
+            <div class="form-actions"><button type="button" class="plain-button" (click)="closeCount()">Cancelar</button><button class="primary-button" type="submit" [disabled]="isSaving()">Guardar conteo</button></div>
+          </form>
+        </div>
+      }
+
+      @if (labelBox(); as box) {
+        <div class="modal-backdrop" (click)="closeQrLabel()">
+          <section class="modal-card label-modal" (click)="$event.stopPropagation()" aria-label="Etiqueta QR de {{ box.code }}">
+            <span class="modal-emoji">🏷️</span><h3>Etiqueta de {{ box.code }}</h3><p>Imprime este QR y pégalo junto a la etiqueta NFC. Ambos abren la misma caja segura.</p>
+            @if (qrDataUrl(); as qrUrl) {
+              <img class="qr-preview" [src]="qrUrl" alt="Código QR de la caja {{ box.code }}" />
+              <strong>{{ box.name }}</strong><small>{{ box.location || 'Ubicación pendiente' }}</small>
+              <div class="form-actions"><button type="button" class="plain-button" (click)="closeQrLabel()">Cerrar</button><button type="button" class="primary-button" (click)="printQrLabel(box)">Imprimir etiqueta</button></div>
+            } @else {
+              <div class="empty-state">Preparando el QR…</div>
+            }
+          </section>
+        </div>
+      }
     </section>
   `,
   styles: [`
@@ -206,14 +251,15 @@ interface NfcBrowserWindow extends Window {
     .notice { display:flex; align-items:center; gap:.6rem; margin:1rem 0; border-radius:15px; padding:.85rem 1rem; color:#831843; background:#fdf2f8; border:1px solid #fbcfe8; font-size:.9rem; } .notice-error { color:#991b1b; background:#fff1f2; border-color:#fecdd3; }
     .stats-grid { margin:1rem 0; display:grid; grid-template-columns:repeat(3,1fr); gap:.85rem; }.stats-grid article { border-radius:20px; padding:1rem 1.15rem; display:grid; grid-template-columns:auto 1fr; column-gap:.75rem; align-items:center; }.stats-grid span { grid-row:span 2; font-size:1.55rem; }.stats-grid strong { font-size:1.35rem; color:#831843; }.stats-grid small { color:#9d174d; }
     .workspace { display:grid; grid-template-columns:minmax(270px, .8fr) minmax(500px,1.75fr); gap:1rem; align-items:start; }.boxes-panel,.detail-panel { border-radius:25px; min-width:0; }.boxes-panel { padding:1rem; position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; }.detail-panel { min-height:590px; padding:1.35rem; }.panel-heading,.detail-header,.nfc-link-card,.item-row,.history-row { display:flex; gap:1rem; justify-content:space-between; align-items:center; }.panel-heading h3,.detail-header h3 { margin-bottom:.15rem; font-size:1.25rem; font-weight:900; }.panel-heading p,.location,.nfc-link-card p { color:#9d174d; font-size:.84rem; margin-bottom:0; }.icon-button { width:38px; height:38px; border:0; border-radius:12px; color:#9d174d; background:#fce7f3; font-size:1.2rem; }.search-form { display:flex; gap:.45rem; margin:1rem 0; }.search-form input,.item-form input,.modal-card input,.modal-card select { width:100%; min-height:42px; border:1px solid #f9a8d4; border-radius:12px; padding:.62rem .72rem; outline:none; color:#4a1630; background:rgba(255,255,255,.85); }.search-form input:focus,.item-form input:focus,.modal-card input:focus,.modal-card select:focus { border-color:#db2777; box-shadow:0 0 0 3px rgba(236,72,153,.13); }.search-form button { width:42px; border:0; border-radius:12px; background:#fce7f3; color:#9d174d; font-size:1.3rem; }.box-list { display:flex; flex-direction:column; gap:.55rem; }.box-card { display:flex; width:100%; gap:.65rem; align-items:flex-start; padding:.8rem; text-align:left; border:1px solid transparent; border-radius:16px; background:transparent; color:#4a1630; }.box-card:hover,.box-card-active { background:#fff1f7; border-color:#f9a8d4; }.box-emoji { font-size:1.35rem; }.box-info { display:grid; min-width:0; flex:1; gap:.1rem; }.box-info b { font-size:.84rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.box-info small,.box-info em { color:#9d174d; font-size:.72rem; font-style:normal; }.nfc-dot { align-self:center; font-size:.58rem; border-radius:999px; color:#9d174d; background:#fce7f3; padding:.25rem .38rem; font-weight:900; }
-    .detail-header { align-items:flex-start; }.nfc-badge { white-space:nowrap; border-radius:999px; background:#fce7f3; color:#9d174d; padding:.38rem .65rem; font-size:.72rem; font-weight:900; }.nfc-pending { color:#a16207; background:#fef3c7; }.nfc-link-card { margin:1.15rem 0; padding:1rem; border-radius:17px; background:linear-gradient(135deg,#fdf2f8,#faf5ff); border:1px dashed #f9a8d4; }.nfc-link-card b { font-size:.9rem; }.detail-actions { margin:1rem 0; }.item-form { display:grid; grid-template-columns:1.2fr 1fr .55fr 1fr; gap:.6rem; padding:1rem; margin:1rem 0; border-radius:18px; background:#fff1f7; }.item-form input:last-of-type,.item-form .form-actions { grid-column:span 2; }.form-actions { justify-content:flex-end; align-items:center; }.items-list,.history-list { display:flex; flex-direction:column; gap:.6rem; }.item-row,.history-row { padding:.85rem .15rem .85rem .75rem; border-bottom:1px solid #fce7f3; }.item-copy { min-width:0; flex:1; display:grid; gap:.18rem; }.item-copy b { font-size:.92rem; }.item-copy small,.history-row small,.history-row em { font-size:.76rem; color:#9d174d; }.quantity-control { display:flex; gap:.4rem; align-items:center; border-radius:12px; background:#fdf2f8; padding:.25rem; }.quantity-control button { width:31px; height:31px; border:0; border-radius:9px; color:#9d174d; background:white; font-size:1rem; font-weight:900; }.quantity-control strong { min-width:2rem; text-align:center; }.history-row { justify-content:flex-start; }.movement-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#fdf2f8; }.history-row div { display:grid; gap:.12rem; flex:1; }.history-row em { font-style:normal; }.history-row strong { color:#15803d; }.history-row strong.negative { color:#dc2626; }.detail-empty,.empty-state { display:grid; place-items:center; text-align:center; color:#9d174d; }.detail-empty { min-height:330px; align-content:center; }.detail-empty span { font-size:3rem; }.detail-empty h3 { margin:.7rem 0 .25rem; font-weight:900; }.detail-empty p { font-size:.9rem; }.empty-state { padding:2rem 1rem; font-size:.86rem; }
-    .modal-backdrop { position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:1rem; background:rgba(76,5,25,.35); backdrop-filter:blur(5px); }.modal-card { width:min(100%,430px); border-radius:26px; padding:1.5rem; }.modal-card h3 { margin:.25rem 0; font-size:1.35rem; font-weight:900; }.modal-card p { color:#9d174d; font-size:.86rem; }.modal-card label { display:grid; gap:.35rem; margin:1rem 0; font-size:.78rem; font-weight:800; color:#831843; }.modal-emoji { font-size:2rem; }
+    .detail-header { align-items:flex-start; }.nfc-badge { white-space:nowrap; border-radius:999px; background:#fce7f3; color:#9d174d; padding:.38rem .65rem; font-size:.72rem; font-weight:900; }.nfc-pending { color:#a16207; background:#fef3c7; }.nfc-link-card { margin:1.15rem 0; padding:1rem; border-radius:17px; background:linear-gradient(135deg,#fdf2f8,#faf5ff); border:1px dashed #f9a8d4; }.nfc-link-card b { font-size:.9rem; }.label-actions { display:flex; }.detail-actions { margin:1rem 0; }.item-form { display:grid; grid-template-columns:1.2fr 1fr .55fr 1fr; gap:.6rem; padding:1rem; margin:1rem 0; border-radius:18px; background:#fff1f7; }.item-form input:last-of-type,.item-form .form-actions { grid-column:span 2; }.form-actions { justify-content:flex-end; align-items:center; }.items-list,.history-list { display:flex; flex-direction:column; gap:.6rem; }.item-row,.history-row { padding:.85rem .15rem .85rem .75rem; border-bottom:1px solid #fce7f3; }.item-copy { min-width:0; flex:1; display:grid; gap:.18rem; }.item-copy b { font-size:.92rem; }.item-copy small,.history-row small,.history-row em { font-size:.76rem; color:#9d174d; }.item-actions { display:flex; gap:.35rem; align-items:center; }.label-item-button { min-height:31px; padding:.35rem .48rem; border:1px solid #f7bed5; border-radius:9px; color:#9d174d; background:#fff7fb; font-size:.67rem; }.quantity-control { display:flex; gap:.4rem; align-items:center; border-radius:12px; background:#fdf2f8; padding:.25rem; }.quantity-control button { width:31px; height:31px; border:0; border-radius:9px; color:#9d174d; background:white; font-size:1rem; font-weight:900; }.quantity-control strong { min-width:2rem; text-align:center; }.history-row { justify-content:flex-start; }.movement-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#fdf2f8; }.history-row div { display:grid; gap:.12rem; flex:1; }.history-row em { font-style:normal; }.history-row strong { color:#15803d; }.history-row strong.negative { color:#dc2626; }.detail-empty,.empty-state { display:grid; place-items:center; text-align:center; color:#9d174d; }.detail-empty { min-height:330px; align-content:center; }.detail-empty span { font-size:3rem; }.detail-empty h3 { margin:.7rem 0 .25rem; font-weight:900; }.detail-empty p { font-size:.9rem; }.empty-state { padding:2rem 1rem; font-size:.86rem; }
+    .modal-backdrop { position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:1rem; background:rgba(76,5,25,.35); backdrop-filter:blur(5px); }.modal-card { width:min(100%,430px); border-radius:26px; padding:1.5rem; }.modal-card h3 { margin:.25rem 0; font-size:1.35rem; font-weight:900; }.modal-card p { color:#9d174d; font-size:.86rem; }.modal-card label { display:grid; gap:.35rem; margin:1rem 0; font-size:.78rem; font-weight:800; color:#831843; }.modal-emoji { font-size:2rem; }.count-list { display:grid; gap:.5rem; max-height:45vh; overflow:auto; margin:1rem 0; }.count-row { display:flex!important; align-items:center; padding:.6rem; margin:0!important; border-radius:13px; background:#fff1f7; }.count-row small,.label-modal small { color:#9d174d; font-weight:500; }.count-row input { width:82px!important; }.label-modal { text-align:center; }.qr-preview { width:min(72vw,290px); background:white; padding:.6rem; border-radius:18px; box-shadow:0 8px 22px rgba(157,23,77,.14); }
     @media (max-width: 920px) { .hero-card { align-items:flex-start; flex-direction:column; }.workspace { grid-template-columns:1fr; }.boxes-panel { position:static; max-height:none; }.box-list { max-height:290px; overflow:auto; }.detail-panel { min-height:0; }.item-form { grid-template-columns:1fr 1fr; }.item-form input:last-of-type,.item-form .form-actions { grid-column:span 2; } }
-    @media (max-width: 560px) { .inventory-page { padding-top:0; }.hero-card,.detail-panel { padding:1rem; border-radius:20px; }.hero-actions,.hero-actions button { width:100%; }.stats-grid { grid-template-columns:1fr; }.detail-header,.nfc-link-card,.item-row { align-items:flex-start; flex-direction:column; }.nfc-link-card .link-button { width:100%; }.quantity-control { align-self:stretch; justify-content:space-between; }.move-button { width:100%; }.item-form { grid-template-columns:1fr; }.item-form input:last-of-type,.item-form .form-actions { grid-column:auto; }.form-actions { justify-content:stretch; }.form-actions button { flex:1; } }
+    @media (max-width: 560px) { .inventory-page { padding-top:0; }.hero-card,.detail-panel { padding:1rem; border-radius:20px; }.hero-actions,.hero-actions button { width:100%; }.stats-grid { grid-template-columns:1fr; }.detail-header,.nfc-link-card,.item-row { align-items:flex-start; flex-direction:column; }.nfc-link-card .link-button { width:100%; }.item-actions { width:100%; }.quantity-control { flex:1; align-self:stretch; justify-content:space-between; }.move-button { width:100%; }.item-form { grid-template-columns:1fr; }.item-form input:last-of-type,.item-form .form-actions { grid-column:auto; }.form-actions { justify-content:stretch; }.form-actions button { flex:1; } }
   `]
 })
 export class InventoryComponent {
   private readonly api = inject(ApiService);
+  private readonly labelPrint = inject(LabelPrintService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
@@ -227,6 +273,9 @@ export class InventoryComponent {
   readonly showItemForm = signal(false);
   readonly showHistory = signal(false);
   readonly transferItem = signal<InventoryItemDto | null>(null);
+  readonly countBox = signal<InventoryBoxDto | null>(null);
+  readonly labelBox = signal<InventoryBoxDto | null>(null);
+  readonly qrDataUrl = signal<string | null>(null);
   readonly isScanningNfc = signal(false);
   readonly nfcStatus = signal('');
   readonly nfcStatusType = signal<'info' | 'error'>('info');
@@ -240,6 +289,8 @@ export class InventoryComponent {
   transferDestinationId = '';
   transferQuantity = 1;
   transferNote = '';
+  countDraft: Record<string, number> = {};
+  countNote = '';
 
   constructor() {
     this.loadBoxes();
@@ -340,6 +391,82 @@ export class InventoryComponent {
     });
   }
 
+  openCount(box: InventoryBoxDto): void {
+    this.countDraft = Object.fromEntries(box.items.map(item => [item.id, item.quantity]));
+    this.countNote = '';
+    this.countBox.set(box);
+  }
+
+  closeCount(): void {
+    this.countBox.set(null);
+    this.countDraft = {};
+    this.countNote = '';
+  }
+
+  completeCount(box: InventoryBoxDto): void {
+    const items = box.items.map(item => ({
+      inventoryItemId: item.id,
+      actualQuantity: Number(this.countDraft[item.id])
+    }));
+    if (items.some(item => !Number.isInteger(item.actualQuantity) || item.actualQuantity < 0)) {
+      this.toast.warning('Escribe cantidades enteras de cero o más para todos los artículos.');
+      return;
+    }
+
+    const request: CompleteInventoryCountDto = {
+      items,
+      note: this.emptyToNull(this.countNote)
+    };
+    this.isSaving.set(true);
+    this.api.completeInventoryCount(box.id, request).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: updated => {
+        this.isSaving.set(false);
+        this.applyBox(updated);
+        this.closeCount();
+        this.toast.success('Conteo físico guardado. Las diferencias quedaron en el historial.');
+      },
+      error: error => {
+        this.isSaving.set(false);
+        this.toast.error(this.errorMessage(error, 'No pudimos guardar el conteo.'));
+      }
+    });
+  }
+
+  openQrLabel(box: InventoryBoxDto): void {
+    this.labelBox.set(box);
+    this.qrDataUrl.set(null);
+    void QRCode.toDataURL(box.nfcUrl, { width: 600, margin: 1, errorCorrectionLevel: 'M' }).then(
+      dataUrl => {
+        if (this.labelBox()?.id === box.id) this.qrDataUrl.set(dataUrl);
+      },
+      () => {
+        this.closeQrLabel();
+        this.toast.error('No pudimos preparar el QR de esta caja.');
+      }
+    );
+  }
+
+  closeQrLabel(): void {
+    this.labelBox.set(null);
+    this.qrDataUrl.set(null);
+  }
+
+  async printQrLabel(box: InventoryBoxDto): Promise<void> {
+    try {
+      await this.labelPrint.printBox(box.id);
+    } catch (error) {
+      this.toast.error(this.errorMessage(error, 'No pudimos preparar la etiqueta de esta caja.'));
+    }
+  }
+
+  async printItemLabel(item: InventoryItemDto): Promise<void> {
+    try {
+      await this.labelPrint.printItem(item.id);
+    } catch (error) {
+      this.toast.error(this.errorMessage(error, 'No pudimos preparar la etiqueta de este artículo.'));
+    }
+  }
+
   startWebNfcReader(): void {
     const browser = window as NfcBrowserWindow;
     if (!browser.NDEFReader) {
@@ -388,11 +515,11 @@ export class InventoryComponent {
   }
 
   movementLabel(type: string): string {
-    return ({ InitialCount: 'Conteo inicial', Added: 'Entrada', Removed: 'Salida', Adjusted: 'Ajuste', TransferOut: 'Movido a otra caja', TransferIn: 'Llegó de otra caja' } as Record<string, string>)[type] ?? 'Movimiento';
+    return ({ InitialCount: 'Conteo inicial', Added: 'Entrada', Removed: 'Salida', Adjusted: 'Ajuste', TransferOut: 'Movido a otra caja', TransferIn: 'Llegó de otra caja', CountAdjustment: 'Diferencia de conteo físico' } as Record<string, string>)[type] ?? 'Movimiento';
   }
 
   movementEmoji(type: string): string {
-    return ({ InitialCount: '✨', Added: '＋', Removed: '−', Adjusted: '↺', TransferOut: '↗', TransferIn: '↙' } as Record<string, string>)[type] ?? '•';
+    return ({ InitialCount: '✨', Added: '＋', Removed: '−', Adjusted: '↺', TransferOut: '↗', TransferIn: '↙', CountAdjustment: '🧮' } as Record<string, string>)[type] ?? '•';
   }
 
   private resolveNfcToken(token: string): void {

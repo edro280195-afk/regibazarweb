@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
+import { LabelPrintService } from '../../../core/services/label-print.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
 import { gsap } from 'gsap';
@@ -677,45 +678,12 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
         }
       </div>
 
-      <!-- Print Preview Modal -->
-      @if (showPrintPreview() && printHtml()) {
-        <div class="fixed inset-0 z-[150] bg-pink-900/60 flex items-center justify-center p-2 md:p-4 animate-fade-in">
-          <div class="bg-white rounded-[2rem] md:rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-[0_32px_64px_-12px_rgba(244,114,182,0.3)] border border-pink-100/50 flex flex-col animate-scale-up" style="max-height: 95vh; contain: content;">
-            <!-- Modal Header -->
-            <div class="px-8 py-6 bg-gradient-to-r from-pink-100/40 to-rose-50/40 border-b border-pink-100/40 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-sm border border-pink-100">🖨️</div>
-                <div>
-                  <h3 class="text-xl font-black text-pink-900">Vista Previa</h3>
-                  <p class="text-[10px] text-pink-400 font-bold uppercase tracking-wider">Confirma la etiqueta antes de imprimir</p>
-                </div>
-              </div>
-              <button class="w-10 h-10 rounded-full bg-white text-pink-300 hover:text-pink-600 hover:bg-pink-50 transition-all shadow-sm flex items-center justify-center border border-pink-100" (click)="closePrintPreview()">✕</button>
-            </div>
-
-            <!-- Preview Body -->
-            <div class="flex-1 overflow-auto p-4 md:p-12 bg-pink-50/30 flex justify-center items-start">
-              <div class="bg-white shadow-2xl border-2 border-dashed border-pink-200 p-1 scale-75 md:scale-90 origin-top rounded-sm" 
-                   [innerHTML]="safePrintHtml()" 
-                   style="width: 100mm; min-height: 148mm; background: white;">
-              </div>
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="p-8 bg-white border-t border-pink-100/40 flex gap-4">
-              <button class="flex-1 btn-coquette btn-outline-pink py-4 font-black text-sm" (click)="closePrintPreview()">Regresar ✨</button>
-              <button class="flex-1 btn-coquette btn-pink py-4 font-black text-sm shadow-xl shadow-pink-200/50 flex items-center justify-center gap-2 group" (click)="executePrint()">
-                <span class="text-xl group-hover:animate-bounce">🖨️</span> Imprimir Etiqueta
-              </button>
-            </div>
-          </div>
-        </div>
-      }
     </div>
   `
 })
 export class OrdersComponent implements OnInit {
   private api = inject(ApiService);
+  private labelPrint = inject(LabelPrintService);
   private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
   private couponService = inject(CouponService);
@@ -774,7 +742,8 @@ export class OrdersComponent implements OnInit {
   isLoadingPackages = signal(false);
   packagesToGenerate = 1;
 
-  // Printing
+  // Compatibilidad temporal para órdenes abiertas antes del diseñador. Las
+  // acciones visibles de impresión ya usan LabelPrintService y plantillas publicadas.
   showPrintPreview = signal(false);
   printHtml = signal('');
   safePrintHtml = computed(() => this.sanitizer.bypassSecurityTrustHtml(this.printHtml()));
@@ -1365,9 +1334,13 @@ export class OrdersComponent implements OnInit {
     });
   }
 
-  async printLabel(pkg: OrderPackageDto, orderData: OrderSummaryDto) {
-    const html = await this.generateLabelHtml(pkg, orderData, this.packages().length);
-    this.openPrintWindow(html, `Etiqueta Bolsa ${pkg.packageNumber}`);
+  async printLabel(pkg: OrderPackageDto, _orderData: OrderSummaryDto) {
+    try {
+      await this.labelPrint.printPackage(pkg.id);
+      this.toast.success(`Etiqueta de bolsa ${pkg.packageNumber} enviada a impresión.`);
+    } catch (error) {
+      this.toast.error(this.labelPrintError(error));
+    }
   }
 
   async printAllLabels() {
@@ -1375,57 +1348,11 @@ export class OrdersComponent implements OnInit {
     if (!order || !this.packages().length) return;
 
     try {
-      let combinedHtml = '';
-      const total = this.packages().length;
-
-      for (const pkg of this.packages()) {
-        const labelHtml = await this.generateLabelHtml(pkg, order, total, true);
-        combinedHtml += labelHtml;
-      }
-
-      const fullHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              @page { margin: 0; size: 100mm 150mm; }
-              body { margin: 0; padding: 0; }
-              .page-break { page-break-after: always; }
-              .label-wrapper { 
-                margin: 0; padding: 4mm; box-sizing: border-box; 
-                width: 100mm; height: 148mm; overflow: hidden;
-                font-family: Arial, sans-serif; display: flex; 
-                flex-direction: column; justify-content: space-between; align-items: center;
-              }
-              .header { text-align: center; width: 100%; }
-              .header h2 { margin: 2px 0; font-size: 16px; font-weight: bold; }
-              .header h3 { margin: 2px 0; font-size: 14px; font-weight: normal; }
-              .info { 
-                text-align: left; width: 100%; font-size: 16px; font-weight: bold; 
-                border-top: 2px dashed #000; border-bottom: 2px dashed #000; 
-                padding: 5px 0; margin: 5px 0;
-              }
-              .info p { margin: 2px 0; }
-              .qr-container { 
-                display: flex; justify-content: center; align-items: center; 
-                flex-grow: 1; width: 100%; overflow: hidden;
-              }
-              .qr-container img { max-width: 75mm; max-height: 75mm; width: auto; height: auto; }
-              .footer { text-align: center; width: 100%; }
-              .footer h1 { margin: 0; font-size: 28px; font-weight: bold; text-transform: uppercase;}
-              .footer p { margin: 2px 0; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            ${combinedHtml}
-          </body>
-        </html>
-      `;
-
-      this.openPrintWindow(fullHtml, `Etiquetas Pedido ${order.id}`);
+      await this.labelPrint.printPackages(this.packages().map(pkg => pkg.id));
+      this.toast.success(`${this.packages().length} etiquetas del pedido ${order.id} enviadas a impresión.`);
     } catch (e) {
       console.error(e);
-      this.toast.error('Error al generar etiquetas masivas 🖨️');
+      this.toast.error(this.labelPrintError(e));
     }
   }
 
@@ -1633,6 +1560,17 @@ export class OrdersComponent implements OnInit {
         }
       }, 800);
     }
+  }
+
+  private labelPrintError(error: unknown): string {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'object' && error !== null && 'error' in error) {
+      const payload = (error as { error?: unknown }).error;
+      if (typeof payload === 'object' && payload !== null && 'message' in payload && typeof (payload as { message?: unknown }).message === 'string') {
+        return (payload as { message: string }).message;
+      }
+    }
+    return 'No pudimos preparar las etiquetas. Intenta de nuevo.';
   }
 
   private animateList(): void {

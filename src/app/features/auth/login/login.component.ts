@@ -134,6 +134,12 @@ export class LoginComponent {
           this.router.navigate(['/admin/routes']);
         } else if (res.role === 'Scaner') {
           this.router.navigate(['/pos']);
+        } else if (res.role === 'Bodega') {
+          if (canReturnToInventory && returnUrl) {
+            this.router.navigateByUrl(returnUrl);
+          } else {
+            this.router.navigate(['/admin/inventory']);
+          }
         } else if (canReturnToInventory && returnUrl) {
           this.router.navigateByUrl(returnUrl);
         } else {

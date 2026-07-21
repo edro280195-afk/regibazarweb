@@ -3,9 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto } from '../../../../core/models';
+import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto, RoutePackagesRequiredDto } from '../../../../core/models';
 import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
 import { AddressEditorV2Component } from '../../clients/address-editor-v2/address-editor-v2.component';
 import { Subject, forkJoin } from 'rxjs';
@@ -26,6 +27,8 @@ interface CandidateRow {
     longitude?: number | null;
     deliveryInstructions?: string;
     hasCoords: boolean;
+    packagesConfirmed?: boolean;
+    totalPackages?: number | null;
     isTandaPending: boolean;
     tandaName?: string;
     tandaWeek?: number;
@@ -227,6 +230,9 @@ declare const google: any;
                                     <p class="text-sm font-bold text-pink-900 truncate">{{ row.clientName }}</p>
                                     @if (row.kind === 'Tanda') {
                                         <span class="px-1 py-0.5 bg-fuchsia-100 text-fuchsia-700 text-[9px] font-black rounded uppercase">Tanda</span>
+                                    }
+                                    @if (row.kind === 'Order' && !row.packagesConfirmed) {
+                                        <span class="px-1 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-black rounded uppercase">Bolsas pendientes</span>
                                     }
                                     @if (!row.hasCoords) {
                                         <span class="px-1 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded uppercase">Sin dir</span>
@@ -463,7 +469,7 @@ declare const google: any;
                     @for (o of gate; track o.id) {
                         <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="font-bold text-pink-900 text-sm">{{ o.clientName }}</span>
+                                <span class="font-bold text-pink-900 text-sm">#{{ o.id }} · {{ o.clientName }}</span>
                                 @if (o.count === null) {
                                     <span class="text-[10px] text-rose-400 font-bold bg-rose-50 px-2 py-0.5 rounded-full">Falta</span>
                                 } @else if (o.count === 0) {
@@ -629,20 +635,31 @@ export class RouteBuilderComponent implements OnInit {
     private mapsPollTimer?: any;
 
     candidates = computed<CandidateRow[]>(() => {
-        const orderRows: CandidateRow[] = this.pendingOrders().map(o => ({
-            key: `order:${o.id}`,
-            kind: 'Order' as const,
-            rawId: o.id,
-            clientId: o.clientId,
-            clientName: o.clientName,
-            address: getEffectiveDeliveryAddress(o.clientAddress, o.alternativeAddress),
-            clientAddress: o.clientAddress,
-            latitude: o.clientLatitude,
-            longitude: o.clientLongitude,
-            deliveryInstructions: o.deliveryInstructions,
-            hasCoords: this.orderHasCoords(o),
-            isTandaPending: false
-        }));
+        // Un intento cerrado se conserva como parada bloqueada. Aunque el pedido vuelva a
+        // quedar pendiente para reintentarse, no debe volver a agregarse a esta misma ruta.
+        const lockedOrderIds = new Set(
+            this.lockedStops()
+                .map(delivery => delivery.orderId)
+                .filter((orderId): orderId is number => orderId != null)
+        );
+        const orderRows: CandidateRow[] = this.pendingOrders()
+            .filter(order => !lockedOrderIds.has(order.id))
+            .map(o => ({
+                key: `order:${o.id}`,
+                kind: 'Order' as const,
+                rawId: o.id,
+                clientId: o.clientId,
+                clientName: o.clientName,
+                address: getEffectiveDeliveryAddress(o.clientAddress, o.alternativeAddress),
+                clientAddress: o.clientAddress,
+                latitude: o.clientLatitude,
+                longitude: o.clientLongitude,
+                deliveryInstructions: o.deliveryInstructions,
+                hasCoords: this.orderHasCoords(o),
+                packagesConfirmed: o.packagesConfirmed === true,
+                totalPackages: o.totalPackages,
+                isTandaPending: false
+            }));
         const tandaRows: CandidateRow[] = this.availableTandas().map(t => ({
             key: `tanda:${t.tandaParticipantId}`,
             kind: 'Tanda' as const,
@@ -1263,10 +1280,14 @@ export class RouteBuilderComponent implements OnInit {
     // ── 🛍️ Puerta de bolsas ──
 
     /** Si el backend rechazó por bolsas faltantes, abre el resolver y devuelve true. */
-    private tryOpenBagsGate(err: any): boolean {
-        const e = err?.error;
-        if (e?.code === 'PACKAGES_REQUIRED' && Array.isArray(e?.orders)) {
-            this.bagsGate.set(e.orders.map((o: any) => ({ id: o.id, clientName: o.clientName, count: null })));
+    private tryOpenBagsGate(err: HttpErrorResponse): boolean {
+        const payload = err.error as RoutePackagesRequiredDto | null;
+        if (payload?.code === 'PACKAGES_REQUIRED' && Array.isArray(payload.orders)) {
+            this.bagsGate.set(payload.orders.map(order => ({
+                id: order.id,
+                clientName: order.clientName,
+                count: order.totalPackages ?? null
+            })));
             return true;
         }
         return false;

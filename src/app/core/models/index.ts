@@ -591,6 +591,18 @@ export interface CreateRouteResponse {
     skipped: SkippedStopDto[];
 }
 
+export interface RoutePackageRequirementDto {
+    id: number;
+    clientName: string;
+    totalPackages?: number | null;
+}
+
+export interface RoutePackagesRequiredDto {
+    code: 'PACKAGES_REQUIRED';
+    message: string;
+    orders: RoutePackageRequirementDto[];
+}
+
 export interface PreviewStopDto {
     kind: 'Order' | 'Tanda';
     orderId?: number;
@@ -790,6 +802,7 @@ export interface InventoryItemDto {
     name: string;
     variant: string | null;
     barcode: string | null;
+    labelCode: string;
     quantity: number;
     updatedAt: string;
 }
@@ -838,6 +851,190 @@ export interface TransferInventoryItemsDto {
     itemId: string;
     quantity: number;
     note?: string | null;
+}
+
+export interface InventoryBarcodeMatchDto {
+    boxId: string;
+    boxCode: string;
+    boxName: string;
+    location: string | null;
+    itemId: string;
+    itemName: string;
+    variant: string | null;
+    barcode: string | null;
+    scannableCode: string;
+    quantity: number;
+}
+
+export interface InventoryCountItemDto {
+    inventoryItemId: string;
+    actualQuantity: number;
+}
+
+export interface CompleteInventoryCountDto {
+    items: InventoryCountItemDto[];
+    note?: string | null;
+}
+
+// ── Diseñador e impresión de etiquetas ──
+export type LabelTemplateKind = 'InventoryBox' | 'InventoryItem' | 'OrderPackage';
+export type LabelPrinterProfile = 'NiimbotB1_50x50' | 'AiyinE40_4x6';
+export type LabelTemplateVersionStatus = 'Draft' | 'Published' | 'Archived';
+export type LabelElementType = 'text' | 'data' | 'image' | 'qr' | 'barcode' | 'shape' | 'line';
+export type LabelAlignment = 'left' | 'center' | 'right';
+
+export interface LabelCanvasDefinition {
+    widthMm: number;
+    heightMm: number;
+    background: string;
+}
+
+export interface LabelElementProperties {
+    text?: string;
+    binding?: string;
+    assetId?: string;
+    fontSize?: number;
+    fontWeight?: number;
+    align?: LabelAlignment;
+    letterSpacing?: number;
+    wrap?: boolean;
+    prefix?: string;
+    suffix?: string;
+    errorCorrection?: 'L' | 'M' | 'Q' | 'H';
+    format?: 'CODE128';
+    displayValue?: boolean;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    radius?: number;
+}
+
+export interface LabelElementDefinition {
+    id: string;
+    type: LabelElementType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    visible: boolean;
+    locked?: boolean;
+    zIndex: number;
+    properties: LabelElementProperties;
+}
+
+export interface LabelDesignDefinition {
+    schemaVersion: 1;
+    canvas: LabelCanvasDefinition;
+    elements: LabelElementDefinition[];
+}
+
+export interface LabelTemplateSummaryDto {
+    id: string;
+    name: string;
+    description: string | null;
+    kind: LabelTemplateKind;
+    printerProfile: LabelPrinterProfile;
+    isDefault: boolean;
+    isArchived: boolean;
+    publishedVersionId: string | null;
+    publishedVersionNumber: number | null;
+    updatedAt: string;
+}
+
+export interface LabelTemplateVersionDto {
+    id: string;
+    versionNumber: number;
+    status: LabelTemplateVersionStatus;
+    designJson: string;
+    revision: number;
+    createdBy: string;
+    createdAt: string;
+    publishedBy: string | null;
+    publishedAt: string | null;
+}
+
+export interface LabelTemplateDetailDto {
+    id: string;
+    name: string;
+    description: string | null;
+    kind: LabelTemplateKind;
+    printerProfile: LabelPrinterProfile;
+    isDefault: boolean;
+    isArchived: boolean;
+    publishedVersionId: string | null;
+    draftVersion: LabelTemplateVersionDto | null;
+    publishedVersion: LabelTemplateVersionDto | null;
+    versions: LabelTemplateVersionDto[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLabelTemplateDto {
+    name: string;
+    description?: string | null;
+    kind: 0 | 1 | 2;
+    printerProfile: 0 | 1;
+    designJson?: string | null;
+}
+
+export interface UpdateLabelTemplateDto {
+    name: string;
+    description?: string | null;
+}
+
+export interface SaveLabelTemplateDraftDto {
+    designJson: string;
+    expectedRevision: number;
+}
+
+export interface SaveLabelTemplateDraftResultDto {
+    draftVersion: LabelTemplateVersionDto;
+    warnings: string[];
+}
+
+export interface PublishLabelTemplateResultDto {
+    publishedVersion: LabelTemplateVersionDto;
+    draftVersion: LabelTemplateVersionDto;
+    warnings: string[];
+}
+
+export interface LabelAssetDto {
+    id: string;
+    name: string;
+    originalFileName: string;
+    contentType: string;
+    url: string;
+    sizeBytes: number;
+    isArchived: boolean;
+    uploadedBy: string;
+    uploadedAt: string;
+}
+
+export interface PublishedLabelTemplateDto {
+    templateId: string;
+    templateName: string;
+    kind: LabelTemplateKind;
+    printerProfile: LabelPrinterProfile;
+    versionId: string;
+    versionNumber: number;
+    designJson: string;
+}
+
+export interface LabelPrintContextDto {
+    template: PublishedLabelTemplateDto;
+    targetKind: LabelTemplateKind;
+    targetId: string;
+    data: Record<string, string>;
+}
+
+export interface CreateLabelPrintEventDto {
+    labelTemplateVersionId: string;
+    targetKind: 0 | 1 | 2;
+    targetId: string;
+    printerProfile: 0 | 1;
+    method: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    copies: number;
 }
 
 export interface CommonProductDto {

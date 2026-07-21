@@ -28,6 +28,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/inventory/inventory.component').then(m => m.InventoryComponent)
             },
             {
+                path: 'labels',
+                loadComponent: () => import('./features/admin/labels/label-designer.component').then(m => m.LabelDesignerComponent)
+            },
+            {
                 path: 'capture',
                 loadComponent: () => import('./features/admin/orders/capture-order/capture-order').then(m => m.CaptureOrderComponent)
             },
