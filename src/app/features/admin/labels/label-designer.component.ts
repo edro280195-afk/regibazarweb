@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -19,8 +20,9 @@ import { LabelRendererService } from '../../../core/services/label-renderer.serv
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { ToastService } from '../../../core/services/toast.service';
 
-type SidebarTab = 'elements' | 'fields' | 'images' | 'layers';
+type SidebarTab = 'elements' | 'fields' | 'images' | 'layers' | 'properties';
 type PointerAction = 'move' | 'resize';
+type ResizeHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 interface PointerState {
     action: PointerAction;
@@ -28,6 +30,12 @@ interface PointerState {
     startX: number;
     startY: number;
     original: LabelElementDefinition;
+    handle?: ResizeHandle;
+}
+
+interface SnapGuide {
+    x: number | null;
+    y: number | null;
 }
 
 interface TemplateStarter {
@@ -40,7 +48,7 @@ interface TemplateStarter {
 
 @Component({
     selector: 'app-label-designer',
-    imports: [FormsModule],
+    imports: [FormsModule, NgTemplateOutlet],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <section class="label-page">
@@ -110,6 +118,7 @@ interface TemplateStarter {
                         <button type="button" [class.active]="activeTab() === 'fields'" (click)="activeTab.set('fields')">Datos</button>
                         <button type="button" [class.active]="activeTab() === 'images'" (click)="activeTab.set('images')">Imágenes</button>
                         <button type="button" [class.active]="activeTab() === 'layers'" (click)="activeTab.set('layers')">Capas</button>
+                        <button type="button" [class.active]="activeTab() === 'properties'" (click)="activeTab.set('properties')">Ajustes</button>
                     </aside>
 
                     <aside class="left-panel">
@@ -164,10 +173,15 @@ interface TemplateStarter {
                                         <button type="button" class="layer-row" [class.selected]="selectedElementId() === element.id" (click)="selectElement(element.id)">
                                             <span class="layer-type">{{ elementTypeName(element.type) }}</span>
                                             <span class="layer-name">{{ elementName(element) }}</span>
-                                            @if (!element.visible) { <small>Oculto</small> }
+                                            @if (element.locked) { <small>Bloqueado</small> }
+                                            @else if (!element.visible) { <small>Oculto</small> }
                                         </button>
                                     }
                                 </div>
+                                <div class="panel-tip">Selecciona una capa para cambiar su orden, ocultarla o bloquearla desde Ajustes.</div>
+                            }
+                            @case ('properties') {
+                                <ng-container *ngTemplateOutlet="elementProperties"></ng-container>
                             }
                         }
                     </aside>
@@ -184,12 +198,16 @@ interface TemplateStarter {
                                 <button type="button" [disabled]="!canUndo()" (click)="undo()">Deshacer</button>
                                 <button type="button" [disabled]="!canRedo()" (click)="redo()">Rehacer</button>
                                 <button type="button" [class.active]="showGrid()" (click)="toggleGrid()">Cuadrícula</button>
+                                <button type="button" [class.active]="snapEnabled()" (click)="toggleSnap()">Imán</button>
+                                <button type="button" [class.active]="showRulers()" (click)="toggleRulers()">Reglas</button>
                                 <button type="button" (click)="printTest()">Probar</button>
                                 <button type="button" (click)="downloadTest()">PNG</button>
                                 <button type="button" (click)="shareTest()">Compartir</button>
+                                <button type="button" aria-label="Alejar lienzo" (click)="changeZoomBy(-1)">−</button>
                                 <select [value]="zoom()" (change)="changeZoom($event)">
-                                    <option [value]="70">70%</option><option [value]="85">85%</option><option [value]="100">100%</option><option [value]="120">120%</option>
+                                    <option [value]="60">60%</option><option [value]="75">75%</option><option [value]="100">100%</option><option [value]="125">125%</option><option [value]="150">150%</option>
                                 </select>
+                                <button type="button" aria-label="Acercar lienzo" (click)="changeZoomBy(1)">+</button>
                             </div>
                         </div>
 
@@ -197,7 +215,12 @@ interface TemplateStarter {
                             <div class="render-error">{{ renderError() }}</div>
                         }
                         <div class="canvas-scroll">
-                            <div class="canvas-scale" [style.width.%]="zoom()">
+                            <div class="canvas-stage" [class.with-rulers]="showRulers()">
+                                @if (showRulers()) {
+                                    <span class="top-ruler" aria-hidden="true"><b>0</b><b>{{ design().canvas.widthMm }} mm</b></span>
+                                    <span class="left-ruler" aria-hidden="true"><b>0</b><b>{{ design().canvas.heightMm }} mm</b></span>
+                                }
+                                <div class="canvas-scale" [style.width.%]="zoom()">
                                 <div
                                     class="label-artboard"
                                     [class.with-grid]="showGrid()"
@@ -208,15 +231,30 @@ interface TemplateStarter {
                                     } @else {
                                         <div class="preview-loading">Renderizando vista térmica…</div>
                                     }
+                                    <div
+                                        class="safe-area"
+                                        aria-hidden="true"
+                                        [style.left.%]="safeInsetXPercent()"
+                                        [style.right.%]="safeInsetXPercent()"
+                                        [style.top.%]="safeInsetYPercent()"
+                                        [style.bottom.%]="safeInsetYPercent()"></div>
+                                    @if (snapGuide().x !== null) {
+                                        <span class="smart-guide smart-guide-vertical" aria-hidden="true" [style.left.%]="snapGuide().x!"></span>
+                                    }
+                                    @if (snapGuide().y !== null) {
+                                        <span class="smart-guide smart-guide-horizontal" aria-hidden="true" [style.top.%]="snapGuide().y!"></span>
+                                    }
                                     @for (element of design().elements; track element.id) {
                                         <div
                                             class="element-hitbox"
                                             [class.selected]="selectedElementId() === element.id"
+                                            [class.locked-element]="element.locked"
                                             [class.hidden-element]="!element.visible"
                                             [style.left.%]="leftPercent(element)"
                                             [style.top.%]="topPercent(element)"
                                             [style.width.%]="widthPercent(element)"
                                             [style.height.%]="heightPercent(element)"
+                                            [style.transform]="'rotate(' + element.rotation + 'deg)'"
                                             (pointerdown)="startPointerAction($event, element, 'move')"
                                             (keydown.enter)="selectElement(element.id)"
                                             tabindex="0"
@@ -224,10 +262,16 @@ interface TemplateStarter {
                                             [attr.aria-label]="'Seleccionar ' + elementName(element)">
                                             @if (selectedElementId() === element.id) {
                                                 <span class="selection-tag">{{ elementTypeName(element.type) }}</span>
-                                                <button class="resize-handle" type="button" aria-label="Cambiar tamaño" (pointerdown)="startPointerAction($event, element, 'resize')"></button>
+                                                @if (!element.locked) {
+                                                    <button class="resize-handle top-left" type="button" aria-label="Cambiar tamaño desde la esquina superior izquierda" (pointerdown)="startPointerAction($event, element, 'resize', 'top-left')"></button>
+                                                    <button class="resize-handle top-right" type="button" aria-label="Cambiar tamaño desde la esquina superior derecha" (pointerdown)="startPointerAction($event, element, 'resize', 'top-right')"></button>
+                                                    <button class="resize-handle bottom-left" type="button" aria-label="Cambiar tamaño desde la esquina inferior izquierda" (pointerdown)="startPointerAction($event, element, 'resize', 'bottom-left')"></button>
+                                                    <button class="resize-handle bottom-right" type="button" aria-label="Cambiar tamaño desde la esquina inferior derecha" (pointerdown)="startPointerAction($event, element, 'resize', 'bottom-right')"></button>
+                                                }
                                             }
                                         </div>
                                     }
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -240,59 +284,7 @@ interface TemplateStarter {
 
                     <aside class="inspector" aria-label="Propiedades del elemento">
                         <div class="panel-heading"><p class="eyebrow">INSPECTOR</p></div>
-                        @if (selectedElement(); as element) {
-                            <div class="selection-title">
-                                <strong>{{ elementTypeName(element.type) }}</strong>
-                                <button type="button" class="icon-text" (click)="duplicateSelected()">Duplicar</button>
-                            </div>
-                            <div class="property-grid compact">
-                                <label>X <input type="number" step="0.5" [value]="element.x" (change)="updateNumeric(element.id, 'x', $event)" /></label>
-                                <label>Y <input type="number" step="0.5" [value]="element.y" (change)="updateNumeric(element.id, 'y', $event)" /></label>
-                                <label>Ancho <input type="number" step="0.5" [value]="element.width" (change)="updateNumeric(element.id, 'width', $event)" /></label>
-                                <label>Alto <input type="number" step="0.5" [value]="element.height" (change)="updateNumeric(element.id, 'height', $event)" /></label>
-                            </div>
-                            <div class="inspector-actions">
-                                <button type="button" (click)="alignSelected('left')">Izquierda</button>
-                                <button type="button" (click)="alignSelected('center')">Centro</button>
-                                <button type="button" (click)="alignSelected('right')">Derecha</button>
-                            </div>
-
-                            @if (element.type === 'text') {
-                                <label class="property-block">Texto
-                                    <textarea [value]="element.properties.text ?? ''" (input)="updateTextProperty(element.id, 'text', $event)"></textarea>
-                                </label>
-                            }
-                            @if (element.type === 'data' || element.type === 'qr' || element.type === 'barcode') {
-                                <label class="property-block">Dato que se imprime
-                                    <select [value]="element.properties.binding ?? ''" (change)="updateTextProperty(element.id, 'binding', $event)">
-                                        @for (field of fields(); track field.key) { <option [value]="field.key">{{ field.label }}</option> }
-                                    </select>
-                                </label>
-                            }
-                            @if (element.type === 'text' || element.type === 'data') {
-                                <div class="property-grid compact">
-                                    <label>Tamaño <input type="number" min="5" max="60" [value]="element.properties.fontSize ?? 12" (change)="updateNumericProperty(element.id, 'fontSize', $event)" /></label>
-                                    <label>Peso <select [value]="element.properties.fontWeight ?? 500" (change)="updateNumericProperty(element.id, 'fontWeight', $event)"><option value="400">Regular</option><option value="500">Medio</option><option value="600">Semibold</option><option value="700">Negrita</option><option value="800">Extra negrita</option></select></label>
-                                </div>
-                                <label class="check-row"><input type="checkbox" [checked]="element.properties.wrap ?? false" (change)="toggleProperty(element.id, 'wrap', $event)" /> Ajustar texto en varias líneas</label>
-                            }
-                            @if (element.type === 'image') {
-                                <p class="property-help">Selecciona otra imagen desde la biblioteca de la izquierda.</p>
-                            }
-                            <label class="check-row"><input type="checkbox" [checked]="element.visible" (change)="toggleVisibility(element.id, $event)" /> Visible en la impresión</label>
-                            <div class="layer-actions">
-                                <button type="button" (click)="changeLayer(element.id, 1)">Traer al frente</button>
-                                <button type="button" (click)="changeLayer(element.id, -1)">Enviar atrás</button>
-                            </div>
-                            <button type="button" class="danger-link" [disabled]="isRequiredElement(element)" (click)="removeSelected()">
-                                {{ isRequiredElement(element) ? 'Dato obligatorio protegido' : 'Eliminar elemento' }}
-                            </button>
-                        } @else {
-                            <div class="empty-inspector">
-                                <strong>Selecciona algo</strong>
-                                <p>Toca un elemento sobre la etiqueta para editarlo. En iPad e iPhone funciona igual con el dedo.</p>
-                            </div>
-                        }
+                        <ng-container *ngTemplateOutlet="elementProperties"></ng-container>
 
                         <div class="version-panel">
                             <div><p class="eyebrow">VERSIONES</p><span>{{ activeTemplate()!.publishedVersion ? 'Publicada: v' + activeTemplate()!.publishedVersion!.versionNumber : 'Aún sin publicar' }}</span></div>
@@ -320,6 +312,104 @@ interface TemplateStarter {
                         </div>
                     </section>
                 }
+
+                <ng-template #elementProperties>
+                    @if (selectedElement(); as element) {
+                        <div class="selection-title">
+                            <div>
+                                <strong>{{ elementTypeName(element.type) }}</strong>
+                                <small>{{ element.locked ? 'Bloqueado para evitar cambios accidentales' : 'Seleccionado en el lienzo' }}</small>
+                            </div>
+                            <button type="button" class="icon-text" (click)="duplicateSelected()">Duplicar</button>
+                        </div>
+
+                        <div class="quick-property-actions">
+                            <button type="button" [class.active]="element.locked" (click)="toggleLocked(element.id)">
+                                {{ element.locked ? 'Desbloquear' : 'Bloquear' }}
+                            </button>
+                            <button type="button" [class.active]="!element.visible" (click)="toggleVisibility(element.id, $event)">
+                                {{ element.visible ? 'Ocultar' : 'Mostrar' }}
+                            </button>
+                        </div>
+
+                        <div class="property-section">
+                            <span class="property-section-title">Medidas en milímetros</span>
+                            <div class="property-grid compact">
+                                <label>X <input type="number" step="0.5" [disabled]="element.locked" [value]="element.x" (change)="updateNumeric(element.id, 'x', $event)" /></label>
+                                <label>Y <input type="number" step="0.5" [disabled]="element.locked" [value]="element.y" (change)="updateNumeric(element.id, 'y', $event)" /></label>
+                                <label>Ancho <input type="number" step="0.5" [disabled]="element.locked" [value]="element.width" (change)="updateNumeric(element.id, 'width', $event)" /></label>
+                                <label>Alto <input type="number" step="0.5" [disabled]="element.locked" [value]="element.height" (change)="updateNumeric(element.id, 'height', $event)" /></label>
+                                <label>Giro <input type="number" step="1" min="-360" max="360" [disabled]="element.locked || element.type === 'qr'" [value]="element.rotation" (change)="updateRotation(element.id, $event)" /></label>
+                            </div>
+                            @if (element.type === 'qr') {
+                                <p class="property-help">El QR permanece sin giro para que siempre se pueda escanear.</p>
+                            }
+                        </div>
+
+                        <div class="property-section">
+                            <span class="property-section-title">Alinear en la etiqueta</span>
+                            <div class="inspector-actions three-columns">
+                                <button type="button" [disabled]="element.locked" (click)="positionSelected('left')">Izquierda</button>
+                                <button type="button" [disabled]="element.locked" (click)="positionSelected('center')">Centro</button>
+                                <button type="button" [disabled]="element.locked" (click)="positionSelected('right')">Derecha</button>
+                                <button type="button" [disabled]="element.locked" (click)="positionSelected('top')">Arriba</button>
+                                <button type="button" [disabled]="element.locked" (click)="positionSelected('middle')">Medio</button>
+                                <button type="button" [disabled]="element.locked" (click)="positionSelected('bottom')">Abajo</button>
+                            </div>
+                        </div>
+
+                        @if (element.type === 'text') {
+                            <label class="property-block">Texto
+                                <textarea [disabled]="element.locked" [value]="element.properties.text ?? ''" (input)="updateTextProperty(element.id, 'text', $event)"></textarea>
+                            </label>
+                        }
+                        @if (element.type === 'data' || element.type === 'qr' || element.type === 'barcode') {
+                            <label class="property-block">Dato que se imprime
+                                <select [disabled]="element.locked" [value]="element.properties.binding ?? ''" (change)="updateTextProperty(element.id, 'binding', $event)">
+                                    @for (field of fields(); track field.key) { <option [value]="field.key">{{ field.label }}</option> }
+                                </select>
+                            </label>
+                        }
+                        @if (element.type === 'text' || element.type === 'data') {
+                            <div class="property-section">
+                                <span class="property-section-title">Tipografía</span>
+                                <div class="property-grid compact">
+                                    <label>Tamaño <input type="number" min="5" max="60" [disabled]="element.locked" [value]="element.properties.fontSize ?? 12" (change)="updateNumericProperty(element.id, 'fontSize', $event)" /></label>
+                                    <label>Peso <select [disabled]="element.locked" [value]="element.properties.fontWeight ?? 500" (change)="updateNumericProperty(element.id, 'fontWeight', $event)"><option value="400">Regular</option><option value="500">Medio</option><option value="600">Semibold</option><option value="700">Negrita</option><option value="800">Extra negrita</option></select></label>
+                                    <label>Espaciado <input type="number" min="0" max="8" step="0.1" [disabled]="element.locked" [value]="element.properties.letterSpacing ?? 0" (change)="updateNumericProperty(element.id, 'letterSpacing', $event)" /></label>
+                                </div>
+                                <div class="inspector-actions text-alignment">
+                                    <button type="button" [class.active]="(element.properties.align ?? 'left') === 'left'" [disabled]="element.locked" (click)="alignText('left')">Texto a la izquierda</button>
+                                    <button type="button" [class.active]="element.properties.align === 'center'" [disabled]="element.locked" (click)="alignText('center')">Texto centrado</button>
+                                    <button type="button" [class.active]="element.properties.align === 'right'" [disabled]="element.locked" (click)="alignText('right')">Texto a la derecha</button>
+                                </div>
+                                <label class="check-row"><input type="checkbox" [disabled]="element.locked" [checked]="element.properties.wrap ?? false" (change)="toggleProperty(element.id, 'wrap', $event)" /> Ajustar texto en varias líneas</label>
+                            </div>
+                        }
+                        @if (element.type === 'qr' || element.type === 'barcode') {
+                            <button type="button" class="secondary-wide-action" [disabled]="element.locked" (click)="applyRecommendedCodeSize(element.id)">Usar tamaño seguro para escanear</button>
+                        }
+                        @if (element.type === 'image') {
+                            <p class="property-help">Elige otra imagen desde Biblioteca. Al cambiar el tamaño, usa las esquinas para conservar una composición limpia.</p>
+                        }
+
+                        <div class="property-section">
+                            <span class="property-section-title">Orden</span>
+                            <div class="layer-actions">
+                                <button type="button" [disabled]="element.locked" (click)="moveSelectedToFront()">Al frente</button>
+                                <button type="button" [disabled]="element.locked" (click)="moveSelectedToBack()">Al fondo</button>
+                            </div>
+                        </div>
+                        <button type="button" class="danger-link" [disabled]="element.locked || isRequiredElement(element)" (click)="removeSelected()">
+                            {{ isRequiredElement(element) ? 'Dato obligatorio protegido' : element.locked ? 'Desbloquea para eliminar' : 'Eliminar elemento' }}
+                        </button>
+                    } @else {
+                        <div class="empty-inspector">
+                            <strong>Selecciona algo</strong>
+                            <p>Toca un elemento sobre la etiqueta para editarlo. Usa las reglas y el imán para colocarlo con precisión.</p>
+                        </div>
+                    }
+                </ng-template>
             }
         </section>
     `,
@@ -347,17 +437,17 @@ interface TemplateStarter {
         .card-action { position:relative; z-index:1; min-height:42px; align-self:flex-start; margin-top:auto; border:1px solid var(--accent); border-radius:11px; padding:.5rem .75rem; color:#642442; background:white; font-weight:750; font-size:.78rem; }
         .existing-list { margin-top:1.6rem; border-top:1px solid #f0d9e4; padding-top:1.1rem; } .existing-title { color:#83536c; font-size:.78rem; font-weight:700; } .existing-template { width:100%; display:flex; justify-content:space-between; align-items:center; gap:1rem; text-align:left; padding:.85rem .2rem; border:0; border-bottom:1px solid #f6e5ec; color:#4e263a; background:transparent; } .existing-template strong, .existing-template small { display:block; } .existing-template small { margin-top:.18rem; color:#94627b; font-size:.72rem; } .template-status { padding:.32rem .55rem; border-radius:999px; color:#7d2854; background:#fce6f0; font-size:.67rem; font-weight:750; white-space:nowrap; } .template-status.unpublished { color:#7a6070; background:#f5eef1; } .template-status.default-template, .default-chip { color:#5f3c08; background:#fff2c9; } .default-chip { display:inline-block; margin-left:.35rem; padding:.16rem .36rem; border-radius:999px; font-size:.57rem; font-weight:800; }
         .editor-shell { position:relative; display:grid; grid-template-columns:74px 250px minmax(0,1fr) 270px; min-height:710px; overflow:hidden; border-radius:24px; }
-        .tool-rail { padding:.7rem .45rem; display:flex; flex-direction:column; gap:.35rem; border-right:1px solid #f0d9e4; background:rgba(253,239,246,.72); } .tool-rail button { min-height:54px; border:1px solid transparent; border-radius:12px; color:#83536c; background:transparent; font-size:.7rem; font-weight:750; } .tool-rail button.active { border-color:#e8b4cc; color:#8e2155; background:#fff; box-shadow:0 7px 18px rgba(144,45,85,.10); }
+        .tool-rail { padding:.7rem .45rem; display:flex; flex-direction:column; gap:.35rem; border-right:1px solid #f0d9e4; background:rgba(253,239,246,.72); } .tool-rail button { min-height:51px; border:1px solid transparent; border-radius:12px; color:#83536c; background:transparent; font-size:.7rem; font-weight:750; } .tool-rail button.active { border-color:#e8b4cc; color:#8e2155; background:#fff; box-shadow:0 7px 18px rgba(144,45,85,.10); }
         .left-panel, .inspector { padding:1rem; overflow-y:auto; background:rgba(255,250,252,.78); } .left-panel { border-right:1px solid #f0d9e4; } .inspector { border-left:1px solid #f0d9e4; } .panel-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:.85rem; } .panel-copy, .panel-tip, .property-help { color:#845e72; font-size:.76rem; line-height:1.45; } .panel-tip, .empty-panel { margin-top:1rem; padding:.7rem; border-radius:10px; color:#895b73; background:#fbf0f5; font-size:.74rem; line-height:1.45; }
         .tool-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; } .tool-grid button { min-height:76px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.2rem; border:1px solid #f0d6e2; border-radius:12px; color:#74304f; background:white; font-size:.68rem; } .tool-grid button b { font-size:1.05rem; }
         .field-list, .layers-list { display:flex; flex-direction:column; gap:.35rem; } .field-row, .layer-row { width:100%; display:flex; justify-content:space-between; align-items:center; gap:.4rem; text-align:left; padding:.65rem; border:1px solid transparent; border-radius:10px; background:transparent; color:#593044; } .field-row:hover, .field-row.selected, .layer-row.selected { border-color:#e6b0c9; background:#fff; } .field-row strong, .field-row small { display:block; } .field-row strong { font-size:.75rem; } .field-row small { margin-top:.15rem; color:#95657d; font-size:.64rem; } .field-row em { color:#9e295d; font-size:.57rem; font-style:normal; font-weight:800; } .layer-type { color:#a04470; font-size:.62rem; font-weight:800; } .layer-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.71rem; } .layer-row small { color:#9a7284; font-size:.6rem; }
         .upload-asset { min-height:76px; display:flex; flex-direction:column; justify-content:center; padding:.75rem; border:1px dashed #d987ae; border-radius:12px; color:#8f2357; background:#fff7fb; font-size:.78rem; font-weight:750; cursor:pointer; } .upload-asset input { position:absolute; width:1px; height:1px; opacity:0; } .upload-asset small { margin-top:.2rem; color:#98657e; font-size:.63rem; font-weight:500; } .asset-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.75rem; } .asset-card { min-width:0; overflow:hidden; border:1px solid #efd5e2; border-radius:10px; padding:0; color:#78405a; background:#fff; font-size:.64rem; text-align:left; } .asset-card img { display:block; width:100%; aspect-ratio:1; object-fit:contain; padding:.3rem; background:#f8f8f8; } .asset-card span { display:block; overflow:hidden; padding:.35rem; text-overflow:ellipsis; white-space:nowrap; }
-        .workspace { min-width:0; display:flex; flex-direction:column; background:radial-gradient(circle at 50% 30%,#fff 0,#fdf3f7 60%,#f8e7ef 100%); } .workspace-toolbar { min-height:65px; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-bottom:1px solid #f0d9e4; } .template-identity { min-width:0; } .template-identity strong, .template-identity small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .template-identity strong { margin-top:.18rem; font-size:.85rem; } .template-identity small { color:#936078; font-size:.63rem; } .printer-chip { display:inline-block; padding:.19rem .42rem; border-radius:999px; color:#7c2952; background:#fde5ef; font-size:.59rem; font-weight:800; } .canvas-actions { display:flex; align-items:center; gap:.4rem; } .canvas-actions button, .canvas-actions select { min-height:34px; border:1px solid #e8c4d4; border-radius:9px; padding:.25rem .45rem; color:#7f3659; background:#fff; font-size:.68rem; } .canvas-actions button.active { color:#922859; background:#fae4ee; }
-        .canvas-scroll { flex:1; overflow:auto; display:flex; justify-content:center; align-items:flex-start; padding:1.5rem; } .canvas-scale { min-width:280px; transition:width .16s ease; } .label-artboard { position:relative; width:100%; overflow:hidden; border:1px solid #cfc7cb; background:#fff; box-shadow:0 20px 45px rgba(68,30,48,.2); touch-action:none; } .label-artboard.with-grid { background-image:linear-gradient(to right,rgba(188,105,147,.18) 1px,transparent 1px),linear-gradient(to bottom,rgba(188,105,147,.18) 1px,transparent 1px); background-size:2% 2%; } .thermal-preview { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; pointer-events:none; user-select:none; } .preview-loading { position:absolute; inset:0; display:grid; place-items:center; color:#9d5d7b; font-size:.78rem; background:white; }
-        .element-hitbox { position:absolute; z-index:5; border:1px solid transparent; touch-action:none; } .element-hitbox.selected { z-index:10; border:1.5px solid #cc3979; box-shadow:0 0 0 1px rgba(255,255,255,.9) inset; } .element-hitbox.hidden-element { opacity:.4; background:repeating-linear-gradient(135deg,rgba(216,87,139,.15) 0 4px,transparent 4px 8px); } .selection-tag { position:absolute; left:-1px; top:-21px; padding:2px 5px; color:#fff; background:#cc3979; font-size:9px; font-weight:750; line-height:1.3; } .resize-handle { position:absolute; right:-7px; bottom:-7px; width:14px; height:14px; border:2px solid #fff; border-radius:50%; background:#cc3979; }
+        .workspace { min-width:0; display:flex; flex-direction:column; background:radial-gradient(circle at 50% 30%,#fff 0,#fdf3f7 60%,#f8e7ef 100%); } .workspace-toolbar { min-height:65px; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-bottom:1px solid #f0d9e4; } .template-identity { min-width:0; } .template-identity strong, .template-identity small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .template-identity strong { margin-top:.18rem; font-size:.85rem; } .template-identity small { color:#936078; font-size:.63rem; } .printer-chip { display:inline-block; padding:.19rem .42rem; border-radius:999px; color:#7c2952; background:#fde5ef; font-size:.59rem; font-weight:800; } .canvas-actions { display:flex; align-items:center; gap:.4rem; } .canvas-actions button, .canvas-actions select { min-height:34px; border:1px solid #e8c4d4; border-radius:9px; padding:.25rem .45rem; color:#7f3659; background:#fff; font-size:.68rem; } .canvas-actions button.active { color:#922859; background:#fae4ee; box-shadow:0 0 0 2px rgba(178,60,111,.1) inset; }
+        .canvas-scroll { flex:1; overflow:auto; display:flex; justify-content:center; align-items:flex-start; padding:1.5rem; } .canvas-stage { position:relative; width:min(100%,760px); min-width:280px; } .canvas-stage.with-rulers { padding:22px 0 0 22px; } .canvas-scale { min-width:280px; margin:0 auto; transition:width .16s ease; } .top-ruler, .left-ruler { position:absolute; display:flex; justify-content:space-between; color:#a65f81; background-color:#fff9fc; font-size:8px; font-weight:800; line-height:1; pointer-events:none; } .top-ruler { top:0; left:22px; right:0; height:18px; align-items:flex-end; padding:0 2px 3px; background-image:repeating-linear-gradient(90deg,transparent 0 9px,rgba(176,78,124,.35) 9px 10px); } .left-ruler { top:22px; bottom:0; left:0; width:18px; flex-direction:column; align-items:flex-end; padding:2px 3px 2px 0; background-image:repeating-linear-gradient(180deg,transparent 0 9px,rgba(176,78,124,.35) 9px 10px); } .left-ruler b:last-child { writing-mode:vertical-rl; transform:rotate(180deg); } .label-artboard { position:relative; width:100%; overflow:hidden; border:1px solid #cfc7cb; background:#fff; box-shadow:0 20px 45px rgba(68,30,48,.2); touch-action:none; } .label-artboard.with-grid { background-image:linear-gradient(to right,rgba(188,105,147,.18) 1px,transparent 1px),linear-gradient(to bottom,rgba(188,105,147,.18) 1px,transparent 1px); background-size:2% 2%; } .thermal-preview { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; pointer-events:none; user-select:none; } .preview-loading { position:absolute; inset:0; display:grid; place-items:center; color:#9d5d7b; font-size:.78rem; background:white; } .safe-area { position:absolute; z-index:3; border:1px dashed rgba(174,61,112,.55); pointer-events:none; } .smart-guide { position:absolute; z-index:7; display:block; background:#a72c61; pointer-events:none; } .smart-guide-vertical { top:0; bottom:0; width:1px; } .smart-guide-horizontal { left:0; right:0; height:1px; }
+        .element-hitbox { position:absolute; z-index:5; border:1px solid transparent; transform-origin:center; touch-action:none; } .element-hitbox.selected { z-index:10; border:1.5px solid #cc3979; box-shadow:0 0 0 1px rgba(255,255,255,.9) inset; } .element-hitbox.locked-element.selected { border-color:#76556b; } .element-hitbox.hidden-element { opacity:.4; background:repeating-linear-gradient(135deg,rgba(216,87,139,.15) 0 4px,transparent 4px 8px); } .selection-tag { position:absolute; left:-1px; top:-21px; padding:2px 5px; color:#fff; background:#cc3979; font-size:9px; font-weight:750; line-height:1.3; } .resize-handle { position:absolute; width:14px; height:14px; border:2px solid #fff; border-radius:50%; background:#cc3979; } .resize-handle.top-left { left:-7px; top:-7px; cursor:nwse-resize; } .resize-handle.top-right { right:-7px; top:-7px; cursor:nesw-resize; } .resize-handle.bottom-left { bottom:-7px; left:-7px; cursor:nesw-resize; } .resize-handle.bottom-right { right:-7px; bottom:-7px; cursor:nwse-resize; }
         .workspace-footer { display:flex; justify-content:space-between; gap:1rem; padding:.6rem 1rem; border-top:1px solid #f0d9e4; color:#8d6076; font-size:.65rem; }
         .render-error { margin:.8rem 1rem 0; padding:.65rem; border-radius:10px; color:#9c244f; background:#ffe9ef; font-size:.75rem; }
-        .selection-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem; } .selection-title strong { font-size:.88rem; } .icon-text, .danger-link { border:0; color:#9a2d5e; background:transparent; font-size:.7rem; font-weight:750; } .property-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; } .property-grid label, .property-block { color:#825069; font-size:.65rem; font-weight:700; } input, select, textarea { width:100%; margin-top:.18rem; border:1px solid #e6bfd0; border-radius:8px; padding:.42rem; color:#4b2940; background:white; font-size:.75rem; outline:none; } textarea { min-height:74px; resize:vertical; } input:focus, select:focus, textarea:focus { border-color:#c13c76; box-shadow:0 0 0 3px rgba(193,60,118,.11); } .property-block { display:block; margin-top:.8rem; } .check-row { display:flex; align-items:center; gap:.4rem; margin-top:.7rem; color:#77455d; font-size:.68rem; } .check-row input { width:16px; height:16px; margin:0; accent-color:#b52d68; } .inspector-actions, .layer-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.3rem; margin-top:.65rem; } .layer-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .inspector-actions button, .layer-actions button { min-height:31px; border:1px solid #e8c7d5; border-radius:8px; color:#80425e; background:#fff; font-size:.61rem; } .danger-link { display:block; margin:1rem auto .25rem; } .empty-inspector { padding:1rem .25rem; color:#855b6e; font-size:.78rem; line-height:1.5; } .version-panel { margin-top:1.4rem; padding-top:1rem; border-top:1px solid #efdce5; } .version-panel > div { display:flex; justify-content:space-between; gap:.5rem; color:#81536b; font-size:.65rem; } .version-panel > div p { margin:0; } .version-panel button { width:100%; margin-top:.35rem; min-height:33px; border:1px solid #eed1df; border-radius:8px; color:#864460; background:#fff; font-size:.66rem; }
+        .selection-title { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.8rem; } .selection-title strong, .selection-title small { display:block; } .selection-title strong { font-size:.88rem; } .selection-title small { margin-top:.15rem; color:#94627a; font-size:.61rem; } .icon-text, .danger-link { border:0; color:#9a2d5e; background:transparent; font-size:.7rem; font-weight:750; } .quick-property-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; margin-bottom:.85rem; } .quick-property-actions button, .secondary-wide-action { min-height:32px; border:1px solid #e8c7d5; border-radius:8px; color:#80425e; background:#fff; font-size:.65rem; font-weight:750; } .quick-property-actions button.active { border-color:#cb5d8b; color:#8f2357; background:#fcecf3; } .property-section { margin-top:.95rem; padding-top:.85rem; border-top:1px solid #f1dfe7; } .property-section-title { display:block; margin-bottom:.5rem; color:#a04b73; font-size:.6rem; font-weight:850; letter-spacing:.07em; text-transform:uppercase; } .property-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; } .property-grid label, .property-block { color:#825069; font-size:.65rem; font-weight:700; } input, select, textarea { width:100%; margin-top:.18rem; border:1px solid #e6bfd0; border-radius:8px; padding:.42rem; color:#4b2940; background:white; font-size:.75rem; outline:none; } textarea { min-height:74px; resize:vertical; } input:focus, select:focus, textarea:focus { border-color:#c13c76; box-shadow:0 0 0 3px rgba(193,60,118,.11); } .property-block { display:block; margin-top:.8rem; } .check-row { display:flex; align-items:center; gap:.4rem; margin-top:.7rem; color:#77455d; font-size:.68rem; } .check-row input { width:16px; height:16px; margin:0; accent-color:#b52d68; } .inspector-actions, .layer-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.3rem; margin-top:.65rem; } .inspector-actions.three-columns { grid-template-columns:repeat(3,minmax(0,1fr)); } .text-alignment { grid-template-columns:1fr; } .layer-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .inspector-actions button, .layer-actions button { min-height:31px; border:1px solid #e8c7d5; border-radius:8px; color:#80425e; background:#fff; font-size:.61rem; } .inspector-actions button.active { border-color:#cb5d8b; color:#8f2357; background:#fcecf3; } .secondary-wide-action { width:100%; margin-top:.9rem; } .danger-link { display:block; margin:1rem auto .25rem; } .empty-inspector { padding:1rem .25rem; color:#855b6e; font-size:.78rem; line-height:1.5; } .version-panel { margin-top:1.4rem; padding-top:1rem; border-top:1px solid #efdce5; } .version-panel > div { display:flex; justify-content:space-between; gap:.5rem; color:#81536b; font-size:.65rem; } .version-panel > div p { margin:0; } .version-panel button { width:100%; margin-top:.35rem; min-height:33px; border:1px solid #eed1df; border-radius:8px; color:#864460; background:#fff; font-size:.66rem; }
         .validation-strip { display:flex; gap:1rem; align-items:flex-start; margin-top:1rem; padding:1rem 1.15rem; border-radius:16px; color:#6c4a5a; font-size:.75rem; } .validation-strip.has-errors { border-color:#efadc3; background:#fff1f5; color:#922850; } .validation-strip > div { display:flex; flex-wrap:wrap; gap:.4rem .7rem; } .validation-strip span { padding-left:.5rem; border-left:2px solid #d7467f; } .validation-strip span.warning { border-color:#d68b20; color:#8a641e; }
         .mobile-tools, .close-mobile { display:none; }
         @media (max-width: 1180px) { .editor-shell { grid-template-columns:64px 220px minmax(0,1fr); } .inspector { display:none; } }
@@ -400,10 +490,13 @@ export class LabelDesignerComponent {
     readonly isPublishing = signal(false);
     readonly isUploadingAsset = signal(false);
     readonly showGrid = signal(true);
+    readonly snapEnabled = signal(true);
+    readonly showRulers = signal(true);
     readonly zoom = signal(100);
     readonly mobilePanelOpen = signal(false);
     readonly isDirty = signal(false);
     readonly lastSavedAt = signal<Date | null>(null);
+    readonly snapGuide = signal<SnapGuide>({ x: null, y: null });
 
     readonly selectedElement = computed(() => this.design().elements.find(element => element.id === this.selectedElementId()) ?? null);
     readonly fields = computed(() => this.activeTemplate() ? this.designService.getFields(this.activeTemplate()!.kind) : []);
@@ -431,7 +524,13 @@ export class LabelDesignerComponent {
     }
 
     panelTitle(): string {
-        return ({ elements: 'AGREGAR', fields: 'DATOS DEL SISTEMA', images: 'BIBLIOTECA', layers: 'CAPAS' } as Record<SidebarTab, string>)[this.activeTab()];
+        return ({
+            elements: 'AGREGAR',
+            fields: 'DATOS DEL SISTEMA',
+            images: 'BIBLIOTECA',
+            layers: 'CAPAS',
+            properties: 'AJUSTES DEL ELEMENTO'
+        } as Record<SidebarTab, string>)[this.activeTab()];
     }
 
     printerLabel(profile: LabelPrinterProfile): string {
@@ -546,16 +645,21 @@ export class LabelDesignerComponent {
         if (event.target === event.currentTarget) this.selectedElementId.set(null);
     }
 
-    startPointerAction(event: PointerEvent, element: LabelElementDefinition, action: PointerAction): void {
+    startPointerAction(event: PointerEvent, element: LabelElementDefinition, action: PointerAction, handle?: ResizeHandle): void {
         event.preventDefault();
         event.stopPropagation();
         this.selectElement(element.id);
+        if (element.locked) {
+            this.toast.info('Este elemento está bloqueado. Desbloquéalo desde Ajustes para moverlo o editarlo.');
+            return;
+        }
         this.pointerState = {
             action,
             elementId: element.id,
             startX: event.clientX,
             startY: event.clientY,
-            original: { ...element, properties: { ...element.properties } }
+            original: { ...element, properties: { ...element.properties } },
+            handle
         };
         (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
     }
@@ -573,8 +677,9 @@ export class LabelDesignerComponent {
         const dy = ((event.clientY - state.startY) / rect.height) * this.design().canvas.heightMm;
         const changed = state.action === 'move'
             ? { ...state.original, x: state.original.x + dx, y: state.original.y + dy }
-            : { ...state.original, width: state.original.width + dx, height: state.original.height + dy };
-        const nextElement = this.snapElement(this.designService.clampElement(changed, this.renderer.getProfile(template.printerProfile)));
+            : this.resizeFromHandle(state.original, dx, dy, state.handle ?? 'bottom-right');
+        const clamped = this.designService.clampElement(changed, this.renderer.getProfile(template.printerProfile));
+        const nextElement = this.applyPlacementSnap(clamped, event.shiftKey);
         this.replaceElement(nextElement, false);
     }
 
@@ -582,6 +687,7 @@ export class LabelDesignerComponent {
     onDocumentPointerUp(): void {
         if (!this.pointerState) return;
         this.pointerState = null;
+        this.snapGuide.set({ x: null, y: null });
         this.commitCurrentToHistory();
         this.queueAutosave();
     }
@@ -595,6 +701,11 @@ export class LabelDesignerComponent {
             if (event.shiftKey) this.redo(); else this.undo();
             return;
         }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+            event.preventDefault();
+            this.redo();
+            return;
+        }
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
             event.preventDefault();
             this.duplicateSelected();
@@ -605,14 +716,18 @@ export class LabelDesignerComponent {
         };
         if (offsetByKey[event.key]) {
             event.preventDefault();
+            if (selected.locked) return;
             const multiplier = event.shiftKey ? 5 : 1;
             const [x, y] = offsetByKey[event.key];
             this.nudgeSelected(x * multiplier, y * multiplier);
         }
         if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
+            if (selected.locked) return;
             this.removeSelected();
         }
+        if (event.key === '+' || event.key === '=') this.changeZoomBy(1);
+        if (event.key === '-') this.changeZoomBy(-1);
     }
 
     updateNumeric(id: string, key: 'x' | 'y' | 'width' | 'height', event: Event): void {
@@ -620,8 +735,14 @@ export class LabelDesignerComponent {
         if (value === null) return;
         const template = this.activeTemplate();
         const element = this.design().elements.find(current => current.id === id);
-        if (!template || !element) return;
+        if (!template || !element || element.locked) return;
         this.replaceElement(this.designService.clampElement({ ...element, [key]: value }, this.renderer.getProfile(template.printerProfile)));
+    }
+
+    updateRotation(id: string, event: Event): void {
+        const rotation = this.readNumber(event);
+        if (rotation === null) return;
+        this.updateElement(id, element => element.type === 'qr' ? element : { ...element, rotation });
     }
 
     updateNumericProperty(id: string, key: keyof LabelElementDefinition['properties'], event: Event): void {
@@ -641,26 +762,52 @@ export class LabelDesignerComponent {
     }
 
     toggleVisibility(id: string, event: Event): void {
-        const visible = (event.target as HTMLInputElement).checked;
-        this.updateElement(id, element => ({ ...element, visible }));
+        const element = this.design().elements.find(current => current.id === id);
+        if (!element) return;
+        const target = event.target;
+        const visible = target instanceof HTMLInputElement ? target.checked : !element.visible;
+        this.replaceElement({ ...element, visible });
     }
 
-    alignSelected(alignment: 'left' | 'center' | 'right'): void {
+    toggleLocked(id: string): void {
+        const element = this.design().elements.find(current => current.id === id);
+        if (!element) return;
+        this.replaceElement({ ...element, locked: !element.locked });
+    }
+
+    alignText(alignment: 'left' | 'center' | 'right'): void {
         const selected = this.selectedElement();
-        if (!selected || !['text', 'data'].includes(selected.type)) return;
+        if (!selected || selected.locked || !['text', 'data'].includes(selected.type)) return;
         this.updateElement(selected.id, element => ({ ...element, properties: { ...element.properties, align: alignment } }));
     }
 
-    changeLayer(id: string, delta: number): void {
-        const element = this.design().elements.find(current => current.id === id);
-        if (!element) return;
-        this.replaceElement({ ...element, zIndex: Math.max(0, element.zIndex + delta) });
+    positionSelected(position: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {
+        const selected = this.selectedElement();
+        const template = this.activeTemplate();
+        if (!selected || selected.locked || !template) return;
+        const profile = this.renderer.getProfile(template.printerProfile);
+        const x = position === 'left' ? 0 : position === 'center' ? (profile.widthMm - selected.width) / 2 : position === 'right' ? profile.widthMm - selected.width : selected.x;
+        const y = position === 'top' ? 0 : position === 'middle' ? (profile.heightMm - selected.height) / 2 : position === 'bottom' ? profile.heightMm - selected.height : selected.y;
+        this.replaceElement(this.designService.clampElement({ ...selected, x, y }, profile));
+    }
+
+    moveSelectedToFront(): void {
+        const selected = this.selectedElement();
+        if (!selected || selected.locked) return;
+        this.replaceElement({ ...selected, zIndex: this.nextZIndex() });
+    }
+
+    moveSelectedToBack(): void {
+        const selected = this.selectedElement();
+        if (!selected || selected.locked) return;
+        const lowestLayer = Math.min(0, ...this.design().elements.map(element => element.zIndex));
+        this.replaceElement({ ...selected, zIndex: lowestLayer - 1 });
     }
 
     duplicateSelected(): void {
         const selected = this.selectedElement();
         const template = this.activeTemplate();
-        if (!selected || !template) return;
+        if (!selected || !template || selected.locked) return;
         const generated = this.designService.createElement(selected.type, template.printerProfile);
         const copy = this.designService.clampElement({
             ...selected,
@@ -689,7 +836,7 @@ export class LabelDesignerComponent {
 
     removeSelected(): void {
         const selected = this.selectedElement();
-        if (!selected || this.isRequiredElement(selected)) return;
+        if (!selected || selected.locked || this.isRequiredElement(selected)) return;
         this.applyDesign({ ...this.design(), elements: this.design().elements.filter(element => element.id !== selected.id) });
         this.selectedElementId.set(null);
     }
@@ -717,8 +864,40 @@ export class LabelDesignerComponent {
         if (Number.isFinite(value)) this.zoom.set(value);
     }
 
+    changeZoomBy(direction: -1 | 1): void {
+        const levels = [60, 75, 100, 125, 150];
+        const currentIndex = levels.indexOf(this.zoom());
+        const fallbackIndex = levels.findIndex(level => level >= this.zoom());
+        const index = currentIndex >= 0 ? currentIndex : Math.max(0, fallbackIndex);
+        this.zoom.set(levels[Math.max(0, Math.min(levels.length - 1, index + direction))]);
+    }
+
     toggleGrid(): void {
         this.showGrid.set(!this.showGrid());
+    }
+
+    toggleSnap(): void {
+        this.snapEnabled.set(!this.snapEnabled());
+        this.snapGuide.set({ x: null, y: null });
+    }
+
+    toggleRulers(): void {
+        this.showRulers.set(!this.showRulers());
+    }
+
+    applyRecommendedCodeSize(id: string): void {
+        const template = this.activeTemplate();
+        const element = this.design().elements.find(current => current.id === id);
+        if (!template || !element || element.locked || !['qr', 'barcode'].includes(element.type)) return;
+        const profile = this.renderer.getProfile(template.printerProfile);
+        if (element.type === 'qr') {
+            const minimum = template.printerProfile === 'NiimbotB1_50x50' ? 20 : 28;
+            const side = Math.min(Math.max(minimum, Math.max(element.width, element.height)), Math.min(profile.widthMm, profile.heightMm) - 2);
+            this.replaceElement(this.designService.clampElement({ ...element, width: side, height: side, rotation: 0 }, profile));
+            return;
+        }
+        const minimumWidth = template.printerProfile === 'NiimbotB1_50x50' ? 30 : 45;
+        this.replaceElement(this.designService.clampElement({ ...element, width: Math.max(minimumWidth, element.width), height: Math.max(10, element.height) }, profile));
     }
 
     toggleMobilePanel(): void {
@@ -841,6 +1020,8 @@ export class LabelDesignerComponent {
     topPercent(element: LabelElementDefinition): number { return (element.y / this.design().canvas.heightMm) * 100; }
     widthPercent(element: LabelElementDefinition): number { return (element.width / this.design().canvas.widthMm) * 100; }
     heightPercent(element: LabelElementDefinition): number { return (element.height / this.design().canvas.heightMm) * 100; }
+    safeInsetXPercent(): number { return (1 / this.design().canvas.widthMm) * 100; }
+    safeInsetYPercent(): number { return (1 / this.design().canvas.heightMm) * 100; }
     elementTypeName(type: LabelElementType): string { return ({ text: 'Texto', data: 'Dato', image: 'Imagen', qr: 'QR', barcode: 'Barras', shape: 'Forma', line: 'Línea' } as Record<LabelElementType, string>)[type]; }
     elementName(element: LabelElementDefinition): string { return element.properties.text || element.properties.binding || element.properties.assetId || this.elementTypeName(element.type); }
     isRequiredElement(element: LabelElementDefinition): boolean { const template = this.activeTemplate(); return !!template && !!element.properties.binding && this.designService.getRequiredBindings(template.kind).includes(element.properties.binding); }
@@ -869,7 +1050,7 @@ export class LabelDesignerComponent {
 
     private updateElement(id: string, update: (element: LabelElementDefinition) => LabelElementDefinition): void {
         const element = this.design().elements.find(current => current.id === id);
-        if (!element) return;
+        if (!element || element.locked) return;
         this.replaceElement(update(element));
     }
 
@@ -885,6 +1066,100 @@ export class LabelDesignerComponent {
         if (!this.showGrid()) return element;
         const snap = (value: number) => Math.round(value * 2) / 2;
         return { ...element, x: snap(element.x), y: snap(element.y), width: snap(element.width), height: snap(element.height) };
+    }
+
+    private resizeFromHandle(element: LabelElementDefinition, dx: number, dy: number, handle: ResizeHandle): LabelElementDefinition {
+        const minimum = element.type === 'line' ? 0.5 : 1;
+        let x = element.x;
+        let y = element.y;
+        let width = element.width;
+        let height = element.height;
+
+        if (handle === 'top-left' || handle === 'bottom-left') {
+            width = Math.max(minimum, element.width - dx);
+            x = element.x + element.width - width;
+        } else {
+            width = Math.max(minimum, element.width + dx);
+        }
+
+        if (handle === 'top-left' || handle === 'top-right') {
+            height = Math.max(minimum, element.height - dy);
+            y = element.y + element.height - height;
+        } else {
+            height = Math.max(minimum, element.height + dy);
+        }
+
+        if (element.type === 'qr') {
+            const side = Math.max(width, height);
+            if (handle === 'top-left' || handle === 'bottom-left') x = element.x + element.width - side;
+            if (handle === 'top-left' || handle === 'top-right') y = element.y + element.height - side;
+            width = side;
+            height = side;
+        }
+
+        return { ...element, x, y, width, height };
+    }
+
+    private applyPlacementSnap(element: LabelElementDefinition, bypassGuides: boolean): LabelElementDefinition {
+        const template = this.activeTemplate();
+        if (!template) return element;
+        const base = this.snapElement(element);
+        if (!this.snapEnabled() || bypassGuides) {
+            this.snapGuide.set({ x: null, y: null });
+            return base;
+        }
+
+        const profile = this.renderer.getProfile(template.printerProfile);
+        const verticalCandidates: Array<{ position: number; guide: number }> = [
+            { position: 0, guide: 0 },
+            { position: (profile.widthMm - base.width) / 2, guide: profile.widthMm / 2 },
+            { position: profile.widthMm - base.width, guide: profile.widthMm }
+        ];
+        const horizontalCandidates: Array<{ position: number; guide: number }> = [
+            { position: 0, guide: 0 },
+            { position: (profile.heightMm - base.height) / 2, guide: profile.heightMm / 2 },
+            { position: profile.heightMm - base.height, guide: profile.heightMm }
+        ];
+
+        for (const other of this.design().elements) {
+            if (other.id === base.id || !other.visible) continue;
+            verticalCandidates.push(
+                { position: other.x, guide: other.x },
+                { position: other.x + other.width / 2 - base.width / 2, guide: other.x + other.width / 2 },
+                { position: other.x + other.width - base.width, guide: other.x + other.width }
+            );
+            horizontalCandidates.push(
+                { position: other.y, guide: other.y },
+                { position: other.y + other.height / 2 - base.height / 2, guide: other.y + other.height / 2 },
+                { position: other.y + other.height - base.height, guide: other.y + other.height }
+            );
+        }
+
+        const nearestX = this.findNearestSnap(base.x, verticalCandidates);
+        const nearestY = this.findNearestSnap(base.y, horizontalCandidates);
+        const snapped = this.designService.clampElement({
+            ...base,
+            x: nearestX?.position ?? base.x,
+            y: nearestY?.position ?? base.y
+        }, profile);
+        this.snapGuide.set({
+            x: nearestX ? (nearestX.guide / profile.widthMm) * 100 : null,
+            y: nearestY ? (nearestY.guide / profile.heightMm) * 100 : null
+        });
+        return snapped;
+    }
+
+    private findNearestSnap(current: number, candidates: Array<{ position: number; guide: number }>): { position: number; guide: number } | null {
+        let nearest: { position: number; guide: number } | null = null;
+        let distance = Number.POSITIVE_INFINITY;
+        for (const candidate of candidates) {
+            const candidateDistance = Math.abs(candidate.position - current);
+            if (candidateDistance < distance) {
+                nearest = candidate;
+                distance = candidateDistance;
+            }
+        }
+        return distance <= 0.85 ? nearest : null;
     }
 
     private commitCurrentToHistory(): void {
