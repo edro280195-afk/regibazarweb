@@ -62,7 +62,7 @@ interface TemplateStarter {
                 <div class="hero-actions">
                     @if (activeTemplate()) {
                         <button class="secondary-action" type="button" (click)="backToLibrary()">Plantillas</button>
-                        <button class="primary-action" type="button" [disabled]="isPublishing() || errors().length > 0" (click)="publish()">
+                        <button class="primary-action" type="button" [disabled]="isPublishing() || isSaving() || errors().length > 0" (click)="publish()">
                             {{ isPublishing() ? 'Publicando…' : 'Publicar versión' }}
                         </button>
                     }
@@ -1186,12 +1186,15 @@ export class LabelDesignerComponent {
 
     publish(): void {
         const template = this.activeTemplate();
-        if (!template || this.errors().length > 0 || this.isPublishing()) return;
+        if (!template || this.errors().length > 0 || this.isPublishing() || this.isSaving()) return;
+        this.isPublishing.set(true);
         this.flushAutosave();
         this.saveDraft(() => {
             const latest = this.activeTemplate()?.draftVersion;
-            if (!latest) return;
-            this.isPublishing.set(true);
+            if (!latest) {
+                this.isPublishing.set(false);
+                return;
+            }
             this.api.publishLabelTemplate(template.id, latest.revision).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
                 next: result => {
                     this.isPublishing.set(false);
@@ -1202,10 +1205,10 @@ export class LabelDesignerComponent {
                 },
                 error: error => {
                     this.isPublishing.set(false);
-                    this.handleSaveError(error);
+                    this.toast.error(this.errorMessage(error, 'No pudimos publicar la versión.'));
                 }
             });
-        });
+        }, () => this.isPublishing.set(false));
     }
 
     leftPercent(element: LabelElementDefinition): number { return (element.x / this.design().canvas.widthMm) * 100; }
@@ -1421,11 +1424,15 @@ export class LabelDesignerComponent {
         }
     }
 
-    private saveDraft(afterSave?: () => void): void {
+    private saveDraft(afterSave?: () => void, afterError?: () => void): void {
         const template = this.activeTemplate();
         const draft = template?.draftVersion;
-        if (!template || !draft || !this.isDirty() || this.isSaving()) {
+        if (!template || !draft || !this.isDirty()) {
             afterSave?.();
+            return;
+        }
+        if (this.isSaving()) {
+            afterError?.();
             return;
         }
         if (this.errors().length > 0) return;
@@ -1443,6 +1450,7 @@ export class LabelDesignerComponent {
             },
             error: error => {
                 this.isSaving.set(false);
+                afterError?.();
                 this.handleSaveError(error);
             }
         });
