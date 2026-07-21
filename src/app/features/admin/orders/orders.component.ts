@@ -141,31 +141,31 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                     </p>
                   }
 
-                  <!-- 🛍️ Bolsas: badge + quick-set inline -->
+                  <!-- 🛍️ Bolsas reales: creación rápida con QR -->
                   <div class="mt-2.5">
                     @if (bagsEditFor() === order.id) {
                       <div class="bg-pink-50/70 rounded-xl p-2 border border-pink-200 flex flex-wrap gap-1.5 items-center animate-[fadeIn_.15s_ease]">
-                        <span class="text-[9px] font-black text-pink-500 uppercase w-full mb-0.5">🛍️ ¿Cuántas bolsas?</span>
+                        <span class="text-[9px] font-black text-pink-500 uppercase w-full mb-0.5">🛍️ Generar bolsas con QR</span>
                         @for (n of [1,2,3,4,5]; track n) {
                           <button class="w-7 h-7 rounded-lg font-black text-xs bg-white text-pink-500 border border-pink-100 hover:bg-pink-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
-                                  [disabled]="savingQuickBags()" (click)="saveQuickBags(order, n)">{{ n }}</button>
+                                  [disabled]="savingQuickBags()" (click)="generateQuickBags(order, n)">{{ n }}</button>
                         }
                         <button class="w-7 h-7 rounded-lg font-black text-sm bg-white text-pink-500 border border-pink-100 hover:bg-pink-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
-                                [disabled]="savingQuickBags()" (click)="saveQuickBags(order, 6)">＋</button>
+                                [disabled]="savingQuickBags()" (click)="generateQuickBags(order, 6)">6</button>
                         <button class="px-2 h-7 rounded-lg font-bold text-[10px] bg-white text-purple-500 border border-purple-100 hover:bg-purple-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
-                                [disabled]="savingQuickBags()" (click)="saveQuickBags(order, 0)">Sin bolsas</button>
+                                [disabled]="savingQuickBags()" (click)="markWithoutBags(order)">Sin bolsas</button>
                         <button class="px-2 h-7 rounded-lg font-bold text-[10px] text-pink-300 hover:text-pink-500 transition-all ml-auto"
                                 [disabled]="savingQuickBags()" (click)="bagsEditFor.set(null)">✕</button>
                       </div>
                     } @else if (order.packagesConfirmed) {
                       <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-all"
-                              (click)="bagsEditFor.set(order.id)" title="Editar bolsas">
+                              (click)="bagsEditFor.set(order.id)" title="Generar más bolsas">
                         🛍️ {{ (order.totalPackages ?? 0) === 0 ? 'Sin bolsas' : order.totalPackages + ' bolsa' + (order.totalPackages === 1 ? '' : 's') }}
                       </button>
                     } @else {
                       <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-500 border border-rose-200 hover:bg-rose-100 transition-all animate-pulse-pink"
-                              (click)="bagsEditFor.set(order.id)" title="Agregar bolsas">
-                        🛍️ ¿Cuántas bolsas?
+                              (click)="bagsEditFor.set(order.id)" title="Generar bolsas">
+                        🛍️ Generar bolsas
                       </button>
                     }
                   </div>
@@ -542,8 +542,9 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                     <p class="text-[9px] font-black text-pink-400 uppercase mb-1">Deseas agregar más?</p>
                     <div class="flex gap-2">
                        <input type="number" class="input-coquette py-1.5 px-3 w-20 text-sm text-center" [(ngModel)]="packagesToGenerate" min="1" />
-                       <button class="btn-coquette btn-pink text-[10px] shadow-sm grow py-2 font-black" (click)="generatePackages(packagesToGenerate)">
-                         {{ packages().length > 0 ? '+ Agregar Bolsas' : 'Generar Bolsas' }}
+                       <button class="btn-coquette btn-pink text-[10px] shadow-sm grow py-2 font-black disabled:opacity-50" type="button"
+                               [disabled]="isLoadingPackages() || packagesToGenerate < 1" (click)="generatePackages(packagesToGenerate)">
+                         {{ isLoadingPackages() ? 'Generando…' : (packages().length > 0 ? '+ Agregar Bolsas' : 'Generar Bolsas') }}
                        </button>
                     </div>
                   </div>
@@ -1299,13 +1300,13 @@ export class OrdersComponent implements OnInit {
 
   generatePackages(count: number) {
     const order = this.selectedOrder();
-    if (!order || count < 1) return;
+    if (!order || count < 1 || this.isLoadingPackages()) return;
     this.isLoadingPackages.set(true);
     this.api.generatePackages(order.id, { count }).subscribe({
       next: () => {
-        // Essential: reload the full list of packages for the order
-        // to ensure we have ALL packages and correct total counts.
         this.loadPackages(order.id);
+        this.reloadSelectedOrder();
+        this.loadOrders();
         this.toast.success('Bolsas agregadas 🏷️');
         this.packagesToGenerate = 1; // Reset to default
       },
@@ -1316,20 +1317,42 @@ export class OrdersComponent implements OnInit {
     });
   }
 
-  /** 🛍️ Quick-set de bolsas desde la tarjeta del Kanban. count = 0 => "va sin bolsas". */
-  saveQuickBags(order: OrderSummaryDto, count: number) {
-    if (this.savingQuickBags()) return;
+  /** 🛍️ Genera bolsas físicas con QR desde la tarjeta del Kanban. */
+  generateQuickBags(order: OrderSummaryDto, count: number): void {
+    if (this.savingQuickBags() || count < 1) return;
     this.savingQuickBags.set(true);
-    this.api.setPackages(order.id, count, true).subscribe({
-      next: (updated) => {
-        this.orders.update(list => list.map(o => o.id === updated.id ? updated : o));
+    this.api.generatePackages(order.id, { count }).subscribe({
+      next: (createdPackages) => {
         this.savingQuickBags.set(false);
         this.bagsEditFor.set(null);
-        this.toast.success(count === 0 ? 'Marcado sin bolsas 🛍️' : `${count} bolsa${count === 1 ? '' : 's'} guardada${count === 1 ? '' : 's'} 🛍️`);
+        this.loadOrders();
+        if (this.selectedOrder()?.id === order.id) {
+          this.reloadSelectedOrder();
+          this.loadPackages(order.id);
+        }
+        this.toast.success(`${createdPackages.length} bolsa${createdPackages.length === 1 ? '' : 's'} creada${createdPackages.length === 1 ? '' : 's'} con QR 🛍️`);
       },
       error: () => {
         this.savingQuickBags.set(false);
-        this.toast.error('No se pudieron guardar las bolsas 🥺');
+        this.toast.error('No se pudieron generar las bolsas 🥺');
+      }
+    });
+  }
+
+  /** Marca que el pedido se entrega sin bolsas físicas. */
+  markWithoutBags(order: OrderSummaryDto): void {
+    if (this.savingQuickBags()) return;
+    this.savingQuickBags.set(true);
+    this.api.setPackages(order.id, 0, true).subscribe({
+      next: (updated) => {
+        this.orders.update(list => list.map(current => current.id === updated.id ? updated : current));
+        this.savingQuickBags.set(false);
+        this.bagsEditFor.set(null);
+        this.toast.success('Marcado sin bolsas 🛍️');
+      },
+      error: () => {
+        this.savingQuickBags.set(false);
+        this.toast.error('No se pudo marcar el pedido sin bolsas 🥺');
       }
     });
   }
