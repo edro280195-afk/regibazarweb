@@ -19,6 +19,7 @@ import { LabelDesignIssue, LabelDesignService } from '../../../core/services/lab
 import { LabelRendererService } from '../../../core/services/label-renderer.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { alignSelection, distributeSelection } from './label-layout.util';
 
 type SidebarTab = 'elements' | 'fields' | 'images' | 'layers' | 'properties';
 type PointerAction = 'move' | 'resize';
@@ -137,7 +138,7 @@ interface TemplateStarter {
                                     <button type="button" (click)="addElement('shape')"><b>□</b><span>Forma</span></button>
                                     <button type="button" (click)="addElement('line')"><b>—</b><span>Línea</span></button>
                                 </div>
-                                <div class="panel-tip">Arrastra los elementos sobre la etiqueta. El borde del lienzo es el borde físico de la impresión.</div>
+                                <div class="panel-tip">Arrastra los elementos sobre la etiqueta. Doble clic en un texto para editarlo ahí mismo; usa Shift + clic para seleccionar varios.</div>
                             }
                             @case ('fields') {
                                 <p class="panel-copy">Estos datos se llenan solos cuando imprimes una caja, artículo o bolsa.</p>
@@ -170,7 +171,7 @@ interface TemplateStarter {
                             @case ('layers') {
                                 <div class="layers-list">
                                     @for (element of orderedElements(); track element.id) {
-                                        <button type="button" class="layer-row" [class.selected]="selectedElementId() === element.id" (click)="selectElement(element.id)">
+                                        <button type="button" class="layer-row" [class.selected]="isElementSelected(element.id)" (click)="selectElement(element.id, $event.shiftKey || $event.ctrlKey || $event.metaKey)">
                                             <span class="layer-type">{{ elementTypeName(element.type) }}</span>
                                             <span class="layer-name">{{ elementName(element) }}</span>
                                             @if (element.locked) { <small>Bloqueado</small> }
@@ -247,7 +248,7 @@ interface TemplateStarter {
                                     @for (element of design().elements; track element.id) {
                                         <div
                                             class="element-hitbox"
-                                            [class.selected]="selectedElementId() === element.id"
+                                            [class.selected]="isElementSelected(element.id)"
                                             [class.locked-element]="element.locked"
                                             [class.hidden-element]="!element.visible"
                                             [style.left.%]="leftPercent(element)"
@@ -256,6 +257,7 @@ interface TemplateStarter {
                                             [style.height.%]="heightPercent(element)"
                                             [style.transform]="'rotate(' + element.rotation + 'deg)'"
                                             (pointerdown)="startPointerAction($event, element, 'move')"
+                                            (dblclick)="startInlineTextEditing($event, element)"
                                             (keydown.enter)="selectElement(element.id)"
                                             tabindex="0"
                                             role="button"
@@ -268,6 +270,18 @@ interface TemplateStarter {
                                                     <button class="resize-handle bottom-left" type="button" aria-label="Cambiar tamaño desde la esquina inferior izquierda" (pointerdown)="startPointerAction($event, element, 'resize', 'bottom-left')"></button>
                                                     <button class="resize-handle bottom-right" type="button" aria-label="Cambiar tamaño desde la esquina inferior derecha" (pointerdown)="startPointerAction($event, element, 'resize', 'bottom-right')"></button>
                                                 }
+                                            }
+                                            @if (inlineEditingElementId() === element.id) {
+                                                <textarea
+                                                    class="canvas-text-editor"
+                                                    aria-label="Editar texto directamente en la etiqueta"
+                                                    [value]="inlineTextValue()"
+                                                    [style.font-size.pt]="element.properties.fontSize ?? 12"
+                                                    [style.font-weight]="element.properties.fontWeight ?? 500"
+                                                    (pointerdown)="$event.stopPropagation()"
+                                                    (input)="setInlineTextValue($event)"
+                                                    (blur)="commitInlineTextEditing()"
+                                                    (keydown.escape)="cancelInlineTextEditing()"></textarea>
                                             }
                                         </div>
                                     }
@@ -314,7 +328,39 @@ interface TemplateStarter {
                 }
 
                 <ng-template #elementProperties>
-                    @if (selectedElement(); as element) {
+                    @if (selectedElements().length > 1) {
+                        <div class="empty-inspector">
+                            <strong>{{ selectedElements().length }} elementos seleccionados</strong>
+                            <p>Usa Shift + clic para sumar o quitar elementos. Estas acciones respetan los que están bloqueados.</p>
+                        </div>
+                        <div class="property-section">
+                            <span class="property-section-title">Alinear selección</span>
+                            <div class="inspector-actions three-columns">
+                                <button type="button" (click)="alignSelectedElements('left')">Izquierda</button>
+                                <button type="button" (click)="alignSelectedElements('center')">Centro</button>
+                                <button type="button" (click)="alignSelectedElements('right')">Derecha</button>
+                                <button type="button" (click)="alignSelectedElements('top')">Arriba</button>
+                                <button type="button" (click)="alignSelectedElements('middle')">Medio</button>
+                                <button type="button" (click)="alignSelectedElements('bottom')">Abajo</button>
+                            </div>
+                        </div>
+                        <div class="property-section">
+                            <span class="property-section-title">Distribuir con el mismo espacio</span>
+                            <div class="layer-actions">
+                                <button type="button" [disabled]="selectedElements().length < 3" (click)="distributeSelectedElements('horizontal')">Horizontal</button>
+                                <button type="button" [disabled]="selectedElements().length < 3" (click)="distributeSelectedElements('vertical')">Vertical</button>
+                            </div>
+                        </div>
+                        <div class="property-section">
+                            <span class="property-section-title">Acciones por lote</span>
+                            <div class="layer-actions">
+                                <button type="button" (click)="duplicateSelected()">Duplicar</button>
+                                <button type="button" (click)="toggleSelectedElementsLock()">Bloquear / desbloquear</button>
+                            </div>
+                            <button type="button" class="secondary-wide-action" (click)="copySelectedElements()">Copiar selección</button>
+                            <button type="button" class="danger-link" (click)="removeSelected()">Eliminar elementos editables</button>
+                        </div>
+                    } @else if (selectedElement(); as element) {
                         <div class="selection-title">
                             <div>
                                 <strong>{{ elementTypeName(element.type) }}</strong>
@@ -369,6 +415,19 @@ interface TemplateStarter {
                                     @for (field of fields(); track field.key) { <option [value]="field.key">{{ field.label }}</option> }
                                 </select>
                             </label>
+                        }
+                        @if (element.type === 'shape' || element.type === 'line') {
+                            <div class="property-section">
+                                <span class="property-section-title">Trazo y relleno</span>
+                                <div class="property-grid compact">
+                                    @if (element.type === 'shape') {
+                                        <label>Relleno <input type="color" [disabled]="element.locked" [value]="element.properties.fill ?? '#FFFFFF'" (input)="updateTextProperty(element.id, 'fill', $event)" /></label>
+                                        <label>Esquinas <input type="number" min="0" max="20" step="0.5" [disabled]="element.locked" [value]="element.properties.radius ?? 0" (change)="updateNumericProperty(element.id, 'radius', $event)" /></label>
+                                    }
+                                    <label>Trazo <input type="color" [disabled]="element.locked" [value]="element.properties.stroke ?? '#000000'" (input)="updateTextProperty(element.id, 'stroke', $event)" /></label>
+                                    <label>Grosor <input type="number" min="0.1" max="4" step="0.1" [disabled]="element.locked" [value]="element.properties.strokeWidth ?? 0.4" (change)="updateNumericProperty(element.id, 'strokeWidth', $event)" /></label>
+                                </div>
+                            </div>
                         }
                         @if (element.type === 'text' || element.type === 'data') {
                             <div class="property-section">
@@ -444,7 +503,7 @@ interface TemplateStarter {
         .upload-asset { min-height:76px; display:flex; flex-direction:column; justify-content:center; padding:.75rem; border:1px dashed #d987ae; border-radius:12px; color:#8f2357; background:#fff7fb; font-size:.78rem; font-weight:750; cursor:pointer; } .upload-asset input { position:absolute; width:1px; height:1px; opacity:0; } .upload-asset small { margin-top:.2rem; color:#98657e; font-size:.63rem; font-weight:500; } .asset-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; margin-top:.75rem; } .asset-card { min-width:0; overflow:hidden; border:1px solid #efd5e2; border-radius:10px; padding:0; color:#78405a; background:#fff; font-size:.64rem; text-align:left; } .asset-card img { display:block; width:100%; aspect-ratio:1; object-fit:contain; padding:.3rem; background:#f8f8f8; } .asset-card span { display:block; overflow:hidden; padding:.35rem; text-overflow:ellipsis; white-space:nowrap; }
         .workspace { min-width:0; display:flex; flex-direction:column; background:radial-gradient(circle at 50% 30%,#fff 0,#fdf3f7 60%,#f8e7ef 100%); } .workspace-toolbar { min-height:65px; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-bottom:1px solid #f0d9e4; } .template-identity { min-width:0; } .template-identity strong, .template-identity small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .template-identity strong { margin-top:.18rem; font-size:.85rem; } .template-identity small { color:#936078; font-size:.63rem; } .printer-chip { display:inline-block; padding:.19rem .42rem; border-radius:999px; color:#7c2952; background:#fde5ef; font-size:.59rem; font-weight:800; } .canvas-actions { display:flex; align-items:center; gap:.4rem; } .canvas-actions button, .canvas-actions select { min-height:34px; border:1px solid #e8c4d4; border-radius:9px; padding:.25rem .45rem; color:#7f3659; background:#fff; font-size:.68rem; } .canvas-actions button.active { color:#922859; background:#fae4ee; box-shadow:0 0 0 2px rgba(178,60,111,.1) inset; }
         .canvas-scroll { flex:1; overflow:auto; display:flex; justify-content:center; align-items:flex-start; padding:1.5rem; } .canvas-stage { position:relative; width:min(100%,760px); min-width:280px; } .canvas-stage.with-rulers { padding:22px 0 0 22px; } .canvas-scale { min-width:280px; margin:0 auto; transition:width .16s ease; } .top-ruler, .left-ruler { position:absolute; display:flex; justify-content:space-between; color:#a65f81; background-color:#fff9fc; font-size:8px; font-weight:800; line-height:1; pointer-events:none; } .top-ruler { top:0; left:22px; right:0; height:18px; align-items:flex-end; padding:0 2px 3px; background-image:repeating-linear-gradient(90deg,transparent 0 9px,rgba(176,78,124,.35) 9px 10px); } .left-ruler { top:22px; bottom:0; left:0; width:18px; flex-direction:column; align-items:flex-end; padding:2px 3px 2px 0; background-image:repeating-linear-gradient(180deg,transparent 0 9px,rgba(176,78,124,.35) 9px 10px); } .left-ruler b:last-child { writing-mode:vertical-rl; transform:rotate(180deg); } .label-artboard { position:relative; width:100%; overflow:hidden; border:1px solid #cfc7cb; background:#fff; box-shadow:0 20px 45px rgba(68,30,48,.2); touch-action:none; } .label-artboard.with-grid { background-image:linear-gradient(to right,rgba(188,105,147,.18) 1px,transparent 1px),linear-gradient(to bottom,rgba(188,105,147,.18) 1px,transparent 1px); background-size:2% 2%; } .thermal-preview { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; pointer-events:none; user-select:none; } .preview-loading { position:absolute; inset:0; display:grid; place-items:center; color:#9d5d7b; font-size:.78rem; background:white; } .safe-area { position:absolute; z-index:3; border:1px dashed rgba(174,61,112,.55); pointer-events:none; } .smart-guide { position:absolute; z-index:7; display:block; background:#a72c61; pointer-events:none; } .smart-guide-vertical { top:0; bottom:0; width:1px; } .smart-guide-horizontal { left:0; right:0; height:1px; }
-        .element-hitbox { position:absolute; z-index:5; border:1px solid transparent; transform-origin:center; touch-action:none; } .element-hitbox.selected { z-index:10; border:1.5px solid #cc3979; box-shadow:0 0 0 1px rgba(255,255,255,.9) inset; } .element-hitbox.locked-element.selected { border-color:#76556b; } .element-hitbox.hidden-element { opacity:.4; background:repeating-linear-gradient(135deg,rgba(216,87,139,.15) 0 4px,transparent 4px 8px); } .selection-tag { position:absolute; left:-1px; top:-21px; padding:2px 5px; color:#fff; background:#cc3979; font-size:9px; font-weight:750; line-height:1.3; } .resize-handle { position:absolute; width:14px; height:14px; border:2px solid #fff; border-radius:50%; background:#cc3979; } .resize-handle.top-left { left:-7px; top:-7px; cursor:nwse-resize; } .resize-handle.top-right { right:-7px; top:-7px; cursor:nesw-resize; } .resize-handle.bottom-left { bottom:-7px; left:-7px; cursor:nesw-resize; } .resize-handle.bottom-right { right:-7px; bottom:-7px; cursor:nwse-resize; }
+        .element-hitbox { position:absolute; z-index:5; border:1px solid transparent; transform-origin:center; touch-action:none; } .element-hitbox.selected { z-index:10; border:1.5px solid #cc3979; box-shadow:0 0 0 1px rgba(255,255,255,.9) inset; } .element-hitbox.locked-element.selected { border-color:#76556b; } .element-hitbox.hidden-element { opacity:.4; background:repeating-linear-gradient(135deg,rgba(216,87,139,.15) 0 4px,transparent 4px 8px); } .selection-tag { position:absolute; left:-1px; top:-21px; padding:2px 5px; color:#fff; background:#cc3979; font-size:9px; font-weight:750; line-height:1.3; } .resize-handle { position:absolute; width:14px; height:14px; border:2px solid #fff; border-radius:50%; background:#cc3979; } .resize-handle.top-left { left:-7px; top:-7px; cursor:nwse-resize; } .resize-handle.top-right { right:-7px; top:-7px; cursor:nesw-resize; } .resize-handle.bottom-left { bottom:-7px; left:-7px; cursor:nesw-resize; } .resize-handle.bottom-right { right:-7px; bottom:-7px; cursor:nwse-resize; } .canvas-text-editor { position:absolute; inset:0; min-height:100%; margin:0; resize:none; border:0; border-radius:0; background:rgba(255,255,255,.96); line-height:1.2; outline:2px solid #b52d68; }
         .workspace-footer { display:flex; justify-content:space-between; gap:1rem; padding:.6rem 1rem; border-top:1px solid #f0d9e4; color:#8d6076; font-size:.65rem; }
         .render-error { margin:.8rem 1rem 0; padding:.65rem; border-radius:10px; color:#9c244f; background:#ffe9ef; font-size:.75rem; }
         .selection-title { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.8rem; } .selection-title strong, .selection-title small { display:block; } .selection-title strong { font-size:.88rem; } .selection-title small { margin-top:.15rem; color:#94627a; font-size:.61rem; } .icon-text, .danger-link { border:0; color:#9a2d5e; background:transparent; font-size:.7rem; font-weight:750; } .quick-property-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; margin-bottom:.85rem; } .quick-property-actions button, .secondary-wide-action { min-height:32px; border:1px solid #e8c7d5; border-radius:8px; color:#80425e; background:#fff; font-size:.65rem; font-weight:750; } .quick-property-actions button.active { border-color:#cb5d8b; color:#8f2357; background:#fcecf3; } .property-section { margin-top:.95rem; padding-top:.85rem; border-top:1px solid #f1dfe7; } .property-section-title { display:block; margin-bottom:.5rem; color:#a04b73; font-size:.6rem; font-weight:850; letter-spacing:.07em; text-transform:uppercase; } .property-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; } .property-grid label, .property-block { color:#825069; font-size:.65rem; font-weight:700; } input, select, textarea { width:100%; margin-top:.18rem; border:1px solid #e6bfd0; border-radius:8px; padding:.42rem; color:#4b2940; background:white; font-size:.75rem; outline:none; } textarea { min-height:74px; resize:vertical; } input:focus, select:focus, textarea:focus { border-color:#c13c76; box-shadow:0 0 0 3px rgba(193,60,118,.11); } .property-block { display:block; margin-top:.8rem; } .check-row { display:flex; align-items:center; gap:.4rem; margin-top:.7rem; color:#77455d; font-size:.68rem; } .check-row input { width:16px; height:16px; margin:0; accent-color:#b52d68; } .inspector-actions, .layer-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.3rem; margin-top:.65rem; } .inspector-actions.three-columns { grid-template-columns:repeat(3,minmax(0,1fr)); } .text-alignment { grid-template-columns:1fr; } .layer-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .inspector-actions button, .layer-actions button { min-height:31px; border:1px solid #e8c7d5; border-radius:8px; color:#80425e; background:#fff; font-size:.61rem; } .inspector-actions button.active { border-color:#cb5d8b; color:#8f2357; background:#fcecf3; } .secondary-wide-action { width:100%; margin-top:.9rem; } .danger-link { display:block; margin:1rem auto .25rem; } .empty-inspector { padding:1rem .25rem; color:#855b6e; font-size:.78rem; line-height:1.5; } .version-panel { margin-top:1.4rem; padding-top:1rem; border-top:1px solid #efdce5; } .version-panel > div { display:flex; justify-content:space-between; gap:.5rem; color:#81536b; font-size:.65rem; } .version-panel > div p { margin:0; } .version-panel button { width:100%; margin-top:.35rem; min-height:33px; border:1px solid #eed1df; border-radius:8px; color:#864460; background:#fff; font-size:.66rem; }
@@ -468,6 +527,7 @@ export class LabelDesignerComponent {
     private renderSequence = 0;
     private history: LabelDesignDefinition[] = [];
     private historyIndex = -1;
+    private copiedElements: LabelElementDefinition[] = [];
 
     readonly starters: TemplateStarter[] = [
         { kind: 'InventoryBox', profile: 'NiimbotB1_50x50', title: 'Cajas de bodega', description: 'Código, ubicación, contenido y QR/NFC para abrir la caja.', accent: '#c23a77' },
@@ -480,6 +540,7 @@ export class LabelDesignerComponent {
     readonly activeTemplate = signal<LabelTemplateDetailDto | null>(null);
     readonly design = signal<LabelDesignDefinition>(this.emptyDesign());
     readonly selectedElementId = signal<string | null>(null);
+    readonly selectedElementIds = signal<string[]>([]);
     readonly activeTab = signal<SidebarTab>('elements');
     readonly selectedBinding = signal('');
     readonly previewUrl = signal<string | null>(null);
@@ -497,8 +558,14 @@ export class LabelDesignerComponent {
     readonly isDirty = signal(false);
     readonly lastSavedAt = signal<Date | null>(null);
     readonly snapGuide = signal<SnapGuide>({ x: null, y: null });
+    readonly inlineEditingElementId = signal<string | null>(null);
+    readonly inlineTextValue = signal('');
 
     readonly selectedElement = computed(() => this.design().elements.find(element => element.id === this.selectedElementId()) ?? null);
+    readonly selectedElements = computed(() => {
+        const selectedIds = new Set(this.selectedElementIds());
+        return this.design().elements.filter(element => selectedIds.has(element.id));
+    });
     readonly fields = computed(() => this.activeTemplate() ? this.designService.getFields(this.activeTemplate()!.kind) : []);
     readonly issues = computed<LabelDesignIssue[]>(() => {
         const template = this.activeTemplate();
@@ -552,6 +619,7 @@ export class LabelDesignerComponent {
                     this.history = [this.designService.cloneDesign(design)];
                     this.historyIndex = 0;
                     this.selectedElementId.set(null);
+                    this.selectedElementIds.set([]);
                     this.selectedBinding.set(this.designService.getFields(template.kind)[0]?.key ?? '');
                     this.isDirty.set(false);
                     this.lastSavedAt.set(new Date(draft.createdAt));
@@ -569,6 +637,7 @@ export class LabelDesignerComponent {
         this.flushAutosave();
         this.activeTemplate.set(null);
         this.selectedElementId.set(null);
+        this.selectedElementIds.set([]);
         this.previewUrl.set(null);
         this.mobilePanelOpen.set(false);
         this.loadLibrary();
@@ -635,20 +704,61 @@ export class LabelDesignerComponent {
         this.addDataElement();
     }
 
-    selectElement(id: string): void {
-        this.selectedElementId.set(id);
+    selectElement(id: string, additive = false): void {
+        const currentIds = this.selectedElementIds();
+        const nextIds = additive
+            ? currentIds.includes(id) ? currentIds.filter(currentId => currentId !== id) : [...currentIds, id]
+            : [id];
+        this.selectedElementIds.set(nextIds);
+        this.selectedElementId.set(nextIds.includes(id) ? id : nextIds[0] ?? null);
         const element = this.design().elements.find(current => current.id === id);
         if (element?.properties.binding) this.selectedBinding.set(element.properties.binding);
     }
 
+    isElementSelected(id: string): boolean {
+        return this.selectedElementIds().includes(id);
+    }
+
+    startInlineTextEditing(event: MouseEvent, element: LabelElementDefinition): void {
+        if (element.type !== 'text' || element.locked) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.selectElement(element.id);
+        this.inlineTextValue.set(element.properties.text ?? '');
+        this.inlineEditingElementId.set(element.id);
+        window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('.canvas-text-editor')?.focus());
+    }
+
+    setInlineTextValue(event: Event): void {
+        this.inlineTextValue.set((event.target as HTMLTextAreaElement).value);
+    }
+
+    commitInlineTextEditing(): void {
+        const id = this.inlineEditingElementId();
+        if (!id) return;
+        this.updateTextPropertyValue(id, 'text', this.inlineTextValue());
+        this.inlineEditingElementId.set(null);
+    }
+
+    cancelInlineTextEditing(): void {
+        this.inlineEditingElementId.set(null);
+        this.inlineTextValue.set('');
+    }
+
     clearSelectionFromCanvas(event: PointerEvent): void {
-        if (event.target === event.currentTarget) this.selectedElementId.set(null);
+        if (event.target === event.currentTarget) {
+            this.selectedElementId.set(null);
+            this.selectedElementIds.set([]);
+            this.cancelInlineTextEditing();
+        }
     }
 
     startPointerAction(event: PointerEvent, element: LabelElementDefinition, action: PointerAction, handle?: ResizeHandle): void {
         event.preventDefault();
         event.stopPropagation();
-        this.selectElement(element.id);
+        const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+        this.selectElement(element.id, additive);
+        if (additive) return;
         if (element.locked) {
             this.toast.info('Este elemento está bloqueado. Desbloquéalo desde Ajustes para moverlo o editarlo.');
             return;
@@ -694,8 +804,34 @@ export class LabelDesignerComponent {
 
     @HostListener('document:keydown', ['$event'])
     onDocumentKeydown(event: KeyboardEvent): void {
+        if (this.isEditingTextControl(event.target)) return;
+        const modifierPressed = event.ctrlKey || event.metaKey;
+        if (modifierPressed && event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            const ids = this.design().elements.map(element => element.id);
+            this.selectedElementIds.set(ids);
+            this.selectedElementId.set(ids[0] ?? null);
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            this.selectedElementIds.set([]);
+            this.selectedElementId.set(null);
+            this.cancelInlineTextEditing();
+            return;
+        }
+        if (modifierPressed && event.key.toLowerCase() === 'c') {
+            event.preventDefault();
+            this.copySelectedElements();
+            return;
+        }
+        if (modifierPressed && event.key.toLowerCase() === 'v') {
+            event.preventDefault();
+            this.pasteCopiedElements();
+            return;
+        }
         const selected = this.selectedElement();
-        if (!selected || this.isEditingTextControl(event.target)) return;
+        if (!selected) return;
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
             event.preventDefault();
             if (event.shiftKey) this.redo(); else this.undo();
@@ -723,7 +859,6 @@ export class LabelDesignerComponent {
         }
         if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
-            if (selected.locked) return;
             this.removeSelected();
         }
         if (event.key === '+' || event.key === '=') this.changeZoomBy(1);
@@ -753,7 +888,11 @@ export class LabelDesignerComponent {
 
     updateTextProperty(id: string, key: keyof LabelElementDefinition['properties'], event: Event): void {
         const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-        this.updateElement(id, element => ({ ...element, properties: { ...element.properties, [key]: target.value } }));
+        this.updateTextPropertyValue(id, key, target.value);
+    }
+
+    updateTextPropertyValue(id: string, key: keyof LabelElementDefinition['properties'], value: string): void {
+        this.updateElement(id, element => ({ ...element, properties: { ...element.properties, [key]: value } }));
     }
 
     toggleProperty(id: string, key: keyof LabelElementDefinition['properties'], event: Event): void {
@@ -775,6 +914,17 @@ export class LabelDesignerComponent {
         this.replaceElement({ ...element, locked: !element.locked });
     }
 
+    toggleSelectedElementsLock(): void {
+        const selected = this.selectedElements();
+        if (!selected.length) return;
+        const selectedIds = new Set(selected.map(element => element.id));
+        const shouldLock = selected.some(element => !element.locked);
+        this.applyDesign({
+            ...this.design(),
+            elements: this.design().elements.map(element => selectedIds.has(element.id) ? { ...element, locked: shouldLock } : element)
+        });
+    }
+
     alignText(alignment: 'left' | 'center' | 'right'): void {
         const selected = this.selectedElement();
         if (!selected || selected.locked || !['text', 'data'].includes(selected.type)) return;
@@ -791,34 +941,73 @@ export class LabelDesignerComponent {
         this.replaceElement(this.designService.clampElement({ ...selected, x, y }, profile));
     }
 
+    alignSelectedElements(position: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {
+        const selected = this.selectedElements().filter(element => !element.locked);
+        if (selected.length < 2) return;
+        const positions = alignSelection(selected, position);
+        this.applyDesign({
+            ...this.design(),
+            elements: this.design().elements.map(element => {
+                const nextPosition = positions.get(element.id);
+                return nextPosition ? { ...element, x: nextPosition.x, y: nextPosition.y } : element;
+            })
+        });
+    }
+
+    distributeSelectedElements(direction: 'horizontal' | 'vertical'): void {
+        const selected = this.selectedElements().filter(element => !element.locked);
+        if (selected.length < 3) return;
+        const positions = distributeSelection(selected, direction);
+        this.applyDesign({
+            ...this.design(),
+            elements: this.design().elements.map(element => {
+                const nextPosition = positions.get(element.id);
+                return nextPosition ? { ...element, x: nextPosition.x, y: nextPosition.y } : element;
+            })
+        });
+    }
+
     moveSelectedToFront(): void {
-        const selected = this.selectedElement();
-        if (!selected || selected.locked) return;
-        this.replaceElement({ ...selected, zIndex: this.nextZIndex() });
+        const selected = this.selectedElements().filter(element => !element.locked);
+        if (!selected.length) return;
+        const selectedIds = new Set(selected.map(element => element.id));
+        const ordered = [...selected].sort((left, right) => left.zIndex - right.zIndex);
+        const zIndexById = new Map(ordered.map((element, index) => [element.id, this.nextZIndex() + index]));
+        this.applyDesign({ ...this.design(), elements: this.design().elements.map(element => selectedIds.has(element.id) ? { ...element, zIndex: zIndexById.get(element.id)! } : element) });
     }
 
     moveSelectedToBack(): void {
-        const selected = this.selectedElement();
-        if (!selected || selected.locked) return;
-        const lowestLayer = Math.min(0, ...this.design().elements.map(element => element.zIndex));
-        this.replaceElement({ ...selected, zIndex: lowestLayer - 1 });
+        const selected = this.selectedElements().filter(element => !element.locked);
+        if (!selected.length) return;
+        const selectedIds = new Set(selected.map(element => element.id));
+        const ordered = [...selected].sort((left, right) => left.zIndex - right.zIndex);
+        const lowestLayer = Math.min(0, ...this.design().elements.map(element => element.zIndex)) - ordered.length;
+        const zIndexById = new Map(ordered.map((element, index) => [element.id, lowestLayer + index]));
+        this.applyDesign({ ...this.design(), elements: this.design().elements.map(element => selectedIds.has(element.id) ? { ...element, zIndex: zIndexById.get(element.id)! } : element) });
     }
 
     duplicateSelected(): void {
-        const selected = this.selectedElement();
+        const selected = this.selectedElements().filter(element => !element.locked);
         const template = this.activeTemplate();
-        if (!selected || !template || selected.locked) return;
-        const generated = this.designService.createElement(selected.type, template.printerProfile);
-        const copy = this.designService.clampElement({
-            ...selected,
-            id: generated.id,
-            x: selected.x + 2,
-            y: selected.y + 2,
-            zIndex: this.nextZIndex(),
-            properties: { ...selected.properties }
-        }, this.renderer.getProfile(template.printerProfile));
-        this.applyDesign({ ...this.design(), elements: [...this.design().elements, copy] });
-        this.selectElement(copy.id);
+        if (!selected.length || !template) return;
+        const copies = this.createElementCopies(selected, template.printerProfile, 2);
+        this.applyDesign({ ...this.design(), elements: [...this.design().elements, ...copies] });
+        this.selectedElementIds.set(copies.map(element => element.id));
+        this.selectedElementId.set(copies[0]?.id ?? null);
+    }
+
+    copySelectedElements(): void {
+        this.copiedElements = this.selectedElements().map(element => ({ ...element, properties: { ...element.properties } }));
+        if (this.copiedElements.length) this.toast.info(`${this.copiedElements.length} elemento${this.copiedElements.length === 1 ? '' : 's'} copiado${this.copiedElements.length === 1 ? '' : 's'}.`);
+    }
+
+    pasteCopiedElements(): void {
+        const template = this.activeTemplate();
+        if (!template || !this.copiedElements.length) return;
+        const copies = this.createElementCopies(this.copiedElements, template.printerProfile, 2);
+        this.applyDesign({ ...this.design(), elements: [...this.design().elements, ...copies] });
+        this.selectedElementIds.set(copies.map(element => element.id));
+        this.selectedElementId.set(copies[0]?.id ?? null);
     }
 
     setAsDefault(): void {
@@ -835,10 +1024,13 @@ export class LabelDesignerComponent {
     }
 
     removeSelected(): void {
-        const selected = this.selectedElement();
-        if (!selected || selected.locked || this.isRequiredElement(selected)) return;
-        this.applyDesign({ ...this.design(), elements: this.design().elements.filter(element => element.id !== selected.id) });
-        this.selectedElementId.set(null);
+        const removableIds = new Set(this.selectedElements().filter(element => !element.locked && !this.isRequiredElement(element)).map(element => element.id));
+        if (!removableIds.size) return;
+        this.applyDesign({ ...this.design(), elements: this.design().elements.filter(element => !removableIds.has(element.id)) });
+        const remaining = this.selectedElementIds().filter(id => !removableIds.has(id));
+        this.selectedElementIds.set(remaining);
+        this.selectedElementId.set(remaining[0] ?? null);
+        this.cancelInlineTextEditing();
     }
 
     undo(): void {
@@ -1060,6 +1252,23 @@ export class LabelDesignerComponent {
         if (!selected || !template) return;
         const adjusted = this.designService.clampElement({ ...selected, x: selected.x + dx, y: selected.y + dy }, this.renderer.getProfile(template.printerProfile));
         this.replaceElement(adjusted);
+    }
+
+    private createElementCopies(elements: LabelElementDefinition[], profile: LabelPrinterProfile, offsetMm: number): LabelElementDefinition[] {
+        const profileSpec = this.renderer.getProfile(profile);
+        const baseZIndex = this.nextZIndex();
+        return elements.map((element, index) => {
+            const generated = this.designService.createElement(element.type, profile);
+            return this.designService.clampElement({
+                ...element,
+                id: generated.id,
+                x: element.x + offsetMm,
+                y: element.y + offsetMm,
+                zIndex: baseZIndex + index,
+                locked: false,
+                properties: { ...element.properties }
+            }, profileSpec);
+        });
     }
 
     private snapElement(element: LabelElementDefinition): LabelElementDefinition {
