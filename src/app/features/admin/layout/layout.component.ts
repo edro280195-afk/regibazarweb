@@ -94,8 +94,8 @@ interface NavItem {
           <div class="user-chip">
             <div class="user-avatar">{{ userInitial() }}</div>
             <div class="user-info">
-              <span class="user-role">Administradora</span>
-              <span class="user-name">Regi Bazar</span>
+              <span class="user-role">{{ userRoleLabel() }}</span>
+              <span class="user-name">{{ auth.userName() || 'Regi Bazar' }}</span>
             </div>
           </div>
         </header>
@@ -502,7 +502,7 @@ interface NavItem {
   `]
 })
 export class LayoutComponent {
-  private auth = inject(AuthService);
+  readonly auth = inject(AuthService);
 
   sidebarOpen = signal(window.innerWidth > 1024);
   isMobile = signal(window.innerWidth <= 1024);
@@ -520,11 +520,13 @@ export class LayoutComponent {
     const allItems: NavItem[] = [
       { label: 'Dashboard', icon: '🏠', route: '/admin' },
       { label: 'Pedidos', icon: '📦', route: '/admin/orders' },
-      { label: 'Lives', icon: 'LV', route: '/admin/live/import' },
-      { label: 'Tandas', icon: '🔄', route: '/admin/tandas' },
-      { label: 'Sorteos', icon: '🎉', route: '/admin/raffles' },
+      { label: 'Inventario', icon: '🧺', route: '/admin/inventory' },
+      { label: 'Etiquetas', icon: '🏷️', route: '/admin/labels' },
+      { label: 'Enviar Enlaces', icon: '💌', route: '/admin/send-links' },
       { label: 'Clientas', icon: '👩‍💼', route: '/admin/clients' },
       { label: 'Rutas', icon: '🚗', route: '/admin/routes' },
+      { label: 'Tandas', icon: '🔄', route: '/admin/tandas' },
+      { label: 'Sorteos', icon: '🎉', route: '/admin/raffles' },
       { label: 'Proveedores', icon: '🏭', route: '/admin/suppliers' },
       { label: 'Finanzas', icon: '💰', route: '/admin/financials' },
       { label: 'Reportes', icon: '📊', route: '/admin/reports' },
@@ -535,6 +537,10 @@ export class LayoutComponent {
 
     if (role === 'Driver') {
       return allItems.filter(i => i.route === '/admin/routes');
+    }
+
+    if (role === 'Bodega') {
+      return allItems.filter(i => i.route === '/admin/inventory' || i.route === '/admin/labels');
     }
 
     return allItems;
@@ -558,6 +564,10 @@ export class LayoutComponent {
   userInitial(): string {
     const name = this.auth.userName();
     return name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  userRoleLabel(): string {
+    return this.auth.userRole() === 'Bodega' ? 'Bodega' : 'Administradora';
   }
 
   onNavClick(): void {

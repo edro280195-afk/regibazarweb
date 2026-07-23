@@ -1,17 +1,18 @@
 import { Component, OnInit, OnDestroy, signal, computed, HostListener, CUSTOM_ELEMENTS_SCHEMA, inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe, KeyValuePipe } from '@angular/common';
-import { GoogleMap, MapMarker, MapDirectionsRenderer } from '@angular/google-maps';
+import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse } from '../../../core/models';
+import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse, AvailableTandaDto } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
-import { AddressPickerComponent } from './address-picker/address-picker.component';
+import { AddressEditorV2Component } from '../clients/address-editor-v2/address-editor-v2.component';
 
 // Base del backend (sin /api) para construir URLs absolutas de imágenes
 const API_BASE = environment.apiUrl.replace(/\/api\/?$/, '');
@@ -41,10 +42,10 @@ interface GeocodedOrder extends OrderSummaryDto {
     RouterLink,
     GoogleMap,
     MapMarker,
-    MapDirectionsRenderer,
+    MapPolyline,
     DragDropModule,
     RouteOptimizerComponent,
-    AddressPickerComponent
+    AddressEditorV2Component
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
@@ -338,50 +339,66 @@ interface GeocodedOrder extends OrderSummaryDto {
                 </div>
               </div>
 
-              <!-- Action Chips -->
-              <div class="px-4 sm:px-5 pb-3 flex flex-wrap gap-2">
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-pink-50 text-pink-600 text-xs font-bold border border-pink-100 hover:bg-pink-100 active:scale-95 transition-all"
-                        (click)="openMap(route)">
-                  🗺️ <span class="hidden sm:inline">Mapa</span>
-                </button>
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100 hover:bg-blue-100 active:scale-95 transition-all"
-                        (click)="copyDriverLink(route)">
-                  📋 <span class="hidden sm:inline">Link</span>
-                </button>
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-purple-50 text-purple-600 text-xs font-bold border border-purple-100 hover:bg-purple-100 active:scale-95 transition-all"
-                        (click)="optimizeRoute(route.id)">
-                  🧩 <span class="hidden sm:inline">Optimizar</span>
-                </button>
-                @if (route.status !== 'Completed') {
-                  <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-rose-50 text-rose-600 text-xs font-bold border border-rose-100 hover:bg-rose-100 active:scale-95 transition-all"
-                          (click)="router.navigate(['/admin/routes', route.id, 'edit'])">
-                    🔄 <span class="hidden sm:inline">Rearmar</span>
+              <!-- Action Bar: 3 acciones grandes + menú "Más" -->
+              <div class="px-4 sm:px-5 pb-3 relative">
+                <div class="grid grid-cols-3 gap-2">
+                  <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-pink-50 text-pink-600 text-xs font-bold border border-pink-100 hover:bg-pink-100 active:scale-95 transition-all"
+                          (click)="openMap(route)">
+                    🗺️ Mapa
                   </button>
-                }
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-green-50 text-green-600 text-xs font-bold border border-green-100 hover:bg-green-100 active:scale-95 transition-all"
-                        (click)="shareWhatsApp(route)">
-                  📱 <span class="hidden sm:inline">WhatsApp</span>
-                </button>
-                @if (route.status !== 'Completed') {
-                  <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200 hover:bg-amber-100 active:scale-95 transition-all"
-                          (click)="openCorteModal(route)">
-                    💰 <span class="hidden sm:inline">Liquidar</span>
-                  </button>
-                }
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100 hover:bg-indigo-100 active:scale-95 transition-all"
-                        (click)="loadRouteBriefing(route.id)"
-                        [disabled]="loadingBriefing() === route.id">
-                  @if (loadingBriefing() === route.id) {
-                    <span class="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span>
+                  @if (route.status !== 'Completed') {
+                    <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white text-xs font-bold shadow-lg shadow-pink-200 hover:shadow-xl active:scale-95 transition-all"
+                            (click)="openAddSheet(route)">
+                      ➕ Agregar
+                    </button>
                   } @else {
-                    ✦
+                    <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-green-50 text-green-600 text-xs font-bold border border-green-100 hover:bg-green-100 active:scale-95 transition-all"
+                            (click)="shareWhatsApp(route)">
+                      📱 WhatsApp
+                    </button>
                   }
-                  <span class="hidden sm:inline">Briefing</span>
-                </button>
-                <button class="sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold border border-red-100 hover:bg-red-100 active:scale-95 transition-all sm:ml-auto"
-                        (click)="deleteRoute(route.id)">
-                  🗑️
-                </button>
+                  <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-white text-gray-500 text-xs font-bold border border-pink-100 hover:bg-pink-50 active:scale-95 transition-all"
+                          (click)="$event.stopPropagation(); toggleMoreMenu(route.id)">
+                    ⋯ Más
+                  </button>
+                </div>
+
+                @if (moreMenuRouteId() === route.id) {
+                  <div class="absolute right-4 sm:right-5 bottom-full mb-1 z-[901] w-60 bg-white rounded-2xl border border-pink-100 shadow-xl shadow-pink-100/60 overflow-hidden animate-scale-in"
+                       (click)="$event.stopPropagation()">
+                    <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
+                            (click)="copyDriverLink(route); moreMenuRouteId.set(null)">
+                      📋 Copiar link del chofer
+                    </button>
+                    <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
+                            (click)="shareWhatsApp(route); moreMenuRouteId.set(null)">
+                      📱 Compartir por WhatsApp
+                    </button>
+                    <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
+                            (click)="optimizeRoute(route.id); moreMenuRouteId.set(null)">
+                      🧩 Optimizar ruta
+                    </button>
+                    @if (route.status !== 'Completed') {
+                      <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
+                              (click)="moreMenuRouteId.set(null); router.navigate(['/admin/routes', route.id, 'edit'])">
+                        🔄 Rearmar ruta
+                      </button>
+                      <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
+                              (click)="openCorteModal(route); moreMenuRouteId.set(null)">
+                        💰 Liquidar
+                      </button>
+                    }
+                    <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
+                            (click)="loadRouteBriefing(route.id); moreMenuRouteId.set(null)"
+                            [disabled]="loadingBriefing() === route.id">
+                      ✦ Briefing C.A.M.I.
+                    </button>
+                    <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-50 border-t border-pink-50 transition-colors"
+                            (click)="moreMenuRouteId.set(null); deleteRoute(route.id)">
+                      🗑️ Eliminar ruta
+                    </button>
+                  </div>
+                }
               </div>
 
               <!-- Briefing Panel -->
@@ -398,10 +415,16 @@ interface GeocodedOrder extends OrderSummaryDto {
               <!-- Deliveries List (Collapsible) -->
               @if (expandedRouteIds().has(route.id)) {
                 <div class="border-t border-pink-50 animate-fade-in-down overflow-hidden">
-                  <div class="divide-y divide-pink-50/80">
+                  <div class="divide-y divide-pink-50/80" cdkDropList (cdkDropListDropped)="onDeliveryDrop(route, $event)">
                     @for (d of route.deliveries; track d.deliveryId; let di = $index) {
-                      <div class="flex items-center gap-3 px-4 py-3 hover:bg-pink-50/30 transition-colors stagger-item"
+                      <div class="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 bg-white hover:bg-pink-50/30 transition-colors stagger-item"
+                           cdkDrag cdkDragLockAxis="y" [cdkDragDisabled]="route.status === 'Completed'"
                            [style.animation-delay]="(di * 30) + 'ms'">
+                        @if (route.status !== 'Completed') {
+                          <span cdkDragHandle class="shrink-0 px-0.5 py-2 text-pink-200 cursor-grab active:cursor-grabbing touch-none select-none" title="Arrastra para reordenar">
+                            <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.5"/><circle cx="7.5" cy="2.5" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13.5" r="1.5"/><circle cx="7.5" cy="13.5" r="1.5"/></svg>
+                          </span>
+                        }
                         <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 border-2 border-white shadow-sm"
                              [class]="d.status === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : d.status === 'NotDelivered' ? 'bg-red-100 text-red-600' : d.status === 'InTransit' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-700'">
                           {{ d.sortOrder }}
@@ -428,7 +451,10 @@ interface GeocodedOrder extends OrderSummaryDto {
                             <p class="text-[10px] text-emerald-500 font-bold">🚪 {{ getDoorTimeMinutes(d) }} min en puerta</p>
                           }
                           @if (d.notes) {
-                            <p class="text-[10px] text-gray-400 italic mt-0.5">💬 {{ d.notes }}</p>
+                            <button class="inline-flex items-center gap-1 mt-1 max-w-full px-2 py-0.5 rounded-lg bg-violet-50 border border-violet-100 text-[10px] font-semibold text-violet-600 text-left"
+                                    (click)="$event.stopPropagation(); openNoteSheet(route, d)">
+                              📝 <span class="truncate">{{ d.notes }}</span>
+                            </button>
                           }
                           @if (d.evidenceUrls && d.evidenceUrls.length > 0) {
                             <div class="flex gap-1 mt-1 flex-wrap">
@@ -441,12 +467,19 @@ interface GeocodedOrder extends OrderSummaryDto {
                             </div>
                           }
                         </div>
-                        <div class="text-right shrink-0 flex items-center gap-2">
-                          <div class="flex flex-col items-end">
+                        <div class="text-right shrink-0 flex items-center gap-1.5 sm:gap-2">
+                          <div class="flex flex-col items-end mr-0.5">
                             <p class="text-sm font-black text-pink-600">{{ d.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                             <span class="text-xs">{{ d.status === 'Delivered' ? '✅' : d.status === 'NotDelivered' ? '❌' : d.status === 'InTransit' ? '🏃' : '⏳' }}</span>
                           </div>
-                          <button class="w-7 h-7 rounded-full bg-pink-50 text-pink-500 hover:bg-pink-100 flex items-center justify-center text-[10px] transition-all relative group shadow-sm border border-pink-100 shrink-0"
+                          @if (route.status !== 'Completed' && d.status !== 'Delivered') {
+                            <button class="w-10 h-10 rounded-xl bg-violet-50 text-violet-500 hover:bg-violet-100 flex items-center justify-center text-sm border border-violet-100 active:scale-90 transition-all shrink-0"
+                                    (click)="$event.stopPropagation(); openNoteSheet(route, d)"
+                                    [title]="d.notes ? 'Editar nota del chofer' : 'Agregar nota para el chofer'">
+                              📝
+                            </button>
+                          }
+                          <button class="w-10 h-10 rounded-xl bg-pink-50 text-pink-500 hover:bg-pink-100 flex items-center justify-center text-sm transition-all relative border border-pink-100 active:scale-90 shrink-0"
                                   (click)="$event.stopPropagation(); openAdminChat(route.id, d.deliveryId, d.clientName)"
                                   title="Chat con la Clienta">
                              💬
@@ -454,19 +487,10 @@ interface GeocodedOrder extends OrderSummaryDto {
                                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-ping"></span>
                              }
                           </button>
-                          @if (route.status !== 'Completed') {
-                            <!-- ↑/↓ buttons -->
-                            <div class="flex flex-col gap-0.5">
-                              <button (click)="moveDelivery(route, di, -1)" [disabled]="di === 0"
-                                      class="w-7 h-7 rounded-lg bg-pink-50 text-pink-400 hover:bg-pink-100 flex items-center justify-center text-xs font-bold active:scale-90 transition-all disabled:opacity-20"
-                                      title="Mover arriba">↑</button>
-                              <button (click)="moveDelivery(route, di, 1)" [disabled]="di === route.deliveries.length - 1"
-                                      class="w-7 h-7 rounded-lg bg-pink-50 text-pink-400 hover:bg-pink-100 flex items-center justify-center text-xs font-bold active:scale-90 transition-all disabled:opacity-20"
-                                      title="Mover abajo">↓</button>
-                            </div>
-                            <button class="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                    (click)="$event.stopPropagation(); removeDeliveryFromRoute(route, d)"
-                                    title="Quitar de ruta">
+                          @if (route.status !== 'Completed' && d.status !== 'Delivered') {
+                            <button class="w-10 h-10 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-sm border border-red-100 active:scale-90 transition-all shrink-0"
+                                    (click)="$event.stopPropagation(); openRemoveConfirm(route, d)"
+                                    title="Quitar de la ruta">
                               🗑️
                             </button>
                           }
@@ -474,22 +498,6 @@ interface GeocodedOrder extends OrderSummaryDto {
                       </div>
                     }
                   </div>
-
-                  <!-- Quick Add Order to Route -->
-                  @if (route.status !== 'Completed' && pendingOrders().length > 0) {
-                    <div class="p-4 bg-pink-50/50 border-t border-pink-50">
-                      <p class="text-[10px] font-black uppercase tracking-widest text-pink-400 mb-2">➕ Agregar Pedido a esta Ruta</p>
-                      <div class="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
-                        @for (po of pendingOrders(); track po.id) {
-                          <button class="px-3 py-1.5 rounded-xl bg-white border border-pink-100 text-[10px] font-bold text-pink-900 shadow-sm hover:border-pink-300 transition-all flex items-center gap-1"
-                                  (click)="addOrderToRoute(route, po.id)">
-                            <span>#{{ po.id }} · {{ po.clientName }}</span>
-                            <span class="text-pink-400">➕</span>
-                          </button>
-                        }
-                      </div>
-                    </div>
-                  }
 
                   <!-- Failed Deliveries -->
                   @if (getFailedDeliveries(route).length > 0) {
@@ -560,14 +568,196 @@ interface GeocodedOrder extends OrderSummaryDto {
       }
 
       <!-- ═══════════════════════════════════════════════════
+           BOTTOM-SHEET: AGREGAR PEDIDOS / TANDAS A RUTA
+           ═══════════════════════════════════════════════════ -->
+      @if (addSheetRoute(); as asr) {
+        <div class="fixed inset-0 z-[3200] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" (click)="closeAddSheet()">
+          <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[88vh] flex flex-col overflow-hidden animate-scale-in shadow-2xl" (click)="$event.stopPropagation()">
+            <div class="pt-3 sm:hidden"><div class="w-10 h-1.5 bg-pink-100 rounded-full mx-auto"></div></div>
+
+            <div class="px-5 pt-4 pb-3 border-b border-pink-50">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-black text-pink-900">➕ Agregar a la Ruta #{{ asr.id }}</h2>
+                <button class="w-9 h-9 rounded-full bg-pink-50 flex items-center justify-center text-pink-400 hover:bg-pink-100 text-lg" (click)="closeAddSheet()">×</button>
+              </div>
+              <p class="text-[11px] text-pink-400 font-semibold mt-0.5">Selecciona varios y confirma una sola vez 💕</p>
+            </div>
+
+            <div class="px-5 pt-3">
+              <input type="text" placeholder="🔍 Buscar por nombre o dirección…"
+                     class="w-full px-4 py-3 rounded-2xl bg-pink-50/60 border border-pink-100 text-sm font-semibold text-pink-900 placeholder:text-pink-300 focus:outline-none focus:border-pink-300 transition-colors"
+                     [ngModel]="addSearchQuery()" (ngModelChange)="addSearchQuery.set($event)" />
+              <div class="flex gap-2 mt-2.5">
+                <button class="flex-1 py-2 rounded-xl text-xs font-black border transition-all"
+                        [class]="addSheetTab() === 'orders' ? 'bg-pink-100 text-pink-600 border-transparent' : 'bg-white text-gray-400 border-pink-100'"
+                        (click)="addSheetTab.set('orders')">
+                  Pedidos · {{ filteredAddableOrders().length }}
+                </button>
+                <button class="flex-1 py-2 rounded-xl text-xs font-black border transition-all"
+                        [class]="addSheetTab() === 'tandas' ? 'bg-fuchsia-100 text-fuchsia-600 border-transparent' : 'bg-white text-gray-400 border-pink-100'"
+                        (click)="addSheetTab.set('tandas')">
+                  Tandas ✨ · {{ filteredAddableTandas().length }}
+                </button>
+              </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-5 py-3 space-y-2 min-h-[180px]">
+              @if (addSheetTab() === 'orders') {
+                @for (o of filteredAddableOrders(); track o.id) {
+                  <button class="w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all active:scale-[0.99]"
+                          [class]="addSelectedOrderIds().has(o.id) ? 'border-pink-400 bg-pink-50' : 'border-pink-50 bg-white hover:border-pink-200'"
+                          (click)="toggleAddOrder(o.id)">
+                    <span class="w-6 h-6 rounded-lg border-2 flex items-center justify-center text-[11px] font-black shrink-0 transition-colors"
+                          [class]="addSelectedOrderIds().has(o.id) ? 'bg-pink-500 border-pink-500 text-white' : 'border-pink-200 text-transparent'">✓</span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-bold text-gray-800 truncate">{{ o.clientName }} <span class="text-pink-300 font-semibold">#{{ o.id }}</span></p>
+                      @if (o.alternativeAddress || o.clientAddress) {
+                        <p class="text-[11px] text-gray-400 truncate">📍 {{ o.alternativeAddress || o.clientAddress }}</p>
+                      } @else {
+                        <span class="inline-block mt-0.5 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">⚠️ Sin dirección</span>
+                      }
+                    </div>
+                    <span class="text-sm font-black text-pink-600 shrink-0">{{ o.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                  </button>
+                } @empty {
+                  <p class="text-center text-sm text-pink-300 font-semibold py-8">No hay pedidos pendientes que coincidan 🌸</p>
+                }
+              } @else {
+                @for (t of filteredAddableTandas(); track t.tandaParticipantId) {
+                  <button class="w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all active:scale-[0.99]"
+                          [class]="addSelectedTandaIds().has(t.tandaParticipantId) ? 'border-fuchsia-400 bg-fuchsia-50' : 'border-pink-50 bg-white hover:border-fuchsia-200'"
+                          (click)="toggleAddTanda(t.tandaParticipantId)">
+                    <span class="w-6 h-6 rounded-lg border-2 flex items-center justify-center text-[11px] font-black shrink-0 transition-colors"
+                          [class]="addSelectedTandaIds().has(t.tandaParticipantId) ? 'bg-fuchsia-500 border-fuchsia-500 text-white' : 'border-fuchsia-200 text-transparent'">✓</span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-bold text-gray-800 truncate">{{ t.clientName }} <span class="text-[9px] px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-700 rounded-md font-black uppercase tracking-wider">✨ Tanda</span></p>
+                      <p class="text-[11px] text-fuchsia-500 truncate">{{ t.tandaName }} · Semana {{ t.week }}/{{ t.totalWeeks }}@if (t.variant) { · {{ t.variant }} }</p>
+                      @if (t.clientAddress) {
+                        <p class="text-[11px] text-gray-400 truncate">📍 {{ t.clientAddress }}</p>
+                      } @else {
+                        <span class="inline-block mt-0.5 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">⚠️ Sin dirección</span>
+                      }
+                    </div>
+                  </button>
+                } @empty {
+                  <p class="text-center text-sm text-fuchsia-300 font-semibold py-8">No hay tandas disponibles que coincidan ✨</p>
+                }
+              }
+            </div>
+
+            <div class="p-4 border-t border-pink-50 bg-white">
+              <button class="w-full h-12 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-pink-200 active:scale-[0.98] transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2"
+                      [disabled]="addSelectionCount() === 0 || addingToRoute()"
+                      (click)="confirmAddToRoute()">
+                @if (addingToRoute()) {
+                  <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span> Agregando…
+                } @else if (addSelectionCount() === 0) {
+                  Selecciona pedidos o tandas
+                } @else {
+                  Agregar {{ addSelectionCount() }} {{ addSelectionCount() === 1 ? 'entrega' : 'entregas' }}
+                  @if (addSelectionTotal() > 0) { · {{ addSelectionTotal() | currency:'MXN':'symbol-narrow':'1.0-0' }} }
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════════════════════════════════════════
+           BOTTOM-SHEET: NOTA PARA EL CHOFER
+           ═══════════════════════════════════════════════════ -->
+      @if (noteSheet(); as ns) {
+        <div class="fixed inset-0 z-[3250] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" (click)="noteSheet.set(null)">
+          <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden animate-scale-in shadow-2xl" (click)="$event.stopPropagation()">
+            <div class="pt-3 sm:hidden"><div class="w-10 h-1.5 bg-pink-100 rounded-full mx-auto"></div></div>
+
+            <div class="px-5 pt-4 pb-3">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-black text-pink-900">📝 Nota para el chofer</h2>
+                <button class="w-9 h-9 rounded-full bg-pink-50 flex items-center justify-center text-pink-400 hover:bg-pink-100 text-lg" (click)="noteSheet.set(null)">×</button>
+              </div>
+              <p class="text-[11px] text-pink-400 font-semibold mt-0.5">{{ ns.clientName }} · la verá en su ruta 🚚</p>
+            </div>
+
+            <div class="px-5 pb-2">
+              <textarea rows="4" maxlength="500"
+                        placeholder="Ej. Cobrar $200 de saldo, dejar con la vecina si no está…"
+                        class="w-full px-4 py-3 rounded-2xl bg-pink-50/60 border border-pink-100 text-sm text-pink-900 placeholder:text-pink-300 focus:outline-none focus:border-violet-300 transition-colors resize-none"
+                        [ngModel]="noteDraft()" (ngModelChange)="noteDraft.set($event)"></textarea>
+              <p class="text-right text-[10px] text-pink-300 font-semibold mt-1">{{ noteDraft().length }}/500</p>
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                @for (q of quickNotes; track q) {
+                  <button class="px-3 py-1.5 rounded-full bg-violet-50 border border-violet-100 text-[11px] font-semibold text-violet-600 hover:bg-violet-100 active:scale-95 transition-all"
+                          (click)="appendQuickNote(q)">{{ q }}</button>
+                }
+              </div>
+            </div>
+
+            <div class="p-4 flex gap-2">
+              @if (ns.existing) {
+                <button class="px-4 h-12 rounded-2xl bg-red-50 text-red-500 font-bold text-sm border border-red-100 active:scale-95 transition-all disabled:opacity-40"
+                        [disabled]="savingNote()"
+                        (click)="noteDraft.set(''); saveNote()">
+                  Borrar
+                </button>
+              }
+              <button class="flex-1 h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-violet-200 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                      [disabled]="savingNote()"
+                      (click)="saveNote()">
+                @if (savingNote()) {
+                  <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span> Guardando…
+                } @else {
+                  Guardar nota
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════════════════════════════════════════
+           DIÁLOGO: CONFIRMAR QUITAR ENTREGA
+           ═══════════════════════════════════════════════════ -->
+      @if (removeConfirm(); as rc) {
+        <div class="fixed inset-0 z-[3300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in" (click)="removeConfirm.set(null)">
+          <div class="bg-white w-full max-w-sm rounded-3xl p-6 text-center animate-scale-in shadow-2xl" (click)="$event.stopPropagation()">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-2xl mb-3">🗑️</div>
+            <h3 class="text-base font-black text-pink-900 mb-1.5">¿Quitar a {{ rc.delivery.clientName }} de la ruta?</h3>
+            @if (rc.delivery.kind === 'Tanda') {
+              <p class="text-xs text-gray-400 mb-5">La tanda <strong>{{ rc.delivery.tandaName }}</strong> volverá a estar disponible para otra ruta. Las demás entregas se renumeran solas.</p>
+            } @else {
+              <p class="text-xs text-gray-400 mb-5">El pedido <strong>#{{ rc.delivery.orderId }} · {{ rc.delivery.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong> vuelve a Pendientes; podrás agregarlo a otra ruta cuando quieras.</p>
+            }
+            <div class="flex gap-2">
+              <button class="flex-1 h-11 rounded-2xl bg-pink-50 text-pink-500 font-bold text-sm border border-pink-100 active:scale-95 transition-all"
+                      (click)="removeConfirm.set(null)">Cancelar</button>
+              <button class="flex-1 h-11 rounded-2xl bg-gradient-to-r from-rose-500 to-red-500 text-white font-bold text-sm shadow-lg shadow-rose-200 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                      [disabled]="removingDelivery()"
+                      (click)="confirmRemoveDelivery()">
+                @if (removingDelivery()) {
+                  <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                } @else {
+                  Sí, quitar
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ═══════════════════════════════════════════════════
            MODAL: MAGIC ADDRESS PICKER (UX Overdose)
            ═══════════════════════════════════════════════════ -->
       @if (showAddressPicker()) {
-        <app-address-picker
-          [initialAddress]="pickerInitialAddress"
+        <app-address-editor-v2
+          [clientName]="pickerOrder()?.clientName"
+          [initialAddress]="pickerOrder()?.clientAddress ?? ''"
+          [initialLat]="pickerOrder()?.clientLatitude"
+          [initialLng]="pickerOrder()?.clientLongitude"
+          [initialInstructions]="pickerOrder()?.deliveryInstructions ?? ''"
           (confirm)="onAddressPickerConfirm($event)"
-          (cancel)="showAddressPicker.set(false)">
-        </app-address-picker>
+          (cancel)="closeAddressPicker()">
+        </app-address-editor-v2>
       }
 
       <!-- ═══════════════════════════════════════════════════
@@ -737,8 +927,8 @@ interface GeocodedOrder extends OrderSummaryDto {
                   <map-marker [position]="entry.value" [options]="driverMarkerOptions"></map-marker>
                 }
 
-                @if (mapDirections(); as dirs) {
-                  <map-directions-renderer [directions]="dirs" [options]="directionsRenderOpts"></map-directions-renderer>
+                @if (mapPolylinePath().length > 0) {
+                  <map-polyline [path]="mapPolylinePath()" [options]="mapPolylineOptions"></map-polyline>
                 }
               </google-map>
 
@@ -1104,8 +1294,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
   // Magic Address Picker
   showAddressPicker = signal(false);
-  pickerInitialAddress = '';
-  private pickerOrder: any = null;
+  pickerOrder = signal<OrderSummaryDto | null>(null);
   showOptimizerModal = signal(false);
 
   // Search & Filtering
@@ -1124,7 +1313,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   showMapModal = signal(false);
   mapRoute = signal<RouteDto | null>(null);
   mapDeliveries: RouteDeliveryDto[] = [];
-  mapDirections = signal<google.maps.DirectionsResult | undefined>(undefined);
+  mapPolylinePath = signal<google.maps.LatLngLiteral[]>([]);
   plottingMap = signal(false);
   @ViewChild(GoogleMap) googleMap!: GoogleMap;
 
@@ -1158,9 +1347,11 @@ export class RoutesComponent implements OnInit, OnDestroy {
     ]
   };
   baseMarkerOpts: google.maps.MarkerOptions = { title: 'Base' };
-  directionsRenderOpts: google.maps.DirectionsRendererOptions = {
-    suppressMarkers: true,
-    polylineOptions: { strokeColor: '#ec4899', strokeWeight: 5, strokeOpacity: 0.8 }
+  mapPolylineOptions: google.maps.PolylineOptions = {
+    strokeColor: '#ec4899',
+    strokeWeight: 5,
+    strokeOpacity: 0.75,
+    clickable: false
   };
 
   // Corte Modal
@@ -1181,6 +1372,51 @@ export class RoutesComponent implements OnInit, OnDestroy {
   // Route Briefing (C.A.M.I.)
   routeBriefing = signal<{ text: string, audioBase64?: string } | null>(null);
   loadingBriefing = signal<number | null>(null);
+
+  // ═══ REDISEÑO: MENÚ "MÁS" / AGREGAR / NOTAS / QUITAR ═══
+  moreMenuRouteId = signal<number | null>(null);
+
+  addSheetRoute = signal<RouteDto | null>(null);
+  addSheetTab = signal<'orders' | 'tandas'>('orders');
+  addSearchQuery = signal('');
+  addSelectedOrderIds = signal<Set<number>>(new Set());
+  addSelectedTandaIds = signal<Set<string>>(new Set());
+  availableTandas = signal<AvailableTandaDto[]>([]);
+  addingToRoute = signal(false);
+
+  filteredAddableOrders = computed(() => {
+    const q = this.addSearchQuery().toLowerCase().trim();
+    const list = this.pendingOrders();
+    if (!q) return list;
+    return list.filter(o =>
+      o.clientName.toLowerCase().includes(q) ||
+      (o.alternativeAddress || o.clientAddress || '').toLowerCase().includes(q) ||
+      String(o.id).includes(q));
+  });
+
+  filteredAddableTandas = computed(() => {
+    const q = this.addSearchQuery().toLowerCase().trim();
+    const list = this.availableTandas();
+    if (!q) return list;
+    return list.filter(t =>
+      t.clientName.toLowerCase().includes(q) ||
+      t.tandaName.toLowerCase().includes(q) ||
+      (t.clientAddress || '').toLowerCase().includes(q));
+  });
+
+  addSelectionCount = computed(() => this.addSelectedOrderIds().size + this.addSelectedTandaIds().size);
+  addSelectionTotal = computed(() => {
+    const ids = this.addSelectedOrderIds();
+    return this.pendingOrders().filter(o => ids.has(o.id)).reduce((sum, o) => sum + o.total, 0);
+  });
+
+  noteSheet = signal<{ routeId: number; deliveryId: number; clientName: string; existing: string | null } | null>(null);
+  noteDraft = signal('');
+  savingNote = signal(false);
+  readonly quickNotes = ['💵 Cobrar saldo pendiente', '📞 Llamar al llegar', '🏠 Dejar con la vecina', '⏰ Entregar después de las 5'];
+
+  removeConfirm = signal<{ route: RouteDto; delivery: RouteDeliveryDto } | null>(null);
+  removingDelivery = signal(false);
   private briefingAudio = new Audio();
 
   // Geocode Cache
@@ -1188,6 +1424,9 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
   @HostListener('window:scroll')
   onScroll() { this.scrollY.set(window.scrollY); }
+
+  @HostListener('document:click')
+  onDocumentClick() { if (this.moreMenuRouteId() !== null) this.moreMenuRouteId.set(null); }
 
   ngOnInit(): void {
     this.loadRoutes();
@@ -1748,27 +1987,38 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   // ─── MAGIC ADDRESS PICKER ───
-  openMagicPicker(order: any): void {
-    this.pickerOrder = order;
-    this.pickerInitialAddress = order.clientAddress || '';
+  openMagicPicker(order: OrderSummaryDto): void {
+    this.pickerOrder.set(order);
     this.showAddressPicker.set(true);
   }
 
-  onAddressPickerConfirm(res: { address: string, lat: number, lng: number }): void {
+  closeAddressPicker(): void {
     this.showAddressPicker.set(false);
-    if (!this.pickerOrder) return;
+    this.pickerOrder.set(null);
+  }
+
+  onAddressPickerConfirm(res: { address: string; lat: number; lng: number; deliveryInstructions: string }): void {
+    const order = this.pickerOrder();
+    if (!order?.clientId || this.isSavingAddress()) return;
     this.isSavingAddress.set(true);
-    this.api.updateClient(this.pickerOrder.clientId, {
-      name: this.pickerOrder.clientName,
-      address: res.address,
-      tag: this.pickerOrder.tags?.[0] || 'None',
-      type: this.pickerOrder.type || 'Nueva'
-    }).subscribe({
+    this.api.setClientCoordinates(
+      order.clientId,
+      res.lat,
+      res.lng,
+      res.address,
+      res.deliveryInstructions
+    ).subscribe({
       next: () => {
         this.toast.success('Ubicación guardada con magia ✨');
-        this.pickerOrder.clientAddress = res.address;
         this.isSavingAddress.set(false);
-        this.pendingOrders.update(list => list.map(o => o.id === this.pickerOrder.id ? { ...o, clientAddress: res.address } : o));
+        this.pendingOrders.update(list => list.map(o => o.id === order.id ? {
+          ...o,
+          clientAddress: res.address,
+          clientLatitude: res.lat,
+          clientLongitude: res.lng,
+          deliveryInstructions: res.deliveryInstructions
+        } : o));
+        this.closeAddressPicker();
       },
       error: () => {
         this.toast.error('Error al guardar ubicación');
@@ -1869,43 +2119,141 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   // ─── ROUTE MUTATION ───
-  removeOrderFromRoute(route: any, orderId: number) {
-    if (!confirm('¿Seguro que quieres quitar este pedido de la ruta?')) return;
+  toggleMoreMenu(routeId: number): void {
+    this.moreMenuRouteId.update(id => id === routeId ? null : routeId);
+  }
 
-    this.api.removeOrderFromRoute(route.id, orderId).subscribe({
-      next: () => {
-        this.toast.success('Pedido removido de la ruta ✨');
-        this.loadRoutes();
-      },
-      error: (err) => this.toast.error('Error al remover pedido')
+  // ── Quitar entrega (con confirmación propia, no confirm() nativo) ──
+  openRemoveConfirm(route: RouteDto, d: RouteDeliveryDto): void {
+    this.removeConfirm.set({ route, delivery: d });
+  }
+
+  confirmRemoveDelivery(): void {
+    const rc = this.removeConfirm();
+    if (!rc) return;
+    this.removingDelivery.set(true);
+
+    const done = (msg: string) => {
+      this.removingDelivery.set(false);
+      this.removeConfirm.set(null);
+      this.toast.success(msg);
+      this.loadRoutes();
+    };
+    const fail = (msg: string) => {
+      this.removingDelivery.set(false);
+      this.toast.error(msg);
+    };
+
+    if (rc.delivery.kind === 'Tanda' && rc.delivery.tandaParticipantId) {
+      this.api.removeTandaFromRoute(rc.route.id, rc.delivery.tandaParticipantId).subscribe({
+        next: () => done('Tanda removida de la ruta ✨'),
+        error: () => fail('Error al remover tanda')
+      });
+    } else if (rc.delivery.orderId != null) {
+      this.api.removeOrderFromRoute(rc.route.id, rc.delivery.orderId).subscribe({
+        next: () => done('Pedido removido, volvió a Pendientes ✨'),
+        error: () => fail('Error al remover pedido')
+      });
+    }
+  }
+
+  // ── Agregar pedidos/tandas (bottom-sheet con buscador) ──
+  openAddSheet(route: RouteDto): void {
+    this.addSheetRoute.set(route);
+    this.addSheetTab.set('orders');
+    this.addSearchQuery.set('');
+    this.addSelectedOrderIds.set(new Set());
+    this.addSelectedTandaIds.set(new Set());
+    this.loadPendingOrders();
+    this.api.getAvailableTandas().subscribe({
+      next: (tandas) => this.availableTandas.set(tandas),
+      error: () => this.availableTandas.set([])
     });
   }
 
-  removeDeliveryFromRoute(route: any, d: RouteDeliveryDto) {
-    if (d.kind === 'Tanda' && d.tandaParticipantId) {
-      if (!confirm('¿Seguro que quieres quitar esta tanda de la ruta?')) return;
-      this.api.removeTandaFromRoute(route.id, d.tandaParticipantId).subscribe({
-        next: () => {
-          this.toast.success('Tanda removida de la ruta ✨');
-          this.loadRoutes();
-        },
-        error: () => this.toast.error('Error al remover tanda')
-      });
-      return;
-    }
-    if (d.orderId != null) {
-      this.removeOrderFromRoute(route, d.orderId);
-    }
+  closeAddSheet(): void {
+    if (this.addingToRoute()) return;
+    this.addSheetRoute.set(null);
   }
 
-  async addOrderToRoute(route: any, orderId: number) {
+  toggleAddOrder(id: number): void {
+    this.addSelectedOrderIds.update(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  toggleAddTanda(id: string): void {
+    this.addSelectedTandaIds.update(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async confirmAddToRoute(): Promise<void> {
+    const route = this.addSheetRoute();
+    if (!route || this.addSelectionCount() === 0) return;
+
+    this.addingToRoute.set(true);
     const pos = await this.getCurrentLocation();
-    this.api.addOrderToRoute(route.id, orderId, pos?.lat, pos?.lng).subscribe({
+    let ok = 0, failed = 0;
+
+    // Secuencial a propósito: cada alta re-optimiza la ruta en el backend
+    for (const orderId of this.addSelectedOrderIds()) {
+      try {
+        await firstValueFrom(this.api.addOrderToRoute(route.id, orderId, pos?.lat, pos?.lng));
+        ok++;
+      } catch { failed++; }
+    }
+    for (const tandaId of this.addSelectedTandaIds()) {
+      try {
+        await firstValueFrom(this.api.addTandaToRoute(route.id, tandaId, pos?.lat, pos?.lng));
+        ok++;
+      } catch { failed++; }
+    }
+
+    this.addingToRoute.set(false);
+    this.addSheetRoute.set(null);
+    if (ok > 0) this.toast.success(`${ok} ${ok === 1 ? 'entrega agregada' : 'entregas agregadas'} a la ruta 🚀`);
+    if (failed > 0) this.toast.error(`${failed} no se ${failed === 1 ? 'pudo' : 'pudieron'} agregar`);
+    this.loadRoutes();
+  }
+
+  // ── Nota para el chofer ──
+  openNoteSheet(route: RouteDto, d: RouteDeliveryDto): void {
+    this.noteSheet.set({ routeId: route.id, deliveryId: d.deliveryId, clientName: d.clientName, existing: d.notes ?? null });
+    this.noteDraft.set(d.notes ?? '');
+  }
+
+  appendQuickNote(text: string): void {
+    this.noteDraft.update(v => {
+      const base = v.trim();
+      return base ? `${base}\n${text}` : text;
+    });
+  }
+
+  saveNote(): void {
+    const ns = this.noteSheet();
+    if (!ns) return;
+    const notes = this.noteDraft().trim() || null;
+    this.savingNote.set(true);
+    this.api.updateDeliveryNotes(ns.routeId, ns.deliveryId, notes).subscribe({
       next: () => {
-        this.toast.success('Pedido agregado a la ruta 🚀');
-        this.loadRoutes();
+        this.savingNote.set(false);
+        this.noteSheet.set(null);
+        this.toast.success(notes ? 'Nota guardada, el chofer ya la ve 📝' : 'Nota eliminada 🧹');
+        // Actualización optimista local (sin recargar todo)
+        this.routes.update(rs => rs.map(r => r.id !== ns.routeId ? r : {
+          ...r,
+          deliveries: r.deliveries.map(d => d.deliveryId === ns.deliveryId ? { ...d, notes: notes ?? undefined } : d)
+        }));
       },
-      error: (err) => this.toast.error(err.error?.message || 'Error al agregar pedido')
+      error: () => {
+        this.savingNote.set(false);
+        this.toast.error('Error al guardar la nota');
+      }
     });
   }
 
@@ -2085,10 +2433,9 @@ export class RoutesComponent implements OnInit, OnDestroy {
     });
   }
 
-  moveDelivery(route: RouteDto, index: number, dir: 1 | -1): void {
-    const newIndex = index + dir;
-    if (newIndex < 0 || newIndex >= route.deliveries.length) return;
-    moveItemInArray(route.deliveries, index, newIndex);
+  onDeliveryDrop(route: RouteDto, event: CdkDragDrop<RouteDeliveryDto[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+    moveItemInArray(route.deliveries, event.previousIndex, event.currentIndex);
     route.deliveries.forEach((d, i) => d.sortOrder = i + 1);
     // Optimistic update — signal Angular that the array changed
     this.routes.update(rs => [...rs]);
@@ -2193,7 +2540,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   openMap(route: RouteDto): void {
     this.mapRoute.set(route);
     this.mapDeliveries = route.deliveries;
-    this.mapDirections.set(undefined);
+    this.mapPolylinePath.set([]);
     this.showMapModal.set(true);
 
     // Try to center on device GPS first
@@ -2206,6 +2553,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   closeMap(): void {
     this.showMapModal.set(false);
     this.mapRoute.set(null);
+    this.mapPolylinePath.set([]);
   }
 
   getDeliveryMarkerOpts(d: RouteDeliveryDto): google.maps.MarkerOptions {
@@ -2225,33 +2573,16 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.plottingMap.set(true);
     const sorted = [...route.deliveries].sort((a, b) => a.sortOrder - b.sortOrder);
     const path: google.maps.LatLngLiteral[] = [this.mapCenter];
-    const waypoints: google.maps.DirectionsWaypoint[] = [];
 
     for (const d of sorted) {
-      let lat = d.latitude;
-      let lng = d.longitude;
-      if (!lat || !lng) {
-        const coords = await this.geocodeAddress(d.clientAddress || '');
-        if (coords) { lat = coords.lat; lng = coords.lng; d.latitude = lat; d.longitude = lng; }
-      }
+      const lat = d.latitude;
+      const lng = d.longitude;
       if (lat && lng) {
-        waypoints.push({ location: { lat, lng }, stopover: true });
         path.push({ lat, lng });
       }
     }
 
-    if (path.length > 1) {
-      const ds = new google.maps.DirectionsService();
-      ds.route({
-        origin: path[0], destination: path[path.length - 1],
-        waypoints: waypoints.slice(0, -1),
-        optimizeWaypoints: false, travelMode: google.maps.TravelMode.DRIVING
-      }, (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          this.mapDirections.set(result);
-        }
-      });
-    }
+    this.mapPolylinePath.set(path.length > 1 ? path : []);
 
     this.plottingMap.set(false);
     setTimeout(() => {

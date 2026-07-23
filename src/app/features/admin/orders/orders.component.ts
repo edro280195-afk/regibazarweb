@@ -1,35 +1,47 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
+import { LabelPrintService } from '../../../core/services/label-print.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus } from '../../../core/models';
+import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
 import { CouponService } from '../../../core/services/coupon.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
+import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messenger.util';
+
+type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 
 @Component({
   selector: 'app-orders',
   standalone: true,
   imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink, BirthdayCouponComponent, GoogleAutocompleteDirective],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6">
       <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-4 animate-slide-down">
+      <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between animate-slide-down">
         <h1 class="text-2xl font-bold text-pink-900">📦 Pedidos</h1>
-        <div class="flex gap-2">
-          <label class="btn-coquette btn-outline-pink cursor-pointer">
+        <div class="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+          <label class="btn-coquette btn-outline-pink min-w-0 cursor-pointer justify-center px-2 py-2 text-[10px] sm:px-4 sm:text-sm" aria-label="Importar pedidos desde Excel">
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
           </label>
-          <a routerLink="/admin/capture" class="btn-coquette btn-pink text-center align-middle inline-block">✨ Nuevo Pedido</a>
+          <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Enviar enlaces">
+            <span class="sm:hidden">💌 Enlaces</span>
+            <span class="hidden sm:inline">💌 Enviar Enlaces</span>
+          </a>
+          <a routerLink="/admin/capture" class="btn-coquette btn-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Crear nuevo pedido">
+            <span class="sm:hidden">✨ Nuevo</span>
+            <span class="hidden sm:inline">✨ Nuevo Pedido</span>
+          </a>
         </div>
       </div>
 
@@ -128,6 +140,35 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                       🚚 Entrega: {{ order.scheduledDeliveryDate | date:'dd MMM yyyy' }}
                     </p>
                   }
+
+                  <!-- 🛍️ Bolsas reales: creación rápida con QR -->
+                  <div class="mt-2.5">
+                    @if (bagsEditFor() === order.id) {
+                      <div class="bg-pink-50/70 rounded-xl p-2 border border-pink-200 flex flex-wrap gap-1.5 items-center animate-[fadeIn_.15s_ease]">
+                        <span class="text-[9px] font-black text-pink-500 uppercase w-full mb-0.5">🛍️ Generar bolsas con QR</span>
+                        @for (n of [1,2,3,4,5]; track n) {
+                          <button class="w-7 h-7 rounded-lg font-black text-xs bg-white text-pink-500 border border-pink-100 hover:bg-pink-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
+                                  [disabled]="savingQuickBags()" (click)="generateQuickBags(order, n)">{{ n }}</button>
+                        }
+                        <button class="w-7 h-7 rounded-lg font-black text-sm bg-white text-pink-500 border border-pink-100 hover:bg-pink-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
+                                [disabled]="savingQuickBags()" (click)="generateQuickBags(order, 6)">6</button>
+                        <button class="px-2 h-7 rounded-lg font-bold text-[10px] bg-white text-purple-500 border border-purple-100 hover:bg-purple-500 hover:text-white transition-all active:scale-90 disabled:opacity-50"
+                                [disabled]="savingQuickBags()" (click)="markWithoutBags(order)">Sin bolsas</button>
+                        <button class="px-2 h-7 rounded-lg font-bold text-[10px] text-pink-300 hover:text-pink-500 transition-all ml-auto"
+                                [disabled]="savingQuickBags()" (click)="bagsEditFor.set(null)">✕</button>
+                      </div>
+                    } @else if (order.packagesConfirmed) {
+                      <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-100 transition-all"
+                              (click)="bagsEditFor.set(order.id)" title="Generar más bolsas">
+                        🛍️ {{ (order.totalPackages ?? 0) === 0 ? 'Sin bolsas' : order.totalPackages + ' bolsa' + (order.totalPackages === 1 ? '' : 's') }}
+                      </button>
+                    } @else {
+                      <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-500 border border-rose-200 hover:bg-rose-100 transition-all animate-pulse-pink"
+                              (click)="bagsEditFor.set(order.id)" title="Generar bolsas">
+                        🛍️ Generar bolsas
+                      </button>
+                    }
+                  </div>
                 </div>
 
                 <!-- Financials & Progress -->
@@ -226,7 +267,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
       @if (selectedOrder() && drawerOpen()) {
         <div class="fixed inset-0 z-[90] bg-gradient-to-r from-pink-900/10 to-pink-800/20 backdrop-blur-[6px] transition-opacity" (click)="closeDrawer()"></div>
         
-        <div class="fixed inset-y-0 right-0 z-[100] w-full md:w-[520px] lg:w-[620px] bg-gradient-to-b from-white via-pink-50/20 to-rose-50/30 backdrop-blur-2xl shadow-[-20px_0_60px_-10px_rgba(236,72,153,0.15)] transform transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex flex-col rounded-l-[2rem] overflow-hidden border-l border-pink-100/30"
+        <aside role="dialog" aria-modal="true" aria-label="Detalle del pedido" class="fixed inset-y-0 right-0 z-[100] w-full md:w-[560px] lg:w-[680px] bg-gradient-to-b from-white via-pink-50/20 to-rose-50/30 backdrop-blur-2xl shadow-[-20px_0_60px_-10px_rgba(236,72,153,0.15)] transform transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex flex-col rounded-l-[2rem] overflow-hidden border-l border-pink-100/30"
              [class.translate-x-0]="drawerOpen()" [class.translate-x-full]="!drawerOpen()">
              
           <!-- Header -->
@@ -251,6 +292,10 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                     <textarea class="input-coquette" [(ngModel)]="editClientData.alternativeAddress" placeholder="Dirección Alternativa" rows="2"
                               appGoogleAutocomplete (placeChanged)="onAltAddressSelected($event)"></textarea>
                     <textarea class="input-coquette" [(ngModel)]="editClientData.deliveryInstructions" placeholder="Instrucciones de entrega (Clienta)" rows="2"></textarea>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#0099FF] text-sm">𝓶</span>
+                      <input class="input-coquette pl-8" [(ngModel)]="editClientData.facebookProfileUrl" placeholder="URL del perfil de Facebook (para Messenger)" />
+                    </div>
                     <select class="input-coquette" [(ngModel)]="editClientData.type">
                       <option value="Nueva">Nueva</option>
                       <option value="Frecuente">Frecuente</option>
@@ -266,41 +311,70 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             <button class="w-9 h-9 flex shrink-0 items-center justify-center rounded-full bg-white/80 text-pink-400 hover:bg-pink-100 hover:text-pink-600 transition-all shadow-sm border border-pink-100/50 ml-4" (click)="closeDrawer()">✕</button>
           </div>
 
-          <!-- Scrollable Body -->
-          <div class="flex-1 overflow-y-auto w-full px-6 py-5 space-y-5 scrollbar-hide">
-            
-            <!-- Visual Pipeline (Status) -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
-              <h4 class="text-xs font-black text-pink-600 mb-3 uppercase tracking-widest flex items-center gap-2">🎀 Estatus del Pedido</h4>
-              <div class="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-hide py-1">
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-md shadow-amber-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-amber-50 hover:text-amber-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Pending')">{{ getStatusLabel('Pending') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
-                
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Confirmed' ? 'bg-pink-50 text-pink-700 border-pink-200 shadow-md shadow-pink-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-pink-50 hover:text-pink-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Confirmed')">{{ getStatusLabel('Confirmed') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
-                
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-md shadow-blue-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-blue-50 hover:text-blue-600'"
-                        (click)="updateStatus(selectedOrder()!.id, 'Shipped')">{{ getStatusLabel('Shipped') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
+          <nav class="px-4 sm:px-6 py-3 bg-white/70 border-b border-pink-100/60 grid grid-cols-4 gap-1.5" aria-label="Secciones del pedido">
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'summary' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'summary'" (click)="setDrawerTab('summary')">Resumen</button>
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'items' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'items'" (click)="setDrawerTab('items')">Artículos <span class="opacity-80">{{ selectedOrder()!.itemsCount }}</span></button>
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'delivery' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'delivery'" (click)="setDrawerTab('delivery')">Entrega</button>
+            <button type="button" class="rounded-xl px-2 py-2 text-[11px] font-black transition-all"
+                    [class]="drawerTab() === 'payment' ? 'bg-pink-500 text-white shadow-sm' : 'text-pink-400 hover:bg-pink-50'"
+                    [attr.aria-pressed]="drawerTab() === 'payment'" (click)="setDrawerTab('payment')">Cobro</button>
+          </nav>
 
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'InRoute' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-md shadow-indigo-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-indigo-50 hover:text-indigo-600'"
+          <!-- Scrollable Body -->
+          <div class="flex-1 overflow-y-auto w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4 scrollbar-hide">
+            
+            <!-- Resumen -->
+            @if (drawerTab() === 'summary') {
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest">🎀 Estatus del pedido</h4>
+                  <p class="text-[10px] text-pink-400 mt-1">Selecciona el estado actual; se guarda al instante.</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-pink-50 text-pink-600 text-[10px] font-black border border-pink-100">{{ getStatusLabel(selectedOrder()!.status) }}</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-amber-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'Pending')">{{ getStatusLabel('Pending') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Confirmed' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-pink-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'Confirmed')">{{ getStatusLabel('Confirmed') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Shipped' ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-violet-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'Shipped')">{{ getStatusLabel('Shipped') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'InRoute' ? 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-fuchsia-50'"
                         (click)="updateStatus(selectedOrder()!.id, 'InRoute')">{{ getStatusLabel('InRoute') }}</button>
-                <div class="w-3 h-px bg-gradient-to-r from-pink-200 to-pink-100 shrink-0"></div>
-                
-                <button class="px-3.5 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap hover:scale-105 active:scale-95 border"
-                        [class]="selectedOrder()!.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-md shadow-emerald-100' : 'bg-white/60 text-pink-300 border-pink-100/50 hover:bg-emerald-50 hover:text-emerald-600'"
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'Delivered' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-purple-50'"
                         (click)="updateStatus(selectedOrder()!.id, 'Delivered')">{{ getStatusLabel('Delivered') }}</button>
+                <button type="button" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all border"
+                        [class]="selectedOrder()!.status === 'NotDelivered' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-white/60 text-pink-400 border-pink-100 hover:bg-rose-50'"
+                        (click)="updateStatus(selectedOrder()!.id, 'NotDelivered')">{{ getStatusLabel('NotDelivered') }}</button>
               </div>
             </div>
 
+            @if (selectedOrder()!.status === 'NotDelivered') {
+              <div class="rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div class="flex-1">
+                  <p class="text-sm font-black text-rose-700">Esta entrega no se completó</p>
+                  <p class="text-[11px] text-rose-500 mt-0.5">Libérala para que vuelva a aparecer al crear una nueva ruta.</p>
+                </div>
+                <button type="button" class="btn-coquette btn-pink py-2 px-4 text-xs shrink-0" (click)="releaseOrderForRoute()">Preparar reintento</button>
+              </div>
+            }
+            }
+
             <!-- Delivery & Period Toggles -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm grid grid-cols-2 gap-5">
+            @if (drawerTab() === 'delivery') {
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-pink-900 mb-2 uppercase">Tipo de Entrega</label>
                 <div class="flex bg-pink-50/50 p-1 rounded-xl border border-pink-100 shadow-inner">
@@ -359,7 +433,7 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             </div>
 
             <!-- Shipping Cost Editor -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm flex items-center justify-between">
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p class="text-[10px] font-black text-pink-500 uppercase tracking-widest flex items-center gap-1">🚚 Costo de Envío</p>
                 <p class="text-sm font-bold text-pink-900 mt-1">Actual: {{ selectedOrder()!.shippingCost | currency:'MXN':'symbol-narrow' }}</p>
@@ -376,67 +450,63 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
               </div>
             </div>
 
-            <!-- Order Items -->
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
-              <div class="flex items-center justify-between mb-4">
-                <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🛍️ Productos ({{ selectedOrder()!.itemsCount }})</h4>
-              </div>
-              
-              <div class="space-y-3" [class.opacity-50]="isProcessingItem()" [class.pointer-events-none]="isProcessingItem()">
-                @for (item of selectedOrder()!.items; track item.id) {
-                  <div class="group/item bg-white/80 rounded-2xl p-4 border border-pink-100/30 shadow-[0_2px_10px_-4px_rgba(244,114,182,0.1)] hover:shadow-[0_8px_25px_-5px_rgba(244,114,182,0.2)] hover:border-pink-200/60 transition-all duration-300 flex flex-col gap-3 relative overflow-hidden focus-within:ring-2 focus-within:ring-pink-300 focus-within:border-pink-400">
-                    <div class="absolute inset-0 bg-gradient-to-r from-pink-50/0 via-white/50 to-pink-50/0 opacity-0 group-hover/item:opacity-100 transition-opacity pointer-events-none"></div>
-                    
-                    <div class="flex justify-between items-start relative z-10">
-                      <div class="flex-1 mr-4">
-                        <input type="text" [(ngModel)]="item.productName" 
-                               (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
-                               class="w-full bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-pink-50/60 transition-all font-black text-pink-900 text-sm appearance-none outline-none ring-0 placeholder-pink-300 px-1 py-0.5 rounded-t-sm" 
-                               placeholder="Nombre del producto...">
-                        <span class="text-[9px] text-pink-400 ml-1 opacity-0 group-focus-within/item:opacity-100 transition-opacity">✏️ Enter para guardar</span>
-                      </div>
-                      <button class="text-pink-200 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-all shrink-0" (click)="removeItem(item.id)" title="Eliminar producto">🗑️</button>
-                    </div>
-                    
-                    <div class="flex items-center justify-between relative z-10 bg-pink-50/30 p-2 rounded-xl">
-                      <div class="flex items-center bg-white rounded-xl border border-pink-100/50 shadow-sm hover:shadow-md transition-shadow">
-                        <button class="w-8 h-8 text-pink-500 hover:bg-pink-100 rounded-l-xl font-black transition-colors flex justify-center items-center active:bg-pink-200" (click)="updateItemQty(item.id, item.quantity - 1, item.productName, item.unitPrice)">−</button>
-                        <span class="w-10 h-full font-black text-pink-900 flex justify-center items-center text-sm border-x border-pink-50 bg-pink-50/30">{{ item.quantity }}</span>
-                        <button class="w-8 h-8 text-pink-500 hover:bg-pink-100 rounded-r-xl font-black transition-colors flex justify-center items-center active:bg-pink-200" (click)="updateItemQty(item.id, item.quantity + 1, item.productName, item.unitPrice)">+</button>
-                      </div>
-                      
-                      <div class="text-right">
-                        <div class="flex items-center justify-end gap-1 mb-0.5">
-                          <input type="number" [(ngModel)]="item.unitPrice" step="0.5"
-                                 (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
-                                 class="w-20 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-white transition-all text-xs text-pink-500 font-bold text-right outline-none ring-0 p-0 m-0">
-                          <span class="text-[10px] text-pink-400 font-medium">c/u</span>
-                        </div>
-                        <p class="font-black text-pink-700 text-base leading-none">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</p>
-                      </div>
-                    </div>
+            }
+
+            <!-- Artículos -->
+            @if (drawerTab() === 'items') {
+              <section class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm" aria-label="Artículos del pedido">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🛍️ Artículos ({{ selectedOrder()!.itemsCount }})</h4>
+                    <p class="text-[10px] text-pink-400 mt-1">Todo el pedido en una lista corta y fácil de editar.</p>
+                  </div>
+                  <button type="button" class="text-xs font-black text-pink-600 hover:text-pink-800 px-2 py-1 rounded-lg hover:bg-pink-50" (click)="toggleNewItemForm()">
+                    {{ showNewItemForm() ? 'Cancelar' : '+ Agregar' }}
+                  </button>
+                </div>
+
+                @if (showNewItemForm()) {
+                  <div class="mb-3 p-3 rounded-xl bg-pink-50/70 border border-pink-100 grid grid-cols-1 sm:grid-cols-[1fr_96px_72px_58px] gap-2 items-center">
+                    <input type="text" class="input-coquette py-2 text-sm" placeholder="Nombre del artículo" [(ngModel)]="newItemName">
+                    <input type="number" class="input-coquette py-2 px-2 text-sm" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
+                    <input type="number" class="input-coquette py-2 px-2 text-sm text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
+                    <button class="btn-coquette btn-pink py-2 px-2 text-xs" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">Agregar</button>
                   </div>
                 }
 
-                <!-- Add New Item Row -->
-                <div class="bg-gradient-to-tr from-pink-50/40 to-rose-50/30 rounded-2xl p-4 border-2 border-dashed border-pink-200/50 mt-4 hover:border-pink-300/50 transition-colors">
-                  <p class="text-xs font-black text-pink-500 mb-3 flex items-center gap-1">✨ Agregar artículo</p>
-                  <div class="flex flex-col gap-2">
-                    <input type="text" class="input-coquette py-2 text-sm" placeholder="Nombre completo del producto" [(ngModel)]="newItemName">
-                    <div class="grid grid-cols-[1fr_70px_60px] gap-2 items-center">
-                      <div class="relative min-w-0">
-                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-pink-400 font-bold">$</span>
-                        <input type="number" class="input-coquette py-2 pl-8 pr-2 text-sm w-full" placeholder="Precio" [(ngModel)]="newItemPrice" min="0">
+                <div class="divide-y divide-pink-100/80" [class.opacity-50]="isProcessingItem()" [class.pointer-events-none]="isProcessingItem()">
+                  @for (item of visibleOrderItems(); track item.id) {
+                    <div class="py-3 first:pt-1">
+                      <div class="flex items-center gap-2">
+                        <input type="text" [(ngModel)]="item.productName"
+                               (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)"
+                               class="min-w-0 flex-1 bg-transparent border-b border-transparent hover:border-pink-200 focus:border-pink-400 focus:bg-pink-50/60 transition-all font-bold text-pink-900 text-sm outline-none px-1 py-1"
+                               placeholder="Nombre del artículo">
+                        <button type="button" class="w-8 h-8 rounded-full text-pink-300 hover:text-rose-500 hover:bg-rose-50 transition-all shrink-0" (click)="removeItem(item.id)" [attr.aria-label]="'Eliminar ' + item.productName">🗑️</button>
                       </div>
-                      <input type="number" class="input-coquette py-2 px-1 text-sm w-full text-center" placeholder="Cant." [(ngModel)]="newItemQty" min="1">
-                      <button class="btn-coquette btn-pink px-0 text-center shadow-md hover:shadow-lg transition-all" [disabled]="!newItemName || newItemPrice <= 0 || newItemQty < 1" (click)="addNewItem()">OK</button>
+                      <div class="mt-2 flex items-center justify-between gap-3">
+                        <div class="inline-flex items-center rounded-xl border border-pink-100 bg-white overflow-hidden">
+                          <button type="button" class="w-8 h-8 text-pink-500 hover:bg-pink-50 font-black" (click)="updateItemQty(item.id, item.quantity - 1, item.productName, item.unitPrice)" [attr.aria-label]="'Reducir ' + item.productName">−</button>
+                          <span class="w-8 text-center text-sm font-black text-pink-900 border-x border-pink-100">{{ item.quantity }}</span>
+                          <button type="button" class="w-8 h-8 text-pink-500 hover:bg-pink-50 font-black" (click)="updateItemQty(item.id, item.quantity + 1, item.productName, item.unitPrice)" [attr.aria-label]="'Aumentar ' + item.productName">+</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <label class="text-[10px] text-pink-400">$ <input type="number" [(ngModel)]="item.unitPrice" step="0.5" (change)="updateItemQty(item.id, item.quantity, item.productName, item.unitPrice)" class="w-16 bg-transparent border-b border-pink-100 focus:border-pink-400 text-right text-xs font-bold text-pink-600 outline-none"> c/u</label>
+                          <span class="min-w-16 text-right font-black text-pink-700 text-sm">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  }
                 </div>
-              </div>
-            </div>
+
+                @if (hasHiddenOrderItems()) {
+                  <button type="button" class="mt-3 w-full py-2 rounded-xl text-xs font-black text-pink-500 hover:bg-pink-50 transition-colors" (click)="showRemainingOrderItems()">Ver {{ hiddenOrderItemsCount() }} artículo(s) más</button>
+                }
+              </section>
+            }
 
             <!-- Logística (Bolsas Anti-Pérdidas) -->
+            @if (drawerTab() === 'delivery') {
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm mb-5">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">🏷️ Logística y Etiquetas</h4>
@@ -460,9 +530,17 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                           <p class="text-[9px] text-pink-400 font-medium font-mono truncate w-24">{{ pkg.qrCodeValue }}...</p>
                         </div>
                       </div>
-                      <button class="bg-gradient-to-r from-pink-100 to-rose-100 text-pink-600 hover:from-pink-200 hover:to-rose-200 border border-pink-200 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm transition-all" (click)="printLabel(pkg, selectedOrder()!)">
-                        🖨️ Imprimir
-                      </button>
+                      <div class="flex items-center gap-1.5">
+                        <button class="bg-gradient-to-r from-pink-100 to-rose-100 text-pink-600 hover:from-pink-200 hover:to-rose-200 border border-pink-200 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm transition-all" (click)="printLabel(pkg, selectedOrder()!)">
+                          🖨️ Imprimir
+                        </button>
+                        @if (pkg.status === 'Packed') {
+                          <button class="bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 w-8 h-8 rounded-lg text-sm font-black flex items-center justify-center shadow-sm transition-all disabled:opacity-50"
+                                  [disabled]="isLoadingPackages()" title="Borrar esta bolsa" (click)="deletePackage(pkg)">
+                            🗑️
+                          </button>
+                        }
+                      </div>
                     </div>
                   }
                 </div>
@@ -472,16 +550,19 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                     <p class="text-[9px] font-black text-pink-400 uppercase mb-1">Deseas agregar más?</p>
                     <div class="flex gap-2">
                        <input type="number" class="input-coquette py-1.5 px-3 w-20 text-sm text-center" [(ngModel)]="packagesToGenerate" min="1" />
-                       <button class="btn-coquette btn-pink text-[10px] shadow-sm grow py-2 font-black" (click)="generatePackages(packagesToGenerate)">
-                         {{ packages().length > 0 ? '+ Agregar Bolsas' : 'Generar Bolsas' }}
+                       <button class="btn-coquette btn-pink text-[10px] shadow-sm grow py-2 font-black disabled:opacity-50" type="button"
+                               [disabled]="isLoadingPackages() || packagesToGenerate < 1" (click)="generatePackages(packagesToGenerate)">
+                         {{ isLoadingPackages() ? 'Generando…' : (packages().length > 0 ? '+ Agregar Bolsas' : 'Generar Bolsas') }}
                        </button>
                     </div>
                   </div>
                 </div>
               }
             </div>
+            }
 
             <!-- Quick Payments -->
+            @if (drawerTab() === 'payment') {
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
               <div class="flex items-center justify-between mb-3">
                 <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">💰 Cobros Express</h4>
@@ -506,17 +587,17 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
               
               <div class="grid grid-cols-3 gap-2 mt-3">
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-                        [class]="paymentMethod === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-md shadow-emerald-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-emerald-50 hover:text-emerald-600'"
+                        [class]="paymentMethod === 'Efectivo' ? 'bg-rose-50 border-rose-200 text-rose-700 shadow-md shadow-rose-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-rose-50 hover:text-rose-600'"
                         (click)="paymentMethod = 'Efectivo'; addPayment()">
                   <span class="text-xl">💵</span> <span class="text-[10px]">Efectivo</span>
                 </button>
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-                        [class]="paymentMethod === 'Transferencia' ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-md shadow-blue-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-blue-50 hover:text-blue-600'"
+                        [class]="paymentMethod === 'Transferencia' ? 'bg-violet-50 border-violet-200 text-violet-700 shadow-md shadow-violet-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-violet-50 hover:text-violet-600'"
                         (click)="paymentMethod = 'Transferencia'; addPayment()">
                   <span class="text-xl">🏦</span> <span class="text-[10px]">Transf.</span>
                 </button>
                 <button class="py-2.5 rounded-2xl border font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-                        [class]="paymentMethod === 'Tarjeta' ? 'bg-purple-50 border-purple-200 text-purple-700 shadow-md shadow-purple-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-purple-50 hover:text-purple-600'"
+                        [class]="paymentMethod === 'Tarjeta' ? 'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-700 shadow-md shadow-fuchsia-100' : 'bg-white/60 border-pink-100/50 text-pink-400 hover:bg-fuchsia-50 hover:text-fuchsia-600'"
                         (click)="paymentMethod = 'Tarjeta'; addPayment()">
                   <span class="text-xl">💳</span> <span class="text-[10px]">Tarjeta</span>
                 </button>
@@ -538,7 +619,44 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
                 </div>
               }
             </div>
-            
+
+            <!-- Canje de RegiPuntos -->
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-violet-100/60 shadow-sm">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-2">💎 Canjear RegiPuntos</h4>
+                <div class="text-right bg-violet-50/80 px-3 py-1.5 rounded-xl border border-violet-100/50">
+                  <p class="text-[9px] text-violet-400 font-bold uppercase tracking-wider">Saldo clienta</p>
+                  <p class="text-base font-black text-violet-600">{{ selectedOrder()!.clientPoints ?? 0 }} pts</p>
+                </div>
+              </div>
+
+              @if (rewards().length === 0) {
+                <p class="text-[11px] text-pink-400 font-medium">Cargando premios…</p>
+              } @else {
+                <div class="space-y-2">
+                  @for (r of rewards(); track r.id) {
+                    @if (canAfford(r)) {
+                      <button class="w-full flex items-center gap-3 p-3 rounded-2xl border border-violet-100/60 bg-white/70 hover:bg-violet-50 hover:border-violet-200 active:scale-[0.98] transition-all text-left disabled:opacity-50"
+                              [disabled]="redeeming()"
+                              (click)="redeemReward(r)">
+                        <span class="text-2xl shrink-0">{{ r.icon || '🎁' }}</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="font-black text-violet-900 text-sm leading-tight">{{ r.name }}</p>
+                          <p class="text-[10px] text-violet-400 font-medium truncate">{{ r.description }}</p>
+                        </div>
+                        <span class="shrink-0 text-[11px] font-black text-white bg-gradient-to-r from-violet-500 to-pink-500 px-2.5 py-1 rounded-full">{{ r.pointsCost }} pts</span>
+                      </button>
+                    }
+                  }
+                  @if (!hasAnyAffordable()) {
+                    <p class="text-[11px] text-pink-400 font-medium text-center py-2">Aún no alcanza para ningún premio. ¡Sigue sumando puntos! ✨</p>
+                  }
+                </div>
+                <p class="text-[9px] text-violet-400/80 mt-2 text-center italic">El canje aplica un descuento al pedido y descuenta los puntos. Queda registrado en su historial.</p>
+              }
+            </div>
+            }
+
             <div class="h-16"></div>
           </div>
 
@@ -551,15 +669,15 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
             
             <div class="flex gap-1.5">
               <button class="w-10 h-10 rounded-2xl bg-purple-50 text-purple-500 hover:bg-purple-100 hover:text-purple-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-purple-100/50" title="Copiar Enlace Público" (click)="copyLink()">🔗</button>
-              <button class="w-10 h-10 rounded-2xl bg-green-50 text-green-500 hover:bg-green-100 hover:text-green-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-green-100/50" title="Ticket WhatsApp" (click)="sendWaTicket()">
-                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.76.45 3.4 1.25 4.84L2 22l5.3-1.15A9.95 9.95 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm4.5 13.5c-.24.68-1.25 1.3-1.8 1.38-.45.06-.98.15-2.82-.6-2.22-.92-3.66-3.17-3.77-3.32-.1-.15-.9-1.2-.9-2.28s.56-1.63.76-1.83c.2-.2.43-.25.58-.25s.3-.02.45-.02c.16-.02.38-.05.6.48.23.55.76 1.83.83 1.95.06.13.1.28.02.48-.08.2-.12.33-.25.48-.12.15-.26.33-.37.45-.13.13-.27.28-.12.53.15.25.66 1.08 1.42 1.75.98.88 1.8 1.15 2.05 1.28.25.13.4.1.55-.07.15-.17.65-.75.83-1.02.17-.26.35-.22.58-.13.22.1 1.42.67 1.67.8.25.13.42.18.47.28.06.1.06.6-.18 1.28z"/></svg>
+              <button class="w-10 h-10 rounded-2xl bg-[#e8f4ff] hover:bg-[#cce4ff] hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-[#b3d5f5]/50" title="Enviar por Messenger" (click)="sendMessenger()">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="#0099FF"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
               </button>
               <button class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-blue-100/50" title="En Camino" (click)="sendWaOnRoute()">🚗</button>
               <button class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-rose-100/50" title="Cobrar" (click)="sendWaPaymentRequest()">💸</button>
               <button class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 hover:bg-amber-100 hover:text-amber-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-amber-100/50" title="Regalo Cumpleaños 🎂" (click)="applyBirthdayGift()">🎁</button>
             </div>
           </div>
-        </div>
+        </aside>
       }
 
       <!-- Hidden Coupon for Capture -->
@@ -569,45 +687,12 @@ import { GoogleAutocompleteDirective } from '../../../shared/directives/google-a
         }
       </div>
 
-      <!-- Print Preview Modal -->
-      @if (showPrintPreview() && printHtml()) {
-        <div class="fixed inset-0 z-[150] bg-pink-900/60 flex items-center justify-center p-2 md:p-4 animate-fade-in">
-          <div class="bg-white rounded-[2rem] md:rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-[0_32px_64px_-12px_rgba(244,114,182,0.3)] border border-pink-100/50 flex flex-col animate-scale-up" style="max-height: 95vh; contain: content;">
-            <!-- Modal Header -->
-            <div class="px-8 py-6 bg-gradient-to-r from-pink-100/40 to-rose-50/40 border-b border-pink-100/40 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-sm border border-pink-100">🖨️</div>
-                <div>
-                  <h3 class="text-xl font-black text-pink-900">Vista Previa</h3>
-                  <p class="text-[10px] text-pink-400 font-bold uppercase tracking-wider">Confirma la etiqueta antes de imprimir</p>
-                </div>
-              </div>
-              <button class="w-10 h-10 rounded-full bg-white text-pink-300 hover:text-pink-600 hover:bg-pink-50 transition-all shadow-sm flex items-center justify-center border border-pink-100" (click)="closePrintPreview()">✕</button>
-            </div>
-
-            <!-- Preview Body -->
-            <div class="flex-1 overflow-auto p-4 md:p-12 bg-pink-50/30 flex justify-center items-start">
-              <div class="bg-white shadow-2xl border-2 border-dashed border-pink-200 p-1 scale-75 md:scale-90 origin-top rounded-sm" 
-                   [innerHTML]="safePrintHtml()" 
-                   style="width: 100mm; min-height: 148mm; background: white;">
-              </div>
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="p-8 bg-white border-t border-pink-100/40 flex gap-4">
-              <button class="flex-1 btn-coquette btn-outline-pink py-4 font-black text-sm" (click)="closePrintPreview()">Regresar ✨</button>
-              <button class="flex-1 btn-coquette btn-pink py-4 font-black text-sm shadow-xl shadow-pink-200/50 flex items-center justify-center gap-2 group" (click)="executePrint()">
-                <span class="text-xl group-hover:animate-bounce">🖨️</span> Imprimir Etiqueta
-              </button>
-            </div>
-          </div>
-        </div>
-      }
     </div>
   `
 })
 export class OrdersComponent implements OnInit {
   private api = inject(ApiService);
+  private labelPrint = inject(LabelPrintService);
   private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
   private couponService = inject(CouponService);
@@ -625,6 +710,10 @@ export class OrdersComponent implements OnInit {
   typeFilter = '';
   selectedOrder = signal<OrderSummaryDto | null>(null);
 
+  // 🛍️ Quick-set de bolsas desde la tarjeta del Kanban (id del pedido en edición inline)
+  bagsEditFor = signal<number | null>(null);
+  savingQuickBags = signal(false);
+
   paymentAmount = 0;
   paymentMethod = 'Efectivo';
   paymentDate = '';  // Fecha real del pago (YYYY-MM-DD)
@@ -639,6 +728,9 @@ export class OrdersComponent implements OnInit {
 
   // Drawer State
   drawerOpen = signal(false);
+  drawerTab = signal<OrderDrawerTab>('items');
+  showNewItemForm = signal(false);
+  showAllOrderItems = signal(false);
   newItemName = '';
   newItemQty = 1;
   newItemPrice = 0;
@@ -648,14 +740,19 @@ export class OrdersComponent implements OnInit {
 
   // Quick Client Edit
   showClientEdit = signal(false);
-  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '' };
+  editClientData = { name: '', phone: '', address: '', alternativeAddress: '', type: 'Nueva', deliveryInstructions: '', facebookProfileUrl: '' };
+
+  // RegiPuntos (canje)
+  rewards = signal<LoyaltyRewardDto[]>([]);
+  redeeming = signal(false);
 
   // Logistics
   packages = signal<OrderPackageDto[]>([]);
   isLoadingPackages = signal(false);
   packagesToGenerate = 1;
 
-  // Printing
+  // Compatibilidad temporal para órdenes abiertas antes del diseñador. Las
+  // acciones visibles de impresión ya usan LabelPrintService y plantillas publicadas.
   showPrintPreview = signal(false);
   printHtml = signal('');
   safePrintHtml = computed(() => this.sanitizer.bypassSecurityTrustHtml(this.printHtml()));
@@ -666,6 +763,40 @@ export class OrdersComponent implements OnInit {
     this.initSignalR();
     this.api.getSalesPeriods().subscribe({
       next: (periods) => this.salesPeriods.set(periods)
+    });
+    this.api.getLoyaltyRewards().subscribe({
+      next: (r) => this.rewards.set(r),
+      error: () => { /* el catálogo es opcional; no bloquea el panel */ }
+    });
+  }
+
+  /** ¿La clienta del pedido tiene puntos suficientes para este premio? */
+  canAfford(reward: LoyaltyRewardDto): boolean {
+    const points = this.selectedOrder()?.clientPoints ?? 0;
+    return points >= reward.pointsCost;
+  }
+
+  hasAnyAffordable(): boolean {
+    return this.rewards().some(r => this.canAfford(r));
+  }
+
+  redeemReward(reward: LoyaltyRewardDto): void {
+    const o = this.selectedOrder();
+    if (!o || o.clientId == null || this.redeeming()) return;
+    if (!confirm(`¿Canjear "${reward.name}" por ${reward.pointsCost} puntos? Se aplicará como descuento al pedido.`)) return;
+
+    this.redeeming.set(true);
+    this.api.redeemLoyaltyReward(o.clientId, o.id, reward.id).subscribe({
+      next: () => {
+        this.redeeming.set(false);
+        this.toast.success(`Canjeado: ${reward.name} 💎✨`);
+        this.reloadSelectedOrder();
+        this.loadOrders();
+      },
+      error: (err) => {
+        this.redeeming.set(false);
+        this.toast.error(err?.error ?? 'No se pudo canjear');
+      }
     });
   }
 
@@ -727,6 +858,13 @@ export class OrdersComponent implements OnInit {
   }
 
   updateStatus(id: number, status: string): void {
+    if (this.selectedOrder()?.id === id
+      && this.selectedOrder()?.status === 'NotDelivered'
+      && status === 'Pending') {
+      this.releaseOrderForRoute();
+      return;
+    }
+
     // Status Morph Animation Start
     const badge = document.querySelector(`.status-badge[data-id="${id}"]`);
     if (badge) {
@@ -739,9 +877,11 @@ export class OrdersComponent implements OnInit {
     }
 
     this.api.updateOrderStatus(id, { status }).subscribe({
-      next: () => {
+      next: (updatedOrder) => {
+        if (this.selectedOrder()?.id === id) {
+          this.selectedOrder.set(updatedOrder);
+        }
         this.loadOrders();
-        // Assuming ORDER_STATUS_LABELS is defined elsewhere or getStatusLabel can be used
         this.toast.success(`Estado actualizado a ${this.getStatusLabel(status)} ✨`);
       },
       error: () => this.toast.error('Error al actualizar estado')
@@ -762,6 +902,9 @@ export class OrdersComponent implements OnInit {
     this.loadPackages(order.id);
     this.paymentAmount = 0;
     this.paymentDate = this.getTodayLocal(); // Pre-llenar con hoy
+    this.drawerTab.set('items');
+    this.showNewItemForm.set(false);
+    this.showAllOrderItems.set(false);
     this.drawerOpen.set(true);
     this.resetNewItemForm();
     // Lock body scroll for mobile
@@ -774,6 +917,52 @@ export class OrdersComponent implements OnInit {
     // Unlock body scroll
     document.body.style.overflow = '';
     setTimeout(() => this.selectedOrder.set(null), 500);
+  }
+
+  setDrawerTab(tab: OrderDrawerTab): void {
+    this.drawerTab.set(tab);
+  }
+
+  toggleNewItemForm(): void {
+    this.showNewItemForm.update(value => !value);
+  }
+
+  visibleOrderItems(): OrderItemDto[] {
+    const items = this.selectedOrder()?.items ?? [];
+    return this.showAllOrderItems() ? items : items.slice(0, 6);
+  }
+
+  hasHiddenOrderItems(): boolean {
+    const items = this.selectedOrder()?.items ?? [];
+    return !this.showAllOrderItems() && items.length > 6;
+  }
+
+  hiddenOrderItemsCount(): number {
+    const items = this.selectedOrder()?.items ?? [];
+    return Math.max(0, items.length - 6);
+  }
+
+  showRemainingOrderItems(): void {
+    this.showAllOrderItems.set(true);
+  }
+
+  releaseOrderForRoute(): void {
+    const order = this.selectedOrder();
+    if (!order || order.status !== 'NotDelivered') return;
+    if (!confirm(`¿Preparar el pedido #${order.id} para volverlo a agregar a una ruta?`)) return;
+
+    this.api.releaseOrderForRoute(order.id).subscribe({
+      next: (updatedOrder) => {
+        this.selectedOrder.set(updatedOrder);
+        this.orders.update(list => list.map(item => item.id === updatedOrder.id ? updatedOrder : item));
+        this.drawerTab.set('summary');
+        this.toast.success('Pedido liberado y listo para una nueva ruta ✨');
+        this.loadOrders();
+      },
+      error: (error: { error?: string }) => {
+        this.toast.error(error.error ?? 'No se pudo preparar el pedido para reintento');
+      }
+    });
   }
 
   resetNewItemForm(): void {
@@ -860,7 +1049,8 @@ export class OrdersComponent implements OnInit {
           address: ord.clientAddress || '',
           alternativeAddress: ord.alternativeAddress || '',
           deliveryInstructions: ord.deliveryInstructions || '',
-          type: ord.type || 'Nueva'
+          type: ord.type || 'Nueva',
+          facebookProfileUrl: ord.clientFacebookProfileUrl || ''
         };
       }
     }
@@ -888,7 +1078,8 @@ export class OrdersComponent implements OnInit {
       ...(trimmedAddress ? { clientAddress: trimmedAddress } : {}),
       alternativeAddress: this.editClientData.alternativeAddress,
       type: this.editClientData.type,
-      deliveryInstructions: this.editClientData.deliveryInstructions
+      deliveryInstructions: this.editClientData.deliveryInstructions,
+      clientFacebookProfileUrl: this.editClientData.facebookProfileUrl
     }).subscribe({
       next: () => {
         this.toast.success('Datos de clienta actualizados 👤💖');
@@ -913,6 +1104,7 @@ export class OrdersComponent implements OnInit {
       next: () => {
         this.toast.success('Producto agregado 🛍️');
         this.resetNewItemForm();
+        this.showNewItemForm.set(false);
         this.reloadSelectedOrder();
         this.loadOrders();
         this.isProcessingItem.set(false);
@@ -1035,6 +1227,37 @@ export class OrdersComponent implements OnInit {
     navigator.clipboard.writeText(link).then(() => this.toast.success('Enlace copiado 🔗'));
   }
 
+  sendMessenger(): void {
+    const o = this.selectedOrder();
+    if (!o) return;
+    const link = o.link.replace('/o/', '/pedido/');
+    const msg = buildOrderMessage({
+      clientName: o.clientName,
+      publicLink: link,
+      scheduledDeliveryDate: o.scheduledDeliveryDate,
+      expiresAt: o.expiresAt
+    });
+
+    navigator.clipboard.writeText(msg).then(() => {
+      this.toast.success('Mensaje copiado 💬 — abre Messenger y pégalo');
+    });
+
+    const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
+    if (chatUrl) {
+      window.open(chatUrl, '_blank');
+    } else {
+      this.toast.info('Pega el mensaje en Messenger. Tip: guarda el Facebook de la clienta para abrir su chat directo 💡');
+    }
+
+    // Marcar como notificada (no bloqueante)
+    if (!o.notifiedAt) {
+      this.api.markOrderNotified(o.id, true).subscribe({
+        next: () => this.reloadSelectedOrder(),
+        error: () => { /* silencioso: el envío ya ocurrió */ }
+      });
+    }
+  }
+
   sendWaTicket(): void {
     const o = this.selectedOrder();
     if (!o || !o.clientPhone) return this.toast.error('Sin teléfono');
@@ -1085,13 +1308,13 @@ export class OrdersComponent implements OnInit {
 
   generatePackages(count: number) {
     const order = this.selectedOrder();
-    if (!order || count < 1) return;
+    if (!order || count < 1 || this.isLoadingPackages()) return;
     this.isLoadingPackages.set(true);
     this.api.generatePackages(order.id, { count }).subscribe({
       next: () => {
-        // Essential: reload the full list of packages for the order
-        // to ensure we have ALL packages and correct total counts.
         this.loadPackages(order.id);
+        this.reloadSelectedOrder();
+        this.loadOrders();
         this.toast.success('Bolsas agregadas 🏷️');
         this.packagesToGenerate = 1; // Reset to default
       },
@@ -1102,9 +1325,74 @@ export class OrdersComponent implements OnInit {
     });
   }
 
-  async printLabel(pkg: OrderPackageDto, orderData: OrderSummaryDto) {
-    const html = await this.generateLabelHtml(pkg, orderData, this.packages().length);
-    this.openPrintWindow(html, `Etiqueta Bolsa ${pkg.packageNumber}`);
+  /** 🗑️ Borra una bolsa generada por error (solo si aún no se ha cargado/entregado). */
+  deletePackage(pkg: OrderPackageDto): void {
+    const order = this.selectedOrder();
+    if (!order || this.isLoadingPackages()) return;
+    if (!confirm(`¿Borrar la bolsa ${pkg.packageNumber}? Esta acción no se puede deshacer.`)) return;
+    this.isLoadingPackages.set(true);
+    this.api.deletePackage(order.id, pkg.id).subscribe({
+      next: (remaining) => {
+        this.packages.set(remaining);
+        this.isLoadingPackages.set(false);
+        this.reloadSelectedOrder();
+        this.loadOrders();
+        this.toast.success(`Bolsa ${pkg.packageNumber} borrada 🗑️`);
+      },
+      error: (err) => {
+        this.isLoadingPackages.set(false);
+        this.toast.error(err?.error?.message ?? err?.error ?? 'No se pudo borrar la bolsa 🥺');
+      }
+    });
+  }
+
+  /** 🛍️ Genera bolsas físicas con QR desde la tarjeta del Kanban. */
+  generateQuickBags(order: OrderSummaryDto, count: number): void {
+    if (this.savingQuickBags() || count < 1) return;
+    this.savingQuickBags.set(true);
+    this.api.generatePackages(order.id, { count }).subscribe({
+      next: (createdPackages) => {
+        this.savingQuickBags.set(false);
+        this.bagsEditFor.set(null);
+        this.loadOrders();
+        if (this.selectedOrder()?.id === order.id) {
+          this.reloadSelectedOrder();
+          this.loadPackages(order.id);
+        }
+        this.toast.success(`${createdPackages.length} bolsa${createdPackages.length === 1 ? '' : 's'} creada${createdPackages.length === 1 ? '' : 's'} con QR 🛍️`);
+      },
+      error: () => {
+        this.savingQuickBags.set(false);
+        this.toast.error('No se pudieron generar las bolsas 🥺');
+      }
+    });
+  }
+
+  /** Marca que el pedido se entrega sin bolsas físicas. */
+  markWithoutBags(order: OrderSummaryDto): void {
+    if (this.savingQuickBags()) return;
+    this.savingQuickBags.set(true);
+    this.api.setPackages(order.id, 0, true).subscribe({
+      next: (updated) => {
+        this.orders.update(list => list.map(current => current.id === updated.id ? updated : current));
+        this.savingQuickBags.set(false);
+        this.bagsEditFor.set(null);
+        this.toast.success('Marcado sin bolsas 🛍️');
+      },
+      error: () => {
+        this.savingQuickBags.set(false);
+        this.toast.error('No se pudo marcar el pedido sin bolsas 🥺');
+      }
+    });
+  }
+
+  async printLabel(pkg: OrderPackageDto, _orderData: OrderSummaryDto) {
+    try {
+      await this.labelPrint.printPackage(pkg.id);
+      this.toast.success(`Etiqueta de bolsa ${pkg.packageNumber} enviada a impresión.`);
+    } catch (error) {
+      this.toast.error(this.labelPrintError(error));
+    }
   }
 
   async printAllLabels() {
@@ -1112,57 +1400,11 @@ export class OrdersComponent implements OnInit {
     if (!order || !this.packages().length) return;
 
     try {
-      let combinedHtml = '';
-      const total = this.packages().length;
-
-      for (const pkg of this.packages()) {
-        const labelHtml = await this.generateLabelHtml(pkg, order, total, true);
-        combinedHtml += labelHtml;
-      }
-
-      const fullHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              @page { margin: 0; size: 100mm 150mm; }
-              body { margin: 0; padding: 0; }
-              .page-break { page-break-after: always; }
-              .label-wrapper { 
-                margin: 0; padding: 4mm; box-sizing: border-box; 
-                width: 100mm; height: 148mm; overflow: hidden;
-                font-family: Arial, sans-serif; display: flex; 
-                flex-direction: column; justify-content: space-between; align-items: center;
-              }
-              .header { text-align: center; width: 100%; }
-              .header h2 { margin: 2px 0; font-size: 16px; font-weight: bold; }
-              .header h3 { margin: 2px 0; font-size: 14px; font-weight: normal; }
-              .info { 
-                text-align: left; width: 100%; font-size: 16px; font-weight: bold; 
-                border-top: 2px dashed #000; border-bottom: 2px dashed #000; 
-                padding: 5px 0; margin: 5px 0;
-              }
-              .info p { margin: 2px 0; }
-              .qr-container { 
-                display: flex; justify-content: center; align-items: center; 
-                flex-grow: 1; width: 100%; overflow: hidden;
-              }
-              .qr-container img { max-width: 75mm; max-height: 75mm; width: auto; height: auto; }
-              .footer { text-align: center; width: 100%; }
-              .footer h1 { margin: 0; font-size: 28px; font-weight: bold; text-transform: uppercase;}
-              .footer p { margin: 2px 0; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            ${combinedHtml}
-          </body>
-        </html>
-      `;
-
-      this.openPrintWindow(fullHtml, `Etiquetas Pedido ${order.id}`);
+      await this.labelPrint.printPackages(this.packages().map(pkg => pkg.id));
+      this.toast.success(`${this.packages().length} etiquetas del pedido ${order.id} enviadas a impresión.`);
     } catch (e) {
       console.error(e);
-      this.toast.error('Error al generar etiquetas masivas 🖨️');
+      this.toast.error(this.labelPrintError(e));
     }
   }
 
@@ -1370,6 +1612,17 @@ export class OrdersComponent implements OnInit {
         }
       }, 800);
     }
+  }
+
+  private labelPrintError(error: unknown): string {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'object' && error !== null && 'error' in error) {
+      const payload = (error as { error?: unknown }).error;
+      if (typeof payload === 'object' && payload !== null && 'message' in payload && typeof (payload as { message?: unknown }).message === 'string') {
+        return (payload as { message: string }).message;
+      }
+    }
+    return 'No pudimos preparar las etiquetas. Intenta de nuevo.';
   }
 
   private animateList(): void {

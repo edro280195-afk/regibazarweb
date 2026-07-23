@@ -609,6 +609,32 @@ h6 {
   }
 }
 
+/* ── iOS Safari Focus Fix ───────────────────────────────────────────
+   Safari iOS hace zoom automático al enfocar cualquier input con
+   font-size < 16px, y combinado con overlays/parallax deja la página
+   atrapada en el zoom. Forzamos 16px en todos los campos y aislamos
+   el stacking context para que los overlays no roben eventos touch. */
+input,
+select,
+textarea {
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+input[type='text'],
+input[type='email'],
+input[type='tel'],
+input[type='number'],
+input[type='search'],
+input[type='password'],
+input[type='url'],
+input:not([type]),
+select,
+textarea {
+  font-size: 16px;
+}
+
 .bg-coquette-pattern {
   background-color: #fce7f3;
 }

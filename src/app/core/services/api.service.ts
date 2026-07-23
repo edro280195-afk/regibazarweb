@@ -10,12 +10,22 @@ import {
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
     AiParsedOrder, AiInsight,
-    CamiMessage, CamiChatRequest, CamiChatResponse,
+    CamiMessage, CamiChatRequest, CamiChatResponse, CamiProactiveSuggestionDto,
     AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse,
     AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto,
     RecomposeRouteResponse,
     ResolveClientRequest, ResolveClientResponse,
-    ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto
+    ClientAliasDto, AddAliasRequest, MergeClientsRequest, DuplicateSuggestionDto,
+    ClientMergeAuditDto,
+    FacebookImportRow, FacebookImportPreviewResponse, FacebookImportApplyRow, FacebookImportApplyResponse,
+    LoyaltyRewardDto,
+    InventoryBoxSummaryDto, InventoryBoxDto, CreateInventoryBoxDto,
+    CreateInventoryItemDto, AdjustInventoryItemDto, TransferInventoryItemsDto,
+    InventoryBarcodeMatchDto, CompleteInventoryCountDto,
+    LabelTemplateSummaryDto, LabelTemplateDetailDto, CreateLabelTemplateDto,
+    UpdateLabelTemplateDto, SaveLabelTemplateDraftDto, SaveLabelTemplateDraftResultDto,
+    PublishLabelTemplateResultDto, LabelAssetDto, LabelPrintContextDto,
+    CreateLabelPrintEventDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -28,6 +38,129 @@ export class ApiService {
         return this.base;
     }
 
+    // ── Inventario físico / cajas NFC ──
+    getInventoryBoxes(search?: string): Observable<InventoryBoxSummaryDto[]> {
+        let params = new HttpParams();
+        if (search?.trim()) params = params.set('search', search.trim());
+        return this.http.get<InventoryBoxSummaryDto[]>(`${this.base}/inventory/boxes`, { params });
+    }
+
+    getInventoryBox(id: string): Observable<InventoryBoxDto> {
+        return this.http.get<InventoryBoxDto>(`${this.base}/inventory/boxes/${id}`);
+    }
+
+    getInventoryBoxByToken(token: string): Observable<InventoryBoxDto> {
+        return this.http.get<InventoryBoxDto>(`${this.base}/inventory/boxes/by-token/${encodeURIComponent(token)}`);
+    }
+
+    createInventoryBox(request: CreateInventoryBoxDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/boxes`, request);
+    }
+
+    updateInventoryBox(id: string, request: CreateInventoryBoxDto): Observable<InventoryBoxDto> {
+        return this.http.put<InventoryBoxDto>(`${this.base}/inventory/boxes/${id}`, request);
+    }
+
+    addInventoryItem(boxId: string, request: CreateInventoryItemDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/boxes/${boxId}/items`, request);
+    }
+
+    adjustInventoryItem(itemId: string, request: AdjustInventoryItemDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/items/${itemId}/adjust`, request);
+    }
+
+    transferInventoryItems(request: TransferInventoryItemsDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/transfers`, request);
+    }
+
+    getInventoryItemsByBarcode(barcode: string): Observable<InventoryBarcodeMatchDto[]> {
+        return this.http.get<InventoryBarcodeMatchDto[]>(`${this.base}/inventory/items/by-barcode/${encodeURIComponent(barcode)}`);
+    }
+
+    completeInventoryCount(boxId: string, request: CompleteInventoryCountDto): Observable<InventoryBoxDto> {
+        return this.http.post<InventoryBoxDto>(`${this.base}/inventory/boxes/${boxId}/counts`, request);
+    }
+
+    getLabelTemplates(includeArchived = false): Observable<LabelTemplateSummaryDto[]> {
+        const params = includeArchived ? new HttpParams().set('includeArchived', 'true') : undefined;
+        return this.http.get<LabelTemplateSummaryDto[]>(`${this.base}/label-templates`, { params });
+    }
+
+    getLabelTemplate(id: string): Observable<LabelTemplateDetailDto> {
+        return this.http.get<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}`);
+    }
+
+    createLabelTemplate(request: CreateLabelTemplateDto): Observable<LabelTemplateDetailDto> {
+        return this.http.post<LabelTemplateDetailDto>(`${this.base}/label-templates`, request);
+    }
+
+    updateLabelTemplate(id: string, request: UpdateLabelTemplateDto): Observable<LabelTemplateDetailDto> {
+        return this.http.put<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}`, request);
+    }
+
+    saveLabelTemplateDraft(id: string, request: SaveLabelTemplateDraftDto): Observable<SaveLabelTemplateDraftResultDto> {
+        return this.http.put<SaveLabelTemplateDraftResultDto>(`${this.base}/label-templates/${id}/draft`, request);
+    }
+
+    publishLabelTemplate(id: string, expectedRevision: number): Observable<PublishLabelTemplateResultDto> {
+        return this.http.post<PublishLabelTemplateResultDto>(`${this.base}/label-templates/${id}/publish`, { expectedRevision });
+    }
+
+    restoreLabelTemplateVersion(id: string, versionId: string, expectedRevision: number): Observable<SaveLabelTemplateDraftResultDto> {
+        return this.http.post<SaveLabelTemplateDraftResultDto>(
+            `${this.base}/label-templates/${id}/versions/${versionId}/restore`,
+            { expectedRevision }
+        );
+    }
+
+    duplicateLabelTemplate(id: string): Observable<LabelTemplateDetailDto> {
+        return this.http.post<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}/duplicate`, {});
+    }
+
+    setDefaultLabelTemplate(id: string): Observable<LabelTemplateDetailDto> {
+        return this.http.post<LabelTemplateDetailDto>(`${this.base}/label-templates/${id}/default`, {});
+    }
+
+    archiveLabelTemplate(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.base}/label-templates/${id}`);
+    }
+
+    getLabelAssets(includeArchived = false): Observable<LabelAssetDto[]> {
+        const params = includeArchived ? new HttpParams().set('includeArchived', 'true') : undefined;
+        return this.http.get<LabelAssetDto[]>(`${this.base}/label-templates/assets`, { params });
+    }
+
+    uploadLabelAsset(file: File, name?: string): Observable<LabelAssetDto> {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (name?.trim()) formData.append('name', name.trim());
+        return this.http.post<LabelAssetDto>(`${this.base}/label-templates/assets`, formData);
+    }
+
+    renameLabelAsset(id: string, name: string): Observable<LabelAssetDto> {
+        return this.http.put<LabelAssetDto>(`${this.base}/label-templates/assets/${id}`, { name });
+    }
+
+    archiveLabelAsset(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.base}/label-templates/assets/${id}`);
+    }
+
+    getBoxLabelPrintContext(templateId: string, boxId: string): Observable<LabelPrintContextDto> {
+        return this.http.get<LabelPrintContextDto>(`${this.base}/label-print-jobs/${templateId}/boxes/${boxId}`);
+    }
+
+    getItemLabelPrintContext(templateId: string, itemId: string): Observable<LabelPrintContextDto> {
+        return this.http.get<LabelPrintContextDto>(`${this.base}/label-print-jobs/${templateId}/items/${itemId}`);
+    }
+
+    getPackageLabelPrintContext(templateId: string, packageId: string): Observable<LabelPrintContextDto> {
+        return this.http.get<LabelPrintContextDto>(`${this.base}/label-print-jobs/${templateId}/packages/${packageId}`);
+    }
+
+    createLabelPrintEvent(request: CreateLabelPrintEventDto): Observable<void> {
+        return this.http.post<void>(`${this.base}/label-print-jobs/events`, request);
+    }
+
     // ── Dashboard ──
     getDashboard(): Observable<DashboardDto> {
         return this.http.get<DashboardDto>(`${this.base}/orders/dashboard`);
@@ -38,7 +171,7 @@ export class ApiService {
         return this.http.get<OrderSummaryDto[]>(`${this.base}/orders`);
     }
 
-    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string): Observable<PagedResult<OrderSummaryDto>> {
+    getOrdersPaged(page: number, size: number, status?: string, search?: string, orderType?: string, startDate?: string, endDate?: string, type?: string, salesPeriodId?: number): Observable<PagedResult<OrderSummaryDto>> {
         let params = new HttpParams()
             .set('page', page.toString())
             .set('pageSize', size.toString());
@@ -46,16 +179,37 @@ export class ApiService {
         if (search) params = params.set('search', search);
         if (orderType) params = params.set('type', orderType);
         if (type) params = params.set('type', type);
-        if (startDate) params = params.set('startDate', startDate);
-        if (endDate) params = params.set('endDate', endDate);
+        if (startDate) params = params.set('dateFrom', startDate);
+        if (endDate) params = params.set('dateTo', endDate);
+        if (salesPeriodId != null) params = params.set('salesPeriodId', salesPeriodId.toString());
         return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/paged`, { params });
     }
+
+    markOrderNotified(id: number, notified: boolean): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${id}/notified`, { notified });
+    }
+
+    getUnpaidOrders(salesPeriodId?: number): Observable<OrderSummaryDto[]> {
+        let params = new HttpParams();
+        if (salesPeriodId != null) params = params.set('salesPeriodId', salesPeriodId.toString());
+        return this.http.get<OrderSummaryDto[]>(`${this.base}/orders/unpaid`, { params });
+    }
+
     getOrderStats(): Observable<OrderStatsDto> {
         return this.http.get<OrderStatsDto>(`${this.base}/orders/stats`);
     }
 
     createManualOrder(order: ManualOrderRequest): Observable<OrderSummaryDto> {
         return this.http.post<OrderSummaryDto>(`${this.base}/orders/manual`, order);
+    }
+
+    /** Pedidos abiertos (cualquier estado distinto a Cancelado) de una clienta, con sus
+     *  artículos. Se usa para preguntar si crear pedido nuevo o agregar a uno existente. */
+    getClientOpenOrders(clientId?: number, name?: string): Observable<OrderSummaryDto[]> {
+        let params = new HttpParams();
+        if (clientId != null) params = params.set('clientId', String(clientId));
+        if (name) params = params.set('name', name);
+        return this.http.get<OrderSummaryDto[]>(`${this.base}/orders/open`, { params });
     }
 
     parseLiveText(text: string, currentState: AiParsedOrder[]): Observable<AiParsedOrder[]> {
@@ -66,12 +220,16 @@ export class ApiService {
         return this.http.post<OrderSummaryDto>(`${this.base}/orders/${id}/apply-birthday-discount`, {});
     }
 
-    updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<any> {
-        return this.http.put(`${this.base}/orders/${id}`, data);
+    updateOrderDetails(id: number, data: UpdateOrderDetailsRequest): Observable<void> {
+        return this.http.put<void>(`${this.base}/orders/${id}`, data);
     }
 
-    updateOrderStatus(id: number, data: { status?: string; orderType?: string; postponedAt?: string; postponedNote?: string }): Observable<any> {
-        return this.http.patch(`${this.base}/orders/${id}/status`, data);
+    updateOrderStatus(id: number, data: { status?: string; orderType?: string; postponedAt?: string; postponedNote?: string }): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${id}/status`, data);
+    }
+
+    releaseOrderForRoute(id: number): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/orders/${id}/release-for-route`, {});
     }
 
     deleteOrder(id: number): Observable<any> {
@@ -84,6 +242,18 @@ export class ApiService {
 
     generatePackages(orderId: number, data: GeneratePackagesRequest): Observable<OrderPackageDto[]> {
         return this.http.post<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/generate`, data);
+    }
+
+    /** Borra una bolsa generada por error (solo si sigue en estado Packed).
+     *  Devuelve la lista de bolsas que quedan en el pedido. */
+    deletePackage(orderId: number, packageId: string): Observable<OrderPackageDto[]> {
+        return this.http.delete<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/${packageId}`);
+    }
+
+    /** Set rápido del número de bolsas. totalPackages = 0 con confirmed = true = "va sin bolsas".
+     *  totalPackages = null con confirmed = false lo regresa a pendiente. */
+    setPackages(orderId: number, totalPackages: number | null, confirmed: boolean = true): Observable<OrderSummaryDto> {
+        return this.http.patch<OrderSummaryDto>(`${this.base}/orders/${orderId}/packages`, { totalPackages, confirmed });
     }
 
     addPayment(orderId: number, payment: AddPaymentRequest): Observable<OrderPaymentDto> {
@@ -153,6 +323,15 @@ export class ApiService {
         return this.http.post<ResolveClientResponse>(`${this.base}/clients/resolve`, req);
     }
 
+    // ── Importación masiva de Facebook ──
+    facebookImportPreview(rows: FacebookImportRow[]): Observable<FacebookImportPreviewResponse> {
+        return this.http.post<FacebookImportPreviewResponse>(`${this.base}/clients/facebook-import/preview`, { rows });
+    }
+
+    facebookImportApply(rows: FacebookImportApplyRow[]): Observable<FacebookImportApplyResponse> {
+        return this.http.post<FacebookImportApplyResponse>(`${this.base}/clients/facebook-import/apply`, { rows });
+    }
+
     getClientAliases(clientId: number): Observable<ClientAliasDto[]> {
         return this.http.get<ClientAliasDto[]>(`${this.base}/clients/${clientId}/aliases`);
     }
@@ -172,6 +351,10 @@ export class ApiService {
     getDuplicateSuggestions(limit: number = 50): Observable<DuplicateSuggestionDto[]> {
         const params = new HttpParams().set('limit', limit.toString());
         return this.http.get<DuplicateSuggestionDto[]>(`${this.base}/clients/duplicate-suggestions`, { params });
+    }
+
+    getClientMergeAudits(take: number = 50): Observable<ClientMergeAuditDto[]> {
+        return this.http.get<ClientMergeAuditDto[]>(`${this.base}/clients/merge-audits?take=${take}`);
     }
 
     // ── Routes ──
@@ -201,8 +384,19 @@ export class ApiService {
         return this.http.post<BulkGeocodeResultDto[]>(`${this.base}/clients/bulk-geocode`, { clientIds });
     }
 
-    setClientCoordinates(clientId: number, latitude: number, longitude: number, address?: string): Observable<any> {
-        return this.http.post(`${this.base}/clients/${clientId}/set-coordinates`, { latitude, longitude, address });
+    setClientCoordinates(
+        clientId: number,
+        latitude: number,
+        longitude: number,
+        address?: string,
+        deliveryInstructions?: string
+    ): Observable<void> {
+        return this.http.post<void>(`${this.base}/clients/${clientId}/set-coordinates`, {
+            latitude,
+            longitude,
+            address,
+            deliveryInstructions
+        });
     }
 
     deleteRoute(id: number): Observable<any> {
@@ -298,6 +492,14 @@ export class ApiService {
         return this.http.post(`${this.base}/loyalty/adjust`, data);
     }
 
+    getLoyaltyRewards(): Observable<LoyaltyRewardDto[]> {
+        return this.http.get<LoyaltyRewardDto[]>(`${this.base}/loyalty/rewards`);
+    }
+
+    redeemLoyaltyReward(clientId: number, orderId: number, rewardId: number): Observable<OrderSummaryDto> {
+        return this.http.post<OrderSummaryDto>(`${this.base}/loyalty/redeem`, { clientId, orderId, rewardId });
+    }
+
     // ── Public Tracking (Client-Facing) ──
     publicGetOrder(accessToken: string): Observable<any> {
         return this.http.get(`${this.base}/pedido/${accessToken}`);
@@ -377,6 +579,10 @@ export class ApiService {
         return this.http.get<Array<{ type: string; message: string; icon: string; relatedId?: number }>>(`${this.base}/cami/alerts`);
     }
 
+    getCamiProactiveSuggestions(): Observable<CamiProactiveSuggestionDto[]> {
+        return this.http.get<CamiProactiveSuggestionDto[]>(`${this.base}/cami/proactive-suggestions`);
+    }
+
     // ── Driver (Repartidor) ──
     getDriverRoute(driverToken: string): Observable<any> {
         return this.http.get(`${this.base}/driver/${driverToken}`);
@@ -398,11 +604,15 @@ export class ApiService {
         return this.http.post(`${this.base}/driver/${driverToken}/transit/${deliveryId}`, {});
     }
 
-    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[]): Observable<any> {
+    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[], signature?: { svg: string; signedByName?: string }): Observable<any> {
         const fd = new FormData();
         fd.append('notes', notes);
         photos.forEach(p => fd.append('photos', p));
         if (payments) fd.append('payments', JSON.stringify(payments));
+        if (signature?.svg) {
+            fd.append('signatureSvg', signature.svg);
+            if (signature.signedByName) fd.append('signedByName', signature.signedByName);
+        }
         return this.http.post(`${this.base}/driver/${driverToken}/deliver/${deliveryId}`, fd);
     }
 
@@ -466,6 +676,10 @@ export class ApiService {
 
     removeTandaFromRoute(routeId: number, tandaParticipantId: string): Observable<any> {
         return this.http.delete(`${this.base}/routes/${routeId}/remove-tanda/${tandaParticipantId}`);
+    }
+
+    updateDeliveryNotes(routeId: number, deliveryId: number, notes: string | null): Observable<any> {
+        return this.http.patch(`${this.base}/routes/${routeId}/deliveries/${deliveryId}/notes`, { notes });
     }
 
     recomposeRoute(routeId: number, orderIds: number[], tandaParticipantIds?: string[]): Observable<RecomposeRouteResponse> {

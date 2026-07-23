@@ -152,6 +152,29 @@ export interface OrderSummaryDto {
     alternativeAddress?: string;
     deliveryRouteId?: number;
     scheduledDeliveryDate?: string;
+    clientFacebookProfileUrl?: string;
+    notifiedAt?: string;
+    clientPoints?: number;
+    clientLatitude?: number | null;
+    clientLongitude?: number | null;
+    /** Número de bolsas del pedido. null = aún no capturado. */
+    totalPackages?: number | null;
+    /** True cuando ya se resolvió el tema de bolsas (número puesto o "va sin bolsas"). */
+    packagesConfirmed?: boolean;
+    /** Evidencia de entrega (fotos). Solo si status = Delivered. */
+    evidenceUrls?: string[];
+    /** Firma digital de quien recibió (SVG). */
+    signatureSvg?: string;
+    /** Nombre de quien firmó. */
+    signedByName?: string;
+    /** Fecha/hora de la firma. */
+    signedAt?: string;
+    /** Motivo de no entrega. Solo si status = NotDelivered. */
+    failureReason?: string;
+    /** Fecha/hora de entrega real. */
+    deliveredAt?: string;
+    /** Evidencia de no-entrega (fotos del intento fallido). */
+    nonDeliveryEvidenceUrls?: string[];
 }
 
 export interface PagedResult<T> {
@@ -221,6 +244,57 @@ export interface ResolveClientResponse {
     suggestedAction: ResolveSuggestedAction;
 }
 
+// ── Importación masiva de Facebook de clientas ──
+
+export interface FacebookImportRow {
+    name: string;
+    facebookUrl: string;
+}
+
+export type FacebookImportStatus = 'matched' | 'review' | 'notfound';
+
+export interface FacebookImportPreviewItem {
+    rowIndex: number;
+    inputName: string;
+    inputUrl: string;
+    urlValid: boolean;
+    status: FacebookImportStatus;
+    suggestedClientId?: number;
+    topScore: number;
+    topAlreadyHasFacebook: boolean;
+    duplicateUrlInBatch: boolean;
+    candidates: ResolveCandidateDto[];
+}
+
+export interface FacebookImportPreviewResponse {
+    items: FacebookImportPreviewItem[];
+}
+
+export interface FacebookImportApplyRow {
+    clientId: number;
+    facebookUrl: string;
+}
+
+export interface FacebookImportApplyResponse {
+    applied: number;
+    skipped: number;
+    errors: string[];
+}
+
+// ── RegiPuntos (canje) ──
+
+export type LoyaltyRewardType = 'FixedDiscount' | 'FreeShipping' | 'Gift';
+
+export interface LoyaltyRewardDto {
+    id: number;
+    name: string;
+    description?: string;
+    pointsCost: number;
+    type: LoyaltyRewardType | string;
+    value: number;
+    icon?: string;
+}
+
 export type ClientAliasSource =
     | 'Unknown'
     | 'ManualConfirm'
@@ -258,6 +332,20 @@ export interface DuplicateSuggestionDto {
     confidence: number;
 }
 
+export interface ClientMergeAuditDto {
+    id: number;
+    sourceClientId: number;
+    sourceName: string;
+    targetClientId: number;
+    targetName: string;
+    mode: 'Manual' | 'Auto';
+    reason?: string;
+    confidence: number;
+    ordersMoved: number;
+    aliasesMoved: number;
+    mergedAt: string;
+}
+
 // Captura asistida por video de lives
 export type LiveSessionStatus =
     | 'Queued'
@@ -289,6 +377,7 @@ export interface LiveSessionDto {
     productCount: number;
     candidateCount: number;
     pendingCount: number;
+    transcript?: string | null;
 }
 
 export interface LiveProductDto {
@@ -502,6 +591,18 @@ export interface CreateRouteResponse {
     skipped: SkippedStopDto[];
 }
 
+export interface RoutePackageRequirementDto {
+    id: number;
+    clientName: string;
+    totalPackages?: number | null;
+}
+
+export interface RoutePackagesRequiredDto {
+    code: 'PACKAGES_REQUIRED';
+    message: string;
+    orders: RoutePackageRequirementDto[];
+}
+
 export interface PreviewStopDto {
     kind: 'Order' | 'Tanda';
     orderId?: number;
@@ -658,6 +759,18 @@ export interface ManualOrderRequest {
      *  salta el lookup por nombre y usa este ID, agregando el clientName tecleado
      *  como alias automáticamente si difiere del nombre canónico. */
     clientId?: number;
+    /** Id del pedido abierto al que la dueña eligió agregar los artículos. Cuando
+     *  viene, el backend fusiona contra ese pedido en lugar de crear uno nuevo. */
+    targetOrderId?: number;
+    /** Si es true, se crea siempre un pedido nuevo aunque la clienta tenga pedidos
+     *  abiertos (la dueña eligió "nuevo pedido"). Desactiva el auto-merge. */
+    forceNew?: boolean;
+    /** Número de bolsas capturado en el alta. undefined/null = "no sé todavía"
+     *  (el pedido queda como bolsas pendientes). Un número (incluido 0 = "va sin
+     *  bolsas") marca packagesConfirmed = true. */
+    totalPackages?: number | null;
+    /** True cuando la dueña resolvió el tema de bolsas al capturar. */
+    packagesConfirmed?: boolean;
 }
 
 export interface LoginRequest {
@@ -670,6 +783,258 @@ export interface LoginResponse {
     name: string;
     role: string;
     expiresAt: string;
+}
+
+// ── Inventario físico / cajas NFC ──
+export interface InventoryBoxSummaryDto {
+    id: string;
+    code: string;
+    name: string;
+    location: string | null;
+    isNfcBound: boolean;
+    articleTypesCount: number;
+    totalUnits: number;
+    updatedAt: string;
+}
+
+export interface InventoryItemDto {
+    id: string;
+    name: string;
+    variant: string | null;
+    barcode: string | null;
+    labelCode: string;
+    quantity: number;
+    updatedAt: string;
+}
+
+export interface InventoryMovementDto {
+    id: string;
+    inventoryItemId: string | null;
+    itemName: string | null;
+    type: string;
+    quantityDelta: number;
+    quantityAfter: number;
+    note: string | null;
+    performedBy: string;
+    occurredAt: string;
+}
+
+export interface InventoryBoxDto extends Omit<InventoryBoxSummaryDto, 'articleTypesCount' | 'totalUnits'> {
+    nfcUrl: string;
+    items: InventoryItemDto[];
+    movements: InventoryMovementDto[];
+    createdAt: string;
+}
+
+export interface CreateInventoryBoxDto {
+    code: string;
+    name: string;
+    location?: string | null;
+}
+
+export interface CreateInventoryItemDto {
+    name: string;
+    variant?: string | null;
+    barcode?: string | null;
+    quantity: number;
+    note?: string | null;
+}
+
+export interface AdjustInventoryItemDto {
+    quantityDelta: number;
+    note?: string | null;
+}
+
+export interface TransferInventoryItemsDto {
+    sourceBoxId: string;
+    destinationBoxId: string;
+    itemId: string;
+    quantity: number;
+    note?: string | null;
+}
+
+export interface InventoryBarcodeMatchDto {
+    boxId: string;
+    boxCode: string;
+    boxName: string;
+    location: string | null;
+    itemId: string;
+    itemName: string;
+    variant: string | null;
+    barcode: string | null;
+    scannableCode: string;
+    quantity: number;
+}
+
+export interface InventoryCountItemDto {
+    inventoryItemId: string;
+    actualQuantity: number;
+}
+
+export interface CompleteInventoryCountDto {
+    items: InventoryCountItemDto[];
+    note?: string | null;
+}
+
+// ── Diseñador e impresión de etiquetas ──
+export type LabelTemplateKind = 'InventoryBox' | 'InventoryItem' | 'OrderPackage';
+export type LabelPrinterProfile = 'NiimbotB1_50x50' | 'AiyinE40_4x6';
+export type LabelTemplateVersionStatus = 'Draft' | 'Published' | 'Archived';
+export type LabelElementType = 'text' | 'data' | 'image' | 'qr' | 'barcode' | 'shape' | 'line';
+export type LabelAlignment = 'left' | 'center' | 'right';
+
+export interface LabelCanvasDefinition {
+    widthMm: number;
+    heightMm: number;
+    background: string;
+}
+
+export interface LabelElementProperties {
+    text?: string;
+    binding?: string;
+    assetId?: string;
+    fontSize?: number;
+    fontWeight?: number;
+    align?: LabelAlignment;
+    letterSpacing?: number;
+    wrap?: boolean;
+    prefix?: string;
+    suffix?: string;
+    errorCorrection?: 'L' | 'M' | 'Q' | 'H';
+    format?: 'CODE128';
+    displayValue?: boolean;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    radius?: number;
+}
+
+export interface LabelElementDefinition {
+    id: string;
+    type: LabelElementType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    visible: boolean;
+    locked?: boolean;
+    zIndex: number;
+    properties: LabelElementProperties;
+}
+
+export interface LabelDesignDefinition {
+    schemaVersion: 1;
+    canvas: LabelCanvasDefinition;
+    elements: LabelElementDefinition[];
+}
+
+export interface LabelTemplateSummaryDto {
+    id: string;
+    name: string;
+    description: string | null;
+    kind: LabelTemplateKind;
+    printerProfile: LabelPrinterProfile;
+    isDefault: boolean;
+    isArchived: boolean;
+    publishedVersionId: string | null;
+    publishedVersionNumber: number | null;
+    updatedAt: string;
+}
+
+export interface LabelTemplateVersionDto {
+    id: string;
+    versionNumber: number;
+    status: LabelTemplateVersionStatus;
+    designJson: string;
+    revision: number;
+    createdBy: string;
+    createdAt: string;
+    publishedBy: string | null;
+    publishedAt: string | null;
+}
+
+export interface LabelTemplateDetailDto {
+    id: string;
+    name: string;
+    description: string | null;
+    kind: LabelTemplateKind;
+    printerProfile: LabelPrinterProfile;
+    isDefault: boolean;
+    isArchived: boolean;
+    publishedVersionId: string | null;
+    draftVersion: LabelTemplateVersionDto | null;
+    publishedVersion: LabelTemplateVersionDto | null;
+    versions: LabelTemplateVersionDto[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLabelTemplateDto {
+    name: string;
+    description?: string | null;
+    kind: 0 | 1 | 2;
+    printerProfile: 0 | 1;
+    designJson?: string | null;
+}
+
+export interface UpdateLabelTemplateDto {
+    name: string;
+    description?: string | null;
+}
+
+export interface SaveLabelTemplateDraftDto {
+    designJson: string;
+    expectedRevision: number;
+}
+
+export interface SaveLabelTemplateDraftResultDto {
+    draftVersion: LabelTemplateVersionDto;
+    warnings: string[];
+}
+
+export interface PublishLabelTemplateResultDto {
+    publishedVersion: LabelTemplateVersionDto;
+    draftVersion: LabelTemplateVersionDto;
+    warnings: string[];
+}
+
+export interface LabelAssetDto {
+    id: string;
+    name: string;
+    originalFileName: string;
+    contentType: string;
+    url: string;
+    sizeBytes: number;
+    isArchived: boolean;
+    uploadedBy: string;
+    uploadedAt: string;
+}
+
+export interface PublishedLabelTemplateDto {
+    templateId: string;
+    templateName: string;
+    kind: LabelTemplateKind;
+    printerProfile: LabelPrinterProfile;
+    versionId: string;
+    versionNumber: number;
+    designJson: string;
+}
+
+export interface LabelPrintContextDto {
+    template: PublishedLabelTemplateDto;
+    targetKind: LabelTemplateKind;
+    targetId: string;
+    data: Record<string, string>;
+}
+
+export interface CreateLabelPrintEventDto {
+    labelTemplateVersionId: string;
+    targetKind: 0 | 1 | 2;
+    targetId: string;
+    printerProfile: 0 | 1;
+    method: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    copies: number;
 }
 
 export interface CommonProductDto {
@@ -727,6 +1092,11 @@ export interface UpdateOrderDetailsRequest {
     deliveryInstructions?: string;
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
+    clientFacebookProfileUrl?: string;
+    /** Número de bolsas. Si viene, marca packagesConfirmed = true en el backend. */
+    totalPackages?: number | null;
+    /** Confirmación explícita de bolsas (permite "va sin bolsas" con totalPackages = 0). */
+    packagesConfirmed?: boolean;
 }
 
 export interface CreateAdminExpenseRequest {
@@ -806,6 +1176,16 @@ export interface CamiGreetingResponse {
     audioBase64?: string;
 }
 
+export interface CamiProactiveSuggestionDto {
+    kind: string;
+    icon: string;
+    title: string;
+    detail: string;
+    actionLabel: string;
+    actionRoute: string;
+    priority: number;
+}
+
 // ── Tandas ──
 export interface TandaProductDto {
     id: string;
@@ -834,9 +1214,10 @@ export interface TandaDto {
 export interface TandaParticipantDto {
     id: string;
     tandaId: string;
-    customerId: string;
+    customerId: number;
     customerName?: string;
     assignedTurn: number;
+    weeklyAmount?: number;
     isDelivered: boolean;
     deliveryDate?: string;
     status: string; // Active, Delinquent, Completed
@@ -867,8 +1248,10 @@ export interface TandaViewDto {
 }
 
 export interface TandaParticipantViewDto {
+    id: string;
     name: string;
     assignedTurn: number;
+    weeklyAmount?: number;
     hasPaidCurrentWeek: boolean;
     paidWeeks: number[];
     isWinnerThisWeek: boolean;
@@ -883,13 +1266,22 @@ export interface CreateTandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    participants: CreateTandaParticipantDto[];
+}
+
+export interface CreateTandaParticipantDto {
+    customerId: number;
+    assignedTurn: number;
+    variant?: string;
+    weeklyAmount?: number;
 }
 
 export interface AddParticipantDto {
     tandaId: string;
-    customerId: string;
+    customerId: number;
     assignedTurn: number;
     variant?: string;
+    weeklyAmount?: number;
 }
 
 export interface RegisterPaymentDto {
@@ -1074,3 +1466,4 @@ export interface TandaShuffleResultDto {
     turnAssignments: TandaTurnAssignmentDto[];
     shuffleDate: string;
 }
+

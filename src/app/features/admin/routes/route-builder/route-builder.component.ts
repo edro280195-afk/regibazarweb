@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto } from '../../../../core/models';
-import { AddressPickerComponent } from '../address-picker/address-picker.component';
-import { Subject } from 'rxjs';
+import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto, RoutePackagesRequiredDto } from '../../../../core/models';
+import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
+import { AddressEditorV2Component } from '../../clients/address-editor-v2/address-editor-v2.component';
+import { Subject, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
 type StopKey = string; // "order:42" | "tanda:guid"
@@ -20,7 +22,13 @@ interface CandidateRow {
     clientId?: number;
     clientName: string;
     address?: string;
+    clientAddress?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    deliveryInstructions?: string;
     hasCoords: boolean;
+    packagesConfirmed?: boolean;
+    totalPackages?: number | null;
     isTandaPending: boolean;
     tandaName?: string;
     tandaWeek?: number;
@@ -31,7 +39,7 @@ declare const google: any;
 @Component({
     selector: 'app-route-builder',
     standalone: true,
-    imports: [CommonModule, FormsModule, GoogleMap, MapMarker, MapPolyline, AddressPickerComponent],
+    imports: [CommonModule, FormsModule, GoogleMap, MapMarker, MapPolyline, AddressEditorV2Component],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     template: `
     <div class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 p-4 sm:p-6">
@@ -49,7 +57,7 @@ declare const google: any;
                     <p class="text-pink-400 text-xs sm:text-sm">
                         {{ isEditMode()
                             ? 'Modifica las paradas pendientes. Las ya entregadas quedan fijas.'
-                            : 'Selecciona y la ruta se calcula sola con Google Routes.' }}
+                            : 'Selecciona y la ruta se calcula sola sin costo.' }}
                     </p>
                 </div>
                 <button (click)="save()"
@@ -78,12 +86,39 @@ declare const google: any;
                     <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest">Duración</p>
                     <p class="text-xl sm:text-2xl font-black text-pink-900">{{ formatDuration(preview()?.totalDurationSeconds ?? 0) }}</p>
                 </div>
-                <div class="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-pink-100/60">
-                    <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest">Motor</p>
-                    <p class="text-xs sm:text-sm font-bold text-pink-700 truncate">{{ optimizerLabel() }}</p>
+                <div class="rounded-2xl p-3 sm:p-4 shadow-sm border"
+                     [class.bg-white]="!isApproxOptimizer()" [class.border-pink-100/60]="!isApproxOptimizer()"
+                     [class.bg-amber-50]="isApproxOptimizer()" [class.border-amber-300]="isApproxOptimizer()">
+                    <p class="text-[10px] font-black uppercase tracking-widest"
+                       [class.text-pink-400]="!isApproxOptimizer()" [class.text-amber-500]="isApproxOptimizer()">Motor</p>
+                    <p class="text-xs sm:text-sm font-bold truncate"
+                       [class.text-pink-700]="!isApproxOptimizer()" [class.text-amber-700]="isApproxOptimizer()">{{ optimizerLabel() }}</p>
+                    @if (isApproxOptimizer()) {
+                        <p class="text-[10px] text-amber-600 font-semibold mt-0.5 leading-tight">Sin distancias reales — revisa el orden</p>
+                    }
                 </div>
             </div>
         </div>
+
+        <!-- ALERT: optimización aproximada (sin distancias reales de calle) -->
+        @if (isApproxOptimizer()) {
+            <div class="max-w-[1600px] mx-auto mb-4">
+                <div class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-4 sm:p-5 shadow-sm">
+                    <div class="flex items-start gap-3 sm:gap-4">
+                        <span class="text-2xl sm:text-3xl">📐</span>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-black text-amber-900 mb-1 text-sm sm:text-base">Ruta calculada en modo aproximado</h3>
+                            <p class="text-xs sm:text-sm text-amber-700">
+                                El orden se calculó con distancias en <strong>línea recta</strong>, no por calles reales,
+                                por lo que puede no ser el más eficiente (en una ciudad con sentidos y puentes el orden se ve raro).
+                                Revisa el orden antes de guardar. Si ya activaste las distancias reales de Google y sigues viendo
+                                esto, hay que revisar la configuración del servidor.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         <!-- ALERT: clientas sin coords -->
         @if (selectedWithoutCoords().length > 0) {
@@ -196,6 +231,9 @@ declare const google: any;
                                     @if (row.kind === 'Tanda') {
                                         <span class="px-1 py-0.5 bg-fuchsia-100 text-fuchsia-700 text-[9px] font-black rounded uppercase">Tanda</span>
                                     }
+                                    @if (row.kind === 'Order' && !row.packagesConfirmed) {
+                                        <span class="px-1 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-black rounded uppercase">Bolsas pendientes</span>
+                                    }
                                     @if (!row.hasCoords) {
                                         <span class="px-1 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded uppercase">Sin dir</span>
                                     }
@@ -204,10 +242,10 @@ declare const google: any;
                                     <p class="text-[10px] text-pink-400 truncate">📍 {{ row.address }}</p>
                                 }
                             </div>
-                            @if (row.kind === 'Order' && row.clientId) {
+                            @if (row.clientId) {
                                 <button (click)="openAddressPicker(row, $event)"
                                         class="w-7 h-7 rounded-xl bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-sm transition-all shrink-0"
-                                        title="Editar dirección">
+                                        title="Editar ubicación e indicaciones">
                                     📍
                                 </button>
                             }
@@ -220,12 +258,41 @@ declare const google: any;
             <div class="lg:col-span-6 bg-white rounded-3xl shadow-sm border border-pink-100/60 overflow-hidden flex flex-col"
                  [class.hidden]="mobileView() !== 'map'" [class.lg:flex]="true">
                 @if (mapsReady()) {
+                    <!-- Barra: selección por zona -->
+                    <div class="flex items-center gap-2 p-2 border-b border-pink-100/60 bg-pink-50/40">
+                        <button (click)="toggleZoneSelect()"
+                                [class.bg-pink-500]="zoneSelectMode()" [class.text-white]="zoneSelectMode()"
+                                [class.bg-white]="!zoneSelectMode()" [class.text-pink-600]="!zoneSelectMode()"
+                                class="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-pink-200 shadow-sm active:scale-95 transition-all">
+                            {{ zoneSelectMode() ? '✏️ Dibujando…' : '✏️ Seleccionar zona' }}
+                        </button>
+                        @if (ghostCandidates().length > 0) {
+                            <span class="text-[11px] font-bold text-pink-400">{{ ghostCandidates().length }} sin elegir en el mapa</span>
+                        }
+                        @if (hasZones()) {
+                            <button (click)="clearZones()"
+                                    class="ml-auto px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-white text-pink-600 border border-pink-200 shadow-sm active:scale-95 transition-all">
+                                🧹 Limpiar zona
+                            </button>
+                        }
+                    </div>
+                    <div class="relative">
                     <google-map
                         height="70vh"
                         width="100%"
                         [center]="mapCenter()"
                         [zoom]="mapZoom()"
-                        [options]="mapOptions">
+                        [options]="mapOptions"
+                        (mapInitialized)="onMapReady($event)">
+
+                        <!-- Candidatas SIN elegir (pines fantasma para encerrar) -->
+                        @for (c of ghostCandidates(); track c.key) {
+                            <map-marker
+                                [position]="{ lat: c.latitude!, lng: c.longitude! }"
+                                [options]="ghostMarkerOptions"
+                                (mapClick)="toggle(c.key)">
+                            </map-marker>
+                        }
 
                         <!-- Depot marker -->
                         @if (depotPosition(); as dp) {
@@ -260,6 +327,19 @@ declare const google: any;
                             <map-polyline [path]="polylinePath()" [options]="polylineOptions"></map-polyline>
                         }
                     </google-map>
+
+                    <!-- Lazo a mano alzada para touch: rodear pines con el dedo -->
+                    @if (zoneSelectMode() && isTouchDevice) {
+                      <div class="lasso-layer"
+                           (pointerdown)="lassoStart($event)"
+                           (pointermove)="lassoMove($event)"
+                           (pointerup)="lassoEnd($event)"
+                           (pointercancel)="lassoCancel()">
+                        <svg class="lasso-svg"><path [attr.d]="lassoPathD()"></path></svg>
+                        <div class="lasso-hint">Rodea con el dedo a las clientas ✏️</div>
+                      </div>
+                    }
+                    </div>
                 } @else {
                     <div class="flex-1 flex items-center justify-center min-h-[70vh]">
                         <p class="text-pink-400 italic">Cargando mapa...</p>
@@ -366,14 +446,76 @@ declare const google: any;
     </div>
 
     @if (pickingAddressFor(); as row) {
-        <app-address-picker
-            [initialAddress]="row.address ?? ''"
+        <app-address-editor-v2
+            [clientName]="row.clientName"
+            [initialAddress]="row.clientAddress ?? ''"
+            [initialLat]="row.latitude"
+            [initialLng]="row.longitude"
+            [initialInstructions]="row.deliveryInstructions ?? ''"
             (confirm)="onAddressConfirmed($event)"
             (cancel)="pickingAddressFor.set(null)">
-        </app-address-picker>
+        </app-address-editor-v2>
+    }
+
+    <!-- 🛍️ Puerta de bolsas: aparece si intentas armar la ruta con pedidos sin bolsas -->
+    @if (bagsGate(); as gate) {
+        <div class="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" (click)="cancelBagsGate()">
+            <div class="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col" (click)="$event.stopPropagation()">
+                <div class="p-5 border-b border-pink-100">
+                    <h3 class="text-lg font-black text-pink-700 flex items-center gap-2">🛍️ Faltan bolsas</h3>
+                    <p class="text-sm text-pink-400 mt-1">Antes de mandar a ruta, dime cuántas bolsas lleva cada pedido. Si de plano no lleva, pon <b>Sin bolsas</b>.</p>
+                </div>
+                <div class="p-5 overflow-y-auto space-y-3 grow">
+                    @for (o of gate; track o.id) {
+                        <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold text-pink-900 text-sm">#{{ o.id }} · {{ o.clientName }}</span>
+                                @if (o.count === null) {
+                                    <span class="text-[10px] text-rose-400 font-bold bg-rose-50 px-2 py-0.5 rounded-full">Falta</span>
+                                } @else if (o.count === 0) {
+                                    <span class="text-[10px] text-purple-500 font-bold bg-purple-50 px-2 py-0.5 rounded-full">Sin bolsas</span>
+                                } @else {
+                                    <span class="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">{{ o.count }} ✓</span>
+                                }
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 items-center">
+                                @for (n of [1,2,3,4,5]; track n) {
+                                    <button type="button" class="w-9 h-9 rounded-lg font-black text-sm transition-all active:scale-90"
+                                        [class]="o.count === n ? 'bg-pink-500 text-white shadow' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
+                                        (click)="setGateBags(o.id, n)">{{ n }}</button>
+                                }
+                                <button type="button" class="w-9 h-9 rounded-lg font-black text-base transition-all active:scale-90"
+                                    [class]="(o.count ?? 0) > 5 ? 'bg-pink-500 text-white shadow' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
+                                    (click)="bumpGateBags(o.id)">＋</button>
+                                <button type="button" class="px-2.5 h-9 rounded-lg font-bold text-xs transition-all active:scale-90"
+                                    [class]="o.count === 0 ? 'bg-purple-500 text-white shadow' : 'bg-white text-purple-500 border border-purple-100 hover:bg-purple-50'"
+                                    (click)="setGateBags(o.id, 0)">Sin bolsas</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="p-5 border-t border-pink-100 space-y-2">
+                    <button type="button" class="btn-coquette btn-pink w-full py-3 font-black disabled:opacity-50"
+                        [disabled]="!allGateResolved() || savingGate()"
+                        (click)="confirmGateAndSave()">
+                        @if (savingGate()) { <span class="spinner mr-2"></span> Guardando... }
+                        @else { Confirmar bolsas y mandar a ruta ✨ }
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-purple-500 bg-purple-50 hover:bg-purple-100 transition-all" (click)="allGateNoBags()">Todas van sin bolsas</button>
+                        <button type="button" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-pink-400 bg-pink-50 hover:bg-pink-100 transition-all" (click)="cancelBagsGate()">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     }
     `,
-    styles: []
+    styles: [`
+        .lasso-layer { position:absolute; inset:0; z-index:30; touch-action:none; cursor:crosshair; }
+        .lasso-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+        .lasso-svg path { fill: rgba(236,72,153,0.12); stroke:#ec4899; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; }
+        .lasso-hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(236,72,153,0.92); color:#fff; font-size:11px; font-weight:800; letter-spacing:.02em; padding:6px 12px; border-radius:999px; pointer-events:none; box-shadow:0 4px 12px rgba(236,72,153,.35); white-space:nowrap; }
+    `]
 })
 export class RouteBuilderComponent implements OnInit {
     private api = inject(ApiService);
@@ -406,6 +548,14 @@ export class RouteBuilderComponent implements OnInit {
     geocodingNow = signal(false);
     pickingAddressFor = signal<CandidateRow | null>(null);
 
+    // 🛍️ Puerta de bolsas: pedidos que el backend rechazó por no tener bolsas capturadas.
+    bagsGate = signal<{ id: number; clientName: string; count: number | null }[] | null>(null);
+    savingGate = signal(false);
+    allGateResolved = computed(() => {
+        const g = this.bagsGate();
+        return !!g && g.length > 0 && g.every(o => o.count !== null);
+    });
+
     mapsReady = signal(typeof google !== 'undefined' && !!google?.maps);
     mapCenter = signal<google.maps.LatLngLiteral>({ lat: 27.4861, lng: -99.5069 });
     mapZoom = signal(12);
@@ -416,8 +566,15 @@ export class RouteBuilderComponent implements OnInit {
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: true,
-        clickableIcons: false
+        clickableIcons: false,
+        // Un dedo panea el mapa (igual que el resto de la app). Sin esto, Google usa
+        // 'auto' que en móvil con mapa parcial se vuelve 'cooperative' (exige 2 dedos).
+        gestureHandling: 'greedy'
     };
+
+    /** Dispositivo táctil: en touch usamos el lazo a mano alzada; en escritorio, DrawingManager. */
+    readonly isTouchDevice = typeof window !== 'undefined' &&
+        ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
     depotMarkerOptions: google.maps.MarkerOptions = {
         icon: {
@@ -442,21 +599,67 @@ export class RouteBuilderComponent implements OnInit {
     polylinePath = signal<google.maps.LatLngLiteral[]>([]);
     depotPosition = signal<google.maps.LatLngLiteral | null>({ lat: 27.4861, lng: -99.5069 });
 
+    // ── Selección por zona (dibujar polígono/círculo/rectángulo en el mapa) ──
+    zoneSelectMode = signal(false);
+    hasZones = signal(false);
+    private mapInstance?: google.maps.Map;
+    private drawingManager?: google.maps.drawing.DrawingManager;
+    private zoneOverlays: google.maps.MVCObject[] = [];
+    private zoneSelectedKeys = new Set<StopKey>(); // claves agregadas por zonas (para poder limpiarlas)
+
+    // ── Lazo a mano alzada (touch) ──
+    lassoPathD = signal('');                 // path SVG del trazo en curso
+    private lassoActive = false;
+    private lassoPoints: { x: number; y: number }[] = [];
+    private projectionOverlay?: google.maps.OverlayView; // para convertir pixeles → LatLng
+
+    // Pin fantasma para candidatas con coords aún no seleccionadas (para poder encerrarlas).
+    // Getter lazy: se evalúa al renderizar (google ya cargado), no en el constructor.
+    private _ghostMarkerOptions?: google.maps.MarkerOptions;
+    get ghostMarkerOptions(): google.maps.MarkerOptions {
+        return this._ghostMarkerOptions ??= {
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: '#c084fc',
+                fillOpacity: 0.55,
+                strokeWeight: 1.5,
+                strokeColor: '#a855f7'
+            } as any,
+            zIndex: 50,
+            clickable: true
+        };
+    }
+
     private previewTrigger$ = new Subject<void>();
     private mapsPollTimer?: any;
 
     candidates = computed<CandidateRow[]>(() => {
-        const routeId = this.editRouteId();
-        const orderRows: CandidateRow[] = this.pendingOrders().map(o => ({
-            key: `order:${o.id}`,
-            kind: 'Order' as const,
-            rawId: o.id,
-            clientId: o.clientId,
-            clientName: o.clientName,
-            address: o.alternativeAddress ?? o.clientAddress,
-            hasCoords: this.orderHasCoords(o),
-            isTandaPending: false
-        }));
+        // Un intento cerrado se conserva como parada bloqueada. Aunque el pedido vuelva a
+        // quedar pendiente para reintentarse, no debe volver a agregarse a esta misma ruta.
+        const lockedOrderIds = new Set(
+            this.lockedStops()
+                .map(delivery => delivery.orderId)
+                .filter((orderId): orderId is number => orderId != null)
+        );
+        const orderRows: CandidateRow[] = this.pendingOrders()
+            .filter(order => !lockedOrderIds.has(order.id))
+            .map(o => ({
+                key: `order:${o.id}`,
+                kind: 'Order' as const,
+                rawId: o.id,
+                clientId: o.clientId,
+                clientName: o.clientName,
+                address: getEffectiveDeliveryAddress(o.clientAddress, o.alternativeAddress),
+                clientAddress: o.clientAddress,
+                latitude: o.clientLatitude,
+                longitude: o.clientLongitude,
+                deliveryInstructions: o.deliveryInstructions,
+                hasCoords: this.orderHasCoords(o),
+                packagesConfirmed: o.packagesConfirmed === true,
+                totalPackages: o.totalPackages,
+                isTandaPending: false
+            }));
         const tandaRows: CandidateRow[] = this.availableTandas().map(t => ({
             key: `tanda:${t.tandaParticipantId}`,
             kind: 'Tanda' as const,
@@ -464,6 +667,10 @@ export class RouteBuilderComponent implements OnInit {
             clientId: t.clientId,
             clientName: t.clientName,
             address: t.clientAddress,
+            clientAddress: t.clientAddress,
+            latitude: t.clientLatitude,
+            longitude: t.clientLongitude,
+            deliveryInstructions: t.deliveryInstructions,
             hasCoords: t.clientLatitude != null && t.clientLongitude != null,
             isTandaPending: true,
             tandaName: t.tandaName,
@@ -493,6 +700,13 @@ export class RouteBuilderComponent implements OnInit {
 
     selectedWithoutCoords = computed(() => this.selectedRows().filter(r => !r.hasCoords));
 
+    /** Candidatas con coords que aún NO están seleccionadas (se muestran como pines fantasma). */
+    ghostCandidates = computed(() => {
+        const sel = this.selected();
+        return this.candidates().filter(c =>
+            !sel.has(c.key) && c.latitude != null && c.longitude != null);
+    });
+
     canSave = computed(() =>
         this.selected().size > 0
         && this.selectedWithoutCoords().length === 0
@@ -504,10 +718,18 @@ export class RouteBuilderComponent implements OnInit {
     optimizerLabel = computed(() => {
         const src = this.preview()?.optimizerSource;
         if (!src) return '—';
-        if (src === 'google-routes-v2') return '🎯 Google Routes';
-        if (src === 'haversine-fallback') return '↪️ Haversine';
+        if (src === 'distance-matrix+2opt') return 'Aprox. sin costo';
+        if (src === 'haversine+2opt') return 'Aprox. sin costo';
+        if (src === 'google-routes-v2') return 'Ruta por calles';
+        if (src === 'haversine-fallback') return 'Aprox. sin costo';
         if (src === 'no-coords') return '⚠️ Sin coords';
         return src;
+    });
+
+    /** True cuando la optimización usó estimación en línea recta (no distancias reales de calle). */
+    isApproxOptimizer = computed(() => {
+        const src = this.preview()?.optimizerSource;
+        return src === 'haversine+2opt' || src === 'haversine-fallback';
     });
 
     constructor() {
@@ -527,11 +749,8 @@ export class RouteBuilderComponent implements OnInit {
             if (p.polylineEncoded) {
                 this.polylinePath.set(this.decodePolyline(p.polylineEncoded));
             } else {
-                const depot = this.depotPosition()!;
-                const pts = p.stops
-                    .filter(s => s.latitude != null && s.longitude != null)
-                    .map(s => ({ lat: s.latitude!, lng: s.longitude! }));
-                this.polylinePath.set(pts.length > 0 ? [depot, ...pts, depot] : pts);
+                // Backend no devolvio polyline real; dibujamos linea aproximada sin costo.
+                this.polylinePath.set(this.buildApproxPolyline(p.stops));
             }
             this.fitMapBounds();
         }, { allowSignalWrites: true });
@@ -712,15 +931,7 @@ export class RouteBuilderComponent implements OnInit {
 
         this.api.getAvailableTandas().subscribe({
             next: (list) => {
-                // In edit mode, also include tandas already in this route
-                if (currentRouteId != null) {
-                    // We already have lockedStops and will pre-select pending tanda deliveries.
-                    // The available-tandas endpoint excludes assigned tandas, but we still need to
-                    // show tandas from this route. We merge them later when the route loads.
-                    this.availableTandas.set(list);
-                } else {
-                    this.availableTandas.set(list);
-                }
+                this.availableTandas.set(list);
                 tandasLoaded = true;
                 done();
             },
@@ -728,13 +939,14 @@ export class RouteBuilderComponent implements OnInit {
         });
     }
 
-    orderHasCoords(o: any): boolean {
-        return !!(o.clientAddress && o.clientAddress.trim().length > 5);
+    orderHasCoords(o: OrderSummaryDto): boolean {
+        return o.clientLatitude != null && o.clientLongitude != null;
     }
 
     toggle(key: StopKey): void {
         const next = new Set(this.selected());
-        if (next.has(key)) next.delete(key); else next.add(key);
+        if (next.has(key)) { next.delete(key); this.zoneSelectedKeys.delete(key); }
+        else next.add(key);
         this.selected.set(next);
     }
 
@@ -742,6 +954,216 @@ export class RouteBuilderComponent implements OnInit {
         const next = new Set(this.selected());
         for (const c of this.visibleCandidates()) next.add(c.key);
         this.selected.set(next);
+    }
+
+    // ── Selección por zona en el mapa ──
+
+    /** Captura la instancia nativa del mapa cuando Google la inicializa. */
+    onMapReady(map: google.maps.Map): void {
+        this.mapInstance = map;
+        // OverlayView vacío solo para acceder a la proyección (pixel de pantalla → LatLng).
+        const ov = new google.maps.OverlayView();
+        ov.onAdd = () => {};
+        ov.draw = () => {};
+        ov.onRemove = () => {};
+        ov.setMap(map);
+        this.projectionOverlay = ov;
+    }
+
+    /** Activa/desactiva el modo de dibujo de zona (polígono / círculo / rectángulo). */
+    toggleZoneSelect(): void {
+        if (this.zoneSelectMode()) {
+            this.stopDrawing();
+            return;
+        }
+        if (!this.mapInstance) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            return;
+        }
+
+        // Touch: lazo a mano alzada (overlay propio). La capa con touch-action:none
+        // captura el dedo, así que el mapa no se panea mientras se dibuja.
+        if (this.isTouchDevice) {
+            this.zoneSelectMode.set(true);
+            return;
+        }
+
+        // Escritorio: DrawingManager (polígono / círculo / rectángulo).
+        if (!google?.maps?.drawing) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            return;
+        }
+        if (!this.drawingManager) this.initDrawingManager();
+        this.drawingManager!.setMap(this.mapInstance);
+        this.drawingManager!.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        this.zoneSelectMode.set(true);
+    }
+
+    // ── Lazo a mano alzada (touch) ──
+    lassoStart(ev: PointerEvent): void {
+        (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);
+        this.lassoActive = true;
+        this.lassoPoints = [];
+        this.addLassoPoint(ev);
+    }
+
+    lassoMove(ev: PointerEvent): void {
+        if (this.lassoActive) this.addLassoPoint(ev);
+    }
+
+    lassoCancel(): void {
+        this.lassoActive = false;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+    }
+
+    private addLassoPoint(ev: PointerEvent): void {
+        const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+        this.lassoPoints.push({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+        if (this.lassoPoints.length === 0) { this.lassoPathD.set(''); return; }
+        const [first, ...rest] = this.lassoPoints;
+        let d = `M ${first.x.toFixed(1)} ${first.y.toFixed(1)}`;
+        for (const p of rest) d += ` L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+        this.lassoPathD.set(d + ' Z');
+    }
+
+    /** Al soltar el dedo: convierte el trazo a un polígono y selecciona las candidatas adentro. */
+    lassoEnd(ev: PointerEvent): void {
+        if (!this.lassoActive) return;
+        this.lassoActive = false;
+        const pts = this.lassoPoints;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+
+        if (pts.length < 3) { this.stopDrawing(); return; }
+
+        const projection = this.projectionOverlay?.getProjection();
+        if (!projection) {
+            this.toast.show('El mapa aún no está listo', 'error');
+            this.stopDrawing();
+            return;
+        }
+
+        const path: google.maps.LatLngLiteral[] = [];
+        for (const p of pts) {
+            const ll = projection.fromContainerPixelToLatLng(new google.maps.Point(p.x, p.y));
+            if (ll) path.push({ lat: ll.lat(), lng: ll.lng() });
+        }
+        if (path.length < 3) { this.stopDrawing(); return; }
+
+        const polygon = new google.maps.Polygon({
+            ...this.zoneShapeStyle(),
+            paths: path,
+            map: this.mapInstance
+        });
+        this.zoneOverlays.push(polygon);
+        this.hasZones.set(true);
+        this.selectInsideShape(google.maps.drawing.OverlayType.POLYGON, polygon);
+        this.stopDrawing();
+    }
+
+    private initDrawingManager(): void {
+        const dm = new google.maps.drawing.DrawingManager({
+            drawingControl: true,
+            drawingControlOptions: {
+                position: google.maps.ControlPosition.TOP_CENTER,
+                drawingModes: [
+                    google.maps.drawing.OverlayType.POLYGON,
+                    google.maps.drawing.OverlayType.CIRCLE,
+                    google.maps.drawing.OverlayType.RECTANGLE
+                ]
+            },
+            polygonOptions: this.zoneShapeStyle(),
+            circleOptions: this.zoneShapeStyle(),
+            rectangleOptions: this.zoneShapeStyle()
+        });
+
+        dm.addListener('overlaycomplete', (e: google.maps.drawing.OverlayCompleteEvent) => {
+            this.zoneOverlays.push(e.overlay as google.maps.MVCObject);
+            this.hasZones.set(true);
+            this.selectInsideShape(e.type, e.overlay);
+            // Tras dibujar, salir del modo dibujo (la zona queda pintada como referencia)
+            // y devolver el paneo de un dedo al mapa.
+            dm.setDrawingMode(null);
+            this.zoneSelectMode.set(false);
+            this.mapInstance?.setOptions({ gestureHandling: 'greedy' });
+        });
+
+        this.drawingManager = dm;
+    }
+
+    private zoneShapeStyle(): google.maps.PolygonOptions {
+        return {
+            fillColor: '#ec4899',
+            fillOpacity: 0.12,
+            strokeColor: '#ec4899',
+            strokeWeight: 2,
+            clickable: false,
+            editable: false,
+            zIndex: 10
+        };
+    }
+
+    /** Selecciona (suma) todas las candidatas con coords que caigan dentro de la figura dibujada. */
+    private selectInsideShape(type: google.maps.drawing.OverlayType, overlay: any): void {
+        const inside = (lat: number, lng: number): boolean => {
+            const point = new google.maps.LatLng(lat, lng);
+            if (type === google.maps.drawing.OverlayType.POLYGON) {
+                return google.maps.geometry.poly.containsLocation(point, overlay);
+            }
+            if (type === google.maps.drawing.OverlayType.RECTANGLE) {
+                return (overlay.getBounds() as google.maps.LatLngBounds)?.contains(point) ?? false;
+            }
+            if (type === google.maps.drawing.OverlayType.CIRCLE) {
+                const center = overlay.getCenter() as google.maps.LatLng;
+                const radius = overlay.getRadius() as number;
+                return google.maps.geometry.spherical.computeDistanceBetween(center, point) <= radius;
+            }
+            return false;
+        };
+
+        const next = new Set(this.selected());
+        let added = 0;
+        for (const c of this.candidates()) {
+            if (c.latitude == null || c.longitude == null) continue;
+            if (next.has(c.key)) continue;
+            if (inside(c.latitude, c.longitude)) {
+                next.add(c.key);
+                this.zoneSelectedKeys.add(c.key);
+                added++;
+            }
+        }
+
+        if (added > 0) {
+            this.selected.set(next);
+            this.toast.show(`+${added} ${added === 1 ? 'clienta agregada' : 'clientas agregadas'} de la zona`, 'success');
+        } else {
+            this.toast.show('No hay clientas sin elegir dentro de la zona', 'info');
+        }
+    }
+
+    private stopDrawing(): void {
+        this.drawingManager?.setDrawingMode(null);
+        this.zoneSelectMode.set(false);
+        this.lassoActive = false;
+        this.lassoPoints = [];
+        this.lassoPathD.set('');
+    }
+
+    /** Borra las figuras dibujadas y des-selecciona SOLO las clientas que agregaron esas zonas
+     *  (las elegidas a mano se conservan). */
+    clearZones(): void {
+        for (const ov of this.zoneOverlays) (ov as any).setMap?.(null);
+        this.zoneOverlays = [];
+        this.hasZones.set(false);
+
+        if (this.zoneSelectedKeys.size > 0) {
+            const next = new Set(this.selected());
+            for (const k of this.zoneSelectedKeys) next.delete(k);
+            this.selected.set(next);
+            this.zoneSelectedKeys.clear();
+        }
+        this.stopDrawing();
     }
 
     clearSelection(): void {
@@ -848,10 +1270,59 @@ export class RouteBuilderComponent implements OnInit {
                 },
                 error: (err) => {
                     this.saving.set(false);
+                    if (this.tryOpenBagsGate(err)) return;
                     this.toast.error(err.error?.message || 'Error al guardar la ruta');
                 }
             });
         }
+    }
+
+    // ── 🛍️ Puerta de bolsas ──
+
+    /** Si el backend rechazó por bolsas faltantes, abre el resolver y devuelve true. */
+    private tryOpenBagsGate(err: HttpErrorResponse): boolean {
+        const payload = err.error as RoutePackagesRequiredDto | null;
+        if (payload?.code === 'PACKAGES_REQUIRED' && Array.isArray(payload.orders)) {
+            this.bagsGate.set(payload.orders.map(order => ({
+                id: order.id,
+                clientName: order.clientName,
+                count: order.totalPackages ?? null
+            })));
+            return true;
+        }
+        return false;
+    }
+
+    setGateBags(id: number, count: number | null): void {
+        this.bagsGate.update(g => g ? g.map(o => o.id === id ? { ...o, count } : o) : g);
+    }
+
+    bumpGateBags(id: number): void {
+        this.bagsGate.update(g => g ? g.map(o =>
+            o.id === id ? { ...o, count: (o.count && o.count > 0 ? o.count : 5) + 1 } : o) : g);
+    }
+
+    allGateNoBags(): void {
+        this.bagsGate.update(g => g ? g.map(o => ({ ...o, count: 0 })) : g);
+    }
+
+    cancelBagsGate(): void { this.bagsGate.set(null); }
+
+    confirmGateAndSave(): void {
+        const g = this.bagsGate();
+        if (!g || !this.allGateResolved()) return;
+        this.savingGate.set(true);
+        forkJoin(g.map(o => this.api.setPackages(o.id, o.count, true))).subscribe({
+            next: () => {
+                this.savingGate.set(false);
+                this.bagsGate.set(null);
+                this.save(); // reintenta: ahora todas tienen bolsas confirmadas
+            },
+            error: () => {
+                this.savingGate.set(false);
+                this.toast.error('No se pudieron guardar las bolsas. Intenta de nuevo 🥺');
+            }
+        });
     }
 
     private decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
@@ -869,15 +1340,32 @@ export class RouteBuilderComponent implements OnInit {
         return path;
     }
 
+    // Dibuja la ruta aproximada sin pedir rutas reales al navegador.
+    private buildApproxPolyline(stops: PreviewStopDto[]): google.maps.LatLngLiteral[] {
+        const depot = this.depotPosition() ?? { lat: 27.4861, lng: -99.5069 };
+        const geocoded = stops.filter(s => s.latitude != null && s.longitude != null);
+        if (geocoded.length === 0) return [];
+        return [
+            depot,
+            ...geocoded.map(s => ({ lat: s.latitude!, lng: s.longitude! }))
+        ];
+    }
+
     openAddressPicker(row: CandidateRow, event: Event): void {
         event.stopPropagation();
         this.pickingAddressFor.set(row);
     }
 
-    onAddressConfirmed(result: { address: string; lat: number; lng: number }): void {
+    onAddressConfirmed(result: { address: string; lat: number; lng: number; deliveryInstructions: string }): void {
         const row = this.pickingAddressFor();
         if (!row || !row.clientId) { this.pickingAddressFor.set(null); return; }
-        this.api.setClientCoordinates(row.clientId, result.lat, result.lng, result.address).subscribe({
+        this.api.setClientCoordinates(
+            row.clientId,
+            result.lat,
+            result.lng,
+            result.address,
+            result.deliveryInstructions
+        ).subscribe({
             next: () => {
                 this.toast.success(`📍 Dirección guardada para ${row.clientName}`);
                 this.pickingAddressFor.set(null);

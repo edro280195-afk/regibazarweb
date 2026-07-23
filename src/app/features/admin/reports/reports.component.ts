@@ -1,12 +1,14 @@
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DecimalPipe, DatePipe, CommonModule } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { ReportDto, SalesPeriodDto, PeriodReportDto, AiInsight } from '../../../core/models';
+import { ReportDto, SalesPeriodDto, PeriodReportDto, AiInsight, OrderSummaryDto } from '../../../core/models';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsOption } from 'echarts';
 import { gsap } from 'gsap';
+import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/utils/messenger.util';
 
 @Component({
   selector: 'app-reports',
@@ -278,7 +280,7 @@ import { gsap } from 'gsap';
                     @for (item of [
                       { icons: '💵', label: 'Efectivo', amount: data()!.cashAmount, col: 'green', orders: data()!.cashOrders },
                       { icons: '📱', label: 'Transferencia', amount: data()!.transferAmount, col: 'blue', orders: data()!.transferOrders },
-                      { icons: '🏦', label: 'Depósito', amount: data()!.depositAmount, col: 'purple', orders: data()!.depositOrders }
+                      { icons: '💳', label: 'Otros (Tarjeta, etc.)', amount: data()!.depositAmount, col: 'purple', orders: data()!.depositOrders }
                     ]; track item.label) {
                       <div class="flex justify-between items-center p-5 rounded-2xl transition-all hover:translate-x-2 border border-transparent hover:border-pink-100"
                            [class]="'bg-' + item.col + '-50/50'">
@@ -476,6 +478,124 @@ import { gsap } from 'gsap';
           </div>
         }
 
+        @if (activeTab() === 'porCobrar') {
+          <div class="space-y-6 animate-fade-in">
+            <!-- Resumen de cobranza -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="card-coquette p-6 bg-gradient-to-br from-rose-50 to-pink-50 border-rose-100">
+                <p class="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">💸 Total por cobrar</p>
+                <h3 class="text-3xl font-black text-rose-700 tracking-tighter">{{ unpaidTotalDue() | currency:'MXN':'symbol-narrow':'1.0-2' }}</h3>
+              </div>
+              <div class="card-coquette p-6 bg-white/50">
+                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-1">📋 Pedidos pendientes</p>
+                <h3 class="text-3xl font-black text-pink-900 tracking-tighter">{{ filteredUnpaid().length }}</h3>
+              </div>
+              <div class="card-coquette p-6 bg-white/50" [class.border-red-200]="unpaidDeliveredCount() > 0">
+                <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">⚠️ Entregados sin cobrar</p>
+                <h3 class="text-3xl font-black text-amber-700 tracking-tighter">{{ unpaidDeliveredCount() }}</h3>
+                <p class="text-[10px] font-bold text-amber-400 mt-1 italic">Ya tienen el producto — urgente</p>
+              </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="card-coquette p-4 bg-white/60 flex flex-wrap gap-3 items-end">
+              <div class="flex-1 min-w-[200px]">
+                <label class="label-coquette text-[10px]">🔍 Buscar clienta</label>
+                <input class="input-coquette w-full" placeholder="Nombre de clienta..."
+                       [ngModel]="searchUnpaid()" (ngModelChange)="searchUnpaid.set($event)" />
+              </div>
+              <div>
+                <label class="label-coquette text-[10px]">Estado</label>
+                <div class="flex gap-1 bg-pink-50/60 p-1 rounded-xl border border-pink-100">
+                  @for (f of unpaidStatusOptions; track f.id) {
+                    <button class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            [class]="unpaidStatusFilter() === f.id ? 'bg-white text-pink-700 shadow-sm' : 'text-pink-400 hover:text-pink-600'"
+                            (click)="unpaidStatusFilter.set(f.id)">{{ f.label }}</button>
+                  }
+                </div>
+              </div>
+              <div>
+                <label class="label-coquette text-[10px]">Ordenar por</label>
+                <select class="input-coquette" [ngModel]="unpaidSort()" (ngModelChange)="unpaidSort.set($event)">
+                  <option value="urgentes">⚠️ Urgentes primero</option>
+                  <option value="saldoDesc">💸 Mayor saldo</option>
+                  <option value="antiguos">📅 Más antiguos</option>
+                </select>
+              </div>
+            </div>
+
+            <p class="text-xs text-pink-400 font-medium px-1">
+              Mostrando {{ filteredUnpaid().length }} de {{ unpaidOrders().length }} pedidos por cobrar
+            </p>
+
+            @if (loadingUnpaid()) {
+              <div class="space-y-3">
+                @for (i of [1,2,3,4,5]; track i) { <div class="shimmer h-16 rounded-2xl"></div> }
+              </div>
+            } @else if (filteredUnpaid().length === 0) {
+              <div class="card-coquette py-20 px-12 text-center bg-white/40">
+                <div class="text-7xl mb-4">🎉</div>
+                <h2 class="text-2xl font-black text-pink-900">¡Todo cobrado!</h2>
+                <p class="text-pink-400 font-bold mt-2">No hay pedidos con saldo pendiente. ✨</p>
+              </div>
+            } @else {
+              <div class="card-coquette p-0 bg-white/60 overflow-hidden">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="bg-pink-50/80 text-pink-700 text-left">
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider">Clienta</th>
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider">Estado</th>
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider text-right">Total</th>
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider text-right">Pagado</th>
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider text-right">Saldo</th>
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider">Entrega</th>
+                        <th class="px-4 py-3 font-black text-[11px] uppercase tracking-wider text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (o of filteredUnpaid(); track o.id) {
+                        <tr class="border-t border-pink-50 hover:bg-pink-50/40 transition-colors"
+                            [class.bg-rose-50/40]="o.status === 'Delivered'">
+                          <td class="px-4 py-3">
+                            <div class="font-black text-pink-900">{{ o.clientName }}</div>
+                            <div class="text-[10px] text-pink-300 font-bold">Pedido #{{ o.id }}</div>
+                          </td>
+                          <td class="px-4 py-3">
+                            <span class="text-[11px] font-bold whitespace-nowrap">{{ getStatusLabelEs(o.status) }}</span>
+                            @if (o.status === 'Delivered') {
+                              <div class="text-[9px] font-black text-rose-500 uppercase">⚠️ Sin cobrar</div>
+                            }
+                          </td>
+                          <td class="px-4 py-3 text-right font-bold text-pink-700 whitespace-nowrap">{{ o.total | currency:'MXN':'symbol-narrow' }}</td>
+                          <td class="px-4 py-3 text-right font-medium text-green-600 whitespace-nowrap">{{ o.amountPaid | currency:'MXN':'symbol-narrow' }}</td>
+                          <td class="px-4 py-3 text-right font-black text-rose-600 whitespace-nowrap">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</td>
+                          <td class="px-4 py-3 text-[11px] text-pink-500 font-medium whitespace-nowrap">
+                            {{ o.scheduledDeliveryDate ? (o.scheduledDeliveryDate | date:"d MMM") : '—' }}
+                          </td>
+                          <td class="px-4 py-3">
+                            <div class="flex items-center justify-center gap-1.5">
+                              <button class="w-9 h-9 rounded-xl bg-[#e8f4ff] hover:bg-[#cce4ff] active:scale-95 flex items-center justify-center transition-all border border-[#b3d5f5]/50"
+                                      title="Recordatorio de cobro por Messenger" (click)="remindPayment(o)">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="#0099FF"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                              </button>
+                              <button class="w-9 h-9 rounded-xl bg-purple-50 text-purple-500 hover:bg-purple-100 active:scale-95 flex items-center justify-center transition-all border border-purple-100/50"
+                                      title="Copiar enlace del pedido" (click)="copyUnpaidLink(o)">🔗</button>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <p class="text-[11px] text-pink-300 font-medium text-center italic">
+                Los pedidos ya entregados sin cobrar aparecen resaltados — son los más urgentes. 🌸
+              </p>
+            }
+          </div>
+        }
+
       } @else {
         <div class="card-coquette py-40 px-12 text-center animate-bounce-in bg-white/40 border-dashed border-2 border-pink-200">
           <div class="text-9xl mb-10 filter drop-shadow-2xl">📉</div>
@@ -632,6 +752,7 @@ import { gsap } from 'gsap';
 export class ReportsComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
+  private route = inject(ActivatedRoute);
 
   data = signal<ReportDto | null>(null);
   periods = signal<SalesPeriodDto[]>([]);
@@ -643,14 +764,58 @@ export class ReportsComponent implements OnInit {
   showGeminiModal = signal(false);
   closingGeminiModal = signal(false);
 
-  activeTab = signal<'resumen' | 'financiero' | 'operativo' | 'clientes'>('resumen');
+  activeTab = signal<'resumen' | 'financiero' | 'operativo' | 'clientes' | 'porCobrar'>('resumen');
 
   tabs = [
     { id: 'resumen', label: 'Resumen', icon: '💎' },
     { id: 'financiero', label: 'Finanzas', icon: '💰' },
     { id: 'operativo', label: 'Operativo', icon: '🚚' },
-    { id: 'clientes', label: 'Clientes', icon: '👑' }
+    { id: 'clientes', label: 'Clientes', icon: '👑' },
+    { id: 'porCobrar', label: 'Por Cobrar', icon: '💸' }
   ] as const;
+
+  // ── Cuentas por cobrar ──
+  unpaidOrders = signal<OrderSummaryDto[]>([]);
+  loadingUnpaid = signal(false);
+  searchUnpaid = signal('');
+  unpaidStatusFilter = signal<'todos' | 'entregados' | 'proceso'>('todos');
+  unpaidSort = signal<'urgentes' | 'saldoDesc' | 'antiguos'>('urgentes');
+
+  unpaidStatusOptions = [
+    { id: 'todos' as const, label: 'Todos' },
+    { id: 'entregados' as const, label: 'Entregados sin cobrar' },
+    { id: 'proceso' as const, label: 'En proceso' }
+  ];
+
+  // Tarjetas resumen: siempre sobre el panorama completo
+  unpaidTotalDue = computed(() => this.unpaidOrders().reduce((sum, o) => sum + (o.balanceDue ?? 0), 0));
+  unpaidDeliveredCount = computed(() => this.unpaidOrders().filter(o => o.status === 'Delivered').length);
+
+  // Tabla: aplica búsqueda + filtro de estado + orden
+  filteredUnpaid = computed(() => {
+    const term = this.searchUnpaid().trim().toLowerCase();
+    const statusF = this.unpaidStatusFilter();
+    const sort = this.unpaidSort();
+
+    let list = this.unpaidOrders().filter(o => {
+      if (term && !o.clientName.toLowerCase().includes(term)) return false;
+      if (statusF === 'entregados' && o.status !== 'Delivered') return false;
+      if (statusF === 'proceso' && o.status === 'Delivered') return false;
+      return true;
+    });
+
+    list = [...list].sort((a, b) => {
+      if (sort === 'saldoDesc') return (b.balanceDue ?? 0) - (a.balanceDue ?? 0);
+      if (sort === 'antiguos') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      // 'urgentes': entregados sin cobrar primero, luego más antiguos
+      const aDel = a.status === 'Delivered' ? 1 : 0;
+      const bDel = b.status === 'Delivered' ? 1 : 0;
+      if (aDel !== bDel) return bDel - aDel;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    return list;
+  });
 
   startDate = '';
   endDate = '';
@@ -694,8 +859,55 @@ export class ReportsComponent implements OnInit {
     this.startDate = firstDay.toISOString().split('T')[0];
     this.endDate = now.toISOString().split('T')[0];
 
+    // Si llegamos desde el Dashboard (?tab=porCobrar) abrimos esa pestaña directo
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab === 'porCobrar' || tab === 'financiero' || tab === 'operativo' || tab === 'clientes' || tab === 'resumen') {
+      this.activeTab.set(tab);
+    }
+
     this.loadPeriods();
     this.loadReport();
+    this.loadUnpaid();
+  }
+
+  loadUnpaid(): void {
+    this.loadingUnpaid.set(true);
+    this.api.getUnpaidOrders().subscribe({
+      next: (orders) => {
+        this.unpaidOrders.set(orders);
+        this.loadingUnpaid.set(false);
+      },
+      error: () => {
+        this.loadingUnpaid.set(false);
+        this.toast.error('Error al cargar cuentas por cobrar');
+      }
+    });
+  }
+
+  remindPayment(o: OrderSummaryDto): void {
+    const link = o.link.replace('/o/', '/pedido/');
+    const msg = buildPaymentReminderMessage(o.clientName, o.balanceDue ?? 0, link);
+    navigator.clipboard.writeText(msg).then(() => this.toast.success(`Recordatorio de ${o.clientName} copiado 💬`));
+    const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
+    if (chatUrl) {
+      window.open(chatUrl, '_blank');
+    } else {
+      this.toast.info('Sin Facebook guardado: pega el mensaje en Messenger 💡');
+    }
+  }
+
+  copyUnpaidLink(o: OrderSummaryDto): void {
+    const link = o.link.replace('/o/', '/pedido/');
+    navigator.clipboard.writeText(link).then(() => this.toast.success('Enlace copiado 🔗'));
+  }
+
+  getStatusLabelEs(status: string): string {
+    const map: Record<string, string> = {
+      Pending: '⏳ Pendiente', Confirmed: '💖 Confirmado', Shipped: '📦 Empacado',
+      InRoute: '🚗 En Ruta', Delivered: '✅ Entregado', NotDelivered: '❌ No Entregado',
+      Postponed: '📅 Pospuesto', Canceled: '🚫 Cancelado'
+    };
+    return map[status] || status;
   }
 
   loadPeriods(): void {
@@ -774,7 +986,7 @@ export class ReportsComponent implements OnInit {
         data: [
           { value: r.cashAmount, name: 'Efectivo', itemStyle: { color: '#34d399' } },
           { value: r.transferAmount, name: 'Transferencia', itemStyle: { color: '#60a5fa' } },
-          { value: r.depositAmount, name: 'Depósito', itemStyle: { color: '#a78bfa' } }
+          { value: r.depositAmount, name: 'Otros', itemStyle: { color: '#a78bfa' } }
         ]
       }]
     };
