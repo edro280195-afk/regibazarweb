@@ -244,6 +244,12 @@ export class ApiService {
         return this.http.post<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/generate`, data);
     }
 
+    /** Borra una bolsa generada por error (solo si sigue en estado Packed).
+     *  Devuelve la lista de bolsas que quedan en el pedido. */
+    deletePackage(orderId: number, packageId: string): Observable<OrderPackageDto[]> {
+        return this.http.delete<OrderPackageDto[]>(`${this.base}/orders/${orderId}/packages/${packageId}`);
+    }
+
     /** Set rápido del número de bolsas. totalPackages = 0 con confirmed = true = "va sin bolsas".
      *  totalPackages = null con confirmed = false lo regresa a pendiente. */
     setPackages(orderId: number, totalPackages: number | null, confirmed: boolean = true): Observable<OrderSummaryDto> {

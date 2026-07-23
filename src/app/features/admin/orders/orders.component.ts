@@ -530,9 +530,17 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                           <p class="text-[9px] text-pink-400 font-medium font-mono truncate w-24">{{ pkg.qrCodeValue }}...</p>
                         </div>
                       </div>
-                      <button class="bg-gradient-to-r from-pink-100 to-rose-100 text-pink-600 hover:from-pink-200 hover:to-rose-200 border border-pink-200 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm transition-all" (click)="printLabel(pkg, selectedOrder()!)">
-                        🖨️ Imprimir
-                      </button>
+                      <div class="flex items-center gap-1.5">
+                        <button class="bg-gradient-to-r from-pink-100 to-rose-100 text-pink-600 hover:from-pink-200 hover:to-rose-200 border border-pink-200 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 shadow-sm transition-all" (click)="printLabel(pkg, selectedOrder()!)">
+                          🖨️ Imprimir
+                        </button>
+                        @if (pkg.status === 'Packed') {
+                          <button class="bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200 w-8 h-8 rounded-lg text-sm font-black flex items-center justify-center shadow-sm transition-all disabled:opacity-50"
+                                  [disabled]="isLoadingPackages()" title="Borrar esta bolsa" (click)="deletePackage(pkg)">
+                            🗑️
+                          </button>
+                        }
+                      </div>
                     </div>
                   }
                 </div>
@@ -1313,6 +1321,27 @@ export class OrdersComponent implements OnInit {
       error: () => {
         this.toast.error('Error al generar bolsas');
         this.isLoadingPackages.set(false);
+      }
+    });
+  }
+
+  /** 🗑️ Borra una bolsa generada por error (solo si aún no se ha cargado/entregado). */
+  deletePackage(pkg: OrderPackageDto): void {
+    const order = this.selectedOrder();
+    if (!order || this.isLoadingPackages()) return;
+    if (!confirm(`¿Borrar la bolsa ${pkg.packageNumber}? Esta acción no se puede deshacer.`)) return;
+    this.isLoadingPackages.set(true);
+    this.api.deletePackage(order.id, pkg.id).subscribe({
+      next: (remaining) => {
+        this.packages.set(remaining);
+        this.isLoadingPackages.set(false);
+        this.reloadSelectedOrder();
+        this.loadOrders();
+        this.toast.success(`Bolsa ${pkg.packageNumber} borrada 🗑️`);
+      },
+      error: (err) => {
+        this.isLoadingPackages.set(false);
+        this.toast.error(err?.error?.message ?? err?.error ?? 'No se pudo borrar la bolsa 🥺');
       }
     });
   }
