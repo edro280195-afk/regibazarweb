@@ -1,17 +1,72 @@
-import { Component, inject, signal, OnInit, computed, ViewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TandaDto, TandaParticipantDto, ClientDto, CLIENT_TAG_LABELS, CamiChatResponse } from '../../../core/models';
+import {
+  CamiChatResponse,
+  ClientDto,
+  TandaDto,
+  TandaParticipantDto,
+  TandaParticipantStatus,
+  TandaPaymentDto,
+  TandaProductDto,
+  TandaStatus,
+  UpdateTandaParticipantDto,
+  UpdateTandaPaymentDto
+} from '../../../core/models';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-animation.component';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  buildPlaceAssignments,
+  buildTandaSlots,
+  getVerifiedWeekPaidAmount
+} from './tanda-admin.util';
+
+interface PaymentForm {
+  amountPaid: number;
+  penaltyPaid: number;
+  paymentDate: string;
+  isVerified: boolean;
+  notes: string;
+}
+
+interface ParticipantForm {
+  customerId: number;
+  assignedTurn: number;
+  variant: string;
+  weeklyAmount?: number;
+  status: TandaParticipantStatus;
+  isDelivered: boolean;
+  deliveryDate: string;
+}
+
+interface TandaEditForm {
+  productId: string;
+  name: string;
+  totalWeeks: number;
+  weeklyAmount: number;
+  penaltyAmount: number;
+  startDate: string;
+  status: TandaStatus;
+}
 
 @Component({
   selector: 'app-tanda-detail',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterLink, FormsModule, DragDropModule, RaffleAnimationComponent],
   template: `
     <div class="space-y-6 max-w-7xl mx-auto animate-fade-in pb-20">
@@ -38,6 +93,40 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
             </div>
         </div>
       } @else if (tanda(); as t) {
+        <section class="rounded-3xl border border-pink-100 bg-white px-5 py-5 shadow-sm" aria-label="Resumen financiero de la tanda">
+          <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-black text-pink-800">{{ statusLabel(t.status) }}</span>
+                <span class="text-xs font-bold text-pink-500">Semana {{ t.currentWeek || 0 }} de {{ t.totalWeeks }}</span>
+              </div>
+              <h1 class="mt-2 truncate text-2xl font-black text-pink-950">{{ t.name }}</h1>
+              <p class="text-sm font-semibold text-pink-600">{{ t.product?.name || 'Producto sin definir' }}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Lugares</p>
+                <p class="text-lg font-black text-pink-950">{{ t.participantCount }}/{{ t.totalWeeks }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Cobrado</p>
+                <p class="text-lg font-black text-pink-950">{{ t.collectedAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Pendiente</p>
+                <p class="text-lg font-black text-rose-700">{{ t.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Avance</p>
+                <p class="text-lg font-black text-pink-950">{{ t.progressPercentage | number:'1.0-0' }}%</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 h-2 overflow-hidden rounded-full bg-pink-100" aria-hidden="true">
+            <div class="h-full rounded-full bg-pink-600 transition-[width] duration-300" [style.width.%]="t.progressPercentage"></div>
+          </div>
+        </section>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           <!-- Main Content: Weekly Management -->
@@ -164,11 +253,15 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                         @for (w of weeksArray(); track w) {
                           <td class="text-center p-2">
                             @if (hasPaid(p, w)) {
-                              <button (click)="onRemovePayment(p, w)" class="text-lg drop-shadow-sm animate-bounce-in inline-block hover:scale-125 transition-transform" title="Quitar pago">💖</button>
+                              <button (click)="openPaymentModal(p, w)"
+                                      class="w-full rounded-lg bg-pink-50 px-1 py-1.5 text-[10px] font-black text-pink-700 hover:bg-pink-100"
+                                      [attr.aria-label]="'Ver pagos de la semana ' + w + ' de ' + p.customerName">
+                                ✓ {{ getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                              </button>
                             } @else {
                               <button (click)="openPaymentModal(p, w)" 
                                       class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
-                                {{ getParticipantWeeklyAmount(p) }}
+                                {{ getWeekPaidAmount(p, w) > 0 ? (getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0') : (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
                               </button>
                             }
                           </td>
@@ -181,7 +274,10 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                           </td>
                         }
                         <td class="text-center">
-                          <input type="checkbox" [checked]="p.isDelivered" (click)="onConfirmSundayDelivery(p)" class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
+                          <input type="checkbox" [checked]="p.isDelivered"
+                                 (click)="$event.preventDefault(); openParticipantEditor(p)"
+                                 [attr.aria-label]="'Editar entrega de ' + p.customerName"
+                                 class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
                         </td>
                         <td class="text-center">
                           <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
@@ -391,8 +487,9 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
               <button class="btn-coquette btn-outline-pink w-full justify-center text-[10px] py-3 font-black shadow-sm" (click)="onProcessPenalties()">
                 ⚠️ Procesar Retrasos
               </button>
-              <button class="bg-rose-50 border border-rose-100 text-rose-300 hover:text-rose-600 hover:bg-rose-100/50 rounded-3xl w-full py-3 text-[10px] font-black transition-all">
-                🚫 Cancelar Tanda
+              <button (click)="setTandaStatus(t.status === 'Cancelled' ? 'Active' : 'Cancelled')"
+                      class="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100/50 rounded-3xl w-full py-3 text-[10px] font-black transition-colors">
+                {{ t.status === 'Cancelled' ? 'Reactivar tanda' : 'Cancelar tanda' }}
               </button>
             </div>
           </div>
@@ -401,31 +498,76 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
       
       <!-- PAYMENT MODAL -->
       @if (showPaymentModal()) {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="showPaymentModal.set(false)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-sm relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl animate-heartbeat">💖</span> Registrar Abono
-             </h3>
-             
-             <div class="bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl p-6 border border-pink-100 text-center mb-8">
-                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-1"> Participante </p>
-                <p class="text-lg font-black text-pink-900 mb-4">{{ activePayment()?.participant?.customerName }}</p>
-                
-                <div class="flex items-end justify-center gap-1">
-                  <p class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500 font-display">
-                    {{ getParticipantWeeklyAmount(activePayment()!.participant) | currency:'MXN':'symbol-narrow':'1.0-0' }}
-                  </p>
-                  <span class="text-pink-400 text-[10px] font-medium uppercase mb-2">/ Sem {{ activePayment()?.week }}</span>
-                </div>
-             </div>
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+          <div class="absolute inset-0 bg-pink-950/35" (click)="showPaymentModal.set(false)"></div>
+          <div class="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-pink-100 bg-white p-5 shadow-2xl sm:p-7">
+            <div class="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[11px] font-black uppercase tracking-wider text-pink-500">Semana {{ activePayment()?.week }}</p>
+                <h3 id="payment-title" class="text-xl font-black text-pink-950">{{ activePayment()?.participant?.customerName }}</h3>
+                <p class="text-sm font-semibold text-pink-600">
+                  Cuota {{ getParticipantWeeklyAmount(activePayment()!.participant) | currency:'MXN':'symbol-narrow':'1.0-0' }} ·
+                  pagado {{ getWeekPaidAmount(activePayment()!.participant, activePayment()!.week) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                </p>
+              </div>
+              <button (click)="showPaymentModal.set(false)" class="h-10 w-10 rounded-full bg-pink-50 text-xl text-pink-700" aria-label="Cerrar">×</button>
+            </div>
 
-             <div class="flex gap-4">
-                <button (click)="showPaymentModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Regresar</button>
-                <button (click)="confirmPayment()" [disabled]="isSavingPay()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isSavingPay()) { <span class="animate-spin italic">⌛</span> } @else { Confirmar 💖 }
-                </button>
-             </div>
+            @if (paymentsForActiveWeek().length > 0) {
+              <div class="mb-6 rounded-2xl border border-pink-100 bg-pink-50/60 p-3">
+                <p class="mb-2 text-[10px] font-black uppercase tracking-wider text-pink-500">Movimientos registrados</p>
+                <div class="space-y-2">
+                  @for (payment of paymentsForActiveWeek(); track payment.id) {
+                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs">
+                      <div>
+                        <p class="font-black text-pink-950">{{ payment.amountPaid | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                        <p class="text-pink-500">{{ payment.paymentDate | date:'dd MMM yyyy, HH:mm' }}{{ payment.notes ? ' · ' + payment.notes : '' }}</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button (click)="editPayment(payment)" class="rounded-lg px-3 py-2 font-bold text-pink-700 hover:bg-pink-50">Editar</button>
+                        <button (click)="requestDeletePayment(payment.id)"
+                                class="rounded-lg px-3 py-2 font-bold text-rose-700 hover:bg-rose-50">
+                          {{ pendingDeletePaymentId() === payment.id ? 'Confirmar borrado' : 'Eliminar' }}
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label class="label-coquette" for="payment-amount">Monto abonado</label>
+                <input id="payment-amount" type="number" min="0.01" step="0.01" [(ngModel)]="paymentForm().amountPaid" class="input-coquette" />
+              </div>
+              <div>
+                <label class="label-coquette" for="payment-penalty">Penalización pagada</label>
+                <input id="payment-penalty" type="number" min="0" step="0.01" [(ngModel)]="paymentForm().penaltyPaid" class="input-coquette" />
+              </div>
+              <div>
+                <label class="label-coquette" for="payment-date">Fecha y hora</label>
+                <input id="payment-date" type="datetime-local" [(ngModel)]="paymentForm().paymentDate" class="input-coquette" />
+              </div>
+              <label class="flex min-h-12 items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50 px-4 font-bold text-pink-800">
+                <input type="checkbox" [(ngModel)]="paymentForm().isVerified" class="h-4 w-4" />
+                Pago verificado
+              </label>
+              <div class="sm:col-span-2">
+                <label class="label-coquette" for="payment-notes">Notas</label>
+                <textarea id="payment-notes" rows="2" [(ngModel)]="paymentForm().notes" class="input-coquette" placeholder="Transferencia, efectivo, referencia..."></textarea>
+              </div>
+            </div>
+
+            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              @if (editingPaymentId()) {
+                <button (click)="cancelPaymentEdit()" class="btn-coquette btn-ghost justify-center">Nuevo abono</button>
+              }
+              <button (click)="showPaymentModal.set(false)" class="btn-coquette btn-ghost justify-center">Cerrar</button>
+              <button (click)="confirmPayment()" [disabled]="isSavingPay()" class="btn-coquette btn-pink justify-center">
+                {{ isSavingPay() ? 'Guardando...' : (editingPaymentId() ? 'Guardar cambios' : 'Registrar abono') }}
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -444,10 +586,19 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                  <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Nombre de la Tanda</label>
                  <input type="text" [(ngModel)]="editForm().name" class="input-coquette py-2" />
                </div>
+
+               <div class="col-span-2">
+                 <label class="text-[10px] font-black text-pink-500 uppercase mb-1 block" for="edit-product">Producto</label>
+                 <select id="edit-product" [(ngModel)]="editForm().productId" class="input-coquette py-2">
+                   @for (product of tandaProducts(); track product.id) {
+                     <option [value]="product.id">{{ product.name }}</option>
+                   }
+                 </select>
+               </div>
                
                <div>
                  <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Semanas Totales</label>
-                 <input type="number" [(ngModel)]="editForm().totalWeeks" class="input-coquette py-2" />
+                 <input type="number" min="1" max="52" [(ngModel)]="editForm().totalWeeks" class="input-coquette py-2" />
                </div>
                
                <div>
@@ -457,12 +608,22 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                
                <div>
                  <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Monto Semanal</label>
-                 <input type="number" [(ngModel)]="editForm().weeklyAmount" class="input-coquette py-2" />
+                 <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm().weeklyAmount" class="input-coquette py-2" />
                </div>
                
                <div>
                  <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Penalización</label>
-                 <input type="number" [(ngModel)]="editForm().penaltyAmount" class="input-coquette py-2" />
+                 <input type="number" min="0" step="0.01" [(ngModel)]="editForm().penaltyAmount" class="input-coquette py-2" />
+               </div>
+
+               <div class="col-span-2">
+                 <label class="text-[10px] font-black text-pink-500 uppercase mb-1 block" for="edit-status">Estado</label>
+                 <select id="edit-status" [(ngModel)]="editForm().status" class="input-coquette py-2">
+                   <option value="Draft">Borrador</option>
+                   <option value="Active">Activa</option>
+                   <option value="Completed">Completada</option>
+                   <option value="Cancelled">Cancelada</option>
+                 </select>
                </div>
              </div>
 
@@ -493,13 +654,9 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
              </div>
 
              <div class="space-y-3">
-                <button (click)="editingTurnId.set(p.id); selectedParticipantActions.set(null)" 
+                <button (click)="openParticipantEditor(p)"
                         class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
-                  <span class="text-lg">🔢</span> Cambiar Turno
-                </button>
-                <button (click)="editingVariantId.set(p.id); editVariantValue = p.variant || ''; selectedParticipantActions.set(null)" 
-                        class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
-                  <span class="text-lg">🎨</span> Editar Variante
+                  <span class="text-lg">✎</span> Editar participante
                 </button>
                 <button (click)="showRemoveConfirm.set(p); selectedParticipantActions.set(null)" 
                         class="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-500 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-rose-100">
@@ -510,6 +667,71 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                   Cancelar
                 </button>
              </div>
+          </div>
+        </div>
+      }
+
+      @if (editingParticipant(); as participant) {
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="participant-editor-title">
+          <div class="absolute inset-0 bg-pink-950/35" (click)="editingParticipant.set(null)"></div>
+          <div class="relative z-10 max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-pink-100 bg-white p-5 shadow-2xl sm:p-7">
+            <div class="mb-6">
+              <p class="text-[11px] font-black uppercase tracking-wider text-pink-500">Lugar {{ participant.assignedTurn }}</p>
+              <h3 id="participant-editor-title" class="text-xl font-black text-pink-950">Editar participante</h3>
+              <p class="text-sm text-pink-600">Todos los datos y lugares pueden modificarse.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="sm:col-span-2">
+                <label class="label-coquette" for="participant-client">Clienta</label>
+                <select id="participant-client" [(ngModel)]="participantForm().customerId" class="input-coquette">
+                  @for (client of allClients(); track client.id) {
+                    <option [ngValue]="client.id">{{ client.name }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-turn">Lugar</label>
+                <input id="participant-turn" type="number" min="1" [max]="tanda()?.totalWeeks ?? 52"
+                       [(ngModel)]="participantForm().assignedTurn" class="input-coquette" />
+                <p class="mt-1 text-[10px] text-pink-500">Si está ocupado, ambas participantes intercambian lugar.</p>
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-status">Estado</label>
+                <select id="participant-status" [(ngModel)]="participantForm().status" class="input-coquette">
+                  <option value="Active">Al corriente</option>
+                  <option value="Delinquent">Con retraso</option>
+                  <option value="Completed">Completada</option>
+                </select>
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-variant">Variante</label>
+                <input id="participant-variant" type="text" [(ngModel)]="participantForm().variant" class="input-coquette" placeholder="Color, talla o modelo" />
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-amount">Abono personalizado</label>
+                <input id="participant-amount" type="number" min="0.01" step="0.01"
+                       [(ngModel)]="participantForm().weeklyAmount" class="input-coquette"
+                       [placeholder]="'General: $' + (tanda()?.weeklyAmount ?? 0)" />
+              </div>
+              <label class="flex min-h-12 items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50 px-4 font-bold text-pink-800">
+                <input type="checkbox" [(ngModel)]="participantForm().isDelivered" class="h-4 w-4" />
+                Producto entregado
+              </label>
+              @if (participantForm().isDelivered) {
+                <div>
+                  <label class="label-coquette" for="participant-delivery-date">Fecha de entrega</label>
+                  <input id="participant-delivery-date" type="date" [(ngModel)]="participantForm().deliveryDate" class="input-coquette" />
+                </div>
+              }
+            </div>
+
+            <div class="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button (click)="editingParticipant.set(null)" class="btn-coquette btn-ghost justify-center">Cancelar</button>
+              <button (click)="saveParticipant()" [disabled]="isUpdatingParticipant()" class="btn-coquette btn-pink justify-center">
+                {{ isUpdatingParticipant() ? 'Guardando...' : 'Guardar participante' }}
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -601,13 +823,13 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
 
     <!-- Modal de Reordenamiento Drag & Drop -->
     @if (showReorderModal()) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div class="fixed inset-0 bg-pink-950/50 z-[100] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
           <!-- Header -->
           <div class="p-6 border-b flex justify-between items-center bg-gradient-to-r from-purple-50 to-pink-50">
             <div>
-              <h3 class="text-xl font-bold text-gray-800">Reordenar Participantes</h3>
-              <p class="text-xs text-gray-500">Arrastra para cambiar el orden de los turnos</p>
+              <h3 class="text-xl font-bold text-pink-950">Mover lugares</h3>
+              <p class="text-xs text-pink-600">Arrastra participantes o espacios vacíos. Todo el orden es editable.</p>
             </div>
             <button (click)="showReorderModal.set(false)" class="p-2 hover:bg-white rounded-full transition-colors">
               <span class="text-2xl text-gray-400">×</span>
@@ -619,24 +841,32 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
             <div cdkDropList 
                  (cdkDropListDropped)="drop($event)"
                  class="space-y-3">
-              @for (p of reorderList(); track p.id) {
+              @for (p of reorderSlots(); track $index) {
                 <div cdkDrag 
-                     class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 cursor-move hover:border-purple-300 transition-colors group">
-                  <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors">
+                     class="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm flex items-center gap-4 cursor-move hover:border-pink-300 transition-colors group">
+                  <div class="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-xs font-bold text-pink-500 group-hover:bg-pink-100 group-hover:text-pink-700 transition-colors">
                     {{ $index + 1 }}
                   </div>
                   <div class="flex-1">
-                    <p class="font-semibold text-gray-800">{{ p.customerName }}</p>
-                    <p class="text-xs text-gray-400">{{ p.variant || 'Sin variante' }}</p>
+                    @if (p; as participant) {
+                      <p class="font-semibold text-pink-950">{{ participant.customerName }}</p>
+                      <p class="text-xs text-pink-500">
+                        {{ participant.variant || 'Sin variante' }}
+                        @if (participant.isDelivered) { · Entregado }
+                      </p>
+                    } @else {
+                      <p class="font-semibold text-pink-400">Lugar disponible</p>
+                      <p class="text-xs text-pink-300">Puedes mover este espacio entre participantes</p>
+                    }
                   </div>
-                  <div class="text-gray-300 group-hover:text-purple-400">
+                  <div class="text-pink-300 group-hover:text-pink-500" aria-hidden="true">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
                     </svg>
                   </div>
 
                   <!-- Placeholder while dragging -->
-                  <div *cdkDragPlaceholder class="bg-purple-50 border-2 border-dashed border-purple-200 h-16 rounded-2xl"></div>
+                  <div *cdkDragPlaceholder class="bg-pink-50 border-2 border-dashed border-pink-200 h-16 rounded-2xl"></div>
                 </div>
               }
             </div>
@@ -669,6 +899,7 @@ export class TandaDetailComponent implements OnInit {
   private tandaService = inject(TandaService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
+  private destroyRef = inject(DestroyRef);
 
   tanda = signal<TandaDto | null>(null);
   participants = signal<TandaParticipantDto[]>([]);
@@ -721,6 +952,7 @@ export class TandaDetailComponent implements OnInit {
 
   // Inscripción
   allClients = signal<ClientDto[]>([]);
+  tandaProducts = signal<TandaProductDto[]>([]);
   clientSearch = signal('');
   showOnlyFrequent = signal(true);
   confirmingDelivery = signal<TandaParticipantDto | null>(null);
@@ -735,7 +967,7 @@ export class TandaDetailComponent implements OnInit {
 
   // Reordenamiento y Sorteo
   showReorderModal = signal(false);
-  reorderList = signal<TandaParticipantDto[]>([]);
+  reorderSlots = signal<Array<TandaParticipantDto | null>>([]);
   isSavingReorder = signal(false);
 
   showRoulette = signal(false);
@@ -749,16 +981,29 @@ export class TandaDetailComponent implements OnInit {
   showPaymentModal = signal(false);
   isSavingPay = signal(false);
   activePayment = signal<{ participant: TandaParticipantDto, week: number } | null>(null);
+  editingPaymentId = signal<string | null>(null);
+  pendingDeletePaymentId = signal<string | null>(null);
+  paymentForm = signal<PaymentForm>(this.createEmptyPaymentForm());
+
+  paymentsForActiveWeek = computed(() => {
+    const active = this.activePayment();
+    if (!active) return [];
+    return (active.participant.payments ?? [])
+      .filter(payment => payment.weekNumber === active.week)
+      .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+  });
 
   // Edición
   showEditModal = signal(false);
   isUpdatingTanda = signal(false);
-  editForm = signal({
+  editForm = signal<TandaEditForm>({
+    productId: '',
     name: '',
     totalWeeks: 10,
     weeklyAmount: 0,
     penaltyAmount: 0,
-    startDate: ''
+    startDate: '',
+    status: 'Active'
   });
 
   // Reordenamiento y Eliminación
@@ -768,6 +1013,17 @@ export class TandaDetailComponent implements OnInit {
   isUpdatingVariant = signal(false);
   selectedParticipantActions = signal<TandaParticipantDto | null>(null);
   showRemoveConfirm = signal<TandaParticipantDto | null>(null);
+  editingParticipant = signal<TandaParticipantDto | null>(null);
+  isUpdatingParticipant = signal(false);
+  participantForm = signal<ParticipantForm>({
+    customerId: 0,
+    assignedTurn: 1,
+    variant: '',
+    weeklyAmount: undefined,
+    status: 'Active',
+    isDelivered: false,
+    deliveryDate: ''
+  });
 
   filteredClientsSearch = computed(() => {
     const s = this.clientSearch().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -784,10 +1040,11 @@ export class TandaDetailComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.route.params.subscribe(params => {
-      this.loadTanda(params['id']);
-    });
+    this.route.params
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => this.loadTanda(params['id']));
     this.loadAllClients();
+    this.loadTandaProducts();
   }
 
   loadAllClients() {
@@ -821,7 +1078,11 @@ export class TandaDetailComponent implements OnInit {
   }
 
   hasPaid(participant: TandaParticipantDto, week: number): boolean {
-    return participant.payments?.some(p => p.weekNumber === week) || false;
+    return this.getWeekPaidAmount(participant, week) >= this.getParticipantWeeklyAmount(participant);
+  }
+
+  getWeekPaidAmount(participant: TandaParticipantDto, week: number): number {
+    return getVerifiedWeekPaidAmount(participant.payments, week);
   }
 
   getParticipantWeeklyAmount(p: TandaParticipantDto): number {
@@ -873,6 +1134,13 @@ export class TandaDetailComponent implements OnInit {
     this.showRoulette.set(true);
   }
 
+  loadTandaProducts() {
+    this.tandaService.getTandaProducts().subscribe({
+      next: products => this.tandaProducts.set(products),
+      error: () => this.toastService.error('No se pudo cargar el catálogo de productos')
+    });
+  }
+
   handleRouletteStart() {
     const winnerNames = this.rouletteWinnerNames();
     if (winnerNames.length > 0) {
@@ -881,22 +1149,25 @@ export class TandaDetailComponent implements OnInit {
   }
 
   openReorderModal() {
-    this.reorderList.set([...this.participants()].sort((a, b) => a.assignedTurn - b.assignedTurn));
+    this.reorderSlots.set(buildTandaSlots(
+      this.participants(),
+      this.tanda()?.totalWeeks ?? 0
+    ));
     this.showReorderModal.set(true);
   }
 
-  drop(event: CdkDragDrop<TandaParticipantDto[]>) {
-    const list = [...this.reorderList()];
+  drop(event: CdkDragDrop<Array<TandaParticipantDto | null>>) {
+    const list = [...this.reorderSlots()];
     moveItemInArray(list, event.previousIndex, event.currentIndex);
-    this.reorderList.set(list);
+    this.reorderSlots.set(list);
   }
 
   onSaveReorder() {
     const t = this.tanda();
     if (t && !this.isSavingReorder()) {
       this.isSavingReorder.set(true);
-      const ids = this.reorderList().map(p => p.id);
-      this.tandaService.reorderParticipants(t.id, ids).subscribe({
+      const assignments = buildPlaceAssignments(this.reorderSlots());
+      this.tandaService.updatePlaces(t.id, assignments).subscribe({
         next: () => {
           this.toastService.success('Orden actualizado con éxito ✨');
           this.showReorderModal.set(false);
@@ -916,7 +1187,7 @@ export class TandaDetailComponent implements OnInit {
     this.clientSearch.set('');
     this.showSuggestions.set(false);
     this.selectedSuggestionIdx.set(-1);
-    this.enrollTurn = this.participants().length + 1;
+    this.enrollTurn = this.findFirstAvailableTurn();
     this.enrollVariant = '';
     this.enrollWeeklyAmount = undefined;
   }
@@ -972,22 +1243,76 @@ export class TandaDetailComponent implements OnInit {
 
   openPaymentModal(participant: TandaParticipantDto, week: number) {
     this.activePayment.set({ participant, week });
+    const remaining = Math.max(
+      0,
+      this.getParticipantWeeklyAmount(participant) - this.getWeekPaidAmount(participant, week)
+    );
+    this.paymentForm.set({
+      ...this.createEmptyPaymentForm(),
+      amountPaid: remaining || this.getParticipantWeeklyAmount(participant)
+    });
+    this.editingPaymentId.set(null);
+    this.pendingDeletePaymentId.set(null);
     this.showPaymentModal.set(true);
     this.isSavingPay.set(false);
+  }
+
+  editPayment(payment: TandaPaymentDto) {
+    this.editingPaymentId.set(payment.id);
+    this.pendingDeletePaymentId.set(null);
+    this.paymentForm.set({
+      amountPaid: payment.amountPaid,
+      penaltyPaid: payment.penaltyPaid,
+      paymentDate: this.toDateTimeLocal(payment.paymentDate),
+      isVerified: payment.isVerified,
+      notes: payment.notes ?? ''
+    });
+  }
+
+  cancelPaymentEdit() {
+    const active = this.activePayment();
+    this.editingPaymentId.set(null);
+    this.pendingDeletePaymentId.set(null);
+    this.paymentForm.set({
+      ...this.createEmptyPaymentForm(),
+      amountPaid: active ? this.getParticipantWeeklyAmount(active.participant) : 0
+    });
   }
 
   confirmPayment() {
     const pay = this.activePayment();
     const t = this.tanda();
     if (pay && t && !this.isSavingPay()) {
+      const form = this.paymentForm();
+      if (form.amountPaid <= 0) {
+        this.toastService.error('Captura un monto mayor a cero');
+        return;
+      }
+
       this.isSavingPay.set(true);
-      this.tandaService.registerPayment({
+      const editingId = this.editingPaymentId();
+      const request = editingId
+        ? this.tandaService.updatePayment(editingId, {
+            weekNumber: pay.week,
+            amountPaid: form.amountPaid,
+            penaltyPaid: form.penaltyPaid,
+            paymentDate: new Date(form.paymentDate).toISOString(),
+            isVerified: form.isVerified,
+            notes: form.notes.trim() || undefined
+          })
+        : this.tandaService.registerPayment({
         participantId: pay.participant.id,
         weekNumber: pay.week,
-        amountPaid: this.getParticipantWeeklyAmount(pay.participant)
-      }).subscribe({
+            amountPaid: form.amountPaid,
+            penaltyPaid: form.penaltyPaid,
+            paymentDate: new Date(form.paymentDate).toISOString(),
+            isVerified: form.isVerified,
+            notes: form.notes.trim() || undefined
+          });
+
+      request.subscribe({
         next: () => {
-          this.toastService.success('Abono registrado correctamente 💅');
+          this.toastService.success(editingId ? 'Abono actualizado' : 'Abono registrado correctamente');
           this.showPaymentModal.set(false);
           this.loadTanda(t.id);
           this.isSavingPay.set(false);
@@ -1004,11 +1329,13 @@ export class TandaDetailComponent implements OnInit {
     const t = this.tanda();
     if (t) {
       this.editForm.set({
+        productId: t.productId,
         name: t.name,
         totalWeeks: t.totalWeeks,
         weeklyAmount: t.weeklyAmount,
         penaltyAmount: t.penaltyAmount || 0,
-        startDate: new Date(t.startDate).toISOString().split('T')[0]
+        startDate: t.startDate.split('T')[0],
+        status: t.status
       });
       this.showEditModal.set(true);
     }
@@ -1033,8 +1360,9 @@ export class TandaDetailComponent implements OnInit {
     }
   }
 
-  onUpdateTurn(p: TandaParticipantDto, event: any) {
-    const newTurn = parseInt(event.target.value);
+  onUpdateTurn(p: TandaParticipantDto, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const newTurn = Number.parseInt(input.value, 10);
     if (isNaN(newTurn) || newTurn === p.assignedTurn) {
       this.editingTurnId.set(null);
       return;
@@ -1162,18 +1490,130 @@ export class TandaDetailComponent implements OnInit {
   }
 
   onRemovePayment(participant: TandaParticipantDto, week: number) {
-    const payment = participant.payments?.find(pay => pay.weekNumber === week);
-    if (!payment) return;
+    this.openPaymentModal(participant, week);
+  }
 
-    if (confirm(`¿Quieres quitar el pago de la semana ${week} para ${participant.customerName}? Se borrará del historial.`)) {
-      this.tandaService.deletePayment(payment.id).subscribe({
-        next: () => {
-          this.toastService.success('Pago eliminado ✨');
-          const t = this.tanda();
-          if (t) this.loadTanda(t.id);
-        },
-        error: (err) => this.toastService.error(err.error?.message || 'Error al eliminar pago')
-      });
+  requestDeletePayment(paymentId: string) {
+    if (this.pendingDeletePaymentId() !== paymentId) {
+      this.pendingDeletePaymentId.set(paymentId);
+      return;
     }
+
+    this.tandaService.deletePayment(paymentId).subscribe({
+      next: () => {
+        this.toastService.success('Pago eliminado');
+        this.showPaymentModal.set(false);
+        const tanda = this.tanda();
+        if (tanda) this.loadTanda(tanda.id);
+      },
+      error: err => this.toastService.error(err.error?.message || 'Error al eliminar pago')
+    });
+  }
+
+  openParticipantEditor(participant: TandaParticipantDto) {
+    this.editingParticipant.set(participant);
+    this.participantForm.set({
+      customerId: participant.customerId,
+      assignedTurn: participant.assignedTurn,
+      variant: participant.variant ?? '',
+      weeklyAmount: participant.weeklyAmount,
+      status: participant.status,
+      isDelivered: participant.isDelivered,
+      deliveryDate: participant.deliveryDate?.split('T')[0] ?? ''
+    });
+    this.selectedParticipantActions.set(null);
+  }
+
+  saveParticipant() {
+    const participant = this.editingParticipant();
+    const tanda = this.tanda();
+    if (!participant || !tanda || this.isUpdatingParticipant()) return;
+
+    const form = this.participantForm();
+    const dto: UpdateTandaParticipantDto = {
+      customerId: form.customerId,
+      assignedTurn: form.assignedTurn,
+      variant: form.variant.trim() || undefined,
+      weeklyAmount: form.weeklyAmount || undefined,
+      status: form.status,
+      isDelivered: form.isDelivered,
+      deliveryDate: form.isDelivered && form.deliveryDate
+        ? new Date(`${form.deliveryDate}T12:00:00`).toISOString()
+        : undefined
+    };
+
+    this.isUpdatingParticipant.set(true);
+    this.tandaService.updateParticipant(participant.id, dto).subscribe({
+      next: () => {
+        this.toastService.success('Participante actualizada');
+        this.editingParticipant.set(null);
+        this.isUpdatingParticipant.set(false);
+        this.loadTanda(tanda.id);
+      },
+      error: err => {
+        this.isUpdatingParticipant.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo actualizar la participante');
+      }
+    });
+  }
+
+  setTandaStatus(status: TandaStatus) {
+    const tanda = this.tanda();
+    if (!tanda || this.isUpdatingTanda()) return;
+    this.isUpdatingTanda.set(true);
+    this.tandaService.updateTanda(tanda.id, {
+      productId: tanda.productId,
+      name: tanda.name,
+      totalWeeks: tanda.totalWeeks,
+      weeklyAmount: tanda.weeklyAmount,
+      penaltyAmount: tanda.penaltyAmount,
+      startDate: tanda.startDate,
+      status
+    }).subscribe({
+      next: () => {
+        this.isUpdatingTanda.set(false);
+        this.toastService.success('Estado de la tanda actualizado');
+        this.loadTanda(tanda.id);
+      },
+      error: err => {
+        this.isUpdatingTanda.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo cambiar el estado');
+      }
+    });
+  }
+
+  private findFirstAvailableTurn(): number {
+    const occupied = new Set(this.participants().map(participant => participant.assignedTurn));
+    const totalWeeks = this.tanda()?.totalWeeks ?? 1;
+    return Array.from({ length: totalWeeks }, (_, index) => index + 1)
+      .find(turn => !occupied.has(turn)) ?? totalWeeks;
+  }
+
+  private createEmptyPaymentForm(): PaymentForm {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return {
+      amountPaid: 0,
+      penaltyPaid: 0,
+      paymentDate: now.toISOString().slice(0, 16),
+      isVerified: true,
+      notes: ''
+    };
+  }
+
+  private toDateTimeLocal(value: string): string {
+    const date = new Date(value);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 16);
+  }
+
+  statusLabel(status: TandaStatus): string {
+    const labels: Record<TandaStatus, string> = {
+      Draft: 'Borrador',
+      Active: 'Activa',
+      Completed: 'Completada',
+      Cancelled: 'Cancelada'
+    };
+    return labels[status];
   }
 }

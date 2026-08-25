@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { CreateTandaDto, TandaDto, ClientDto, TandaProductDto } from '../../../core/models';
+import { CreateTandaDto, TandaDto, ClientDto, TandaProductDto, TandaStatus } from '../../../core/models';
 import { RouterLink } from '@angular/router';
 import { gsap } from 'gsap';
 import {
@@ -60,6 +60,29 @@ interface TandaForm {
           </button>
         </div>
 
+        @if (!loadingTandas()) {
+          <section class="rounded-3xl border border-pink-100 bg-white/90 px-5 py-4 shadow-sm" aria-label="Resumen de tandas">
+            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Activas</p>
+                <p class="mt-1 text-2xl font-black text-pink-950">{{ activeTandasCount() }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Lugares ocupados</p>
+                <p class="mt-1 text-2xl font-black text-pink-950">{{ occupiedPlacesCount() }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Cobrado</p>
+                <p class="mt-1 text-xl font-black text-pink-950">{{ totalCollected() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Por cobrar</p>
+                <p class="mt-1 text-xl font-black text-rose-700">{{ totalBalance() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+            </div>
+          </section>
+        }
+
         <!-- Filters & Search (Integrated) -->
         <div class="card-coquette p-5 animate-slide-up delay-100" style="opacity:0; animation-fill-mode: forwards;">
           <div class="flex flex-wrap gap-4 items-end">
@@ -67,19 +90,26 @@ interface TandaForm {
               <label class="label-coquette">🔍 Buscar Tanda o Producto</label>
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
-                <input class="input-coquette pl-10" 
+                <input class="input-coquette pl-10"
+                       type="search"
+                       [ngModel]="searchQuery()"
+                       (ngModelChange)="searchQuery.set($event)"
                        placeholder="Nombre de tanda o producto..." 
-                       [(ngModel)]="searchQuery" />
+                       aria-label="Buscar tanda o producto" />
               </div>
             </div>
 
             <div class="w-48">
               <label class="label-coquette">📋 Estado</label>
-              <select class="input-coquette py-2">
+              <select class="input-coquette py-2"
+                      [ngModel]="statusFilter()"
+                      (ngModelChange)="statusFilter.set($event)"
+                      aria-label="Filtrar por estado">
                 <option value="">Todas</option>
                 <option value="Active">🟢 Activas</option>
                 <option value="Draft">📝 Borradores</option>
                 <option value="Completed">💖 Completadas</option>
+                <option value="Cancelled">Canceladas</option>
               </select>
             </div>
           </div>
@@ -105,8 +135,8 @@ interface TandaForm {
                     <div class="flex flex-col gap-1.5">
                       <span class="text-[10px] font-black text-pink-400 tracking-[0.2em] uppercase">Tanda #{{ tanda.id.slice(0,4) }}</span>
                     </div>
-                    <span class="badge shadow-sm" [class]="tanda.status === 'Active' ? 'badge-confirmed' : 'badge-pending'">
-                      {{ tanda.status === 'Active' ? '🟢 Activa' : '⏳ Borrador' }}
+                    <span class="badge shadow-sm" [class]="statusClass(tanda.status)">
+                      {{ statusLabel(tanda.status) }}
                     </span>
                   </div>
 
@@ -126,7 +156,7 @@ interface TandaForm {
                     <div class="flex justify-between items-end">
                       <div>
                         <p class="text-[10px] text-pink-400 font-bold mb-1 uppercase tracking-wider">Abono Semanal</p>
-                        <p class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500">
+                        <p class="text-2xl font-black text-pink-700">
                           {{ tanda.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
                         </p>
                       </div>
@@ -135,6 +165,21 @@ interface TandaForm {
                         {{ tanda.totalWeeks }} Semanas
                         </p>
                       </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-5 space-y-2" aria-label="Avance de cobro">
+                    <div class="flex items-center justify-between text-[11px] font-bold text-pink-700">
+                      <span>{{ tanda.participantCount }} de {{ tanda.totalWeeks }} lugares</span>
+                      <span>{{ tanda.progressPercentage | number:'1.0-0' }}% cobrado</span>
+                    </div>
+                    <div class="h-2 overflow-hidden rounded-full bg-pink-100">
+                      <div class="h-full rounded-full bg-pink-600 transition-[width] duration-300"
+                           [style.width.%]="tanda.progressPercentage"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] font-semibold text-pink-500">
+                      <span>{{ tanda.collectedAmount | currency:'MXN':'symbol-narrow':'1.0-0' }} recibidos</span>
+                      <span>{{ tanda.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }} pendientes</span>
                     </div>
                   </div>
 
@@ -374,7 +419,8 @@ export class TandasComponent implements OnInit {
   scrollY = signal(0);
   
   // Filtros / Búsqueda
-  searchQuery = '';
+  searchQuery = signal('');
+  statusFilter = signal<TandaStatus | ''>('');
   
   // Gestión de Productos en Modal
   productSearch = '';
@@ -396,13 +442,20 @@ export class TandasComponent implements OnInit {
   };
 
   filteredTandas = computed(() => {
-    const q = this.searchQuery.toLowerCase().trim();
-    if (!q) return this.tandas();
-    return this.tandas().filter(t => 
-      t.name.toLowerCase().includes(q) || 
-      t.product?.name.toLowerCase().includes(q)
-    );
+    const q = this.searchQuery().toLowerCase().trim();
+    const status = this.statusFilter();
+    return this.tandas().filter(t => {
+      const matchesSearch = !q
+        || t.name.toLowerCase().includes(q)
+        || t.product?.name.toLowerCase().includes(q);
+      return matchesSearch && (!status || t.status === status);
+    });
   });
+
+  activeTandasCount = computed(() => this.tandas().filter(t => t.status === 'Active').length);
+  occupiedPlacesCount = computed(() => this.tandas().reduce((total, t) => total + t.participantCount, 0));
+  totalCollected = computed(() => this.tandas().reduce((total, t) => total + t.collectedAmount, 0));
+  totalBalance = computed(() => this.tandas().reduce((total, t) => total + t.balanceDue, 0));
 
   filteredPlaceClients = () => {
     const query = this.placeSearch.toLowerCase().trim();
@@ -433,7 +486,9 @@ export class TandasComponent implements OnInit {
 
   @HostListener('window:scroll')
   onScroll() {
-    this.scrollY.set(window.scrollY);
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.scrollY.set(window.scrollY);
+    }
   }
 
   ngOnInit() {
@@ -472,6 +527,10 @@ export class TandasComponent implements OnInit {
   }
 
   animateList() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gsap.set('.tanda-card-anim', { opacity: 1, y: 0 });
+      return;
+    }
     gsap.set('.tanda-card-anim', { opacity: 0, y: 30 });
     gsap.to('.tanda-card-anim', {
       opacity: 1,
@@ -577,7 +636,7 @@ export class TandasComponent implements OnInit {
     return this.newTanda.name.trim().length > 0
       && this.productSearch.trim().length > 0
       && this.newTanda.totalWeeks >= 1
-      && this.newTanda.weeklyAmount >= 0
+      && this.newTanda.weeklyAmount > 0
       && this.newTanda.startDate.length > 0
       && areTandaPlacesComplete(this.tandaPlaces(), this.newTanda.totalWeeks);
   }
@@ -652,5 +711,25 @@ export class TandasComponent implements OnInit {
     this.selectedPlaceTurn.set(1);
     this.showPlaceSuggestions.set(false);
     this.tandaPlaces.set(resizeTandaPlaces([], this.newTanda.totalWeeks));
+  }
+
+  statusLabel(status: TandaStatus): string {
+    const labels: Record<TandaStatus, string> = {
+      Draft: 'Borrador',
+      Active: 'Activa',
+      Completed: 'Completada',
+      Cancelled: 'Cancelada'
+    };
+    return labels[status];
+  }
+
+  statusClass(status: TandaStatus): string {
+    const classes: Record<TandaStatus, string> = {
+      Draft: 'badge-pending',
+      Active: 'badge-confirmed',
+      Completed: 'badge-delivered',
+      Cancelled: 'badge-canceled'
+    };
+    return classes[status];
   }
 }

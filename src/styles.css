@@ -901,6 +901,35 @@ select.input-coquette {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Accesibilidad: foco claro y movimiento opcional */
+:focus-visible {
+  outline: 3px solid #db2777;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .btn-coquette:hover,
+  .card-coquette:hover,
+  button:active,
+  a:active,
+  [role='button']:active {
+    transform: none !important;
+  }
+}
+
 @keyframes float {
 
   0%,

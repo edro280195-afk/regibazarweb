@@ -1187,6 +1187,9 @@ export interface CamiProactiveSuggestionDto {
 }
 
 // ── Tandas ──
+export type TandaStatus = 'Draft' | 'Active' | 'Completed' | 'Cancelled';
+export type TandaParticipantStatus = 'Active' | 'Delinquent' | 'Completed';
+
 export interface TandaProductDto {
     id: string;
     name: string;
@@ -1204,9 +1207,18 @@ export interface TandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
-    status: string; // Draft, Active, Completed, Cancelled
+    status: TandaStatus;
     createdAt: string;
     accessToken?: string;
+    currentWeek: number;
+    participantCount: number;
+    availablePlaces: number;
+    paidInstallments: number;
+    totalInstallments: number;
+    expectedAmount: number;
+    collectedAmount: number;
+    balanceDue: number;
+    progressPercentage: number;
     product?: TandaProductDto;
     participants?: TandaParticipantDto[];
 }
@@ -1220,8 +1232,12 @@ export interface TandaParticipantDto {
     weeklyAmount?: number;
     isDelivered: boolean;
     deliveryDate?: string;
-    status: string; // Active, Delinquent, Completed
+    status: TandaParticipantStatus;
     variant?: string;
+    expectedAmount: number;
+    collectedAmount: number;
+    balanceDue: number;
+    paidInstallments: number;
     payments?: TandaPaymentDto[];
 }
 
@@ -1289,7 +1305,47 @@ export interface RegisterPaymentDto {
     weekNumber: number;
     amountPaid: number;
     penaltyPaid?: number;
+    paymentDate?: string;
+    isVerified?: boolean;
     notes?: string;
+}
+
+export interface UpdateTandaDto {
+    productId?: string;
+    name: string;
+    totalWeeks: number;
+    weeklyAmount: number;
+    penaltyAmount: number;
+    startDate: string;
+    status?: TandaStatus;
+}
+
+export interface UpdateTandaParticipantDto {
+    customerId: number;
+    assignedTurn: number;
+    variant?: string;
+    weeklyAmount?: number;
+    status: TandaParticipantStatus;
+    isDelivered: boolean;
+    deliveryDate?: string;
+}
+
+export interface UpdateTandaPaymentDto {
+    weekNumber: number;
+    amountPaid: number;
+    penaltyPaid: number;
+    paymentDate: string;
+    isVerified: boolean;
+    notes?: string;
+}
+
+export interface TandaPlaceAssignmentDto {
+    participantId: string;
+    assignedTurn: number;
+}
+
+export interface ApiMessageDto {
+    message: string;
 }
 
 // ── Raffle Models ──

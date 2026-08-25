@@ -43,6 +43,27 @@ vista previa a escala física:
 En Safari de iPhone/iPad no existe Web Bluetooth confiable para la B1. Compartir
 el PNG evita una integración frágil y mantiene el diseño exacto.
 
+### Impresión directa de bolsas desde Android
+
+En **Administrar ruta** hay una tarjeta de **Etiquetas de bolsas**. Está pensada
+para la AIYIN E40 Pro y permite enviar todas las bolsas de la ruta con un solo
+toque, sin abrir Label Expert por cada etiqueta.
+
+1. En los ajustes Bluetooth de Android, empareja primero la E40 Pro.
+2. En la tarjeta toca **Configurar**, autoriza Bluetooth y selecciona la E40.
+   Esa elección queda guardada sólo en ese teléfono.
+3. Toca **Imprimir N etiquetas**. La app prepara cada diseño publicado, lo
+   envía por Bluetooth en orden y muestra el avance de la cola.
+4. Si una bolsa no se envía, queda marcada como pendiente; usa **Reintentar**
+   sin volver a mandar las que ya aceptó la impresora.
+
+La E40 recibe el trabajo en TSPL por Bluetooth Classic (SPP), a 800 × 1200 dots
+para el área útil de una etiqueta de 100 × 150 mm. La bitácora registra el
+evento cuando el equipo acepta los bytes; como cualquier impresora térmica, eso
+no prueba que el papel haya salido físicamente. Si la E40 no aparece entre los
+equipos emparejados o no acepta SPP, abre **Vista previa** en la bolsa y usa el
+envío a Label Expert como respaldo.
+
 ## Reglas de seguridad y recuperación
 
 - Sólo una plantilla predeterminada por tipo puede imprimir automáticamente.
