@@ -102,9 +102,14 @@ interface TandaEditForm {
         <section class="rounded-3xl border border-pink-100 bg-white px-5 py-5 shadow-sm" aria-label="Resumen financiero de la tanda">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-black text-pink-800">{{ statusLabel(t.status) }}</span>
-                <span class="text-xs font-bold text-pink-500">Semana {{ t.currentWeek || 0 }} de {{ t.totalWeeks }}</span>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-black text-pink-800">{{ statusLabel(t.status) }}</span>
+                  <span class="text-xs font-bold text-pink-500">Semana {{ t.currentWeek || 0 }} de {{ t.totalWeeks }}</span>
+                </div>
+                <button (click)="openEditModal()" class="px-3 py-1 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs border border-pink-200 shadow-sm flex items-center gap-1.5 transition-all active:scale-95">
+                  <span>✎</span> Editar Tanda
+                </button>
               </div>
               <h1 class="mt-2 truncate text-2xl font-black text-pink-950">{{ t.name }}</h1>
               <p class="text-sm font-semibold text-pink-600">{{ t.product?.name || 'Producto sin definir' }}</p>
@@ -472,7 +477,12 @@ interface TandaEditForm {
           <div class="space-y-6">
             <!-- Tanda Summary Card -->
             <div class="card-coquette p-6 bg-gradient-to-br from-white to-pink-50/30">
-              <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-4">Información General</h4>
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em]">Información General</h4>
+                <button (click)="openEditModal()" class="text-xs font-bold text-pink-600 hover:text-pink-800 bg-pink-100/60 hover:bg-pink-100 px-2 py-0.5 rounded-lg border border-pink-200 transition-colors">
+                  ✎ Editar
+                </button>
+              </div>
               <div class="space-y-4">
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-pink-600 font-bold italic">Producto:</span>
@@ -700,65 +710,123 @@ interface TandaEditForm {
 
       <!-- EDIT TANDA MODAL -->
       @if (showEditModal()) {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="showEditModal.set(false)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-lg relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl">📝</span> Editar Detalles de Tanda
-             </h3>
-             
-             <div class="grid grid-cols-2 gap-4 mb-8">
-               <div class="col-span-2">
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Nombre de la Tanda</label>
-                 <input type="text" [(ngModel)]="editForm().name" class="input-coquette py-2" />
+        <div class="fixed inset-0 z-[100] overflow-y-auto bg-pink-950/40 p-4 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="edit-tanda-title">
+          <div class="flex min-h-full items-center justify-center">
+            <div class="relative w-full max-w-lg rounded-3xl border border-pink-100 bg-white p-6 sm:p-8 shadow-2xl animate-scale-in">
+               <div class="mb-5 flex items-start justify-between gap-4 border-b border-pink-100/60 pb-3">
+                 <div>
+                   <h3 id="edit-tanda-title" class="text-xl font-black text-pink-950 flex items-center gap-2">
+                      <span class="text-2xl">📝</span> Editar Detalles de Tanda
+                   </h3>
+                   <p class="text-xs text-pink-500 font-medium">Modifica nombre, producto, fechas, valores y monedas</p>
+                 </div>
+                 <button (click)="showEditModal.set(false)" class="h-9 w-9 rounded-full bg-pink-50 hover:bg-pink-100 text-lg font-black text-pink-700 flex items-center justify-center transition-colors">×</button>
                </div>
+               
+               <div class="space-y-4 mb-6">
+                 <div>
+                   <label class="label-coquette" for="edit-tanda-name">Nombre de la Tanda</label>
+                   <input id="edit-tanda-name" type="text" [(ngModel)]="editForm().name" class="input-coquette text-sm font-bold" />
+                 </div>
 
-               <div class="col-span-2">
-                 <label class="text-[10px] font-black text-pink-500 uppercase mb-1 block" for="edit-product">Producto</label>
-                 <select id="edit-product" [(ngModel)]="editForm().productId" class="input-coquette py-2">
-                   @for (product of tandaProducts(); track product.id) {
-                     <option [value]="product.id">{{ product.name }}</option>
+                 <div>
+                   <label class="label-coquette" for="edit-product">Producto del Catálogo</label>
+                   <select id="edit-product" [(ngModel)]="editForm().productId" class="input-coquette text-sm font-bold">
+                     @for (product of tandaProducts(); track product.id) {
+                       <option [value]="product.id">{{ product.name }}</option>
+                     }
+                   </select>
+                 </div>
+
+                 <!-- Sección de Moneda y Valor del Artículo -->
+                 <div class="p-3.5 bg-pink-50/70 border border-pink-100 rounded-2xl space-y-3">
+                   <div class="flex items-center justify-between">
+                     <span class="text-xs font-black text-pink-900">💵 Moneda y Valor</span>
+                     <div class="flex rounded-xl bg-white p-0.5 border border-pink-200">
+                       <button type="button" (click)="setEditCurrency('MXN')"
+                               [class.bg-pink-500]="editForm().currency === 'MXN'"
+                               [class.text-white]="editForm().currency === 'MXN'"
+                               [class.text-pink-700]="editForm().currency !== 'MXN'"
+                               class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">MXN ($)</button>
+                       <button type="button" (click)="setEditCurrency('USD')"
+                               [class.bg-pink-500]="editForm().currency === 'USD'"
+                               [class.text-white]="editForm().currency === 'USD'"
+                               [class.text-pink-700]="editForm().currency !== 'USD'"
+                               class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">USD ($)</button>
+                     </div>
+                   </div>
+
+                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                     <div>
+                       <label class="text-[10px] font-bold text-pink-700">Valor Artículo ({{ editForm().currency || 'MXN' }})</label>
+                       <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                              placeholder="Ej. 1200"
+                              [(ngModel)]="editForm().itemCost"
+                              (ngModelChange)="onEditItemCostOrRateChange()" />
+                     </div>
+                     @if (editForm().currency === 'USD') {
+                       <div>
+                         <label class="text-[10px] font-bold text-pink-700">Tipo de Cambio (MXN/USD)</label>
+                         <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                                placeholder="Ej. 19.50"
+                                [(ngModel)]="editForm().exchangeRate"
+                                (ngModelChange)="onEditItemCostOrRateChange()" />
+                       </div>
+                     } @else {
+                       <div class="flex flex-col justify-end">
+                         <p class="text-[11px] text-pink-500 italic pb-1.5">Moneda nacional estándar</p>
+                       </div>
+                     }
+                   </div>
+
+                   @if (editForm().currency === 'USD' && editForm().itemCost && editForm().exchangeRate) {
+                     <div class="text-[11px] font-semibold text-purple-700 bg-purple-50/80 px-2.5 py-1.5 rounded-xl border border-purple-100 flex justify-between">
+                       <span>Equivalente en pesos:</span>
+                       <span class="font-black">{{ (editForm().itemCost! * editForm().exchangeRate!) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                     </div>
                    }
-                 </select>
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Semanas Totales</label>
-                 <input type="number" min="1" max="52" [(ngModel)]="editForm().totalWeeks" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Fecha de Inicio</label>
-                 <input type="date" [(ngModel)]="editForm().startDate" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Monto Semanal</label>
-                 <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm().weeklyAmount" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Penalización</label>
-                 <input type="number" min="0" step="0.01" [(ngModel)]="editForm().penaltyAmount" class="input-coquette py-2" />
+                 </div>
+                 
+                 <div class="grid grid-cols-2 gap-3">
+                   <div>
+                     <label class="label-coquette">Semanas Totales</label>
+                     <input type="number" min="1" max="52" [(ngModel)]="editForm().totalWeeks" (ngModelChange)="onEditItemCostOrRateChange()" class="input-coquette text-sm font-bold" />
+                   </div>
+                   <div>
+                     <label class="label-coquette">Abono Semanal (MXN)</label>
+                     <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm().weeklyAmount" class="input-coquette text-sm font-bold" />
+                   </div>
+                 </div>
+
+                 <div class="grid grid-cols-2 gap-3">
+                   <div>
+                     <label class="label-coquette">Fecha de Inicio</label>
+                     <input type="date" [(ngModel)]="editForm().startDate" class="input-coquette text-sm font-bold" />
+                   </div>
+                   <div>
+                     <label class="label-coquette">Penalización</label>
+                     <input type="number" min="0" step="0.01" [(ngModel)]="editForm().penaltyAmount" class="input-coquette text-sm font-bold" />
+                   </div>
+                 </div>
+
+                 <div>
+                   <label class="label-coquette" for="edit-status">Estado</label>
+                   <select id="edit-status" [(ngModel)]="editForm().status" class="input-coquette text-sm font-bold">
+                     <option value="Draft">Borrador</option>
+                     <option value="Active">Activa</option>
+                     <option value="Completed">Completada</option>
+                     <option value="Cancelled">Cancelada</option>
+                   </select>
+                 </div>
                </div>
 
-               <div class="col-span-2">
-                 <label class="text-[10px] font-black text-pink-500 uppercase mb-1 block" for="edit-status">Estado</label>
-                 <select id="edit-status" [(ngModel)]="editForm().status" class="input-coquette py-2">
-                   <option value="Draft">Borrador</option>
-                   <option value="Active">Activa</option>
-                   <option value="Completed">Completada</option>
-                   <option value="Cancelled">Cancelada</option>
-                 </select>
+               <div class="flex flex-col-reverse sm:flex-row gap-3">
+                  <button (click)="showEditModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
+                  <button (click)="onUpdateTanda()" [disabled]="isUpdatingTanda()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
+                     @if (isUpdatingTanda()) { <span class="animate-spin italic">⌛</span> } @else { Guardar Cambios ✨ }
+                  </button>
                </div>
-             </div>
-
-             <div class="flex gap-4">
-                <button (click)="showEditModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
-                <button (click)="onUpdateTanda()" [disabled]="isUpdatingTanda()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isUpdatingTanda()) { <span class="animate-spin italic">⌛</span> } @else { Guardar Cambios ✨ }
-                </button>
-             </div>
+            </div>
           </div>
         </div>
       }
@@ -1558,6 +1626,28 @@ export class TandaDetailComponent implements OnInit {
           this.toastService.error(err.error?.message || 'Error de pago. Solo Viernes/Sábado.');
         }
       });
+    }
+  }
+
+  setEditCurrency(curr: string) {
+    this.editForm.update(f => {
+      const exchangeRate = curr === 'USD' && !f.exchangeRate ? 19.50 : f.exchangeRate;
+      return { ...f, currency: curr, exchangeRate };
+    });
+    this.onEditItemCostOrRateChange();
+  }
+
+  onEditItemCostOrRateChange() {
+    const f = this.editForm();
+    if (f.itemCost && f.itemCost > 0 && f.totalWeeks > 0) {
+      let totalMxn = f.itemCost;
+      if (f.currency === 'USD' && f.exchangeRate) {
+        totalMxn = f.itemCost * f.exchangeRate;
+      }
+      this.editForm.update(form => ({
+        ...form,
+        weeklyAmount: Math.ceil(totalMxn / form.totalWeeks)
+      }));
     }
   }
 
