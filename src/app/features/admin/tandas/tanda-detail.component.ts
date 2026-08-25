@@ -210,7 +210,106 @@ interface TandaEditForm {
               </div>
 
               @if (viewMode() === 'table') {
-                <div class="overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide animate-fade-in">
+                <!-- VISTA MÓVIL: SEMANA POR SEMANA (< lg) -->
+                <div class="block lg:hidden space-y-4 animate-fade-in">
+                  <!-- Selector de Semana -->
+                  <div class="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-3 border border-pink-100 shadow-sm">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                      <button (click)="prevSelectedWeek()" 
+                              [disabled]="selectedWeekMobile() <= 1"
+                              class="w-9 h-9 rounded-xl bg-white border border-pink-100 text-pink-600 font-black text-base flex items-center justify-center shadow-sm disabled:opacity-40 disabled:pointer-events-none hover:bg-pink-100 active:scale-95 transition-all">
+                        ←
+                      </button>
+                      <div class="text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                          <span class="text-base font-black text-pink-900">Semana {{ selectedWeekMobile() }}</span>
+                          @if (selectedWeekMobile() === currentWeek()) {
+                            <span class="px-2 py-0.5 rounded-full bg-pink-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                              Actual
+                            </span>
+                          }
+                        </div>
+                        <p class="text-[10px] text-pink-500 font-bold">
+                          Cobrado: {{ mobileWeekStats().collected | currency:'MXN':'symbol-narrow':'1.0-0' }} · {{ mobileWeekStats().paidCount }}/{{ participants().length }} pagadas
+                        </p>
+                      </div>
+                      <button (click)="nextSelectedWeek()" 
+                              [disabled]="selectedWeekMobile() >= (tanda()?.totalWeeks ?? 52)"
+                              class="w-9 h-9 rounded-xl bg-white border border-pink-100 text-pink-600 font-black text-base flex items-center justify-center shadow-sm disabled:opacity-40 disabled:pointer-events-none hover:bg-pink-100 active:scale-95 transition-all">
+                        →
+                      </button>
+                    </div>
+
+                    <!-- Píldoras rápidas de semanas -->
+                    <div class="flex gap-1.5 overflow-x-auto pb-1 pt-1 scrollbar-hide">
+                      @for (w of weeksArray(); track w) {
+                        <button (click)="selectedWeekMobile.set(w)"
+                                [class]="selectedWeekMobile() === w 
+                                  ? 'bg-pink-600 text-white font-black shadow-md scale-105' 
+                                  : (w === currentWeek() ? 'bg-pink-100 text-pink-800 font-bold border border-pink-300' : 'bg-white text-pink-600 border border-pink-100 font-medium')"
+                                class="px-3 py-1 rounded-xl text-xs shrink-0 transition-all">
+                          Sem {{ w }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Lista de Participantes para la Semana Seleccionada -->
+                  <div class="space-y-2.5">
+                    @for (p of participants(); track p.id) {
+                      <div class="bg-white rounded-2xl p-4 border border-pink-100 shadow-sm flex items-center justify-between gap-3 hover:border-pink-200 transition-all">
+                        <!-- Info Clienta -->
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <span class="w-7 h-7 rounded-xl bg-pink-800 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-sm">
+                            {{ p.assignedTurn }}
+                          </span>
+                          <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                              <p class="text-sm font-black text-pink-950 truncate">{{ p.customerName }}</p>
+                              @if (p.isDelivered) {
+                                <span class="text-[11px]" title="Producto entregado">📦</span>
+                              }
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5 text-[10px] text-pink-400">
+                              <span>Cuota: {{ getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                              @if (p.variant) {
+                                <span>· {{ p.variant }}</span>
+                              }
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Botón de Pago / Estado para la semana -->
+                        <div class="flex items-center gap-2 shrink-0">
+                          @if (hasPaid(p, selectedWeekMobile())) {
+                            <button (click)="openPaymentModal(p, selectedWeekMobile())"
+                                    class="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-black text-xs border border-emerald-100 flex items-center gap-1 shadow-sm active:scale-95 transition-all">
+                              <span>✓</span> {{ getWeekPaidAmount(p, selectedWeekMobile()) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                            </button>
+                          } @else {
+                            <button (click)="openPaymentModal(p, selectedWeekMobile())"
+                                    class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xs shadow-md shadow-pink-200 active:scale-95 transition-all">
+                              {{ getWeekPaidAmount(p, selectedWeekMobile()) > 0 ? 'Abonar ' + (getWeekPaidAmount(p, selectedWeekMobile()) | currency:'MXN':'symbol-narrow':'1.0-0') : 'Abonar ' + (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
+                            </button>
+                          }
+
+                          <button (click)="selectedParticipantActions.set(p)" 
+                                  class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
+                            ⚙️
+                          </button>
+                        </div>
+                      </div>
+                    } @empty {
+                      <div class="text-center py-12 text-pink-300 font-medium bg-pink-50/30 rounded-2xl border border-dashed border-pink-100">
+                        <div class="text-3xl mb-1">🌸</div>
+                        No hay participantes registradas
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <!-- VISTA ESCRITORIO: TABLA COMPLETA (>= lg) -->
+                <div class="hidden lg:block overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide animate-fade-in">
                   <table class="table-coquette w-full">
                     <thead>
                       <tr>
@@ -223,80 +322,80 @@ interface TandaEditForm {
                         <th class="text-center">⚙️</th>
                       </tr>
                     </thead>
-                  <tbody>
-                    @for (p of participants(); track p.id) {
-                      <tr class="group">
-                        <td class="sticky left-0 z-20 bg-white group-hover:bg-pink-50/30 transition-colors shadow-[4px_0_8px_rgba(131,24,67,0.03)]">
-                          <div class="flex items-center gap-3">
-                            <!-- Turno Editable -->
-                            @if (editingTurnId() === p.id) {
-                              <input type="number" 
-                                     [value]="p.assignedTurn" 
-                                     (blur)="editingTurnId.set(null)"
-                                     (keyup.enter)="onUpdateTurn(p, $event)"
-                                     class="w-10 h-8 rounded border-pink-200 text-center font-black text-pink-600 bg-pink-50 p-1"
-                                     #turnInput
-                                     (focus)="turnInput.select()">
-                            } @else {
-                              <span (click)="editingTurnId.set(p.id)" 
-                                    class="w-6 h-6 rounded bg-pink-800 text-white text-[10px] font-black flex items-center justify-center shrink-0 cursor-pointer hover:bg-pink-600 transition-colors"
-                                    title="Clic para cambiar turno">{{ p.assignedTurn }}</span>
-                            }
-                            <span class="text-sm font-black text-pink-900 truncate flex-1" [title]="p.customerName">{{ p.customerName }}</span>
-                            <!-- Botón de ajustes móvil -->
-                            <button (click)="selectedParticipantActions.set(p)" 
-                                    class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
-                                ⚙️
-                            </button>
-                          </div>
-                        </td>
-                        @for (w of weeksArray(); track w) {
-                          <td class="text-center p-2">
-                            @if (hasPaid(p, w)) {
-                              <button (click)="openPaymentModal(p, w)"
-                                      class="w-full rounded-lg bg-pink-50 px-1 py-1.5 text-[10px] font-black text-pink-700 hover:bg-pink-100"
-                                      [attr.aria-label]="'Ver pagos de la semana ' + w + ' de ' + p.customerName">
-                                ✓ {{ getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                    <tbody>
+                      @for (p of participants(); track p.id) {
+                        <tr class="group">
+                          <td class="sticky left-0 z-20 bg-white group-hover:bg-pink-50/30 transition-colors shadow-[4px_0_8px_rgba(131,24,67,0.03)]">
+                            <div class="flex items-center gap-3">
+                              <!-- Turno Editable -->
+                              @if (editingTurnId() === p.id) {
+                                <input type="number" 
+                                       [value]="p.assignedTurn" 
+                                       (blur)="editingTurnId.set(null)"
+                                       (keyup.enter)="onUpdateTurn(p, $event)"
+                                       class="w-10 h-8 rounded border-pink-200 text-center font-black text-pink-600 bg-pink-50 p-1"
+                                       #turnInput
+                                       (focus)="turnInput.select()">
+                              } @else {
+                                <span (click)="editingTurnId.set(p.id)" 
+                                      class="w-6 h-6 rounded bg-pink-800 text-white text-[10px] font-black flex items-center justify-center shrink-0 cursor-pointer hover:bg-pink-600 transition-colors"
+                                      title="Clic para cambiar turno">{{ p.assignedTurn }}</span>
+                              }
+                              <span class="text-sm font-black text-pink-900 truncate flex-1" [title]="p.customerName">{{ p.customerName }}</span>
+                              <!-- Botón de ajustes -->
+                              <button (click)="selectedParticipantActions.set(p)" 
+                                      class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
+                                  ⚙️
                               </button>
-                            } @else {
-                              <button (click)="openPaymentModal(p, w)" 
-                                      class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
-                                {{ getWeekPaidAmount(p, w) > 0 ? (getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0') : (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
-                              </button>
-                            }
+                            </div>
                           </td>
-                        }
-                        @if (tanda(); as t) {
+                          @for (w of weeksArray(); track w) {
+                            <td class="text-center p-2">
+                              @if (hasPaid(p, w)) {
+                                <button (click)="openPaymentModal(p, w)"
+                                        class="w-full rounded-lg bg-pink-50 px-1 py-1.5 text-[10px] font-black text-pink-700 hover:bg-pink-100"
+                                        [attr.aria-label]="'Ver pagos de la semana ' + w + ' de ' + p.customerName">
+                                  ✓ {{ getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                                </button>
+                              } @else {
+                                <button (click)="openPaymentModal(p, w)" 
+                                        class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
+                                  {{ getWeekPaidAmount(p, w) > 0 ? (getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0') : (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
+                                </button>
+                              }
+                            </td>
+                          }
+                          @if (tanda(); as t) {
+                            <td class="text-center">
+                              <span class="text-[9px] font-black text-pink-400 uppercase tracking-tight">
+                                {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
+                              </span>
+                            </td>
+                          }
                           <td class="text-center">
-                            <span class="text-[9px] font-black text-pink-400 uppercase tracking-tight">
-                              {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
-                            </span>
+                            <input type="checkbox" [checked]="p.isDelivered"
+                                   (click)="$event.preventDefault(); openParticipantEditor(p)"
+                                   [attr.aria-label]="'Editar entrega de ' + p.customerName"
+                                   class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
                           </td>
-                        }
-                        <td class="text-center">
-                          <input type="checkbox" [checked]="p.isDelivered"
-                                 (click)="$event.preventDefault(); openParticipantEditor(p)"
-                                 [attr.aria-label]="'Editar entrega de ' + p.customerName"
-                                 class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
-                        </td>
-                        <td class="text-center">
-                          <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
-                             ⚙️
-                          </button>
-                        </td>
-                      </tr>
-                    } @empty {
-                      <tr>
-                        <td [attr.colspan]="weeksArray().length + 3" class="text-center py-20 text-pink-300 font-medium">
-                          <div class="text-4xl mb-2">🌸</div>
-                          Comienza inscribiendo a las participantes
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            } @else {
+                          <td class="text-center">
+                            <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
+                               ⚙️
+                            </button>
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td [attr.colspan]="weeksArray().length + 3" class="text-center py-20 text-pink-300 font-medium">
+                            <div class="text-4xl mb-2">🌸</div>
+                            Comienza inscribiendo a las participantes
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
                 <!-- RUTA DE ENTREGAS CON ESTEROIDES (Visual View) -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-in">
                   @for (p of participants(); track p.id) {
@@ -941,6 +1040,22 @@ export class TandaDetailComponent implements OnInit {
   sundayParticipant = signal<TandaParticipantDto | null>(null);
   loading = signal(true);
   viewMode = signal<'table' | 'visual'>('table');
+  selectedWeekMobile = signal<number>(1);
+
+  mobileWeekStats = computed(() => {
+    const w = this.selectedWeekMobile();
+    const parts = this.participants();
+    let collected = 0;
+    let paidCount = 0;
+    for (const p of parts) {
+      const paid = this.getWeekPaidAmount(p, w);
+      collected += paid;
+      if (paid >= this.getParticipantWeeklyAmount(p)) {
+        paidCount++;
+      }
+    }
+    return { collected, paidCount };
+  });
 
   currentWeek = computed(() => {
     const t = this.tanda();
@@ -1110,6 +1225,10 @@ export class TandaDetailComponent implements OnInit {
           this.participants.set([...data.participants].sort((a, b) => a.assignedTurn - b.assignedTurn));
         }
         this.weeksArray.set(Array.from({ length: data.totalWeeks }, (_, i) => i + 1));
+        const cw = this.currentWeek();
+        if (cw > 0 && cw <= data.totalWeeks) {
+          this.selectedWeekMobile.set(cw);
+        }
         this.loading.set(false);
 
         this.tandaService.getSundayDelivery(id).subscribe({
@@ -1122,6 +1241,15 @@ export class TandaDetailComponent implements OnInit {
         this.toastService.error('Tanda no encontrada o error de servidor 😿');
       }
     });
+  }
+
+  prevSelectedWeek() {
+    this.selectedWeekMobile.update(w => Math.max(1, w - 1));
+  }
+
+  nextSelectedWeek() {
+    const total = this.tanda()?.totalWeeks ?? 52;
+    this.selectedWeekMobile.update(w => Math.min(total, w + 1));
   }
 
   hasPaid(participant: TandaParticipantDto, week: number): boolean {
