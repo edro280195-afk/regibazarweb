@@ -48,6 +48,9 @@ interface ParticipantForm {
   assignedTurn: number;
   variant: string;
   weeklyAmount?: number;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
   status: TandaParticipantStatus;
   isDelivered: boolean;
   deliveryDate: string;
@@ -60,6 +63,9 @@ interface TandaEditForm {
   weeklyAmount: number;
   penaltyAmount: number;
   startDate: string;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
   status: TandaStatus;
 }
 
@@ -480,6 +486,21 @@ interface TandaEditForm {
                   <span class="text-pink-600 font-bold italic">Paga Semanal:</span>
                   <span class="text-base font-black text-pink-600">{{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                 </div>
+                @if (t.itemCost) {
+                  <div class="flex justify-between items-center text-sm pt-2 border-t border-pink-100">
+                    <span class="text-pink-600 font-bold italic">Valor Artículo:</span>
+                    <span class="text-sm font-black text-purple-800">
+                      {{ t.itemCost | currency:(t.currency || 'MXN'):'symbol-narrow':'1.0-0' }}
+                      <span class="text-[10px] uppercase font-bold text-pink-400">({{ t.currency || 'MXN' }})</span>
+                    </span>
+                  </div>
+                }
+                @if (t.currency === 'USD' && t.exchangeRate) {
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-pink-500 font-bold">Tipo de Cambio:</span>
+                    <span class="font-black text-pink-700">{{ t.exchangeRate | currency:'MXN':'symbol-narrow':'1.2-2' }} MXN/USD</span>
+                  </div>
+                }
               </div>
 
               <!-- Enlace de Clienta -->
@@ -563,9 +584,15 @@ interface TandaEditForm {
                           <input type="number" [(ngModel)]="enrollTurn" class="input-coquette py-1.5 text-xs text-center font-black" min="1" [max]="t.totalWeeks" />
                         </div>
                       </div>
-                      <div>
-                        <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Abono Semanal (vacío = usar {{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }})</label>
-                        <input type="number" [(ngModel)]="enrollWeeklyAmount" class="input-coquette py-1.5 text-xs font-bold" placeholder="Ej. 350" />
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Abono Semanal (MXN)</label>
+                          <input type="number" [(ngModel)]="enrollWeeklyAmount" class="input-coquette py-1.5 text-xs font-bold" [placeholder]="t.weeklyAmount.toString()" />
+                        </div>
+                        <div>
+                          <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Valor Propio (Opcional)</label>
+                          <input type="number" [(ngModel)]="enrollItemCost" class="input-coquette py-1.5 text-xs font-bold" placeholder="Ej. 1200" />
+                        </div>
                       </div>
                       <button (click)="onAddParticipant()" [disabled]="isEnrolling()" class="btn-coquette btn-pink w-full py-3 text-[10px] font-black shadow-md">
                         @if (isEnrolling()) { <span class="animate-spin italic">⌛</span> } @else { Inscribir en Tanda 🎀 }
@@ -828,6 +855,32 @@ interface TandaEditForm {
                 <input id="participant-turn" type="number" min="1" [max]="tanda()?.totalWeeks ?? 52"
                        [(ngModel)]="participantForm().assignedTurn" class="input-coquette" />
                 <p class="mt-1 text-[10px] text-pink-500">Si está ocupado, ambas participantes intercambian lugar.</p>
+              </div>
+
+              <div>
+                <label class="label-coquette" for="participant-amount">Abono Semanal (MXN)</label>
+                <input id="participant-amount" type="number" min="0.01" step="0.01"
+                       [(ngModel)]="participantForm().weeklyAmount" class="input-coquette"
+                       [placeholder]="tanda()?.weeklyAmount?.toString() || 'General'" />
+              </div>
+
+              <div>
+                <label class="label-coquette" for="participant-cost">Valor del Artículo</label>
+                <input id="participant-cost" type="number" min="0" step="0.01"
+                       [(ngModel)]="participantForm().itemCost" class="input-coquette"
+                       placeholder="Ej. 1200" />
+              </div>
+
+              <div>
+                <label class="label-coquette" for="participant-curr">Moneda / Tipo de Cambio</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <select id="participant-curr" [(ngModel)]="participantForm().currency" class="input-coquette">
+                    <option value="">(Heredar de Tanda)</option>
+                    <option value="MXN">MXN</option>
+                    <option value="USD">USD</option>
+                  </select>
+                  <input type="number" step="0.01" [(ngModel)]="participantForm().exchangeRate" class="input-coquette" placeholder="T.C." />
+                </div>
               </div>
               <div>
                 <label class="label-coquette" for="participant-status">Estado</label>
@@ -1112,6 +1165,9 @@ export class TandaDetailComponent implements OnInit {
   enrollTurn = 1;
   enrollVariant = '';
   enrollWeeklyAmount?: number;
+  enrollCurrency = 'MXN';
+  enrollItemCost?: number;
+  enrollExchangeRate?: number;
   isEnrolling = signal(false);
 
   // Reordenamiento y Sorteo
@@ -1377,7 +1433,10 @@ export class TandaDetailComponent implements OnInit {
         customerId: sc.id,
         assignedTurn: this.enrollTurn,
         variant: this.enrollVariant,
-        weeklyAmount: this.enrollWeeklyAmount || undefined
+        weeklyAmount: this.enrollWeeklyAmount || undefined,
+        currency: this.enrollCurrency || undefined,
+        itemCost: this.enrollItemCost || undefined,
+        exchangeRate: this.enrollExchangeRate || undefined
       }).subscribe({
         next: () => {
           this.toastService.success(`${sc.name} inscrita con éxito ✨`);
@@ -1385,6 +1444,8 @@ export class TandaDetailComponent implements OnInit {
           this.selectedClient.set(null);
           this.enrollVariant = '';
           this.enrollWeeklyAmount = undefined;
+          this.enrollItemCost = undefined;
+          this.enrollExchangeRate = undefined;
           this.isEnrolling.set(false);
         },
         error: (err) => {
@@ -1510,6 +1571,9 @@ export class TandaDetailComponent implements OnInit {
         weeklyAmount: t.weeklyAmount,
         penaltyAmount: t.penaltyAmount || 0,
         startDate: t.startDate.split('T')[0],
+        currency: t.currency || 'MXN',
+        itemCost: t.itemCost,
+        exchangeRate: t.exchangeRate,
         status: t.status
       });
       this.showEditModal.set(true);
@@ -1709,6 +1773,9 @@ export class TandaDetailComponent implements OnInit {
       assignedTurn: participant.assignedTurn,
       variant: participant.variant ?? '',
       weeklyAmount: participant.weeklyAmount,
+      currency: participant.currency ?? '',
+      itemCost: participant.itemCost,
+      exchangeRate: participant.exchangeRate,
       status: participant.status,
       isDelivered: participant.isDelivered,
       deliveryDate: participant.deliveryDate?.split('T')[0] ?? ''
@@ -1727,6 +1794,9 @@ export class TandaDetailComponent implements OnInit {
       assignedTurn: form.assignedTurn,
       variant: form.variant.trim() || undefined,
       weeklyAmount: form.weeklyAmount || undefined,
+      currency: form.currency?.trim() || undefined,
+      itemCost: form.itemCost || undefined,
+      exchangeRate: form.exchangeRate || undefined,
       status: form.status,
       isDelivered: form.isDelivered,
       deliveryDate: form.isDelivered && form.deliveryDate
@@ -1760,6 +1830,9 @@ export class TandaDetailComponent implements OnInit {
       weeklyAmount: tanda.weeklyAmount,
       penaltyAmount: tanda.penaltyAmount,
       startDate: tanda.startDate,
+      currency: tanda.currency,
+      itemCost: tanda.itemCost,
+      exchangeRate: tanda.exchangeRate,
       status
     }).subscribe({
       next: () => {

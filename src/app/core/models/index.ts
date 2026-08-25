@@ -1207,6 +1207,9 @@ export interface TandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     status: TandaStatus;
     createdAt: string;
     accessToken?: string;
@@ -1230,6 +1233,9 @@ export interface TandaParticipantDto {
     customerName?: string;
     assignedTurn: number;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     isDelivered: boolean;
     deliveryDate?: string;
     status: TandaParticipantStatus;
@@ -1282,6 +1288,9 @@ export interface CreateTandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     participants: CreateTandaParticipantDto[];
 }
 
@@ -1290,6 +1299,9 @@ export interface CreateTandaParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
 }
 
 export interface AddParticipantDto {
@@ -1298,6 +1310,9 @@ export interface AddParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
 }
 
 export interface RegisterPaymentDto {
@@ -1317,6 +1332,9 @@ export interface UpdateTandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     status?: TandaStatus;
 }
 
@@ -1325,6 +1343,9 @@ export interface UpdateTandaParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     status: TandaParticipantStatus;
     isDelivered: boolean;
     deliveryDate?: string;

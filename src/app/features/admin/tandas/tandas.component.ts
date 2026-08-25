@@ -20,6 +20,9 @@ interface TandaForm {
   totalWeeks: number;
   weeklyAmount: number;
   startDate: string;
+  currency: string;
+  itemCost?: number;
+  exchangeRate?: number;
 }
 
 @Component({
@@ -132,8 +135,11 @@ interface TandaForm {
                   
                   <!-- Card Header -->
                   <div class="flex justify-between items-start mb-4">
-                    <div class="flex flex-col gap-1.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
                       <span class="text-[10px] font-black text-pink-400 tracking-[0.2em] uppercase">Tanda #{{ tanda.id.slice(0,4) }}</span>
+                      @if (tanda.currency === 'USD') {
+                        <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200">USD</span>
+                      }
                     </div>
                     <span class="badge shadow-sm" [class]="statusClass(tanda.status)">
                       {{ statusLabel(tanda.status) }}
@@ -164,6 +170,11 @@ interface TandaForm {
                         <p class="text-[10px] font-black text-pink-500 bg-white/80 px-2 py-1 rounded-xl shadow-sm border border-pink-100 inline-block">
                         {{ tanda.totalWeeks }} Semanas
                         </p>
+                        @if (tanda.itemCost) {
+                          <p class="text-[10px] font-bold text-purple-700 mt-1">
+                            Valor: {{ tanda.itemCost | currency:(tanda.currency || 'MXN'):'symbol-narrow':'1.0-0' }}
+                          </p>
+                        }
                       </div>
                     </div>
                   </div>
@@ -263,6 +274,57 @@ interface TandaForm {
                     }
                   </div>
 
+                  <!-- Moneda y Valor del Artículo -->
+                  <div class="p-3 bg-pink-50/70 border border-pink-100 rounded-2xl space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-black text-pink-900">💵 Moneda y Valor del Artículo</span>
+                      <div class="flex rounded-xl bg-white p-0.5 border border-pink-200">
+                        <button type="button" (click)="setCurrency('MXN')"
+                                [class.bg-pink-500]="newTanda.currency === 'MXN'"
+                                [class.text-white]="newTanda.currency === 'MXN'"
+                                [class.text-pink-700]="newTanda.currency !== 'MXN'"
+                                class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">MXN ($)</button>
+                        <button type="button" (click)="setCurrency('USD')"
+                                [class.bg-pink-500]="newTanda.currency === 'USD'"
+                                [class.text-white]="newTanda.currency === 'USD'"
+                                [class.text-pink-700]="newTanda.currency !== 'USD'"
+                                class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">USD ($)</button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="text-[10px] font-bold text-pink-700">Valor Artículo ({{ newTanda.currency }})</label>
+                        <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                               placeholder="Ej. 1200"
+                               [(ngModel)]="newTanda.itemCost"
+                               (ngModelChange)="onItemCostOrRateChange()"
+                               name="itemCost" />
+                      </div>
+                      @if (newTanda.currency === 'USD') {
+                        <div>
+                          <label class="text-[10px] font-bold text-pink-700">Tipo de Cambio (MXN/USD)</label>
+                          <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                                 placeholder="Ej. 19.50"
+                                 [(ngModel)]="newTanda.exchangeRate"
+                                 (ngModelChange)="onItemCostOrRateChange()"
+                                 name="exchangeRate" />
+                        </div>
+                      } @else {
+                        <div class="flex flex-col justify-end">
+                          <p class="text-[11px] text-pink-500 italic pb-1.5">Pago regular en moneda nacional</p>
+                        </div>
+                      }
+                    </div>
+
+                    @if (newTanda.currency === 'USD' && newTanda.itemCost && newTanda.exchangeRate) {
+                      <div class="text-[11px] font-semibold text-purple-700 bg-purple-50/80 px-2.5 py-1.5 rounded-xl border border-purple-100 flex justify-between">
+                        <span>Equivalente en pesos:</span>
+                        <span class="font-black">{{ (newTanda.itemCost * newTanda.exchangeRate) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                      </div>
+                    }
+                  </div>
+
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="label-coquette">📅 Lugares / semanas</label>
@@ -272,7 +334,7 @@ interface TandaForm {
                              min="1" max="52" required />
                     </div>
                     <div>
-                      <label class="label-coquette">💰 Abono semanal</label>
+                      <label class="label-coquette">💰 Abono semanal (MXN)</label>
                       <input class="input-coquette" type="number" name="amount" [(ngModel)]="newTanda.weeklyAmount" min="0" required />
                     </div>
                   </div>
@@ -375,12 +437,18 @@ interface TandaForm {
                         </div>
 
                         @if (place.client) {
-                          <div class="mt-3 ml-[52px]" (click)="$event.stopPropagation()">
-                            <input class="input-coquette py-2 text-xs"
+                          <div class="mt-3 ml-[52px] grid grid-cols-1 sm:grid-cols-2 gap-2" (click)="$event.stopPropagation()">
+                            <input class="input-coquette py-1.5 text-xs"
                                    [name]="'variant-' + place.assignedTurn"
                                    [ngModel]="place.variant"
                                    (ngModelChange)="updatePlaceVariant(place.assignedTurn, $event)"
-                                   placeholder="Variante, color o talla (opcional)" />
+                                   placeholder="Variante, color o talla" />
+                            <input class="input-coquette py-1.5 text-xs font-bold"
+                                   type="number"
+                                   [name]="'weeklyAmount-' + place.assignedTurn"
+                                   [ngModel]="place.weeklyAmount"
+                                   (ngModelChange)="updatePlaceWeeklyAmount(place.assignedTurn, $event)"
+                                   placeholder="Abono ($/sem opcional)" />
                           </div>
                         }
                       </div>
@@ -438,7 +506,10 @@ export class TandasComponent implements OnInit {
     name: '',
     totalWeeks: 10,
     weeklyAmount: 100,
-    startDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
+    startDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local
+    currency: 'MXN',
+    itemCost: undefined,
+    exchangeRate: undefined
   };
 
   filteredTandas = computed(() => {
@@ -581,6 +652,7 @@ export class TandasComponent implements OnInit {
     if (this.selectedPlaceTurn() > totalWeeks) {
       this.selectedPlaceTurn.set(totalWeeks);
     }
+    this.onItemCostOrRateChange();
   }
 
   selectPlace(assignedTurn: number) {
@@ -675,11 +747,17 @@ export class TandasComponent implements OnInit {
       ...this.newTanda,
       productId,
       penaltyAmount: 0,
+      currency: this.newTanda.currency,
+      itemCost: this.newTanda.itemCost || undefined,
+      exchangeRate: this.newTanda.currency === 'USD' ? this.newTanda.exchangeRate : undefined,
       participants: this.tandaPlaces().map(place => ({
         customerId: place.client!.id,
         assignedTurn: place.assignedTurn,
         variant: place.variant.trim() || undefined,
-        weeklyAmount: place.weeklyAmount
+        weeklyAmount: place.weeklyAmount,
+        currency: place.currency || undefined,
+        itemCost: place.itemCost || undefined,
+        exchangeRate: place.exchangeRate || undefined
       }))
     };
 
@@ -698,12 +776,40 @@ export class TandasComponent implements OnInit {
     });
   }
 
+  setCurrency(curr: string) {
+    this.newTanda.currency = curr;
+    if (curr === 'USD' && !this.newTanda.exchangeRate) {
+      this.newTanda.exchangeRate = 19.50;
+    }
+    this.onItemCostOrRateChange();
+  }
+
+  onItemCostOrRateChange() {
+    if (this.newTanda.itemCost && this.newTanda.itemCost > 0 && this.newTanda.totalWeeks > 0) {
+      let totalMxn = this.newTanda.itemCost;
+      if (this.newTanda.currency === 'USD' && this.newTanda.exchangeRate) {
+        totalMxn = this.newTanda.itemCost * this.newTanda.exchangeRate;
+      }
+      this.newTanda.weeklyAmount = Math.ceil(totalMxn / this.newTanda.totalWeeks);
+    }
+  }
+
+  updatePlaceWeeklyAmount(assignedTurn: number, amount: any) {
+    const val = amount ? Number(amount) : undefined;
+    this.tandaPlaces.update(places => places.map(place =>
+      place.assignedTurn === assignedTurn ? { ...place, weeklyAmount: val } : place
+    ));
+  }
+
   resetForm() {
     this.newTanda = {
       name: '',
       totalWeeks: 10,
       weeklyAmount: 100,
-      startDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
+      startDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local
+      currency: 'MXN',
+      itemCost: undefined,
+      exchangeRate: undefined
     };
     this.productSearch = '';
     this.selectedProduct.set(null);

@@ -5,6 +5,9 @@ export interface TandaPlaceDraft {
   client: ClientDto | null;
   variant: string;
   weeklyAmount?: number;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
 }
 
 export function resizeTandaPlaces(
