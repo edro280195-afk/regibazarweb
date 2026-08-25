@@ -682,13 +682,47 @@ interface TandaEditForm {
             </div>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div class="sm:col-span-2">
-                <label class="label-coquette" for="participant-client">Clienta</label>
-                <select id="participant-client" [(ngModel)]="participantForm().customerId" class="input-coquette">
-                  @for (client of allClients(); track client.id) {
-                    <option [ngValue]="client.id">{{ client.name }}</option>
+              <div class="sm:col-span-2 relative">
+                <label class="label-coquette" for="edit-participant-search">Clienta</label>
+                <div class="relative">
+                  <input id="edit-participant-search"
+                         type="text"
+                         class="input-coquette pl-10 text-xs sm:text-sm font-bold"
+                         [ngModel]="editParticipantClientSearch()"
+                         (ngModelChange)="onEditParticipantSearch($event)"
+                         (focus)="showEditParticipantSuggestions.set(true)"
+                         (blur)="hideEditParticipantSuggestionsWithDelay()"
+                         placeholder="Escribe el nombre de la clienta..." />
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
+                  @if (participantForm().customerId) {
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-pink-700 bg-pink-100 px-2 py-0.5 rounded-full">
+                      Seleccionada
+                    </span>
                   }
-                </select>
+                </div>
+
+                @if (showEditParticipantSuggestions() && filteredEditParticipantClients().length > 0) {
+                  <div class="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-2xl border border-pink-100 bg-white p-2 shadow-2xl animate-slide-down">
+                    @for (cl of filteredEditParticipantClients(); track cl.id) {
+                      <div (mousedown)="$event.preventDefault()"
+                           (click)="selectClientForEditParticipant(cl)"
+                           class="flex cursor-pointer items-center justify-between gap-2 rounded-xl p-2.5 transition-colors hover:bg-pink-50"
+                           [class.bg-pink-50]="participantForm().customerId === cl.id">
+                        <div class="min-w-0">
+                          <p class="truncate text-xs font-bold text-pink-900">{{ cl.name }}</p>
+                          <p class="text-[10px] text-pink-400">{{ cl.tag || 'Clienta' }} {{ cl.phone ? '· ' + cl.phone : '' }}</p>
+                        </div>
+                        <span class="text-[11px] font-black text-pink-500">
+                          {{ participantForm().customerId === cl.id ? '✓' : 'Elegir' }}
+                        </span>
+                      </div>
+                    }
+                  </div>
+                } @else if (showEditParticipantSuggestions() && editParticipantClientSearch().trim().length >= 2) {
+                  <div class="absolute top-full left-0 right-0 z-50 mt-1 rounded-2xl border border-pink-100 bg-white p-3 text-center shadow-2xl animate-slide-down">
+                    <p class="text-xs text-pink-400 italic">No se encontraron clientas con ese nombre 🔍</p>
+                  </div>
+                }
               </div>
               <div>
                 <label class="label-coquette" for="participant-turn">Lugar</label>
@@ -783,11 +817,11 @@ interface TandaEditForm {
         </div>
       }
 
-      <!-- CUSTOM DELIVERY CONFIRMATION MODAL -->
+      <!-- CUSTOM DELIVERY CONFIRMATION MODAL (Mobile Centered) -->
       @if (confirmingDelivery(); as p) {
-        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-md"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-sm relative z-10 animate-scale-in">
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div class="fixed inset-0 bg-pink-950/40 backdrop-blur-md" (click)="confirmingDelivery.set(null)"></div>
+          <div class="card-coquette bg-white p-6 sm:p-8 w-full max-w-sm relative z-10 my-auto shadow-2xl animate-scale-in">
              <div class="w-20 h-20 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-pink-500 text-4xl mb-6 animate-bounce-subtle">
                 🎁
              </div>
@@ -1015,6 +1049,8 @@ export class TandaDetailComponent implements OnInit {
   showRemoveConfirm = signal<TandaParticipantDto | null>(null);
   editingParticipant = signal<TandaParticipantDto | null>(null);
   isUpdatingParticipant = signal(false);
+  editParticipantClientSearch = signal('');
+  showEditParticipantSuggestions = signal(false);
   participantForm = signal<ParticipantForm>({
     customerId: 0,
     assignedTurn: 1,
@@ -1023,6 +1059,17 @@ export class TandaDetailComponent implements OnInit {
     status: 'Active',
     isDelivered: false,
     deliveryDate: ''
+  });
+
+  filteredEditParticipantClients = computed(() => {
+    const s = this.editParticipantClientSearch().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const clients = this.allClients();
+    if (!s) return clients.slice(0, 10);
+    return clients.filter(cl => {
+      const name = (cl.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const phone = cl.phone || '';
+      return name.includes(s) || phone.includes(s);
+    }).slice(0, 12);
   });
 
   filteredClientsSearch = computed(() => {
@@ -1510,8 +1557,25 @@ export class TandaDetailComponent implements OnInit {
     });
   }
 
+  onEditParticipantSearch(term: string) {
+    this.editParticipantClientSearch.set(term);
+    this.showEditParticipantSuggestions.set(true);
+  }
+
+  selectClientForEditParticipant(client: ClientDto) {
+    this.participantForm.update(form => ({ ...form, customerId: client.id }));
+    this.editParticipantClientSearch.set(client.name);
+    this.showEditParticipantSuggestions.set(false);
+  }
+
+  hideEditParticipantSuggestionsWithDelay() {
+    setTimeout(() => this.showEditParticipantSuggestions.set(false), 250);
+  }
+
   openParticipantEditor(participant: TandaParticipantDto) {
     this.editingParticipant.set(participant);
+    this.editParticipantClientSearch.set(participant.customerName || '');
+    this.showEditParticipantSuggestions.set(false);
     this.participantForm.set({
       customerId: participant.customerId,
       assignedTurn: participant.assignedTurn,
