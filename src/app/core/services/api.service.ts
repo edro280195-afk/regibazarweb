@@ -232,8 +232,8 @@ export class ApiService {
         return this.http.post<OrderSummaryDto>(`${this.base}/orders/${id}/release-for-route`, {});
     }
 
-    deleteOrder(id: number): Observable<any> {
-        return this.http.delete(`${this.base}/orders/${id}`);
+    deleteOrder(id: number): Observable<void> {
+        return this.http.delete<void>(`${this.base}/orders/${id}`);
     }
 
     getPackages(orderId: number): Observable<OrderPackageDto[]> {

@@ -556,6 +556,7 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
                     <tbody>
                       @for (o of filteredUnpaid(); track o.id) {
                         <tr class="border-t border-pink-50 hover:bg-pink-50/40 transition-colors"
+                            [class.unpaid-row-removing]="removingUnpaidId() === o.id"
                             [class.bg-rose-50/40]="o.status === 'Delivered'">
                           <td class="px-4 py-3">
                             <div class="font-black text-pink-900">{{ o.clientName }}</div>
@@ -581,6 +582,16 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
                               </button>
                               <button class="w-9 h-9 rounded-xl bg-purple-50 text-purple-500 hover:bg-purple-100 active:scale-95 flex items-center justify-center transition-all border border-purple-100/50"
                                       title="Copiar enlace del pedido" (click)="copyUnpaidLink(o)">🔗</button>
+                              <button class="w-9 h-9 rounded-xl bg-amber-50 text-amber-500 hover:bg-amber-100 active:scale-95 flex items-center justify-center transition-all border border-amber-100/50 disabled:opacity-50 disabled:cursor-wait"
+                                      title="Cancelar pedido" [attr.aria-label]="'Cancelar pedido #' + o.id"
+                                      [disabled]="processingUnpaidId() !== null" (click)="cancelUnpaidOrder(o)">🚫</button>
+                              <button class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-100 active:scale-95 flex items-center justify-center transition-all border border-rose-100/50 disabled:opacity-50 disabled:cursor-wait"
+                                      title="Eliminar pedido definitivamente" [attr.aria-label]="'Eliminar pedido #' + o.id"
+                                      [disabled]="processingUnpaidId() !== null" (click)="deleteUnpaidOrder(o)">🗑️</button>
+                              @if (processingUnpaidId() === o.id) {
+                                <span class="w-9 h-9 rounded-xl bg-white/80 text-pink-400 flex items-center justify-center border border-pink-100/50 animate-pulse"
+                                      role="status" aria-label="Procesando acción">⏳</span>
+                              }
                             </div>
                           </td>
                         </tr>
@@ -747,6 +758,12 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
       animation: cycleText 7.5s infinite;
       opacity: 0;
     }
+    .unpaid-row-removing {
+      opacity: 0;
+      transform: translateX(10px);
+      transition: opacity 220ms ease, transform 220ms ease;
+      pointer-events: none;
+    }
   `
 })
 export class ReportsComponent implements OnInit {
@@ -777,6 +794,8 @@ export class ReportsComponent implements OnInit {
   // ── Cuentas por cobrar ──
   unpaidOrders = signal<OrderSummaryDto[]>([]);
   loadingUnpaid = signal(false);
+  processingUnpaidId = signal<number | null>(null);
+  removingUnpaidId = signal<number | null>(null);
   searchUnpaid = signal('');
   unpaidStatusFilter = signal<'todos' | 'entregados' | 'proceso'>('todos');
   unpaidSort = signal<'urgentes' | 'saldoDesc' | 'antiguos'>('urgentes');
@@ -899,6 +918,46 @@ export class ReportsComponent implements OnInit {
   copyUnpaidLink(o: OrderSummaryDto): void {
     const link = o.link.replace('/o/', '/pedido/');
     navigator.clipboard.writeText(link).then(() => this.toast.success('Enlace copiado 🔗'));
+  }
+
+  cancelUnpaidOrder(o: OrderSummaryDto): void {
+    if (this.processingUnpaidId() !== null) return;
+    if (!confirm(`¿Cancelar el pedido #${o.id} de ${o.clientName}? Se conservará como cancelado y dejará de aparecer aquí.`)) return;
+
+    this.processingUnpaidId.set(o.id);
+    this.api.updateOrderStatus(o.id, { status: 'Canceled' }).subscribe({
+      next: () => this.completeUnpaidAction(o.id, 'Pedido cancelado 🚫'),
+      error: (err) => {
+        this.processingUnpaidId.set(null);
+        this.toast.error(err.error?.message || 'Error al cancelar el pedido');
+      }
+    });
+  }
+
+  deleteUnpaidOrder(o: OrderSummaryDto): void {
+    if (this.processingUnpaidId() !== null) return;
+    if (!confirm(`¿Eliminar definitivamente el pedido #${o.id} de ${o.clientName}? Esta acción no se puede deshacer.`)) return;
+
+    this.processingUnpaidId.set(o.id);
+    this.api.deleteOrder(o.id).subscribe({
+      next: () => this.completeUnpaidAction(o.id, 'Pedido eliminado 🗑️'),
+      error: (err) => {
+        this.processingUnpaidId.set(null);
+        this.toast.error(err.error?.message || 'Error al eliminar el pedido');
+      }
+    });
+  }
+
+  private completeUnpaidAction(orderId: number, successMessage: string): void {
+    this.removingUnpaidId.set(orderId);
+
+    // Dejamos que la fila desaparezca con una transición antes de actualizar los totales.
+    window.setTimeout(() => {
+      this.unpaidOrders.update(orders => orders.filter(order => order.id !== orderId));
+      this.removingUnpaidId.set(null);
+      this.processingUnpaidId.set(null);
+      this.toast.success(successMessage);
+    }, 220);
   }
 
   getStatusLabelEs(status: string): string {
