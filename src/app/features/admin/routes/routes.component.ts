@@ -341,7 +341,7 @@ interface GeocodedOrder extends OrderSummaryDto {
 
               <!-- Action Bar: 3 acciones grandes + menú "Más" -->
               <div class="px-4 sm:px-5 pb-3 relative">
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-pink-50 text-pink-600 text-xs font-bold border border-pink-100 hover:bg-pink-100 active:scale-95 transition-all"
                           (click)="openMap(route)">
                     🗺️ Mapa
@@ -784,20 +784,20 @@ interface GeocodedOrder extends OrderSummaryDto {
               <p class="text-xs text-pink-400 font-semibold mt-1">Selecciona los pedidos para esta ruta</p>
 
               <!-- Search and Filters Bar -->
-              <div class="mt-4 flex gap-2">
+              <div class="mt-4 flex flex-wrap gap-2">
                 <div class="relative flex-1">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-300">🔍</span>
                   <input type="text" 
                          [ngModel]="searchQuery()" 
                          (ngModelChange)="searchQuery.set($event)"
                          placeholder="Buscar por nombre o teléfono..." 
-                         class="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-pink-50/50 border border-pink-100 text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all" />
+                   class="min-w-0 flex-1 basis-full pl-9 pr-4 py-2.5 rounded-2xl bg-pink-50/50 border border-pink-100 text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all sm:basis-auto" />
                 </div>
-                <button class="px-4 py-2.5 rounded-2xl bg-white border border-pink-100 text-pink-600 font-bold text-xs hover:bg-pink-50 transition-all"
+                   <button class="min-h-11 flex-1 px-4 py-2.5 rounded-2xl bg-white border border-pink-100 text-pink-600 font-bold text-xs hover:bg-pink-50 transition-all sm:flex-none"
                         (click)="selectAllFiltered()">
                   Todo
                 </button>
-                <button class="px-3 py-2.5 rounded-2xl bg-white border border-pink-100 text-gray-400 font-bold text-xs hover:bg-gray-50 transition-all"
+                   <button class="min-h-11 px-3 py-2.5 rounded-2xl bg-white border border-pink-100 text-gray-400 font-bold text-xs hover:bg-gray-50 transition-all"
                         (click)="deselectAll()" title="Deseleccionar todos">
                   ✕
                 </button>

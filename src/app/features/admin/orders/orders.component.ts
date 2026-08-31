@@ -48,7 +48,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
       <!-- Filters -->
       <div class="card-coquette p-4 animate-slide-up delay-100" style="opacity:0">
         <div class="flex flex-wrap gap-3 items-end">
-          <div class="flex-1 min-w-[200px]">
+          <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette">🔍 Buscar</label>
             <input class="input-coquette" placeholder="Clienta, artículo o #123..." [(ngModel)]="search" (input)="loadOrders()" />
           </div>

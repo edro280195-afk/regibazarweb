@@ -164,7 +164,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                             <!-- MP Form -->
                             <form id="mp-card-form" class="space-y-3">
                               <div id="mp-cardNumber" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
-                              <div class="grid grid-cols-2 gap-3">
+                              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div id="mp-expirationDate" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                                 <div id="mp-securityCode" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                               </div>

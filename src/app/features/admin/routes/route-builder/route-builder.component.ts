@@ -514,7 +514,7 @@ declare const google: any;
         .lasso-layer { position:absolute; inset:0; z-index:30; touch-action:none; cursor:crosshair; }
         .lasso-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
         .lasso-svg path { fill: rgba(236,72,153,0.12); stroke:#ec4899; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; }
-        .lasso-hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(236,72,153,0.92); color:#fff; font-size:11px; font-weight:800; letter-spacing:.02em; padding:6px 12px; border-radius:999px; pointer-events:none; box-shadow:0 4px 12px rgba(236,72,153,.35); white-space:nowrap; }
+    .lasso-hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); max-width:calc(100% - 1rem); background:rgba(236,72,153,0.92); color:#fff; font-size:11px; font-weight:800; letter-spacing:.02em; padding:6px 12px; border-radius:999px; pointer-events:none; box-shadow:0 4px 12px rgba(236,72,153,.35); white-space:normal; overflow-wrap:anywhere; text-align:center; }
     `]
 })
 export class RouteBuilderComponent implements OnInit {

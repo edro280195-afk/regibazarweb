@@ -143,9 +143,9 @@ interface DisplayMessage {
       <footer class="flex-shrink-0 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 p-4 pb-safe">
 
         <!-- Suggestion Chips -->
-        <div class="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+        <div class="flex flex-wrap gap-2 pb-4">
           @for (s of suggestions; track s) {
-            <button class="shrink-0 px-4 py-1.5 rounded-full bg-slate-800 border border-white/5 text-white/80 text-xs font-medium transition-all hover:bg-slate-700 active:scale-95"
+            <button class="max-w-full px-4 py-2 rounded-full bg-slate-800 border border-white/5 text-white/80 text-xs font-medium transition-all hover:bg-slate-700 active:scale-95"
                     (click)="sendText(s)">
               {{ s }}
             </button>
@@ -154,7 +154,7 @@ interface DisplayMessage {
 
         <div class="flex flex-col gap-4">
           <!-- Text Input Row -->
-          <div class="flex items-center gap-2 bg-slate-800 rounded-full p-1 pl-4 border border-white/5 focus-within:border-indigo-500/50 transition-all shadow-inner">
+          <div class="flex min-w-0 items-center gap-2 bg-slate-800 rounded-full p-1 pl-4 border border-white/5 focus-within:border-indigo-500/50 transition-all shadow-inner">
             <input
               class="flex-1 bg-transparent border-none text-white text-sm outline-none placeholder:text-slate-500 py-2"
               type="text"
@@ -164,7 +164,7 @@ interface DisplayMessage {
               (keyup.enter)="onSendText()"
               [disabled]="isLoading() || voiceStatus() === 'listening'"
             />
-            <button class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center transition-all hover:bg-indigo-500 disabled:opacity-30"
+            <button class="w-11 h-11 shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center transition-all hover:bg-indigo-500 disabled:opacity-30"
                     (click)="onSendText()" [disabled]="!textInput.trim() || isLoading()">
               <span class="text-xs">↑</span>
             </button>
@@ -317,7 +317,8 @@ interface DisplayMessage {
       border-radius: 999px;
       background: rgba(244, 114, 182, 0.15);
       border: 1px solid rgba(244, 114, 182, 0.3);
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
   `]
 })

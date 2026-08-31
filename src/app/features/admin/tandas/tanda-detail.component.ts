@@ -252,13 +252,13 @@ interface TandaEditForm {
                     </div>
 
                     <!-- Píldoras rápidas de semanas -->
-                    <div class="flex gap-1.5 overflow-x-auto pb-1 pt-1 scrollbar-hide">
+                    <div class="flex flex-wrap justify-center gap-1.5 pb-1 pt-1">
                       @for (w of weeksArray(); track w) {
                         <button (click)="selectedWeekMobile.set(w)"
                                 [class]="selectedWeekMobile() === w 
                                   ? 'bg-pink-600 text-white font-black shadow-md scale-105' 
                                   : (w === currentWeek() ? 'bg-pink-100 text-pink-800 font-bold border border-pink-300' : 'bg-white text-pink-600 border border-pink-100 font-medium')"
-                                class="px-3 py-1 rounded-xl text-xs shrink-0 transition-all">
+                                class="min-h-11 px-3 py-2 rounded-xl text-xs transition-all">
                           Sem {{ w }}
                         </button>
                       }
@@ -594,7 +594,7 @@ interface TandaEditForm {
                           <input type="number" [(ngModel)]="enrollTurn" class="input-coquette py-1.5 text-xs text-center font-black" min="1" [max]="t.totalWeeks" />
                         </div>
                       </div>
-                      <div class="grid grid-cols-2 gap-2">
+                      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div>
                           <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Abono Semanal (MXN)</label>
                           <input type="number" [(ngModel)]="enrollWeeklyAmount" class="input-coquette py-1.5 text-xs font-bold" [placeholder]="t.weeklyAmount.toString()" />
@@ -787,7 +787,7 @@ interface TandaEditForm {
                    }
                  </div>
                  
-                 <div class="grid grid-cols-2 gap-3">
+                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                    <div>
                      <label class="label-coquette">Semanas Totales</label>
                      <input type="number" min="1" max="52" [(ngModel)]="editForm().totalWeeks" (ngModelChange)="onEditItemCostOrRateChange()" class="input-coquette text-sm font-bold" />
@@ -798,7 +798,7 @@ interface TandaEditForm {
                    </div>
                  </div>
 
-                 <div class="grid grid-cols-2 gap-3">
+                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                    <div>
                      <label class="label-coquette">Fecha de Inicio</label>
                      <input type="date" [(ngModel)]="editForm().startDate" class="input-coquette text-sm font-bold" />
@@ -941,7 +941,7 @@ interface TandaEditForm {
 
               <div>
                 <label class="label-coquette" for="participant-curr">Moneda / Tipo de Cambio</label>
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <select id="participant-curr" [(ngModel)]="participantForm().currency" class="input-coquette">
                     <option value="">(Heredar de Tanda)</option>
                     <option value="MXN">MXN</option>

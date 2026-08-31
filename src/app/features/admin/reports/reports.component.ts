@@ -47,9 +47,9 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
         </div>
 
         <div class="flex flex-wrap gap-6 items-end relative z-10">
-          <div class="flex-1 min-w-[200px]">
+          <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette text-pink-800 font-black mb-2 block text-xs tracking-widest uppercase">📅 Rango de Fechas</label>
-            <div class="flex items-center gap-2 group">
+            <div class="flex flex-col gap-2 group sm:flex-row sm:items-center">
               <input type="date" class="input-coquette flex-1 shadow-inner focus:ring-pink-300 transition-all border-pink-50 calendar-pink" 
                      [(ngModel)]="startDate" (change)="onDateChange()" />
               <span class="text-pink-200 font-black">/</span>
@@ -58,7 +58,7 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
             </div>
           </div>
           
-          <div class="min-w-[240px]">
+          <div class="w-full min-w-0 md:min-w-[240px] md:flex-1">
             <label class="label-coquette text-pink-800 font-black mb-2 block text-xs tracking-widest uppercase">✂️ Por Corte de Venta</label>
             <select class="input-coquette w-full bg-white/50 border-pink-50 cursor-pointer" (change)="onPeriodChange($event)">
               <option value="">Selecciona un corte...</option>
@@ -68,8 +68,8 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
             </select>
           </div>
 
-          <div class="flex gap-2">
-            <button (click)="exportToExcel()" class="btn-coquette bg-gradient-to-r from-green-400 to-emerald-500 text-white h-[42px] px-6 hover:scale-105 active:scale-95 shadow-md flex items-center gap-2 group border-0">
+          <div class="flex w-full flex-wrap gap-2 sm:w-auto">
+            <button (click)="exportToExcel()" class="btn-coquette flex-1 bg-gradient-to-r from-green-400 to-emerald-500 text-white h-[42px] px-4 hover:scale-105 active:scale-95 shadow-md sm:flex-none sm:px-6 flex items-center gap-2 group border-0">
               <span class="group-hover:rotate-12 transition-transform block italic font-black text-xs">📥 EXCEL</span>
             </button>
             
@@ -499,14 +499,14 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
 
             <!-- Filtros -->
             <div class="card-coquette p-4 bg-white/60 flex flex-wrap gap-3 items-end">
-              <div class="flex-1 min-w-[200px]">
+              <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
                 <label class="label-coquette text-[10px]">🔍 Buscar clienta</label>
                 <input class="input-coquette w-full" placeholder="Nombre de clienta..."
                        [ngModel]="searchUnpaid()" (ngModelChange)="searchUnpaid.set($event)" />
               </div>
               <div>
                 <label class="label-coquette text-[10px]">Estado</label>
-                <div class="flex gap-1 bg-pink-50/60 p-1 rounded-xl border border-pink-100">
+                <div class="flex flex-wrap gap-1 bg-pink-50/60 p-1 rounded-xl border border-pink-100">
                   @for (f of unpaidStatusOptions; track f.id) {
                     <button class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                             [class]="unpaidStatusFilter() === f.id ? 'bg-white text-pink-700 shadow-sm' : 'text-pink-400 hover:text-pink-600'"
@@ -540,7 +540,7 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
               </div>
             } @else {
               <div class="card-coquette p-0 bg-white/60 overflow-hidden">
-                <div class="overflow-x-auto">
+                <div class="hidden md:block overflow-x-auto">
                   <table class="w-full text-sm">
                     <thead>
                       <tr class="bg-pink-50/80 text-pink-700 text-left">
@@ -598,6 +598,66 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
                       }
                     </tbody>
                   </table>
+                </div>
+                <div class="md:hidden p-3 space-y-3">
+                  @for (o of filteredUnpaid(); track o.id) {
+                    <article class="rounded-2xl border border-pink-100 bg-white/80 p-4 shadow-sm transition-all"
+                             [class.opacity-50]="removingUnpaidId() === o.id"
+                             [class.bg-rose-50\/40]="o.status === 'Delivered'">
+                      <div class="flex min-w-0 items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <h3 class="break-words font-black text-pink-900">{{ o.clientName }}</h3>
+                          <p class="text-[10px] font-bold text-pink-300">Pedido #{{ o.id }}</p>
+                        </div>
+                        <span class="shrink-0 rounded-full bg-pink-50 px-2 py-1 text-[10px] font-bold text-pink-600">
+                          {{ getStatusLabelEs(o.status) }}
+                        </span>
+                      </div>
+                      @if (o.status === 'Delivered') {
+                        <p class="mt-2 text-[10px] font-black uppercase text-rose-500">⚠️ Sin cobrar</p>
+                      }
+                      <div class="mt-3 grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
+                        <div class="min-w-0 rounded-xl bg-pink-50/70 p-2">
+                          <p class="text-[9px] font-bold uppercase text-pink-400">Total</p>
+                          <p class="break-words text-xs font-black text-pink-700">{{ o.total | currency:'MXN':'symbol-narrow' }}</p>
+                        </div>
+                        <div class="min-w-0 rounded-xl bg-green-50/70 p-2">
+                          <p class="text-[9px] font-bold uppercase text-green-400">Pagado</p>
+                          <p class="break-words text-xs font-black text-green-700">{{ o.amountPaid | currency:'MXN':'symbol-narrow' }}</p>
+                        </div>
+                        <div class="min-w-0 rounded-xl bg-rose-50/70 p-2">
+                          <p class="text-[9px] font-bold uppercase text-rose-400">Saldo</p>
+                          <p class="break-words text-xs font-black text-rose-600">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</p>
+                        </div>
+                      </div>
+                      <p class="mt-3 text-[11px] font-medium text-pink-500">
+                        Entrega: {{ o.scheduledDeliveryDate ? (o.scheduledDeliveryDate | date:'d MMM') : 'Sin fecha' }}
+                      </p>
+                      <div class="mt-3 grid grid-cols-2 gap-2">
+                        <button class="min-h-11 rounded-xl bg-[#e8f4ff] px-2 text-xs font-bold text-blue-600"
+                                title="Recordatorio de cobro por Messenger" (click)="remindPayment(o)">
+                          💬 Messenger
+                        </button>
+                        <button class="min-h-11 rounded-xl bg-purple-50 px-2 text-xs font-bold text-purple-600"
+                                title="Copiar enlace del pedido" (click)="copyUnpaidLink(o)">
+                          🔗 Copiar enlace
+                        </button>
+                        <button class="min-h-11 rounded-xl bg-amber-50 px-2 text-xs font-bold text-amber-600 disabled:opacity-50"
+                                title="Cancelar pedido" [attr.aria-label]="'Cancelar pedido #' + o.id"
+                                [disabled]="processingUnpaidId() !== null" (click)="cancelUnpaidOrder(o)">
+                          🚫 Cancelar
+                        </button>
+                        <button class="min-h-11 rounded-xl bg-rose-50 px-2 text-xs font-bold text-rose-600 disabled:opacity-50"
+                                title="Eliminar pedido definitivamente" [attr.aria-label]="'Eliminar pedido #' + o.id"
+                                [disabled]="processingUnpaidId() !== null" (click)="deleteUnpaidOrder(o)">
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+                      @if (processingUnpaidId() === o.id) {
+                        <p class="mt-2 text-center text-[10px] font-bold text-pink-400" role="status">⏳ Procesando acción...</p>
+                      }
+                    </article>
+                  }
                 </div>
               </div>
               <p class="text-[11px] text-pink-300 font-medium text-center italic">

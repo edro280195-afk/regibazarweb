@@ -408,7 +408,7 @@
         <div class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-end animate-fade-in" (click)="cancelFail()">
             <div class="bg-black/80 border-t border-white/20 rounded-t-[3rem] w-full p-8 animate-slide-up" (click)="$event.stopPropagation()">
                 <h3 class="text-2xl font-black uppercase mb-6 tracking-tighter">😿 Reportar Error</h3>
-                <div class="grid grid-cols-2 gap-2 mb-6">
+                <div class="grid grid-cols-1 gap-2 mb-6 sm:grid-cols-2">
                     @for (reason of failReasons; track reason) {
                         <button class="py-3 px-2 border rounded-xl text-[10px] font-bold uppercase transition-all"
                                 [class.bg-red-500/20]="selectedReason() === reason"

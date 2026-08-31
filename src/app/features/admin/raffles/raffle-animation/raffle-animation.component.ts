@@ -370,7 +370,7 @@ interface Participant {
             }
             .main-title {
                 color: white;
-                font-size: 4rem;
+                font-size: clamp(2.2rem, 8vw, 4rem);
                 font-weight: 900;
                 margin-top: 0.5rem;
                 text-shadow: 0 0 20px rgba(236, 72, 153, 0.5);
@@ -378,7 +378,8 @@ interface Participant {
             
             .animation-workspace {
                 width: 100%;
-                height: 500px;
+                min-height: 0;
+                height: min(500px, 70vw);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -387,8 +388,9 @@ interface Participant {
             /* Roulette Styles */
             .roulette-container {
                 position: relative;
-                width: 500px;
-                height: 500px;
+                width: min(500px, 100%);
+                height: auto;
+                aspect-ratio: 1;
             }
             .roulette-pointer {
                 position: absolute;
@@ -446,6 +448,7 @@ interface Participant {
             /* Slot Styles */
             .slot-machine {
                 display: flex;
+                max-width: 100%;
                 gap: 1.5rem;
                 background: #111;
                 padding: 2rem;
@@ -454,7 +457,7 @@ interface Participant {
                 box-shadow: 0 0 50px rgba(236, 72, 153, 0.2);
             }
             .slot-column {
-                width: 150px;
+                width: clamp(70px, 24vw, 150px);
                 height: 250px;
                 background: black;
                 border-radius: 1.5rem;
@@ -473,6 +476,7 @@ interface Participant {
                 font-size: 1.5rem;
                 text-align: center;
                 padding: 1rem;
+                overflow-wrap: anywhere;
             }
             .slot-overlay {
                 position: absolute;
@@ -513,6 +517,15 @@ interface Participant {
             }
             .card-inner { z-index: 2; padding: 2px; text-align: center; }
             .card-name { color: white; font-weight: 700; line-height: 1; }
+
+            @media (max-width: 600px) {
+                .animation-workspace { height: min(420px, 86vw); }
+                .slot-machine { gap: .5rem; padding: .75rem; border-width: 4px; border-radius: 1.5rem; }
+                .slot-column { height: 180px; border-radius: 1rem; }
+                .slot-item { height: 180px; font-size: 1rem; padding: .5rem; }
+                .center-piece { width: 72px; height: 72px; border-width: 5px; }
+                .center-emoji { font-size: 2rem; }
+            }
             .card-x {
                 position: absolute;
                 inset: 0;

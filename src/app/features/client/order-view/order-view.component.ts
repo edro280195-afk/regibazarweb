@@ -734,7 +734,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               <div class="animate-bounce-up-y-only pointer-events-auto">
                 <div class="bg-gray-900/90 backdrop-blur-md text-white text-sm font-medium px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30">
                   <span class="text-xl">✨</span>
-                  <span class="whitespace-nowrap font-bold">{{ toastMessage() }}</span>
+                  <span class="max-w-[calc(100vw-5rem)] break-words text-center font-bold">{{ toastMessage() }}</span>
                 </div>
               </div>
             </div>
@@ -765,7 +765,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                   <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                 }
                 <!-- Tooltip -->
-                <span class="absolute right-full mr-3 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <span class="absolute right-full mr-3 hidden max-w-48 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal sm:block">
                   Chat de Ayuda 💬
                 </span>
               </button>
@@ -809,7 +809,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                   }
                   
                   <!-- Hover Tooltip -->
-                  <span class="absolute -top-8 right-0 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                  <span class="absolute -top-8 right-0 hidden max-w-48 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal pointer-events-none shadow-lg sm:block">
                     Ver Tour ✨
                   </span>
                 </button>

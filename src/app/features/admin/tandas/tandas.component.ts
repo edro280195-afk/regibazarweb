@@ -65,7 +65,7 @@ interface TandaForm {
 
         @if (!loadingTandas()) {
           <section class="rounded-3xl border border-pink-100 bg-white/90 px-5 py-4 shadow-sm" aria-label="Resumen de tandas">
-            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Activas</p>
                 <p class="mt-1 text-2xl font-black text-pink-950">{{ activeTandasCount() }}</p>
@@ -89,7 +89,7 @@ interface TandaForm {
         <!-- Filters & Search (Integrated) -->
         <div class="card-coquette p-5 animate-slide-up delay-100" style="opacity:0; animation-fill-mode: forwards;">
           <div class="flex flex-wrap gap-4 items-end">
-            <div class="flex-1 min-w-[300px] relative">
+            <div class="w-full min-w-0 md:flex-1 md:min-w-[300px] relative">
               <label class="label-coquette">🔍 Buscar Tanda o Producto</label>
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
@@ -292,7 +292,7 @@ interface TandaForm {
                       </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label class="text-[10px] font-bold text-pink-700">Valor Artículo ({{ newTanda.currency }})</label>
                         <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
@@ -325,7 +325,7 @@ interface TandaForm {
                     }
                   </div>
 
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label class="label-coquette">📅 Lugares / semanas</label>
                       <input class="input-coquette" type="number" name="weeks"
@@ -406,7 +406,7 @@ interface TandaForm {
                            [class.bg-white]="place.client"
                            [class.bg-pink-50/50]="!place.client"
                            [class.border-pink-100]="selectedPlaceTurn() !== place.assignedTurn">
-                        <div class="flex items-center gap-3">
+                          <div class="flex flex-wrap items-center gap-3">
                           <div class="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-pink-500 to-rose-400 text-white flex items-center justify-center font-black shadow-sm">
                             {{ place.assignedTurn }}
                           </div>
@@ -421,7 +421,7 @@ interface TandaForm {
                             }
                           </div>
 
-                          <div class="flex items-center gap-1">
+                          <div class="ml-auto flex items-center gap-1">
                             <button type="button" title="Subir" [disabled]="place.assignedTurn === 1"
                                     (click)="movePlace(place.assignedTurn, -1, $event)"
                                     class="w-8 h-8 rounded-lg bg-pink-50 text-pink-500 font-black disabled:opacity-30">↑</button>
