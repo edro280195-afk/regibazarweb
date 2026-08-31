@@ -157,11 +157,21 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                     @if (!getProofForWeek(me.paymentProofs, t.currentWeek) || getProofForWeek(me.paymentProofs, t.currentWeek)?.status === 'Rejected') {
                       <div class="mt-4 space-y-3">
-                        <label class="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-pink-300 bg-pink-50/60 px-4 py-3 text-xs font-bold text-pink-700 hover:bg-pink-100">
-                          <span class="min-w-0 truncate">{{ proofFileName() || 'Elegir foto del comprobante' }}</span>
-                          <span class="shrink-0 rounded-xl bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wider text-pink-600 shadow-sm">Elegir</span>
-                          <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
-                        </label>
+                        <div class="rounded-2xl border border-dashed border-pink-300 bg-pink-50/60 p-3">
+                          <p class="mb-2 text-center text-[10px] font-black uppercase tracking-widest text-pink-500">¿Cómo quieres agregarlo?</p>
+                          <div class="grid grid-cols-2 gap-2">
+                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
+                              <span class="text-xl">📷</span>
+                              <span>Tomar foto</span>
+                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" capture="environment" (change)="onProofSelected($event)">
+                            </label>
+                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
+                              <span class="text-xl">🖼️</span>
+                              <span class="truncate">{{ proofFileName() || 'Galería' }}</span>
+                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
+                            </label>
+                          </div>
+                        </div>
                         @if (proofError()) {
                           <p class="text-xs font-bold text-rose-600">{{ proofError() }}</p>
                         }
