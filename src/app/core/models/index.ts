@@ -1279,6 +1279,7 @@ export interface TandaParticipantDto {
     tandaId: string;
     customerId: number;
     customerName?: string;
+    publicAccessToken?: string;
     assignedTurn: number;
     weeklyAmount?: number;
     currency?: string;
@@ -1315,6 +1316,56 @@ export interface TandaViewDto {
     startDate: string;
     currentWeek: number;
     participants: TandaParticipantViewDto[];
+    currentParticipant?: TandaParticipantPublicViewDto | null;
+}
+
+export interface TandaPaymentProofPublicDto {
+    id: string;
+    weekNumber: number;
+    amountClaimed: number;
+    status: 'Pending' | 'Approved' | 'Rejected' | string;
+    submittedAt: string;
+    reviewedAt?: string;
+    rejectionReason?: string;
+}
+
+export interface TandaParticipantPublicViewDto {
+    id: string;
+    name: string;
+    assignedTurn: number;
+    currentWeek: number;
+    totalWeeks: number;
+    weeklyAmount: number;
+    expectedAmount: number;
+    collectedAmount: number;
+    balanceDue: number;
+    hasPaidCurrentWeek: boolean;
+    paidWeeks: number[];
+    paymentProofs: TandaPaymentProofPublicDto[];
+}
+
+export interface TandaPaymentProofAdminDto {
+    id: string;
+    participantId: string;
+    tandaId: string;
+    participantName: string;
+    tandaName: string;
+    weekNumber: number;
+    amountClaimed: number;
+    fileUrl: string;
+    fileType: string;
+    status: string;
+    submittedAt: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+    rejectionReason?: string;
+}
+
+export interface TandaPaymentProofUploadResultDto {
+    proof: TandaPaymentProofPublicDto;
+    tandaId: string;
+    participantName: string;
+    message: string;
 }
 
 export interface TandaParticipantViewDto {

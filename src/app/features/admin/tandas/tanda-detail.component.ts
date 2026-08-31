@@ -20,6 +20,7 @@ import {
   TandaParticipantDto,
   TandaParticipantStatus,
   TandaPaymentDto,
+  TandaPaymentProofAdminDto,
   TandaProductDto,
   TandaStatus,
   UpdateTandaParticipantDto,
@@ -137,6 +138,44 @@ interface TandaEditForm {
             <div class="h-full rounded-full bg-pink-600 transition-[width] duration-300" [style.width.%]="t.progressPercentage"></div>
           </div>
         </section>
+
+        @if (paymentProofs().length > 0) {
+          <section class="rounded-3xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm" aria-label="Comprobantes pendientes de revisión">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-amber-600">Revisión necesaria</p>
+                <h2 class="text-lg font-black text-pink-950">Comprobantes de pago</h2>
+                <p class="text-xs font-medium text-pink-600">Aprueba para registrar automáticamente el abono en esta tanda.</p>
+              </div>
+              <span class="rounded-full bg-amber-200 px-3 py-1 text-[11px] font-black text-amber-900">{{ paymentProofs().length }} pendiente{{ paymentProofs().length === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              @for (proof of paymentProofs(); track proof.id) {
+                <article class="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+                  <a [href]="proof.fileUrl" target="_blank" rel="noopener noreferrer" class="block bg-pink-50">
+                    <img [src]="proof.fileUrl" [alt]="'Comprobante de ' + proof.participantName" class="h-48 w-full object-contain" loading="lazy">
+                  </a>
+                  <div class="space-y-3 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <h3 class="truncate text-sm font-black text-pink-950">{{ proof.participantName }}</h3>
+                        <p class="text-[11px] font-bold text-pink-500">Semana {{ proof.weekNumber }} · {{ proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                      </div>
+                      <span class="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">En revisión</span>
+                    </div>
+                    <p class="text-[10px] font-medium text-pink-400">Enviado {{ proof.submittedAt | date:'dd MMM yyyy, HH:mm' }}</p>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                      <button type="button" (click)="reviewPaymentProof(proof, true)" [disabled]="reviewingProofId() === proof.id" class="btn-coquette btn-pink flex-1 justify-center text-xs disabled:opacity-50">
+                        {{ reviewingProofId() === proof.id ? 'Guardando...' : '✓ Aprobar y registrar' }}
+                      </button>
+                      <button type="button" (click)="rejectPaymentProof(proof)" [disabled]="reviewingProofId() === proof.id" class="btn-coquette btn-rose flex-1 justify-center text-xs disabled:opacity-50">Rechazar</button>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
@@ -856,6 +895,10 @@ interface TandaEditForm {
                         class="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-500 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-rose-100">
                   <span class="text-lg">🗑️</span> Quitar de esta Tanda
                 </button>
+                <button (click)="copyParticipantMessage(p)"
+                        class="w-full py-4 bg-purple-50 hover:bg-purple-100 text-purple-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-purple-100">
+                  <span class="text-lg">💌</span> Copiar instrucciones de pago
+                </button>
                 <button (click)="selectedParticipantActions.set(null)" 
                         class="w-full py-4 text-pink-300 font-bold rounded-2xl flex items-center justify-center gap-3 transition-all">
                   Cancelar
@@ -1157,6 +1200,8 @@ export class TandaDetailComponent implements OnInit {
 
   tanda = signal<TandaDto | null>(null);
   participants = signal<TandaParticipantDto[]>([]);
+  paymentProofs = signal<TandaPaymentProofAdminDto[]>([]);
+  reviewingProofId = signal<string | null>(null);
   weeksArray = signal<number[]>([]);
   sundayParticipant = signal<TandaParticipantDto | null>(null);
   loading = signal(true);
@@ -1354,6 +1399,7 @@ export class TandaDetailComponent implements OnInit {
           this.selectedWeekMobile.set(cw);
         }
         this.loading.set(false);
+        this.loadPaymentProofs(id);
 
         this.tandaService.getSundayDelivery(id).subscribe({
           next: (p) => this.sundayParticipant.set(p),
@@ -1365,6 +1411,35 @@ export class TandaDetailComponent implements OnInit {
         this.toastService.error('Tanda no encontrada o error de servidor 😿');
       }
     });
+  }
+
+  loadPaymentProofs(tandaId: string) {
+    this.tandaService.getPaymentProofs(tandaId).subscribe({
+      next: proofs => this.paymentProofs.set(proofs),
+      error: () => this.paymentProofs.set([])
+    });
+  }
+
+  reviewPaymentProof(proof: TandaPaymentProofAdminDto, approve: boolean, rejectionReason?: string) {
+    if (this.reviewingProofId()) return;
+    this.reviewingProofId.set(proof.id);
+    this.tandaService.reviewPaymentProof(proof.id, approve, rejectionReason).subscribe({
+      next: () => {
+        this.reviewingProofId.set(null);
+        this.toastService.success(approve ? 'Comprobante aprobado y pago registrado ✨' : 'Comprobante rechazado');
+        this.loadPaymentProofs(proof.tandaId);
+        this.loadTanda(proof.tandaId);
+      },
+      error: error => {
+        this.reviewingProofId.set(null);
+        this.toastService.error(error.error?.message || 'No se pudo revisar el comprobante');
+      }
+    });
+  }
+
+  rejectPaymentProof(proof: TandaPaymentProofAdminDto) {
+    const reason = window.prompt('Indica brevemente por qué se rechaza el comprobante:')?.trim();
+    if (reason) this.reviewPaymentProof(proof, false, reason);
   }
 
   prevSelectedWeek() {
@@ -1542,6 +1617,21 @@ export class TandaDetailComponent implements OnInit {
     const url = `${window.location.origin}/tanda-view/${token}`;
     navigator.clipboard.writeText(url).then(() => {
       this.toastService.success('¡Enlace copiado al portapapeles! 🎀');
+    });
+  }
+
+  copyParticipantMessage(participant: TandaParticipantDto) {
+    const tanda = this.tanda();
+    if (!tanda || !participant.publicAccessToken) {
+      this.toastService.error('Esta participante aún no tiene enlace personal');
+      return;
+    }
+    const link = `${window.location.origin}/tanda-view/${participant.publicAccessToken}`;
+    const weekly = this.getParticipantWeeklyAmount(participant).toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
+    const message = `Hola ${participant.customerName || 'hermosa'} 💕\n\nTu abono semanal de la tanda es de ${weekly}. Cuando realices tu transferencia, entra a tu enlace personal para consultar tu avance y subir la foto del comprobante:\n\n${link}\n\nToca “Enviar comprobante” y nosotros revisaremos tu pago. ✨`;
+    navigator.clipboard.writeText(message).then(() => {
+      this.selectedParticipantActions.set(null);
+      this.toastService.success('Instrucciones copiadas para enviar por Messenger 💌');
     });
   }
 

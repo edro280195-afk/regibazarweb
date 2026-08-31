@@ -6,7 +6,8 @@ import {
   TandaDto, CreateTandaDto, AddParticipantDto, 
   RegisterPaymentDto, TandaParticipantDto, TandaPaymentDto,
   ApiMessageDto, TandaPlaceAssignmentDto, TandaProductDto, TandaViewDto,
-  UpdateTandaDto, UpdateTandaParticipantDto, UpdateTandaPaymentDto
+  UpdateTandaDto, UpdateTandaParticipantDto, UpdateTandaPaymentDto,
+  TandaPaymentProofAdminDto, TandaPaymentProofUploadResultDto
 } from '../models';
 
 @Injectable({
@@ -38,6 +39,39 @@ export class TandaService {
 
   getPublicTanda(token: string): Observable<TandaViewDto> {
     return this.http.get<TandaViewDto>(`${environment.apiUrl}/public-tanda/${token}`);
+  }
+
+  uploadTandaPaymentProof(
+    token: string,
+    weekNumber: number,
+    amountClaimed: number,
+    file: File
+  ): Observable<TandaPaymentProofUploadResultDto> {
+    const formData = new FormData();
+    formData.append('weekNumber', String(weekNumber));
+    formData.append('amountClaimed', String(amountClaimed));
+    formData.append('file', file, file.name);
+    return this.http.post<TandaPaymentProofUploadResultDto>(
+      `${environment.apiUrl}/public-tanda/${token}/payment-proofs`,
+      formData
+    );
+  }
+
+  getPaymentProofs(tandaId: string, status = 'Pending'): Observable<TandaPaymentProofAdminDto[]> {
+    return this.http.get<TandaPaymentProofAdminDto[]>(`${this.base}/${tandaId}/payment-proofs`, {
+      params: { status }
+    });
+  }
+
+  reviewPaymentProof(
+    proofId: string,
+    approve: boolean,
+    rejectionReason?: string
+  ): Observable<TandaPaymentProofAdminDto> {
+    return this.http.post<TandaPaymentProofAdminDto>(`${this.base}/payment-proofs/${proofId}/review`, {
+      approve,
+      rejectionReason
+    });
   }
 
   createTanda(dto: CreateTandaDto): Observable<TandaDto> {
