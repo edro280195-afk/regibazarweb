@@ -1041,7 +1041,7 @@ export class ReportsComponent implements OnInit {
 
   remindPayment(o: OrderSummaryDto): void {
     const link = o.link.replace('/o/', '/pedido/');
-    const msg = buildPaymentReminderMessage(o.clientName, o.balanceDue ?? 0, link);
+    const msg = buildPaymentReminderMessage(o.clientName, o.balanceDue ?? 0, link, o.status);
     navigator.clipboard.writeText(msg).then(() => this.toast.success(`Recordatorio de ${o.clientName} copiado 💬`));
     const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
     if (chatUrl) {

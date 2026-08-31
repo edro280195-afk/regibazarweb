@@ -119,6 +119,54 @@ export interface OrderPaymentDto {
     notes?: string;
 }
 
+export type PublicOrderViewMode =
+    | 'Payment'
+    | 'Tracking'
+    | 'DeliveredWithBalance'
+    | 'Delivered'
+    | 'NotDelivered'
+    | 'Postponed'
+    | 'Canceled';
+
+export interface ClientOrderViewDto {
+    clientId: number;
+    clientName: string;
+    items: OrderItemDto[];
+    subtotal: number;
+    shippingCost: number;
+    total: number;
+    status: string;
+    estimatedArrival?: string | null;
+    driverLocation?: { latitude: number; longitude: number; lastUpdate: string } | null;
+    queuePosition?: number | null;
+    totalDeliveries?: number | null;
+    isCurrentDelivery: boolean;
+    deliveriesAhead?: number | null;
+    clientLatitude?: number | null;
+    clientLongitude?: number | null;
+    createdAt?: string | null;
+    type?: string | null;
+    clientAddress?: string | null;
+    advancePayment: number;
+    payments?: OrderPaymentDto[];
+    amountPaid: number;
+    balanceDue: number;
+    clientPoints: number;
+    deliveryInstructions?: string | null;
+    expiresAt?: string | null;
+    scheduledDeliveryDate?: string | null;
+    evidenceUrls?: string[] | null;
+    signatureSvg?: string | null;
+    signedByName?: string | null;
+    signedAt?: string | null;
+    failureReason?: string | null;
+    deliveredAt?: string | null;
+    nonDeliveryEvidenceUrls?: string[] | null;
+    publicViewMode?: PublicOrderViewMode | string | null;
+    publicAccessUntil?: string | null;
+    paymentVisible: boolean;
+}
+
 export interface OrderSummaryDto {
     id: number;
     clientName: string;

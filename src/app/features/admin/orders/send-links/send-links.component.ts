@@ -230,7 +230,12 @@ export class SendLinksComponent implements OnInit {
       clientName: o.clientName,
       publicLink: link,
       scheduledDeliveryDate: o.scheduledDeliveryDate,
-      expiresAt: o.expiresAt
+      expiresAt: o.expiresAt,
+      status: o.status,
+      total: o.total,
+      amountPaid: o.amountPaid,
+      balanceDue: o.balanceDue,
+      clientAddress: o.clientAddress
     });
 
     navigator.clipboard.writeText(msg).then(() => {

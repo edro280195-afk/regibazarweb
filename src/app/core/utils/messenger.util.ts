@@ -85,6 +85,12 @@ export interface OrderMessageData {
      * entrega. Solo se usa como respaldo para derivar la fecha de entrega si faltara.
      */
     expiresAt?: string | null;
+    /** Estado actual para adaptar el mensaje al momento del pedido. */
+    status?: string | null;
+    total?: number | null;
+    amountPaid?: number | null;
+    balanceDue?: number | null;
+    clientAddress?: string | null;
 }
 
 /**
@@ -96,6 +102,8 @@ export interface OrderMessageData {
  */
 export function buildOrderMessage(data: OrderMessageData): string {
     const nombre = (data.clientName || '').trim() || 'bonita';
+    const saldo = data.balanceDue ?? 0;
+    const status = data.status || '';
 
     // Fecha de entrega (domingo): la programada, o si falta, derivada de expiresAt - 1 día
     let entregaIso = data.scheduledDeliveryDate || null;
@@ -116,11 +124,33 @@ export function buildOrderMessage(data: OrderMessageData): string {
     const fechaEntrega = formatSpanishDate(entregaIso);
     const fechaLimite = formatSpanishDate(limiteIso);
 
-    const lineas: string[] = [
-        `Hola ${nombre}, aquí te dejo tu total de compras ✅🛍️`,
-        data.publicLink,
-        ''
-    ];
+    const lineas: string[] = [`Hola ${nombre} 💕`];
+
+    if (status === 'Delivered' && saldo > 0) {
+        lineas.push(
+            '🚨 ¡Tu pedido ya fue entregado!',
+            `Aún queda un saldo pendiente de ${formatCurrency(saldo)}.`,
+            'Puedes liquidarlo y consultar los detalles de tu entrega aquí:',
+            data.publicLink,
+            '',
+            'Por favor ayúdame a dejarlo liquidado. Si ya pagaste, mándame tu comprobante ✨'
+        );
+        return lineas.join('\n');
+    }
+
+    if (status === 'InRoute' || status === 'InTransit') {
+        lineas.push('🚗 ¡Tu pedido ya va en camino!', data.publicLink, '');
+        if (data.clientAddress) lineas.push(`Lo llevamos a: ${data.clientAddress}.`);
+        if (saldo > 0) lineas.push(`Recuerda tener listo tu saldo de ${formatCurrency(saldo)}.`);
+        lineas.push('', 'Puedes abrir el enlace para ver el seguimiento de tu entrega 💖');
+        return lineas.join('\n');
+    }
+
+    lineas.push('Aquí te dejo el detalle de tu pedido ✅🛍️', data.publicLink, '');
+
+    if (data.total != null) lineas.push(`Total: ${formatCurrency(data.total)}.`);
+    if (data.amountPaid != null && data.amountPaid > 0) lineas.push(`Abono registrado: ${formatCurrency(data.amountPaid)}.`);
+    if (saldo > 0) lineas.push(`Saldo pendiente: ${formatCurrency(saldo)}.`);
 
     if (fechaEntrega) lineas.push(`Fecha de entrega es el ${fechaEntrega}.`);
     if (fechaLimite) lineas.push(`Fecha límite para pasar a recoger tu pedido: ${fechaLimite}.`);
@@ -132,14 +162,23 @@ export function buildOrderMessage(data: OrderMessageData): string {
 }
 
 /** Mensaje amable de recordatorio de cobro para una clienta con saldo pendiente. */
-export function buildPaymentReminderMessage(clientName: string, balanceDue: number, publicLink: string): string {
+export function buildPaymentReminderMessage(clientName: string, balanceDue: number, publicLink: string, status?: string | null): string {
     const nombre = (clientName || '').trim() || 'bonita';
-    const saldo = balanceDue.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+    const saldo = formatCurrency(balanceDue);
+    const delivered = status === 'Delivered';
     return [
         `Hola ${nombre} 💕`,
-        `Te recuerdo que tu pedido tiene un saldo pendiente de ${saldo}.`,
+        delivered
+            ? `🚨 Tu pedido ya fue entregado y tiene un saldo pendiente de ${saldo}.`
+            : `Te recuerdo que tu pedido tiene un saldo pendiente de ${saldo}.`,
         publicLink,
         '',
-        '¿Cómo te gustaría pagarlo? Quedo al pendiente ✨🛍️'
+        delivered
+            ? 'Por favor ayúdame a dejarlo liquidado. Si ya pagaste, mándame tu comprobante ✨'
+            : '¿Cómo te gustaría pagarlo? Quedo al pendiente ✨🛍️'
     ].join('\n');
+}
+
+function formatCurrency(value: number): string {
+    return value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 }

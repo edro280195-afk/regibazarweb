@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-    DashboardDto, OrderSummaryDto, PagedResult, ReportDto, ClientDto,
+    DashboardDto, OrderSummaryDto, ClientOrderViewDto, PagedResult, ReportDto, ClientDto,
     RouteDto, SupplierDto, InvestmentDto, SalesPeriodDto, PeriodReportDto,
     FinancialReportDto, DriverExpenseDto, ManualOrderRequest, OrderStatsDto,
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
@@ -11,7 +11,7 @@ import {
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
     AiParsedOrder, AiInsight,
     CamiMessage, CamiChatRequest, CamiChatResponse, CamiProactiveSuggestionDto,
-    AiRouteSelectionRequest, AiRouteSelectionResponse, CamiGreetingResponse,
+    AiRouteSelectionRequest, AiRouteSelectionResponse,
     AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto,
     RecomposeRouteResponse,
     ResolveClientRequest, ResolveClientResponse,
@@ -501,8 +501,8 @@ export class ApiService {
     }
 
     // ── Public Tracking (Client-Facing) ──
-    publicGetOrder(accessToken: string): Observable<any> {
-        return this.http.get(`${this.base}/pedido/${accessToken}`);
+    publicGetOrder(accessToken: string): Observable<ClientOrderViewDto> {
+        return this.http.get<ClientOrderViewDto>(`${this.base}/pedido/${accessToken}`);
     }
 
     publicConfirmOrder(accessToken: string): Observable<any> {
@@ -519,10 +519,6 @@ export class ApiService {
     
     publicUpdateInstructions(accessToken: string, instructions: string): Observable<any> {
         return this.http.patch(`${this.base}/pedido/${accessToken}/instructions`, { instructions });
-    }
-
-    publicGetCamiGreeting(accessToken: string): Observable<CamiGreetingResponse> {
-        return this.http.get<CamiGreetingResponse>(`${this.base}/pedido/${accessToken}/cami-greeting`);
     }
 
     publicCardPayment(accessToken: string, body: {
