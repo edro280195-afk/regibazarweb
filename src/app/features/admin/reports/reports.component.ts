@@ -25,20 +25,22 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
           </p>
         </div>
         
-        <!-- Premium Pill Tabs -->
-        <div class="bg-white/40 backdrop-blur-xl p-1.5 rounded-2xl border border-white/60 shadow-sm flex gap-1 self-start">
+        <!-- Navegación de reportes -->
+        <nav class="report-tabs" aria-label="Secciones de reportes" role="tablist">
           @for (tab of tabs; track tab.id) {
-            <button (click)="activeTab.set(tab.id)" 
-                    [class]="activeTab() === tab.id ? 'tab-pill-active' : 'tab-pill-inactive'">
-              <span class="mr-1.5">{{ tab.icon }}</span>
-              {{ tab.label }}
+            <button type="button" role="tab" [attr.aria-selected]="activeTab() === tab.id"
+                    [class.active]="activeTab() === tab.id"
+                    class="report-tab"
+                    (click)="activeTab.set(tab.id)">
+              <span class="report-tab-icon" aria-hidden="true">{{ tab.icon }}</span>
+              <span class="report-tab-label">{{ tab.label }}</span>
             </button>
           }
-        </div>
+        </nav>
       </div>
 
       <!-- Filters Panel -->
-      <div class="card-coquette p-6 border-pink-100 bg-white/60 backdrop-blur-md sticky top-0 z-30 shadow-sm animate-slide-up overflow-hidden">
+      <div class="report-filters card-coquette p-4 border-pink-100 bg-white/60 backdrop-blur-md shadow-sm animate-slide-up overflow-hidden">
         <!-- Floating Sparkles Background -->
         <div class="absolute inset-0 pointer-events-none opacity-20">
           <div class="sparkle-1">✨</div>
@@ -46,10 +48,10 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
           <div class="sparkle-3">💖</div>
         </div>
 
-        <div class="flex flex-wrap gap-6 items-end relative z-10">
+        <div class="flex flex-wrap gap-4 items-end relative z-10">
           <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette text-pink-800 font-black mb-2 block text-xs tracking-widest uppercase">📅 Rango de Fechas</label>
-            <div class="flex flex-col gap-2 group sm:flex-row sm:items-center">
+            <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 group">
               <input type="date" class="input-coquette flex-1 shadow-inner focus:ring-pink-300 transition-all border-pink-50 calendar-pink" 
                      [(ngModel)]="startDate" (change)="onDateChange()" />
               <span class="text-pink-200 font-black">/</span>
@@ -807,6 +809,80 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
     </div>
   `,
   styles: `
+    .report-tabs {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: .35rem;
+      width: min(100%, 760px);
+      padding: .35rem;
+      border: 1px solid rgba(249, 168, 212, .45);
+      border-radius: 1.25rem;
+      background: rgba(255, 255, 255, .58);
+      box-shadow: 0 8px 24px rgba(157, 23, 77, .06);
+    }
+
+    .report-tab {
+      display: flex;
+      min-width: 0;
+      min-height: 3rem;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      padding: .55rem .7rem;
+      border: 1px solid transparent;
+      border-radius: .9rem;
+      color: #be6b92;
+      background: transparent;
+      font-size: .72rem;
+      font-weight: 800;
+      line-height: 1.1;
+      transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+
+    .report-tab:hover {
+      color: #9d174d;
+      background: rgba(253, 242, 248, .8);
+    }
+
+    .report-tab.active {
+      color: #9d174d;
+      border-color: rgba(249, 168, 212, .7);
+      background: linear-gradient(135deg, #fff, #fdf2f8);
+      box-shadow: 0 5px 14px rgba(236, 72, 153, .14);
+    }
+
+    .report-tab-icon {
+      flex: 0 0 auto;
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+
+    .report-tab-label {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+
+    .report-filters {
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 767px) {
+      .report-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .report-tab:last-child {
+        grid-column: 1 / -1;
+      }
+
+      .report-tab {
+        min-height: 2.75rem;
+        padding-inline: .45rem;
+      }
+    }
+
     @keyframes cycleText {
       0% { opacity: 0; transform: translateY(15px); filter: blur(4px); }
       5% { opacity: 1; transform: translateY(0); filter: blur(0); }
