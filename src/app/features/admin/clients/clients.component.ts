@@ -59,7 +59,7 @@ import { gsap } from 'gsap';
         <!-- Filters (Glassmorphic) -->
         <div class="bg-white/70 backdrop-blur-xl p-5 rounded-3xl border border-white shadow-[0_8px_30px_rgb(244,114,182,0.1)] animate-slide-up delay-100" style="opacity:0; animation-fill-mode: forwards;">
           <div class="flex flex-wrap gap-3 items-center">
-            <div class="flex-1 min-w-[250px] relative">
+            <div class="w-full min-w-0 md:flex-1 md:min-w-[250px] relative">
               <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
               <input class="w-full bg-white/60 border border-pink-200/50 rounded-2xl py-3 pl-10 pr-4 text-pink-900 placeholder-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all shadow-inner" 
                      placeholder="Buscar por nombre, teléfono o dirección..." 

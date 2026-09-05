@@ -150,9 +150,9 @@
                     </map-marker>
                     }
 
-                    @if (directionsResult(); as result) {
-                    <map-directions-renderer [directions]="result" [options]="directionsOptions">
-                    </map-directions-renderer>
+                    @if (polylinePath().length > 0) {
+                    <map-polyline [path]="polylinePath()" [options]="polylineOptions">
+                    </map-polyline>
                     }
                 </google-map>
 

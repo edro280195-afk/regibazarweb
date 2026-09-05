@@ -1,9 +1,11 @@
 import { Component, inject, signal, computed, OnInit, ElementRef, ViewChild, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { ClientDto, ManualOrderRequest, OrderType, ExcelUploadResultDto, OrderSummaryDto, PagedResult, ORDER_STATUS_CSS, CommonProductDto } from '../../../../core/models';
+import { normalizeOptionalAddress } from '../../../../core/utils/address.util';
 import { ClientResolverComponent, ClientResolveResult } from './client-resolver/client-resolver.component';
 
 interface LiveCapture {
@@ -44,6 +46,14 @@ interface TurboQueueItem {
   /** ID de clienta resuelto por <app-client-resolver>. Cuando viene, el backend usa
    *  este ID directo y agrega el clientName como alias si difiere del canónico. */
   resolvedClientId?: number;
+}
+
+/** Decisión de la dueña ante una clienta con pedidos abiertos. */
+interface OrderTargetDecision {
+  /** Id del pedido existente al que agregar los artículos. */
+  targetOrderId?: number;
+  /** true = crear pedido nuevo (ignora auto-merge). */
+  forceNew: boolean;
 }
 
 const NUMBER_WORDS: Record<string, number> = {
@@ -87,8 +97,12 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   manualOrderType = 'Delivery';
   manualClient = signal('');
   manualAlternativeAddress = signal('');
+  manualAddressOnlyForOrder = signal(false);
   manualScheduledDate = signal('');
   manualType = '';
+  // 🛍️ Bolsas capturadas en el alta. null = "no sé todavía" (queda pendiente); un número
+  // (incluido 0 = "va sin bolsas") confirma el dato en el momento.
+  manualBags = signal<number | null>(null);
   manualItems: { id: string; productName: string; quantity: number; unitPrice: number }[] = [];
   currentItem = { productName: '', quantity: 1, unitPrice: 0 };
 
@@ -186,6 +200,57 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
   textInput = '';
 
+  // ═════════════════ PEDIDO ABIERTO: NUEVO vs AGREGAR ═════════════════
+  // Cuando la clienta ya tiene pedidos abiertos (estado ≠ Cancelado), preguntamos si
+  // se crea uno nuevo o se agregan los artículos a uno existente. Se usa en Manual y Turbo.
+  openOrderPrompt = signal<{ clientName: string; orders: OrderSummaryDto[] } | null>(null);
+  expandedPromptOrderId = signal<number | null>(null);
+  private orderPromptResolver: ((decision: OrderTargetDecision | null) => void) | null = null;
+
+  readonly promptStatusLabel: Record<string, string> = {
+    Pending: '⏳ Pendiente', InRoute: '🚗 En camino', Delivered: '✅ Entregada',
+    NotDelivered: '❌ No entregada', Postponed: '📅 Pospuesta', Confirmed: '💖 Confirmada',
+    Shipped: '📦 Enviada', Canceled: '🚫 Cancelada'
+  };
+
+  /**
+   * Revisa si la clienta tiene pedidos abiertos. Si no tiene, resuelve directo a
+   * "nuevo pedido". Si tiene, abre el modal y espera la decisión de la dueña.
+   * Devuelve null si la dueña cerró/canceló el diálogo.
+   */
+  private async decideOrderTarget(clientId: number | undefined, clientName: string): Promise<OrderTargetDecision | null> {
+    let openOrders: OrderSummaryDto[] = [];
+    try {
+      openOrders = await firstValueFrom(this.api.getClientOpenOrders(clientId, clientId ? undefined : clientName));
+    } catch {
+      openOrders = [];
+    }
+    if (!openOrders || openOrders.length === 0) {
+      return { forceNew: true };
+    }
+    // Si solo hay uno, lo dejamos expandido para ver su contenido de inmediato.
+    this.expandedPromptOrderId.set(openOrders.length === 1 ? openOrders[0].id : null);
+    this.openOrderPrompt.set({ clientName, orders: openOrders });
+    return new Promise<OrderTargetDecision | null>(resolve => {
+      this.orderPromptResolver = resolve;
+    });
+  }
+
+  chooseNewOrder() { this.resolveOrderPrompt({ forceNew: true }); }
+  chooseExistingOrder(orderId: number) { this.resolveOrderPrompt({ targetOrderId: orderId, forceNew: false }); }
+  cancelOrderPrompt() { this.resolveOrderPrompt(null); }
+  togglePromptOrder(orderId: number) {
+    this.expandedPromptOrderId.update(v => (v === orderId ? null : orderId));
+  }
+
+  private resolveOrderPrompt(decision: OrderTargetDecision | null) {
+    this.openOrderPrompt.set(null);
+    this.expandedPromptOrderId.set(null);
+    const resolver = this.orderPromptResolver;
+    this.orderPromptResolver = null;
+    resolver?.(decision);
+  }
+
   // ═════════════════ INIT & DESTROY ═════════════════
   ngOnInit() {
     this.api.getClients().subscribe({
@@ -264,6 +329,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       this.manualType = (exactMatch.ordersCount && exactMatch.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
       this.manualResolvedClientId.set(exactMatch.id);
       this.manualResolvedCanonicalName.set(exactMatch.name);
+      this.manualAlternativeAddress.set(exactMatch.address ?? '');
+      this.manualAddressOnlyForOrder.set(false);
     } else {
       this.autoDetected.set(false);
       this.manualType = ''; // Clear type if no exact match
@@ -271,6 +338,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       if (this.manualResolvedCanonicalName() && this.manualResolvedCanonicalName().toLowerCase() !== this.manualClient().toLowerCase()) {
         this.manualResolvedClientId.set(null);
         this.manualResolvedCanonicalName.set('');
+        this.manualAlternativeAddress.set('');
+        this.manualAddressOnlyForOrder.set(false);
       }
     }
   }
@@ -283,6 +352,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     // Confirmar identidad: el cliente elegido del autocomplete es la clienta canónica.
     this.manualResolvedClientId.set(client.id);
     this.manualResolvedCanonicalName.set(client.name);
+    this.manualAlternativeAddress.set(client.address ?? '');
+    this.manualAddressOnlyForOrder.set(false);
 
     // Auto-focus next field
     setTimeout(() => {
@@ -306,6 +377,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     const candidate = result.matchedCandidate;
     if (candidate) {
       this.manualType = (candidate.ordersCount >= 1) ? 'Frecuente' : (candidate.type || 'Nueva');
+      this.manualAlternativeAddress.set(candidate.address ?? '');
+      this.manualAddressOnlyForOrder.set(false);
       this.toast.success(`Identificada: ${candidate.name} 💖`);
     }
   }
@@ -344,7 +417,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     return this.manualItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   }
 
-  createManual() {
+  async createManual() {
     if (!this.manualClient().trim()) {
       this.toast.warning('¿A quién le vendemos? Falta la clienta 💁‍♀️');
       return;
@@ -358,28 +431,47 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const clientName = this.manualClient().trim();
+    const resolvedId = this.manualResolvedClientId();
+
+    // ¿Nuevo pedido o agregar a uno abierto? Preguntamos si tiene pedidos abiertos.
+    const decision = await this.decideOrderTarget(resolvedId ?? undefined, clientName);
+    if (!decision) return; // La dueña cerró el diálogo: dejamos el formulario intacto.
+
     this.uploading.set(true);
     this.error.set('');
 
-    const resolvedId = this.manualResolvedClientId();
+    const deliveryAddress = normalizeOptionalAddress(this.manualAlternativeAddress());
     const req: ManualOrderRequest = {
-      clientName: this.manualClient().trim(),
-      alternativeAddress: this.manualAlternativeAddress().trim(),
+      clientName,
+      ...(deliveryAddress && this.manualAddressOnlyForOrder()
+        ? { alternativeAddress: deliveryAddress }
+        : deliveryAddress
+          ? { clientAddress: deliveryAddress }
+          : {}),
       type: this.manualType || 'Nueva',
       orderType: this.manualOrderType,
       items: this.manualItems.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice })),
       scheduledDeliveryDate: this.manualScheduledDate() || undefined,
       clientId: resolvedId ?? undefined,
+      targetOrderId: decision.targetOrderId,
+      forceNew: decision.forceNew,
+      ...(this.manualBags() !== null
+        ? { totalPackages: this.manualBags()!, packagesConfirmed: true }
+        : {}),
     };
 
     this.api.createManualOrder(req).subscribe({
       next: (res) => {
         this.uploading.set(false);
-        this.toast.success(`Pedido creado para ${this.manualClient()} 💖`);
+        this.toast.success(decision.targetOrderId
+          ? `Artículos agregados al pedido #${decision.targetOrderId} de ${clientName} 💖`
+          : `Pedido creado para ${clientName} 💖`);
 
         // Reset manual form securely
         this.manualClient.set('');
         this.manualAlternativeAddress.set('');
+        this.manualAddressOnlyForOrder.set(false);
         this.manualType = '';
         this.autoDetected.set(false);
         this.manualResolvedClientId.set(null);
@@ -388,6 +480,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
         this.currentItem = { productName: '', quantity: 1, unitPrice: 0 };
         this.manualOrderType = 'Delivery';
         this.manualScheduledDate.set('');
+        this.manualBags.set(null);
 
         // Set single result format if needed, but not strictly required by user flow
         // The original logic just showed a toast. If we want link preview:
@@ -683,7 +776,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     ));
   }
 
-  submitTurboQueue() {
+  async submitTurboQueue() {
     const queue = this.turboQueue();
     if (queue.length === 0) return;
 
@@ -694,7 +787,8 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
       grouped.get(key)!.push(item);
     });
 
-    const orders = Array.from(grouped.entries()).map(([_, items]) => ({
+    const orders = Array.from(grouped.entries()).map(([key, items]) => ({
+      key,
       clientName: items[0].clientName,
       resolvedClientId: items.find(i => i.resolvedClientId)?.resolvedClientId,
       items: items.map(i => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice }))
@@ -703,20 +797,16 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     this.uploading.set(true);
     let successCount = 0;
     const finalResults: any[] = [];
+    const processedKeys = new Set<string>();
 
-    const process = (idx: number) => {
-      if (idx >= orders.length) {
-        this.uploading.set(false);
-        this.turboProgress.set('');
-        this.toast.success(`¡${successCount} pedidos creados! 💖`);
-        this.result.set({ ordersCreated: successCount, clientsCreated: 0, warnings: [], orders: finalResults });
-        this.turboQueue.set([]);
-        this.turboResolvedClients.set(new Map());
-        this.lastAdded.set(null);
-        return;
-      }
+    for (let idx = 0; idx < orders.length; idx++) {
       const o = orders[idx];
       this.turboProgress.set(`${o.clientName} (${idx + 1}/${orders.length})...`);
+
+      // ¿Nuevo pedido o agregar a uno abierto? Preguntamos por cada clienta que tenga
+      // pedidos abiertos. Si la dueña cierra el diálogo, abortamos el resto de la cola.
+      const decision = await this.decideOrderTarget(o.resolvedClientId, o.clientName);
+      if (!decision) break;
 
       // Determine client type dynamically instead of hardcoding 'Nueva'
       const matched = this.findBestClientMatch(o.clientName);
@@ -728,17 +818,30 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
         orderType: this.turboOrderType,
         items: o.items,
         clientId: o.resolvedClientId,
+        targetOrderId: decision.targetOrderId,
+        forceNew: decision.forceNew,
       };
-      this.api.createManualOrder(req).subscribe({
-        next: (res) => {
-          successCount++;
-          finalResults.push({ id: res.id, clientName: res.clientName, total: res.total, orderType: res.orderType, link: res.link, items: res.items.map(i => ({ id: i.id, productName: i.productName, quantity: i.quantity })) });
-          process(idx + 1);
-        },
-        error: () => { this.toast.error(`Error con ${o.clientName} 😿`); process(idx + 1); }
-      });
-    };
-    process(0);
+      try {
+        const res = await firstValueFrom(this.api.createManualOrder(req));
+        successCount++;
+        finalResults.push({ id: res.id, clientName: res.clientName, total: res.total, orderType: res.orderType, link: res.link, items: res.items.map(i => ({ id: i.id, productName: i.productName, quantity: i.quantity })) });
+        processedKeys.add(o.key);
+      } catch {
+        this.toast.error(`Error con ${o.clientName} 😿`);
+        processedKeys.add(o.key); // lo quitamos de la cola para no reintentar en bucle
+      }
+    }
+
+    this.uploading.set(false);
+    this.turboProgress.set('');
+    // Solo quitamos de la cola las clientas ya procesadas; las canceladas se conservan.
+    this.turboQueue.update(q => q.filter(i => !processedKeys.has(i.clientName.toLowerCase().trim())));
+    this.turboResolvedClients.set(new Map());
+    this.lastAdded.set(null);
+    if (successCount > 0) {
+      this.toast.success(`¡${successCount} pedidos procesados! 💖`);
+      this.result.set({ ordersCreated: successCount, clientsCreated: 0, warnings: [], orders: finalResults });
+    }
   }
 
   // ═════════════════ LIVE MODE METHODS ═════════════════

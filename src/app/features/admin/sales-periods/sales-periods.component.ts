@@ -41,7 +41,7 @@ import { SalesPeriodDto, PeriodReportDto } from '../../../core/models';
               <!-- Period Report -->
               @if (expandedPeriod() === period.id && periodReport()) {
                 <div class="mt-4 pt-4 border-t border-pink-100 animate-slide-up">
-                  <div class="grid grid-cols-3 gap-4 mb-4">
+                  <div class="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-3 sm:gap-4">
                     <div class="text-center p-3 bg-green-50 rounded-xl">
                       <p class="text-xl font-bold text-green-700">{{ periodReport()!.totalSales | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
                       <p class="text-xs text-green-500">💵 Ventas</p>
@@ -95,7 +95,7 @@ import { SalesPeriodDto, PeriodReportDto } from '../../../core/models';
                 <label class="label-coquette">📋 Nombre</label>
                 <input class="input-coquette" [(ngModel)]="form.name" placeholder="ej. Marzo 2026 - Q1" />
               </div>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label class="label-coquette">📅 Inicio</label>
                   <input type="date" class="input-coquette" [(ngModel)]="form.startDate" />

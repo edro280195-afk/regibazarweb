@@ -7,6 +7,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { ApiService } from '../../../core/services/api.service';
 import { environment } from '../../../../environments/environment';
 import { gsap } from 'gsap';
+import { TandaPaymentProofPublicDto, TandaViewDto } from '../../../core/models';
 
 const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
@@ -118,6 +119,72 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 </div>
               }
 
+              @if (t.currentParticipant; as me) {
+                <section class="rounded-[2.5rem] border-2 border-pink-200 bg-white/95 p-6 shadow-xl shadow-pink-100/40 animate-fade-in-up" aria-label="Enviar comprobante de pago">
+                  <div class="flex items-start gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-pink-100 text-xl">📸</div>
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-black uppercase tracking-widest text-pink-500">Tu comprobante</p>
+                      <h3 class="text-lg font-black text-pink-950">Sube tu pago de esta semana</h3>
+                      <p class="mt-1 text-xs font-medium leading-relaxed text-pink-700">1. Realiza tu transferencia · 2. toma una foto · 3. súbela aquí. Revisaremos el comprobante y el pago se aplicará automáticamente. 💖</p>
+                    </div>
+                  </div>
+
+                  @if (me.hasPaidCurrentWeek) {
+                    <div class="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-700">✅ Tu pago de la semana {{ t.currentWeek }} ya está registrado</div>
+                  } @else {
+                    <div class="mt-5 rounded-2xl bg-pink-50 px-4 py-3">
+                      <div class="flex items-center justify-between gap-3 text-xs">
+                        <span class="font-bold text-pink-700">Semana {{ t.currentWeek }}</span>
+                        <span class="font-black text-pink-900">{{ me.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                      </div>
+                    </div>
+
+                    @if (getProofForWeek(me.paymentProofs, t.currentWeek); as proof) {
+                      <div class="mt-4 rounded-2xl border px-4 py-3 text-xs"
+                           [ngClass]="proof.status === 'Pending' ? 'border-amber-200 bg-amber-50 text-amber-800' : proof.status === 'Rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'">
+                        @if (proof.status === 'Pending') {
+                          <p class="font-black">⏳ Comprobante en revisión</p>
+                          <p class="mt-1 font-medium">Te avisaremos cuando tu pago quede aplicado.</p>
+                        } @else if (proof.status === 'Rejected') {
+                          <p class="font-black">💌 Necesitamos otra foto</p>
+                          <p class="mt-1 font-medium">{{ proof.rejectionReason || 'El comprobante no pudo validarse.' }} Puedes enviar uno nuevo abajo.</p>
+                        } @else {
+                          <p class="font-black">✅ Comprobante aprobado y pago aplicado</p>
+                        }
+                      </div>
+                    }
+
+                    @if (!getProofForWeek(me.paymentProofs, t.currentWeek) || getProofForWeek(me.paymentProofs, t.currentWeek)?.status === 'Rejected') {
+                      <div class="mt-4 space-y-3">
+                        <div class="rounded-2xl border border-dashed border-pink-300 bg-pink-50/60 p-3">
+                          <p class="mb-2 text-center text-[10px] font-black uppercase tracking-widest text-pink-500">¿Cómo quieres agregarlo?</p>
+                          <div class="grid grid-cols-2 gap-2">
+                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
+                              <span class="text-xl">📷</span>
+                              <span>Tomar foto</span>
+                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" capture="environment" (change)="onProofSelected($event)">
+                            </label>
+                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
+                              <span class="text-xl">🖼️</span>
+                              <span class="truncate">{{ proofFileName() || 'Galería' }}</span>
+                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
+                            </label>
+                          </div>
+                        </div>
+                        @if (proofError()) {
+                          <p class="text-xs font-bold text-rose-600">{{ proofError() }}</p>
+                        }
+                        <button type="button" (click)="submitPaymentProof()" [disabled]="!proofFile() || proofUploading()"
+                                class="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 py-3.5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-pink-200 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">
+                          {{ proofUploading() ? 'ENVIANDO... ✨' : 'ENVIAR COMPROBANTE 💖' }}
+                        </button>
+                      </div>
+                    }
+                  }
+                </section>
+              }
+
               <!-- Payment Methods Section -->
               <div id="payment-methods" class="relative z-10">
                 <h3 class="text-center text-pink-950 font-black text-lg font-display mb-1 flex items-center justify-center gap-2">
@@ -150,6 +217,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                         @if (!mpResult()) {
                           <div class="space-y-4">
                             <!-- Participant Selector -->
+                            @if (!t.currentParticipant) {
                             <div class="space-y-2">
                               <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">¿Quién eres? ✨</label>
                               <select class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl px-4 py-3 text-sm font-bold text-pink-900 focus:outline-none focus:border-pink-300 transition-all"
@@ -160,11 +228,14 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                 }
                               </select>
                             </div>
+                            } @else {
+                              <div class="rounded-2xl bg-pink-50 px-4 py-3 text-xs font-bold text-pink-700">Pagando como <strong>{{ t.currentParticipant.name }}</strong> · semana {{ t.currentWeek }}</div>
+                            }
 
                             <!-- MP Form -->
                             <form id="mp-card-form" class="space-y-3">
                               <div id="mp-cardNumber" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
-                              <div class="grid grid-cols-2 gap-3">
+                              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div id="mp-expirationDate" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                                 <div id="mp-securityCode" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                               </div>
@@ -224,12 +295,12 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           <div class="text-3xl">🏦</div>
                           <div>
                             <h4 class="font-black text-blue-900 text-xs leading-tight uppercase tracking-widest">Transferencia</h4>
-                            <span class="text-[10px] font-bold text-blue-600 uppercase">Citibanamex</span>
+                            <span class="text-[10px] font-bold text-blue-600 uppercase">MercadoPago</span>
                           </div>
                         </div>
-                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10 cursor-pointer active:scale-95 transition-all" (click)="copyText('5256786137583898')">
-                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Número de Tarjeta</p>
-                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">5256 7861 3758 3898</p>
+                        <div class="bg-white/60 rounded-2xl p-4 border border-blue-200/50 mb-3 relative z-10 cursor-pointer active:scale-95 transition-all" (click)="copyText('722969017661718376')">
+                          <p class="text-[9px] text-blue-700/70 font-black uppercase mb-1">Cuenta CLABE</p>
+                          <p class="font-mono font-black text-blue-900 text-sm tracking-widest">722969017661718376</p>
                         </div>
                         <p class="text-[9px] text-blue-700/80 text-center font-black uppercase">A nombre de: Yazmin Vara ✨</p>
                       </div>
@@ -425,8 +496,8 @@ export class TandaViewComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private tandaService = inject(TandaService);
   private api = inject(ApiService);
-  
-  tanda = signal<any | null>(null);
+
+  tanda = signal<TandaViewDto | null>(null);
   loading = signal(true);
   error = signal(false);
   scrollY = signal(0);
@@ -434,7 +505,7 @@ export class TandaViewComponent implements OnInit {
 
   activeTab = signal<'summary' | 'transparency'>('summary');
   paymentTab = signal<'transfer' | 'cash' | 'oxxo' | 'card'>('transfer');
-  
+
   // Mercado Pago Signals
   mp: any;
   cardFormInstance: any;
@@ -443,6 +514,10 @@ export class TandaViewComponent implements OnInit {
   mpResult = signal<{ status: string; message: string } | null>(null);
   mpFetching = signal(false);
   selectedParticipantId = signal<string | null>(null);
+  proofFile = signal<File | null>(null);
+  proofFileName = signal('');
+  proofUploading = signal(false);
+  proofError = signal('');
   showAssistantBubble = signal(true);
   private bubbleTimeout: any;
 
@@ -450,21 +525,21 @@ export class TandaViewComponent implements OnInit {
     const t = this.tanda();
     if (!t) return BASE_MESSENGER_URL;
     let ref = `tanda_${t.id}`;
-    
+
     // Si ya seleccionó quién es, lo incluimos en el ref para que sepas quién te escribe
     const pId = this.selectedParticipantId();
     if (pId) {
       const p = t.participants.find((x: any) => x.id === pId);
       if (p) ref += `_cli_${p.name.replace(/\s/g, '_')}`;
     }
-    
+
     return `${BASE_MESSENGER_URL}?ref=${ref}`;
   }
 
   toastVisible = signal(false);
   toastMessage = signal('');
   private toastTimeout: any;
-  
+
   isWinnerThisWeek = computed(() => {
     const t = this.tanda();
     if (!t) return false;
@@ -473,12 +548,12 @@ export class TandaViewComponent implements OnInit {
     // pero para demos mostramos si alguna participante tiene su turno esta semana.
     // Pero el usuario pidió "vista de la clienta", así que por ahora lo dejamos genérico o 
     // basado en URL si pasamos el participantId.
-    return false; 
+    return false;
   });
 
   @HostListener('window:scroll', ['$event'])
-  onScroll(event?: any) { 
-    this.scrollY.set(window.scrollY); 
+  onScroll(event?: any) {
+    this.scrollY.set(window.scrollY);
   }
 
   copyText(val: string) {
@@ -557,7 +632,7 @@ export class TandaViewComponent implements OnInit {
         return;
       }
     }
-    
+
     // Give Angular time to render the form container
     setTimeout(() => {
       const formEl = document.getElementById('mp-card-form');
@@ -585,7 +660,7 @@ export class TandaViewComponent implements OnInit {
       console.warn('⚠️ Card form already mounted');
       return;
     }
-    
+
     const formEl = document.getElementById('mp-card-form');
     if (!formEl) {
       console.error('❌ Cannot mount: Form element missing');
@@ -684,11 +759,68 @@ export class TandaViewComponent implements OnInit {
     this.tandaService.getPublicTanda(token).subscribe({
       next: (data) => {
         this.tanda.set(data);
+        this.selectedParticipantId.set(data.currentParticipant?.id ?? null);
+        this.proofFile.set(null);
+        this.proofFileName.set('');
+        this.proofError.set('');
         this.loading.set(false);
       },
       error: () => {
         this.loading.set(false);
         this.error.set(true);
+      }
+    });
+  }
+
+  getProofForWeek(proofs: TandaPaymentProofPublicDto[], week: number): TandaPaymentProofPublicDto | undefined {
+    return proofs.find(proof => proof.weekNumber === week);
+  }
+
+  onProofSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    this.proofError.set('');
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      this.proofFile.set(null);
+      this.proofFileName.set('');
+      this.proofError.set('Selecciona una imagen JPG, PNG o WEBP.');
+      return;
+    }
+    if (file.size > 8_000_000) {
+      this.proofFile.set(null);
+      this.proofFileName.set('');
+      this.proofError.set('La imagen no puede superar 8 MB.');
+      return;
+    }
+    this.proofFile.set(file);
+    this.proofFileName.set(file.name);
+  }
+
+  submitPaymentProof() {
+    const tanda = this.tanda();
+    const participant = tanda?.currentParticipant;
+    const file = this.proofFile();
+    if (!tanda || !participant || !file || this.proofUploading()) return;
+
+    this.proofUploading.set(true);
+    this.proofError.set('');
+    this.tandaService.uploadTandaPaymentProof(
+      this.accessToken,
+      tanda.currentWeek,
+      participant.weeklyAmount,
+      file
+    ).subscribe({
+      next: result => {
+        this.proofUploading.set(false);
+        this.proofFile.set(null);
+        this.proofFileName.set('');
+        this.showToast(result.message + ' ✨');
+        this.loadTanda(this.accessToken);
+      },
+      error: error => {
+        this.proofUploading.set(false);
+        this.proofError.set(error.error?.message || 'No se pudo enviar el comprobante. Intenta nuevamente.');
       }
     });
   }
@@ -701,18 +833,18 @@ export class TandaViewComponent implements OnInit {
 
   getDeliveryDate(startDate: string, turn: number): Date {
     if (!startDate) return new Date();
-    
+
     // Extraemos las partes de la fecha (YYYY-MM-DD)
     const datePart = startDate.split('T')[0];
     const parts = datePart.split('-');
-    
+
     // Forzamos el parseo local para evitar saltos de día por UTC
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
-    
+
     const date = new Date(year, month, day, 12, 0, 0); // 12:00 PM local para ser súper seguros
-    
+
     // Sumamos las semanas según el turno
     date.setDate(date.getDate() + (turn - 1) * 7);
 

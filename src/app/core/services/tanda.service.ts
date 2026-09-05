@@ -1,11 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { 
   TandaDto, CreateTandaDto, AddParticipantDto, 
   RegisterPaymentDto, TandaParticipantDto, TandaPaymentDto,
-  TandaProductDto
+  ApiMessageDto, TandaPlaceAssignmentDto, TandaProductDto, TandaViewDto,
+  UpdateTandaDto, UpdateTandaParticipantDto, UpdateTandaPaymentDto,
+  TandaPaymentProofAdminDto, TandaPaymentProofUploadResultDto
 } from '../models';
 
 @Injectable({
@@ -35,8 +37,41 @@ export class TandaService {
     return this.http.get<TandaDto>(`${this.base}/${id}`);
   }
 
-  getPublicTanda(token: string): Observable<any> {
-    return this.http.get<any>(`${environment.apiUrl}/public-tanda/${token}`);
+  getPublicTanda(token: string): Observable<TandaViewDto> {
+    return this.http.get<TandaViewDto>(`${environment.apiUrl}/public-tanda/${token}`);
+  }
+
+  uploadTandaPaymentProof(
+    token: string,
+    weekNumber: number,
+    amountClaimed: number,
+    file: File
+  ): Observable<TandaPaymentProofUploadResultDto> {
+    const formData = new FormData();
+    formData.append('weekNumber', String(weekNumber));
+    formData.append('amountClaimed', String(amountClaimed));
+    formData.append('file', file, file.name);
+    return this.http.post<TandaPaymentProofUploadResultDto>(
+      `${environment.apiUrl}/public-tanda/${token}/payment-proofs`,
+      formData
+    );
+  }
+
+  getPaymentProofs(tandaId: string, status = 'Pending'): Observable<TandaPaymentProofAdminDto[]> {
+    return this.http.get<TandaPaymentProofAdminDto[]>(`${this.base}/${tandaId}/payment-proofs`, {
+      params: { status }
+    });
+  }
+
+  reviewPaymentProof(
+    proofId: string,
+    approve: boolean,
+    rejectionReason?: string
+  ): Observable<TandaPaymentProofAdminDto> {
+    return this.http.post<TandaPaymentProofAdminDto>(`${this.base}/payment-proofs/${proofId}/review`, {
+      approve,
+      rejectionReason
+    });
   }
 
   createTanda(dto: CreateTandaDto): Observable<TandaDto> {
@@ -48,13 +83,24 @@ export class TandaService {
     return this.http.post<TandaParticipantDto>(`${this.base}/participants`, dto);
   }
 
+  updateParticipant(
+    participantId: string,
+    dto: UpdateTandaParticipantDto
+  ): Observable<TandaParticipantDto> {
+    return this.http.put<TandaParticipantDto>(`${this.base}/participants/${participantId}`, dto);
+  }
+
   // ── Pagos ──
   registerPayment(dto: RegisterPaymentDto): Observable<TandaPaymentDto> {
     return this.http.post<TandaPaymentDto>(`${this.base}/payments`, dto);
   }
 
-  deletePayment(paymentId: string): Observable<any> {
-    return this.http.delete(`${this.base}/payments/${paymentId}`);
+  updatePayment(paymentId: string, dto: UpdateTandaPaymentDto): Observable<TandaPaymentDto> {
+    return this.http.put<TandaPaymentDto>(`${this.base}/payments/${paymentId}`, dto);
+  }
+
+  deletePayment(paymentId: string): Observable<ApiMessageDto> {
+    return this.http.delete<ApiMessageDto>(`${this.base}/payments/${paymentId}`);
   }
 
   // ── Operaciones Especiales ──
@@ -66,32 +112,31 @@ export class TandaService {
     return this.http.post<{ message: string }>(`${this.base}/${tandaId}/process-penalties`, {});
   }
 
-  updateTanda(id: string, dto: any): Observable<TandaDto> {
+  updateTanda(id: string, dto: UpdateTandaDto): Observable<TandaDto> {
     return this.http.put<TandaDto>(`${this.base}/${id}`, dto);
   }
 
-  updateParticipantTurn(participantId: string, newTurn: number): Observable<any> {
-    return this.http.patch(`${this.base}/participants/${participantId}/turn`, { newTurn });
+  updateParticipantTurn(participantId: string, newTurn: number): Observable<ApiMessageDto> {
+    return this.http.patch<ApiMessageDto>(`${this.base}/participants/${participantId}/turn`, { newTurn });
   }
 
-  updateParticipantVariant(participantId: string, variant: string): Observable<any> {
-    return this.http.patch(`${this.base}/participants/${participantId}/variant`, { variant });
+  updateParticipantVariant(participantId: string, variant: string): Observable<ApiMessageDto> {
+    return this.http.patch<ApiMessageDto>(`${this.base}/participants/${participantId}/variant`, { variant });
   }
 
-  confirmParticipantDelivery(participantId: string): Observable<any> {
-    return this.http.patch(`${this.base}/participants/${participantId}/confirm-delivery`, {});
+  confirmParticipantDelivery(participantId: string): Observable<ApiMessageDto> {
+    return this.http.patch<ApiMessageDto>(`${this.base}/participants/${participantId}/confirm-delivery`, {});
   }
 
-  shuffleParticipants(tandaId: string, winnerId?: string): Observable<any> {
-    const url = winnerId ? `${this.base}/${tandaId}/shuffle?winnerId=${winnerId}` : `${this.base}/${tandaId}/shuffle`;
-    return this.http.post(url, {});
+  removeParticipant(participantId: string): Observable<ApiMessageDto> {
+    return this.http.delete<ApiMessageDto>(`${this.base}/participants/${participantId}`);
   }
 
-  removeParticipant(participantId: string): Observable<any> {
-    return this.http.delete(`${this.base}/participants/${participantId}`);
+  reorderParticipants(tandaId: string, participantIds: string[]): Observable<ApiMessageDto> {
+    return this.http.post<ApiMessageDto>(`${this.base}/${tandaId}/reorder`, { participantIds });
   }
 
-  reorderParticipants(tandaId: string, participantIds: string[]): Observable<any> {
-    return this.http.post(`${this.base}/${tandaId}/reorder`, { participantIds });
+  updatePlaces(tandaId: string, assignments: TandaPlaceAssignmentDto[]): Observable<ApiMessageDto> {
+    return this.http.put<ApiMessageDto>(`${this.base}/${tandaId}/places`, { assignments });
   }
 }

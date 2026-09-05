@@ -1,9 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { ClientDto, DuplicateSuggestionDto } from '../../../../core/models';
+import { ClientDto, ClientMergeAuditDto, DuplicateSuggestionDto } from '../../../../core/models';
 
 interface PairWithDetails {
     suggestion: DuplicateSuggestionDto;
@@ -14,7 +14,7 @@ interface PairWithDetails {
 @Component({
     selector: 'app-clients-duplicates',
     standalone: true,
-    imports: [CommonModule],
+    imports: [CommonModule, DatePipe],
     template: `
     <div class="p-4 lg:p-8 min-h-[80vh]">
       <div class="max-w-5xl mx-auto">
@@ -41,7 +41,7 @@ interface PairWithDetails {
         }
 
         @if (!loading() && suggestions().length > 0) {
-        <div class="space-y-4">
+        <div class="space-y-4 mb-8">
           @for (pair of pairsWithDetails(); track pair.suggestion.leftClientId + '-' + pair.suggestion.rightClientId) {
           <div class="card-coquette p-4">
             <div class="flex items-center gap-2 mb-3">
@@ -103,6 +103,67 @@ interface PairWithDetails {
           }
         </div>
         }
+
+        <!-- Historial de fusiones (colapsado por defecto) -->
+        <div class="card-coquette p-4 mt-6">
+          <button type="button"
+            class="w-full flex items-center justify-between text-left"
+            (click)="toggleAudits()">
+            <div>
+              <h2 class="text-lg font-bold text-pink-900">📜 Historial de fusiones</h2>
+              <p class="text-xs text-pink-600 mt-0.5">
+                Fusiones automáticas y manuales recientes.
+              </p>
+            </div>
+            <span class="text-pink-500 text-2xl select-none">
+              {{ auditsExpanded() ? '−' : '+' }}
+            </span>
+          </button>
+
+          @if (auditsExpanded()) {
+          <div class="mt-4">
+            @if (auditsLoading()) {
+            <div class="text-center text-pink-700 text-sm py-4">
+              <span class="spinner inline-block mr-2"></span> Cargando historial…
+            </div>
+            } @else if (audits().length === 0) {
+            <div class="text-center text-pink-600 text-sm py-4">
+              Sin fusiones registradas todavía.
+            </div>
+            } @else {
+            <ul class="divide-y divide-pink-100">
+              @for (a of audits(); track a.id) {
+              <li class="py-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                <div class="text-xs text-pink-600 sm:w-32 shrink-0">
+                  {{ a.mergedAt | date:'short' }}
+                </div>
+                <div class="shrink-0">
+                  @if (a.mode === 'Auto') {
+                  <span class="audit-badge audit-badge-auto">✨ Auto</span>
+                  } @else {
+                  <span class="audit-badge audit-badge-manual">✋ Manual</span>
+                  }
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm text-pink-900 truncate">
+                    <strong>{{ a.sourceName }}</strong>
+                    <span class="mx-1 text-pink-400">→</span>
+                    <strong>{{ a.targetName }}</strong>
+                  </div>
+                  @if (a.reason) {
+                  <div class="text-xs text-pink-500 mt-0.5 truncate">{{ a.reason }}</div>
+                  }
+                </div>
+                <div class="text-xs text-pink-700 shrink-0 sm:text-right">
+                  {{ a.ordersMoved }} pedidos, {{ a.aliasesMoved }} alias movidos
+                </div>
+              </li>
+              }
+            </ul>
+            }
+          </div>
+          }
+        </div>
       </div>
     </div>
   `,
@@ -118,6 +179,17 @@ interface PairWithDetails {
     }
     .badge-phone { background: rgba(255, 182, 200, 0.25); color: #9d3a72; }
     .badge-name { background: rgba(199, 119, 184, 0.18); color: #7a3d6a; }
+    .audit-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .audit-badge-auto { background: rgba(199, 119, 184, 0.22); color: #7a3d6a; }
+    .audit-badge-manual { background: rgba(255, 218, 230, 0.6); color: #9d3a72; }
     .spinner {
       width: 16px; height: 16px;
       border: 2px solid rgba(255, 182, 200, 0.4);
@@ -137,6 +209,12 @@ export class ClientsDuplicatesComponent implements OnInit {
     suggestions = signal<DuplicateSuggestionDto[]>([]);
     clients = signal<ClientDto[]>([]);
     merging = signal<string | null>(null);
+
+    // Historial de fusiones (colapsable, se carga la primera vez que se expande)
+    auditsExpanded = signal(false);
+    auditsLoaded = signal(false);
+    auditsLoading = signal(false);
+    audits = signal<ClientMergeAuditDto[]>([]);
 
     pairsWithDetails = computed<PairWithDetails[]>(() => {
         const byId = new Map(this.clients().map(c => [c.id, c]));
@@ -177,10 +255,40 @@ export class ClientsDuplicatesComponent implements OnInit {
                 this.merging.set(null);
                 this.toast.success(`Fusionada en ${targetName} 💖`);
                 this.load();
+                // Si el historial ya estaba abierto, refrescamos para reflejar la nueva fusión.
+                if (this.auditsExpanded()) {
+                    this.loadAudits();
+                } else {
+                    // En cualquier caso marcamos como no cargado para que al abrir muestre lo nuevo.
+                    this.auditsLoaded.set(false);
+                }
             },
             error: () => {
                 this.merging.set(null);
                 this.toast.error('Error al fusionar 😿');
+            }
+        });
+    }
+
+    toggleAudits() {
+        const next = !this.auditsExpanded();
+        this.auditsExpanded.set(next);
+        if (next && !this.auditsLoaded()) {
+            this.loadAudits();
+        }
+    }
+
+    loadAudits() {
+        this.auditsLoading.set(true);
+        this.api.getClientMergeAudits(50).subscribe({
+            next: (rows) => {
+                this.audits.set(rows ?? []);
+                this.auditsLoaded.set(true);
+                this.auditsLoading.set(false);
+            },
+            error: () => {
+                this.auditsLoading.set(false);
+                this.toast.error('No se pudo cargar el historial de fusiones 😿');
             }
         });
     }
