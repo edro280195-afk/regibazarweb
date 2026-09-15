@@ -146,11 +146,12 @@ export function buildOrderMessage(data: OrderMessageData): string {
         return lineas.join('\n');
     }
 
-    lineas.push('Aquí te dejo el detalle de tu pedido ✅🛍️', data.publicLink, '');
-
-    if (data.total != null) lineas.push(`Total: ${formatCurrency(data.total)}.`);
-    if (data.amountPaid != null && data.amountPaid > 0) lineas.push(`Abono registrado: ${formatCurrency(data.amountPaid)}.`);
-    if (saldo > 0) lineas.push(`Saldo pendiente: ${formatCurrency(saldo)}.`);
+    lineas.push(
+        'Aquí te dejo el enlace de tu pedido ✅🛍️',
+        data.publicLink,
+        '',
+        'Dentro del enlace encontrarás toda la información de tu pedido.'
+    );
 
     if (fechaEntrega) lineas.push(`Fecha de entrega es el ${fechaEntrega}.`);
     if (fechaLimite) lineas.push(`Fecha límite para pasar a recoger tu pedido: ${fechaLimite}.`);

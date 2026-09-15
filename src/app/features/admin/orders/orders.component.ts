@@ -1267,7 +1267,7 @@ export class OrdersComponent implements OnInit {
     const o = this.selectedOrder();
     if (!o || !o.clientPhone) return this.toast.error('Sin teléfono');
     const link = o.link.replace('/o/', '/pedido/');
-    const msg = encodeURIComponent(`Hola hermosa! 🎀 Aquí tienes tu nota: ${link}`);
+    const msg = encodeURIComponent(`Hola hermosa! 🎀 Aquí tienes el enlace de tu pedido, dentro del enlace encontrarás toda la información: ${link}`);
     window.open(`https://wa.me/52${o.clientPhone.replace(/\D/g, '')}?text=${msg}`, '_blank');
   }
 
