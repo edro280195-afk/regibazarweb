@@ -119,6 +119,54 @@ export interface OrderPaymentDto {
     notes?: string;
 }
 
+export type PublicOrderViewMode =
+    | 'Payment'
+    | 'Tracking'
+    | 'DeliveredWithBalance'
+    | 'Delivered'
+    | 'NotDelivered'
+    | 'Postponed'
+    | 'Canceled';
+
+export interface ClientOrderViewDto {
+    clientId: number;
+    clientName: string;
+    items: OrderItemDto[];
+    subtotal: number;
+    shippingCost: number;
+    total: number;
+    status: string;
+    estimatedArrival?: string | null;
+    driverLocation?: { latitude: number; longitude: number; lastUpdate: string } | null;
+    queuePosition?: number | null;
+    totalDeliveries?: number | null;
+    isCurrentDelivery: boolean;
+    deliveriesAhead?: number | null;
+    clientLatitude?: number | null;
+    clientLongitude?: number | null;
+    createdAt?: string | null;
+    type?: string | null;
+    clientAddress?: string | null;
+    advancePayment: number;
+    payments?: OrderPaymentDto[];
+    amountPaid: number;
+    balanceDue: number;
+    clientPoints: number;
+    deliveryInstructions?: string | null;
+    expiresAt?: string | null;
+    scheduledDeliveryDate?: string | null;
+    evidenceUrls?: string[] | null;
+    signatureSvg?: string | null;
+    signedByName?: string | null;
+    signedAt?: string | null;
+    failureReason?: string | null;
+    deliveredAt?: string | null;
+    nonDeliveryEvidenceUrls?: string[] | null;
+    publicViewMode?: PublicOrderViewMode | string | null;
+    publicAccessUntil?: string | null;
+    paymentVisible: boolean;
+}
+
 export interface OrderSummaryDto {
     id: number;
     clientName: string;
@@ -1187,6 +1235,9 @@ export interface CamiProactiveSuggestionDto {
 }
 
 // ── Tandas ──
+export type TandaStatus = 'Draft' | 'Active' | 'Completed' | 'Cancelled';
+export type TandaParticipantStatus = 'Active' | 'Delinquent' | 'Completed';
+
 export interface TandaProductDto {
     id: string;
     name: string;
@@ -1204,9 +1255,21 @@ export interface TandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
-    status: string; // Draft, Active, Completed, Cancelled
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
+    status: TandaStatus;
     createdAt: string;
     accessToken?: string;
+    currentWeek: number;
+    participantCount: number;
+    availablePlaces: number;
+    paidInstallments: number;
+    totalInstallments: number;
+    expectedAmount: number;
+    collectedAmount: number;
+    balanceDue: number;
+    progressPercentage: number;
     product?: TandaProductDto;
     participants?: TandaParticipantDto[];
 }
@@ -1216,15 +1279,22 @@ export interface TandaParticipantDto {
     tandaId: string;
     customerId: number;
     customerName?: string;
-    publicToken: string;
+    publicAccessToken?: string;
     assignedTurn: number;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     isDelivered: boolean;
     deliveryDate?: string;
-    status: string; // Active, Delinquent, Completed
+    status: TandaParticipantStatus;
     variant?: string;
+    expectedAmount: number;
+    collectedAmount: number;
+    balanceDue: number;
+    paidInstallments: number;
     payments?: TandaPaymentDto[];
-    items?: TandaParticipantItemDto[];
+    items: TandaParticipantItemDto[];
 }
 
 export interface TandaParticipantItemDto {
@@ -1265,7 +1335,64 @@ export interface TandaViewDto {
     startDate: string;
     currentWeek: number;
     participants: TandaParticipantViewDto[];
-    participant?: TandaParticipantViewDto;
+    currentParticipant?: TandaParticipantPublicViewDto | null;
+}
+
+export interface TandaPaymentProofPublicDto {
+    id: string;
+    weekNumber: number;
+    amountClaimed: number;
+    ocrAmount?: number;
+    depositDate?: string;
+    ocrConfidence?: number;
+    status: 'Pending' | 'Approved' | 'Rejected' | string;
+    submittedAt: string;
+    reviewedAt?: string;
+    rejectionReason?: string;
+}
+
+export interface TandaParticipantPublicViewDto {
+    id: string;
+    name: string;
+    assignedTurn: number;
+    currentWeek: number;
+    totalWeeks: number;
+    weeklyAmount: number;
+    items: TandaParticipantItemDto[];
+    expectedAmount: number;
+    collectedAmount: number;
+    balanceDue: number;
+    hasPaidCurrentWeek: boolean;
+    paidWeeks: number[];
+    paymentProofs: TandaPaymentProofPublicDto[];
+}
+
+export interface TandaPaymentProofAdminDto {
+    id: string;
+    participantId: string;
+    tandaId: string;
+    participantName: string;
+    tandaName: string;
+    weekNumber: number;
+    amountClaimed: number;
+    ocrAmount?: number;
+    depositDate?: string;
+    ocrText?: string;
+    ocrConfidence?: number;
+    fileUrl: string;
+    fileType: string;
+    status: string;
+    submittedAt: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+    rejectionReason?: string;
+}
+
+export interface TandaPaymentProofUploadResultDto {
+    proof: TandaPaymentProofPublicDto;
+    tandaId: string;
+    participantName: string;
+    message: string;
 }
 
 export interface TandaParticipantViewDto {
@@ -1278,9 +1405,7 @@ export interface TandaParticipantViewDto {
     isWinnerThisWeek: boolean;
     isDelivered: boolean;
     variant?: string;
-    publicToken: string;
     items: TandaParticipantItemDto[];
-    payments: TandaPaymentDto[];
 }
 
 export interface CreateTandaDto {
@@ -1290,6 +1415,9 @@ export interface CreateTandaDto {
     weeklyAmount: number;
     penaltyAmount: number;
     startDate: string;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     participants: CreateTandaParticipantDto[];
 }
 
@@ -1298,6 +1426,9 @@ export interface CreateTandaParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     items?: CreateTandaParticipantItemDto[];
 }
 
@@ -1316,15 +1447,10 @@ export interface AddParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
     items?: CreateTandaParticipantItemDto[];
-}
-
-export interface RegisterPaymentDto {
-    participantId: string;
-    weekNumber: number;
-    amountPaid: number;
-    penaltyPaid?: number;
-    notes?: string;
 }
 
 export interface VerifyTandaPaymentDto {
@@ -1332,6 +1458,64 @@ export interface VerifyTandaPaymentDto {
     amountPaid?: number;
     depositDate?: string;
     notes?: string;
+}
+
+export interface ReplaceTandaParticipantItemsDto {
+    items: CreateTandaParticipantItemDto[];
+}
+
+export interface RegisterPaymentDto {
+    participantId: string;
+    weekNumber: number;
+    amountPaid: number;
+    penaltyPaid?: number;
+    paymentDate?: string;
+    isVerified?: boolean;
+    notes?: string;
+}
+
+export interface UpdateTandaDto {
+    productId?: string;
+    name: string;
+    totalWeeks: number;
+    weeklyAmount: number;
+    penaltyAmount: number;
+    startDate: string;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
+    status?: TandaStatus;
+}
+
+export interface UpdateTandaParticipantDto {
+    customerId: number;
+    assignedTurn: number;
+    variant?: string;
+    weeklyAmount?: number;
+    currency?: string;
+    itemCost?: number;
+    exchangeRate?: number;
+    status: TandaParticipantStatus;
+    isDelivered: boolean;
+    deliveryDate?: string;
+}
+
+export interface UpdateTandaPaymentDto {
+    weekNumber: number;
+    amountPaid: number;
+    penaltyPaid: number;
+    paymentDate: string;
+    isVerified: boolean;
+    notes?: string;
+}
+
+export interface TandaPlaceAssignmentDto {
+    participantId: string;
+    assignedTurn: number;
+}
+
+export interface ApiMessageDto {
+    message: string;
 }
 
 // ── Raffle Models ──

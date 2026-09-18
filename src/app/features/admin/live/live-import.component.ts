@@ -135,7 +135,8 @@ type StepId = 'Queued' | 'Downloading' | 'Transcribing' | 'Parsing' | 'Ready';
       padding: 10px 14px;
       border-radius: 12px;
       font-weight: 800;
-      white-space: nowrap;
+       white-space: normal;
+       overflow-wrap: anywhere;
     }
     .import-grid {
       display: grid;

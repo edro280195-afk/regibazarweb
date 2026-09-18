@@ -1,17 +1,80 @@
-import { Component, inject, signal, OnInit, computed, ViewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TandaDto, TandaParticipantDto, TandaPaymentDto, CreateTandaParticipantItemDto, ClientDto, CLIENT_TAG_LABELS, CamiChatResponse } from '../../../core/models';
+import {
+  CamiChatResponse,
+  ClientDto,
+  TandaDto,
+  TandaParticipantDto,
+  TandaParticipantStatus,
+  TandaPaymentDto,
+  TandaPaymentProofAdminDto,
+  TandaProductDto,
+  TandaStatus,
+  CreateTandaParticipantItemDto,
+  UpdateTandaParticipantDto,
+  UpdateTandaPaymentDto
+} from '../../../core/models';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-animation.component';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  buildPlaceAssignments,
+  buildTandaSlots,
+  getVerifiedWeekPaidAmount
+} from './tanda-admin.util';
+
+interface PaymentForm {
+  amountPaid: number;
+  penaltyPaid: number;
+  paymentDate: string;
+  isVerified: boolean;
+  notes: string;
+}
+
+interface ParticipantForm {
+  customerId: number;
+  assignedTurn: number;
+  variant: string;
+  weeklyAmount?: number;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
+  status: TandaParticipantStatus;
+  isDelivered: boolean;
+  deliveryDate: string;
+}
+
+interface TandaEditForm {
+  productId: string;
+  name: string;
+  totalWeeks: number;
+  weeklyAmount: number;
+  penaltyAmount: number;
+  startDate: string;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
+  status: TandaStatus;
+}
 
 @Component({
   selector: 'app-tanda-detail',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterLink, FormsModule, DragDropModule, RaffleAnimationComponent],
   template: `
     <div class="space-y-6 max-w-7xl mx-auto animate-fade-in pb-20">
@@ -38,6 +101,89 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
             </div>
         </div>
       } @else if (tanda(); as t) {
+        <section class="rounded-3xl border border-pink-100 bg-white px-5 py-5 shadow-sm" aria-label="Resumen financiero de la tanda">
+          <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-black text-pink-800">{{ statusLabel(t.status) }}</span>
+                  <span class="text-xs font-bold text-pink-500">Semana {{ t.currentWeek || 0 }} de {{ t.totalWeeks }}</span>
+                </div>
+                <button (click)="openEditModal()" class="px-3 py-1 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs border border-pink-200 shadow-sm flex items-center gap-1.5 transition-all active:scale-95">
+                  <span>✎</span> Editar Tanda
+                </button>
+              </div>
+              <h1 class="mt-2 truncate text-2xl font-black text-pink-950">{{ t.name }}</h1>
+              <p class="text-sm font-semibold text-pink-600">{{ t.product?.name || 'Producto sin definir' }}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Lugares</p>
+                <p class="text-lg font-black text-pink-950">{{ t.participantCount }}/{{ t.totalWeeks }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Cobrado</p>
+                <p class="text-lg font-black text-pink-950">{{ t.collectedAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Pendiente</p>
+                <p class="text-lg font-black text-rose-700">{{ t.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-pink-500">Avance</p>
+                <p class="text-lg font-black text-pink-950">{{ t.progressPercentage | number:'1.0-0' }}%</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 h-2 overflow-hidden rounded-full bg-pink-100" aria-hidden="true">
+            <div class="h-full rounded-full bg-pink-600 transition-[width] duration-300" [style.width.%]="t.progressPercentage"></div>
+          </div>
+        </section>
+
+        @if (paymentProofs().length > 0) {
+          <section class="rounded-3xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm" aria-label="Comprobantes pendientes de revisión">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-amber-600">Revisión necesaria</p>
+                <h2 class="text-lg font-black text-pink-950">Comprobantes de pago</h2>
+                <p class="text-xs font-medium text-pink-600">Aprueba para registrar automáticamente el abono en esta tanda.</p>
+              </div>
+              <span class="rounded-full bg-amber-200 px-3 py-1 text-[11px] font-black text-amber-900">{{ paymentProofs().length }} pendiente{{ paymentProofs().length === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              @for (proof of paymentProofs(); track proof.id) {
+                <article class="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+                  <a [href]="proof.fileUrl" target="_blank" rel="noopener noreferrer" class="block bg-pink-50">
+                    <img [src]="proof.fileUrl" [alt]="'Comprobante de ' + proof.participantName" class="h-48 w-full object-contain" loading="lazy">
+                  </a>
+                  <div class="space-y-3 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <h3 class="truncate text-sm font-black text-pink-950">{{ proof.participantName }}</h3>
+                        <p class="text-[11px] font-bold text-pink-500">Semana {{ proof.weekNumber }} · {{ proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                      </div>
+                      <span class="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase text-amber-800">En revisión</span>
+                    </div>
+                    <p class="text-[10px] font-medium text-pink-400">Enviado {{ proof.submittedAt | date:'dd MMM yyyy, HH:mm' }}</p>
+                    @if (proof.ocrAmount || proof.depositDate) {
+                      <p class="rounded-xl bg-purple-50 px-3 py-2 text-[10px] font-bold text-purple-700">
+                        OCR: {{ proof.ocrAmount || proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                        @if (proof.depositDate) { · depósito {{ proof.depositDate | date:'dd/MM/yyyy HH:mm' }} }
+                      </p>
+                    }
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                      <button type="button" (click)="reviewPaymentProof(proof, true)" [disabled]="reviewingProofId() === proof.id" class="btn-coquette btn-pink flex-1 justify-center text-xs disabled:opacity-50">
+                        {{ reviewingProofId() === proof.id ? 'Guardando...' : '✓ Aprobar y registrar' }}
+                      </button>
+                      <button type="button" (click)="rejectPaymentProof(proof)" [disabled]="reviewingProofId() === proof.id" class="btn-coquette btn-rose flex-1 justify-center text-xs disabled:opacity-50">Rechazar</button>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           <!-- Main Content: Weekly Management -->
@@ -121,7 +267,109 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
               </div>
 
               @if (viewMode() === 'table') {
-                <div class="overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide animate-fade-in">
+                <!-- VISTA MÓVIL: SEMANA POR SEMANA (< lg) -->
+                <div class="block lg:hidden space-y-4 animate-fade-in">
+                  <!-- Selector de Semana -->
+                  <div class="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-3 border border-pink-100 shadow-sm">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                      <button (click)="prevSelectedWeek()" 
+                              [disabled]="selectedWeekMobile() <= 1"
+                              class="w-9 h-9 rounded-xl bg-white border border-pink-100 text-pink-600 font-black text-base flex items-center justify-center shadow-sm disabled:opacity-40 disabled:pointer-events-none hover:bg-pink-100 active:scale-95 transition-all">
+                        ←
+                      </button>
+                      <div class="text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                          <span class="text-base font-black text-pink-900">Semana {{ selectedWeekMobile() }}</span>
+                          @if (selectedWeekMobile() === currentWeek()) {
+                            <span class="px-2 py-0.5 rounded-full bg-pink-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                              Actual
+                            </span>
+                          }
+                        </div>
+                        <p class="text-[10px] text-pink-500 font-bold">
+                          Cobrado: {{ mobileWeekStats().collected | currency:'MXN':'symbol-narrow':'1.0-0' }} · {{ mobileWeekStats().paidCount }}/{{ participants().length }} pagadas
+                        </p>
+                      </div>
+                      <button (click)="nextSelectedWeek()" 
+                              [disabled]="selectedWeekMobile() >= (tanda()?.totalWeeks ?? 52)"
+                              class="w-9 h-9 rounded-xl bg-white border border-pink-100 text-pink-600 font-black text-base flex items-center justify-center shadow-sm disabled:opacity-40 disabled:pointer-events-none hover:bg-pink-100 active:scale-95 transition-all">
+                        →
+                      </button>
+                    </div>
+
+                    <!-- Píldoras rápidas de semanas -->
+                    <div class="flex flex-wrap justify-center gap-1.5 pb-1 pt-1">
+                      @for (w of weeksArray(); track w) {
+                        <button (click)="selectedWeekMobile.set(w)"
+                                [class]="selectedWeekMobile() === w 
+                                  ? 'bg-pink-600 text-white font-black shadow-md scale-105' 
+                                  : (w === currentWeek() ? 'bg-pink-100 text-pink-800 font-bold border border-pink-300' : 'bg-white text-pink-600 border border-pink-100 font-medium')"
+                                class="min-h-11 px-3 py-2 rounded-xl text-xs transition-all">
+                          Sem {{ w }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Lista de Participantes para la Semana Seleccionada -->
+                  <div class="space-y-2.5">
+                    @for (p of participants(); track p.id) {
+                      <div class="bg-white rounded-2xl p-4 border border-pink-100 shadow-sm flex items-center justify-between gap-3 hover:border-pink-200 transition-all">
+                        <!-- Info Clienta -->
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                          <span class="w-7 h-7 rounded-xl bg-pink-800 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-sm">
+                            {{ p.assignedTurn }}
+                          </span>
+                          <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                              <p class="text-sm font-black text-pink-950 truncate">{{ p.customerName }}</p>
+                              @if (p.isDelivered) {
+                                <span class="text-[11px]" title="Producto entregado">📦</span>
+                              }
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5 text-[10px] text-pink-400">
+                              <span>Cuota: {{ getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                              @if (p.variant) {
+                                <span>· {{ p.variant }}</span>
+                              }
+                            </div>
+                            @if (p.items.length > 0) {
+                              <p class="mt-1 truncate text-[10px] font-bold text-purple-500">🛍️ {{ itemSummary(p) }}</p>
+                            }
+                          </div>
+                        </div>
+
+                        <!-- Botón de Pago / Estado para la semana -->
+                        <div class="flex items-center gap-2 shrink-0">
+                          @if (hasPaid(p, selectedWeekMobile())) {
+                            <button (click)="openPaymentModal(p, selectedWeekMobile())"
+                                    class="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-black text-xs border border-emerald-100 flex items-center gap-1 shadow-sm active:scale-95 transition-all">
+                              <span>✓</span> {{ getWeekPaidAmount(p, selectedWeekMobile()) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                            </button>
+                          } @else {
+                            <button (click)="openPaymentModal(p, selectedWeekMobile())"
+                                    class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xs shadow-md shadow-pink-200 active:scale-95 transition-all">
+                              {{ getWeekPaidAmount(p, selectedWeekMobile()) > 0 ? 'Abonar ' + (getWeekPaidAmount(p, selectedWeekMobile()) | currency:'MXN':'symbol-narrow':'1.0-0') : 'Abonar ' + (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
+                            </button>
+                          }
+
+                          <button (click)="selectedParticipantActions.set(p)" 
+                                  class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
+                            ⚙️
+                          </button>
+                        </div>
+                      </div>
+                    } @empty {
+                      <div class="text-center py-12 text-pink-300 font-medium bg-pink-50/30 rounded-2xl border border-dashed border-pink-100">
+                        <div class="text-3xl mb-1">🌸</div>
+                        No hay participantes registradas
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <!-- VISTA ESCRITORIO: TABLA COMPLETA (>= lg) -->
+                <div class="hidden lg:block overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide animate-fade-in">
                   <table class="table-coquette w-full">
                     <thead>
                       <tr>
@@ -134,86 +382,83 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                         <th class="text-center">⚙️</th>
                       </tr>
                     </thead>
-                  <tbody>
-                    @for (p of participants(); track p.id) {
-                      <tr class="group">
-                        <td class="sticky left-0 z-20 bg-white group-hover:bg-pink-50/30 transition-colors shadow-[4px_0_8px_rgba(131,24,67,0.03)]">
-                          <div class="flex items-center gap-3">
-                            <!-- Turno Editable -->
-                            @if (editingTurnId() === p.id) {
-                              <input type="number" 
-                                     [value]="p.assignedTurn" 
-                                     (blur)="editingTurnId.set(null)"
-                                     (keyup.enter)="onUpdateTurn(p, $event)"
-                                     class="w-10 h-8 rounded border-pink-200 text-center font-black text-pink-600 bg-pink-50 p-1"
-                                     #turnInput
-                                     (focus)="turnInput.select()">
-                            } @else {
-                              <span (click)="editingTurnId.set(p.id)" 
-                                    class="w-6 h-6 rounded bg-pink-800 text-white text-[10px] font-black flex items-center justify-center shrink-0 cursor-pointer hover:bg-pink-600 transition-colors"
-                                    title="Clic para cambiar turno">{{ p.assignedTurn }}</span>
-                            }
-                            <span class="text-sm font-black text-pink-900 truncate flex-1" [title]="p.customerName">{{ p.customerName }}</span>
-                            <!-- Botón de ajustes móvil -->
-                            <button (click)="selectedParticipantActions.set(p)" 
-                                    class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
-                                ⚙️
-                            </button>
-                          </div>
-                          @if (p.items?.length) {
-                            <div class="mt-2 ml-9 flex flex-wrap gap-1">
-                              @for (item of p.items; track item.id) {
-                                <span class="px-2 py-1 rounded-lg bg-purple-50 text-purple-600 text-[9px] font-bold border border-purple-100">
-                                  {{ item.quantity }}× {{ item.productName }}@if (item.variant) { · {{ item.variant }} }
-                                </span>
-                              }
-                            </div>
-                          }
-                        </td>
-                        @for (w of weeksArray(); track w) {
-                          <td class="text-center p-2">
-                            @if (getPayment(p, w); as payment) {
-                              @if (payment.isVerified) {
-                                <button (click)="onRemovePayment(p, w)" class="text-lg drop-shadow-sm animate-bounce-in inline-block hover:scale-125 transition-transform" title="Quitar pago verificado">💖</button>
+                    <tbody>
+                      @for (p of participants(); track p.id) {
+                        <tr class="group">
+                          <td class="sticky left-0 z-20 bg-white group-hover:bg-pink-50/30 transition-colors shadow-[4px_0_8px_rgba(131,24,67,0.03)]">
+                            <div class="flex items-center gap-3">
+                              <!-- Turno Editable -->
+                              @if (editingTurnId() === p.id) {
+                                <input type="number" 
+                                       [value]="p.assignedTurn" 
+                                       (blur)="editingTurnId.set(null)"
+                                       (keyup.enter)="onUpdateTurn(p, $event)"
+                                       class="w-10 h-8 rounded border-pink-200 text-center font-black text-pink-600 bg-pink-50 p-1"
+                                       #turnInput
+                                       (focus)="turnInput.select()">
                               } @else {
-                                <button (click)="openPaymentReview(p, payment)" class="text-lg inline-block hover:scale-125 transition-transform" title="Revisar comprobante">🕘</button>
+                                <span (click)="editingTurnId.set(p.id)" 
+                                      class="w-6 h-6 rounded bg-pink-800 text-white text-[10px] font-black flex items-center justify-center shrink-0 cursor-pointer hover:bg-pink-600 transition-colors"
+                                      title="Clic para cambiar turno">{{ p.assignedTurn }}</span>
                               }
-                            } @else {
-                              <button (click)="openPaymentModal(p, w)" 
-                                      class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
-                                {{ getParticipantWeeklyAmount(p) }}
+                              <span class="text-sm font-black text-pink-900 truncate flex-1" [title]="p.customerName">{{ p.customerName }}</span>
+                              <!-- Botón de ajustes -->
+                              <button (click)="selectedParticipantActions.set(p)" 
+                                      class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
+                                  ⚙️
                               </button>
+                            </div>
+                            @if (p.items.length > 0) {
+                              <p class="mt-1 pl-9 text-[10px] font-bold text-purple-500">🛍️ {{ itemSummary(p) }}</p>
                             }
                           </td>
-                        }
-                        @if (tanda(); as t) {
+                          @for (w of weeksArray(); track w) {
+                            <td class="text-center p-2">
+                              @if (hasPaid(p, w)) {
+                                <button (click)="openPaymentModal(p, w)"
+                                        class="w-full rounded-lg bg-pink-50 px-1 py-1.5 text-[10px] font-black text-pink-700 hover:bg-pink-100"
+                                        [attr.aria-label]="'Ver pagos de la semana ' + w + ' de ' + p.customerName">
+                                  ✓ {{ getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                                </button>
+                              } @else {
+                                <button (click)="openPaymentModal(p, w)" 
+                                        class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
+                                  {{ getWeekPaidAmount(p, w) > 0 ? (getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0') : (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
+                                </button>
+                              }
+                            </td>
+                          }
+                          @if (tanda(); as t) {
+                            <td class="text-center">
+                              <span class="text-[9px] font-black text-pink-400 uppercase tracking-tight">
+                                {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
+                              </span>
+                            </td>
+                          }
                           <td class="text-center">
-                            <span class="text-[9px] font-black text-pink-400 uppercase tracking-tight">
-                              {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
-                            </span>
+                            <input type="checkbox" [checked]="p.isDelivered"
+                                   (click)="$event.preventDefault(); openParticipantEditor(p)"
+                                   [attr.aria-label]="'Editar entrega de ' + p.customerName"
+                                   class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
                           </td>
-                        }
-                        <td class="text-center">
-                          <input type="checkbox" [checked]="p.isDelivered" (click)="onConfirmSundayDelivery(p)" class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
-                        </td>
-                        <td class="text-center">
-                          <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
-                             ⚙️
-                          </button>
-                        </td>
-                      </tr>
-                    } @empty {
-                      <tr>
-                        <td [attr.colspan]="weeksArray().length + 3" class="text-center py-20 text-pink-300 font-medium">
-                          <div class="text-4xl mb-2">🌸</div>
-                          Comienza inscribiendo a las participantes
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            } @else {
+                          <td class="text-center">
+                            <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
+                               ⚙️
+                            </button>
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td [attr.colspan]="weeksArray().length + 3" class="text-center py-20 text-pink-300 font-medium">
+                            <div class="text-4xl mb-2">🌸</div>
+                            Comienza inscribiendo a las participantes
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
                 <!-- RUTA DE ENTREGAS CON ESTEROIDES (Visual View) -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-in">
                   @for (p of participants(); track p.id) {
@@ -255,12 +500,8 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                                    <div class="mt-1 flex items-center gap-1">
                                       <span class="text-[8px] bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full font-black uppercase tracking-wider border border-pink-200">💎 {{ p.variant || 'Sin Variante' }}</span>
                                    </div>
-                                   @if (p.items?.length) {
-                                     <div class="mt-2 flex flex-wrap gap-1">
-                                       @for (item of p.items; track item.id) {
-                                         <span class="text-[8px] bg-purple-50 text-purple-600 px-2 py-1 rounded-lg font-bold border border-purple-100">{{ item.quantity }}× {{ item.productName }}</span>
-                                       }
-                                     </div>
+                                   @if (p.items.length > 0) {
+                                     <p class="mt-2 max-w-[190px] text-[10px] font-bold leading-relaxed text-purple-600">🛍️ {{ itemSummary(p) }}</p>
                                    }
                                 </div>
                              </div>
@@ -291,7 +532,12 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
           <div class="space-y-6">
             <!-- Tanda Summary Card -->
             <div class="card-coquette p-6 bg-gradient-to-br from-white to-pink-50/30">
-              <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-4">Información General</h4>
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em]">Información General</h4>
+                <button (click)="openEditModal()" class="text-xs font-bold text-pink-600 hover:text-pink-800 bg-pink-100/60 hover:bg-pink-100 px-2 py-0.5 rounded-lg border border-pink-200 transition-colors">
+                  ✎ Editar
+                </button>
+              </div>
               <div class="space-y-4">
                 <div class="flex justify-between items-center text-sm">
                   <span class="text-pink-600 font-bold italic">Producto:</span>
@@ -305,23 +551,29 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                   <span class="text-pink-600 font-bold italic">Paga Semanal:</span>
                   <span class="text-base font-black text-pink-600">{{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                 </div>
-              </div>
-
-              <!-- Enlaces individuales por clienta -->
-              <div class="mt-6 pt-5 border-t border-pink-100">
-                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-2">🔗 Enlaces individuales</p>
-                <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  @for (participant of participants(); track participant.id) {
-                    <button (click)="onCopyParticipantLink(participant)" class="w-full py-2.5 px-3 bg-pink-50 hover:bg-pink-100 text-pink-700 text-[10px] font-black rounded-xl transition-all flex items-center justify-between gap-2 border border-pink-100">
-                      <span class="truncate">{{ participant.customerName }}</span>
-                      <span class="shrink-0">Copiar</span>
-                    </button>
-                  }
-                </div>
-                @if (t.accessToken) {
-                  <button (click)="onCopyLink(t.accessToken)" class="mt-2 w-full py-2 text-[9px] font-bold text-pink-300 hover:text-pink-500">Usar enlace grupal anterior</button>
+                @if (t.itemCost) {
+                  <div class="flex justify-between items-center text-sm pt-2 border-t border-pink-100">
+                    <span class="text-pink-600 font-bold italic">Valor Artículo:</span>
+                    <span class="text-sm font-black text-purple-800">
+                      {{ t.itemCost | currency:(t.currency || 'MXN'):'symbol-narrow':'1.0-0' }}
+                      <span class="text-[10px] uppercase font-bold text-pink-400">({{ t.currency || 'MXN' }})</span>
+                    </span>
+                  </div>
+                }
+                @if (t.currency === 'USD' && t.exchangeRate) {
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-pink-500 font-bold">Tipo de Cambio:</span>
+                    <span class="font-black text-pink-700">{{ t.exchangeRate | currency:'MXN':'symbol-narrow':'1.2-2' }} MXN/USD</span>
+                  </div>
                 }
               </div>
+
+              <!-- Enlace de Clienta -->
+              @if (t.accessToken) {
+                <button (click)="onCopyLink(t.accessToken)" class="mt-6 w-full py-3 bg-pink-100 hover:bg-pink-200 text-pink-600 text-[10px] font-black rounded-2xl uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm border border-pink-200">
+                  🔗 Copiar Enlace Clientas
+                </button>
+              }
             </div>
 
             <!-- Enrollment Panel -->
@@ -397,9 +649,15 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                           <input type="number" [(ngModel)]="enrollTurn" class="input-coquette py-1.5 text-xs text-center font-black" min="1" [max]="t.totalWeeks" />
                         </div>
                       </div>
-                      <div>
-                        <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Abono Semanal (vacío = usar {{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }})</label>
-                        <input type="number" [(ngModel)]="enrollWeeklyAmount" class="input-coquette py-1.5 text-xs font-bold" placeholder="Ej. 350" />
+                      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                          <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Abono Semanal (MXN)</label>
+                          <input type="number" [(ngModel)]="enrollWeeklyAmount" class="input-coquette py-1.5 text-xs font-bold" [placeholder]="t.weeklyAmount.toString()" />
+                        </div>
+                        <div>
+                          <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Valor Propio (Opcional)</label>
+                          <input type="number" [(ngModel)]="enrollItemCost" class="input-coquette py-1.5 text-xs font-bold" placeholder="Ej. 1200" />
+                        </div>
                       </div>
                       <button (click)="onAddParticipant()" [disabled]="isEnrolling()" class="btn-coquette btn-pink w-full py-3 text-[10px] font-black shadow-md">
                         @if (isEnrolling()) { <span class="animate-spin italic">⌛</span> } @else { Inscribir en Tanda 🎀 }
@@ -420,8 +678,9 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
               <button class="btn-coquette btn-outline-pink w-full justify-center text-[10px] py-3 font-black shadow-sm" (click)="onProcessPenalties()">
                 ⚠️ Procesar Retrasos
               </button>
-              <button class="bg-rose-50 border border-rose-100 text-rose-300 hover:text-rose-600 hover:bg-rose-100/50 rounded-3xl w-full py-3 text-[10px] font-black transition-all">
-                🚫 Cancelar Tanda
+              <button (click)="setTandaStatus(t.status === 'Cancelled' ? 'Active' : 'Cancelled')"
+                      class="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100/50 rounded-3xl w-full py-3 text-[10px] font-black transition-colors">
+                {{ t.status === 'Cancelled' ? 'Reactivar tanda' : 'Cancelar tanda' }}
               </button>
             </div>
           </div>
@@ -430,98 +689,75 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
       
       <!-- PAYMENT MODAL -->
       @if (showPaymentModal()) {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="showPaymentModal.set(false)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-sm relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl animate-heartbeat">💖</span> Registrar Abono
-             </h3>
-             
-             <div class="bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl p-6 border border-pink-100 text-center mb-8">
-                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-1"> Participante </p>
-                <p class="text-lg font-black text-pink-900 mb-4">{{ activePayment()?.participant?.customerName }}</p>
-                
-                <div class="flex items-end justify-center gap-1">
-                  <p class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500 font-display">
-                    {{ getParticipantWeeklyAmount(activePayment()!.participant) | currency:'MXN':'symbol-narrow':'1.0-0' }}
-                  </p>
-                  <span class="text-pink-400 text-[10px] font-medium uppercase mb-2">/ Sem {{ activePayment()?.week }}</span>
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+          <div class="absolute inset-0 bg-pink-950/35" (click)="showPaymentModal.set(false)"></div>
+          <div class="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-pink-100 bg-white p-5 shadow-2xl sm:p-7">
+            <div class="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[11px] font-black uppercase tracking-wider text-pink-500">Semana {{ activePayment()?.week }}</p>
+                <h3 id="payment-title" class="text-xl font-black text-pink-950">{{ activePayment()?.participant?.customerName }}</h3>
+                <p class="text-sm font-semibold text-pink-600">
+                  Cuota {{ getParticipantWeeklyAmount(activePayment()!.participant) | currency:'MXN':'symbol-narrow':'1.0-0' }} ·
+                  pagado {{ getWeekPaidAmount(activePayment()!.participant, activePayment()!.week) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                </p>
+              </div>
+              <button (click)="showPaymentModal.set(false)" class="h-10 w-10 rounded-full bg-pink-50 text-xl text-pink-700" aria-label="Cerrar">×</button>
+            </div>
+
+            @if (paymentsForActiveWeek().length > 0) {
+              <div class="mb-6 rounded-2xl border border-pink-100 bg-pink-50/60 p-3">
+                <p class="mb-2 text-[10px] font-black uppercase tracking-wider text-pink-500">Movimientos registrados</p>
+                <div class="space-y-2">
+                  @for (payment of paymentsForActiveWeek(); track payment.id) {
+                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs">
+                      <div>
+                        <p class="font-black text-pink-950">{{ payment.amountPaid | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                        <p class="text-pink-500">{{ payment.paymentDate | date:'dd MMM yyyy, HH:mm' }}{{ payment.notes ? ' · ' + payment.notes : '' }}</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button (click)="editPayment(payment)" class="rounded-lg px-3 py-2 font-bold text-pink-700 hover:bg-pink-50">Editar</button>
+                        <button (click)="requestDeletePayment(payment.id)"
+                                class="rounded-lg px-3 py-2 font-bold text-rose-700 hover:bg-rose-50">
+                          {{ pendingDeletePaymentId() === payment.id ? 'Confirmar borrado' : 'Eliminar' }}
+                        </button>
+                      </div>
+                    </div>
+                  }
                 </div>
-             </div>
-
-             <div class="flex gap-4">
-                <button (click)="showPaymentModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Regresar</button>
-                <button (click)="confirmPayment()" [disabled]="isSavingPay()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isSavingPay()) { <span class="animate-spin italic">⌛</span> } @else { Confirmar 💖 }
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-
-      <!-- REVIEW PAYMENT PROOF MODAL -->
-      @if (reviewPayment(); as review) {
-        <div class="fixed inset-0 z-[115] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="reviewPayment.set(null)"></div>
-          <div class="card-coquette bg-white p-7 w-full max-w-md relative z-10 animate-scale-in">
-            <h3 class="text-xl font-black text-pink-900 mb-2 flex items-center gap-2">🧾 Revisar comprobante</h3>
-            <p class="text-xs text-pink-500 font-bold mb-5">{{ review.participant.customerName }} · Semana {{ review.payment.weekNumber }}</p>
-            @if (review.payment.proofUrl) {
-              <a [href]="review.payment.proofUrl" target="_blank" rel="noopener" class="block rounded-2xl overflow-hidden border border-pink-100 mb-5 bg-pink-50 text-center">
-                <img [src]="review.payment.proofUrl" alt="Comprobante de pago" class="max-h-56 w-full object-contain" />
-                <span class="block py-2 text-[10px] font-black text-pink-600 uppercase tracking-widest">Abrir comprobante</span>
-              </a>
+              </div>
             }
-            <div class="grid grid-cols-2 gap-3 mb-5">
-              <div class="rounded-2xl bg-purple-50 p-3 border border-purple-100">
-                <p class="text-[9px] font-black text-purple-400 uppercase">Importe OCR</p>
-                <p class="text-lg font-black text-purple-700">{{ (review.payment.ocrAmount ?? review.payment.amountPaid) | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
-              </div>
-              <div class="rounded-2xl bg-amber-50 p-3 border border-amber-100">
-                <p class="text-[9px] font-black text-amber-500 uppercase">Fecha / hora OCR</p>
-                <p class="text-xs font-black text-amber-700">{{ review.payment.depositDate ? (review.payment.depositDate | date:'dd/MM/yyyy HH:mm') : 'No detectada' }}</p>
-              </div>
-            </div>
-            <div class="mb-5">
-              <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Importe confirmado</label>
-              <input type="number" [(ngModel)]="reviewAmount" class="input-coquette" min="0" step="0.01" />
-            </div>
-            <div class="flex gap-3">
-              <button (click)="reviewPayment.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cerrar</button>
-              <button (click)="verifyPayment(false)" [disabled]="isVerifyingPayment()" class="btn-coquette btn-rose flex-1 justify-center">Rechazar</button>
-              <button (click)="verifyPayment(true)" [disabled]="isVerifyingPayment()" class="btn-coquette btn-pink flex-1 justify-center">Aprobar ✨</button>
-            </div>
-          </div>
-        </div>
-      }
 
-      <!-- EDIT PARTICIPANT ITEMS MODAL -->
-      @if (editingItemsParticipant(); as p) {
-        <div class="fixed inset-0 z-[115] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="editingItemsParticipant.set(null)"></div>
-          <div class="card-coquette bg-white p-7 w-full max-w-lg relative z-10 animate-scale-in max-h-[90vh] overflow-y-auto">
-            <h3 class="text-xl font-black text-pink-900 mb-1 flex items-center gap-2">🛍️ Artículos de {{ p.customerName }}</h3>
-            <p class="text-xs text-pink-400 font-medium mb-5">Cada artículo puede tener una cantidad y un cobro semanal diferente.</p>
-            <div class="space-y-3">
-              @for (item of itemDrafts(); track $index; let i = $index) {
-                <div class="rounded-2xl bg-pink-50/60 border border-pink-100 p-3">
-                  <div class="flex gap-2 items-start">
-                    <input [(ngModel)]="item.productName" [name]="'item-name-' + i" class="input-coquette py-2 text-xs flex-1" placeholder="Artículo" />
-                    <input [(ngModel)]="item.quantity" [name]="'item-qty-' + i" type="number" min="1" class="input-coquette py-2 text-xs w-16 text-center" title="Cantidad" />
-                    <button (click)="removeItemDraft(i)" [disabled]="itemDrafts().length === 1" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 font-black disabled:opacity-30">×</button>
-                  </div>
-                  <div class="grid grid-cols-3 gap-2 mt-2">
-                    <input [(ngModel)]="item.unitPrice" [name]="'item-price-' + i" type="number" min="0" step="0.01" class="input-coquette py-2 text-xs" placeholder="Precio" />
-                    <input [(ngModel)]="item.weeklyAmount" [name]="'item-weekly-' + i" type="number" min="0" step="0.01" class="input-coquette py-2 text-xs" placeholder="Cobro semanal" />
-                    <input [(ngModel)]="item.variant" [name]="'item-variant-' + i" class="input-coquette py-2 text-xs" placeholder="Variante" />
-                  </div>
-                </div>
-              }
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label class="label-coquette" for="payment-amount">Monto abonado</label>
+                <input id="payment-amount" type="number" min="0.01" step="0.01" [(ngModel)]="paymentForm().amountPaid" class="input-coquette" />
+              </div>
+              <div>
+                <label class="label-coquette" for="payment-penalty">Penalización pagada</label>
+                <input id="payment-penalty" type="number" min="0" step="0.01" [(ngModel)]="paymentForm().penaltyPaid" class="input-coquette" />
+              </div>
+              <div>
+                <label class="label-coquette" for="payment-date">Fecha y hora</label>
+                <input id="payment-date" type="datetime-local" [(ngModel)]="paymentForm().paymentDate" class="input-coquette" />
+              </div>
+              <label class="flex min-h-12 items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50 px-4 font-bold text-pink-800">
+                <input type="checkbox" [(ngModel)]="paymentForm().isVerified" class="h-4 w-4" />
+                Pago verificado
+              </label>
+              <div class="sm:col-span-2">
+                <label class="label-coquette" for="payment-notes">Notas</label>
+                <textarea id="payment-notes" rows="2" [(ngModel)]="paymentForm().notes" class="input-coquette" placeholder="Transferencia, efectivo, referencia..."></textarea>
+              </div>
             </div>
-            <button (click)="addItemDraft()" class="mt-4 w-full py-3 rounded-2xl border border-dashed border-purple-200 text-purple-600 text-xs font-black hover:bg-purple-50">＋ Agregar otro artículo</button>
-            <div class="flex gap-3 mt-6">
-              <button (click)="editingItemsParticipant.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
-              <button (click)="saveParticipantItems()" [disabled]="isSavingItems()" class="btn-coquette btn-pink flex-1 justify-center">Guardar artículos ✨</button>
+
+            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              @if (editingPaymentId()) {
+                <button (click)="cancelPaymentEdit()" class="btn-coquette btn-ghost justify-center">Nuevo abono</button>
+              }
+              <button (click)="showPaymentModal.set(false)" class="btn-coquette btn-ghost justify-center">Cerrar</button>
+              <button (click)="confirmPayment()" [disabled]="isSavingPay()" class="btn-coquette btn-pink justify-center">
+                {{ isSavingPay() ? 'Guardando...' : (editingPaymentId() ? 'Guardar cambios' : 'Registrar abono') }}
+              </button>
             </div>
           </div>
         </div>
@@ -529,46 +765,123 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
 
       <!-- EDIT TANDA MODAL -->
       @if (showEditModal()) {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="showEditModal.set(false)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-lg relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl">📝</span> Editar Detalles de Tanda
-             </h3>
-             
-             <div class="grid grid-cols-2 gap-4 mb-8">
-               <div class="col-span-2">
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Nombre de la Tanda</label>
-                 <input type="text" [(ngModel)]="editForm().name" class="input-coquette py-2" />
+        <div class="fixed inset-0 z-[100] overflow-y-auto bg-pink-950/40 p-4 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="edit-tanda-title">
+          <div class="flex min-h-full items-center justify-center">
+            <div class="relative w-full max-w-lg rounded-3xl border border-pink-100 bg-white p-6 sm:p-8 shadow-2xl animate-scale-in">
+               <div class="mb-5 flex items-start justify-between gap-4 border-b border-pink-100/60 pb-3">
+                 <div>
+                   <h3 id="edit-tanda-title" class="text-xl font-black text-pink-950 flex items-center gap-2">
+                      <span class="text-2xl">📝</span> Editar Detalles de Tanda
+                   </h3>
+                   <p class="text-xs text-pink-500 font-medium">Modifica nombre, producto, fechas, valores y monedas</p>
+                 </div>
+                 <button (click)="showEditModal.set(false)" class="h-9 w-9 rounded-full bg-pink-50 hover:bg-pink-100 text-lg font-black text-pink-700 flex items-center justify-center transition-colors">×</button>
                </div>
                
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Semanas Totales</label>
-                 <input type="number" [(ngModel)]="editForm().totalWeeks" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Fecha de Inicio</label>
-                 <input type="date" [(ngModel)]="editForm().startDate" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Monto Semanal</label>
-                 <input type="number" [(ngModel)]="editForm().weeklyAmount" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Penalización</label>
-                 <input type="number" [(ngModel)]="editForm().penaltyAmount" class="input-coquette py-2" />
-               </div>
-             </div>
+               <div class="space-y-4 mb-6">
+                 <div>
+                   <label class="label-coquette" for="edit-tanda-name">Nombre de la Tanda</label>
+                   <input id="edit-tanda-name" type="text" [(ngModel)]="editForm().name" class="input-coquette text-sm font-bold" />
+                 </div>
 
-             <div class="flex gap-4">
-                <button (click)="showEditModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
-                <button (click)="onUpdateTanda()" [disabled]="isUpdatingTanda()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isUpdatingTanda()) { <span class="animate-spin italic">⌛</span> } @else { Guardar Cambios ✨ }
-                </button>
-             </div>
+                 <div>
+                   <label class="label-coquette" for="edit-product">Producto del Catálogo</label>
+                   <select id="edit-product" [(ngModel)]="editForm().productId" class="input-coquette text-sm font-bold">
+                     @for (product of tandaProducts(); track product.id) {
+                       <option [value]="product.id">{{ product.name }}</option>
+                     }
+                   </select>
+                 </div>
+
+                 <!-- Sección de Moneda y Valor del Artículo -->
+                 <div class="p-3.5 bg-pink-50/70 border border-pink-100 rounded-2xl space-y-3">
+                   <div class="flex items-center justify-between">
+                     <span class="text-xs font-black text-pink-900">💵 Moneda y Valor</span>
+                     <div class="flex rounded-xl bg-white p-0.5 border border-pink-200">
+                       <button type="button" (click)="setEditCurrency('MXN')"
+                               [class.bg-pink-500]="editForm().currency === 'MXN'"
+                               [class.text-white]="editForm().currency === 'MXN'"
+                               [class.text-pink-700]="editForm().currency !== 'MXN'"
+                               class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">MXN ($)</button>
+                       <button type="button" (click)="setEditCurrency('USD')"
+                               [class.bg-pink-500]="editForm().currency === 'USD'"
+                               [class.text-white]="editForm().currency === 'USD'"
+                               [class.text-pink-700]="editForm().currency !== 'USD'"
+                               class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">USD ($)</button>
+                     </div>
+                   </div>
+
+                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                     <div>
+                       <label class="text-[10px] font-bold text-pink-700">Valor Artículo ({{ editForm().currency || 'MXN' }})</label>
+                       <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                              placeholder="Ej. 1200"
+                              [(ngModel)]="editForm().itemCost"
+                              (ngModelChange)="onEditItemCostOrRateChange()" />
+                     </div>
+                     @if (editForm().currency === 'USD') {
+                       <div>
+                         <label class="text-[10px] font-bold text-pink-700">Tipo de Cambio (MXN/USD)</label>
+                         <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                                placeholder="Ej. 19.50"
+                                [(ngModel)]="editForm().exchangeRate"
+                                (ngModelChange)="onEditItemCostOrRateChange()" />
+                       </div>
+                     } @else {
+                       <div class="flex flex-col justify-end">
+                         <p class="text-[11px] text-pink-500 italic pb-1.5">Moneda nacional estándar</p>
+                       </div>
+                     }
+                   </div>
+
+                   @if (editForm().currency === 'USD' && editForm().itemCost && editForm().exchangeRate) {
+                     <div class="text-[11px] font-semibold text-purple-700 bg-purple-50/80 px-2.5 py-1.5 rounded-xl border border-purple-100 flex justify-between">
+                       <span>Equivalente en pesos:</span>
+                       <span class="font-black">{{ (editForm().itemCost! * editForm().exchangeRate!) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                     </div>
+                   }
+                 </div>
+                 
+                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                   <div>
+                     <label class="label-coquette">Semanas Totales</label>
+                     <input type="number" min="1" max="52" [(ngModel)]="editForm().totalWeeks" (ngModelChange)="onEditItemCostOrRateChange()" class="input-coquette text-sm font-bold" />
+                   </div>
+                   <div>
+                     <label class="label-coquette">Abono Semanal (MXN)</label>
+                     <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm().weeklyAmount" class="input-coquette text-sm font-bold" />
+                   </div>
+                 </div>
+
+                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                   <div>
+                     <label class="label-coquette">Fecha de Inicio</label>
+                     <input type="date" [(ngModel)]="editForm().startDate" class="input-coquette text-sm font-bold" />
+                   </div>
+                   <div>
+                     <label class="label-coquette">Penalización</label>
+                     <input type="number" min="0" step="0.01" [(ngModel)]="editForm().penaltyAmount" class="input-coquette text-sm font-bold" />
+                   </div>
+                 </div>
+
+                 <div>
+                   <label class="label-coquette" for="edit-status">Estado</label>
+                   <select id="edit-status" [(ngModel)]="editForm().status" class="input-coquette text-sm font-bold">
+                     <option value="Draft">Borrador</option>
+                     <option value="Active">Activa</option>
+                     <option value="Completed">Completada</option>
+                     <option value="Cancelled">Cancelada</option>
+                   </select>
+                 </div>
+               </div>
+
+               <div class="flex flex-col-reverse sm:flex-row gap-3">
+                  <button (click)="showEditModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
+                  <button (click)="onUpdateTanda()" [disabled]="isUpdatingTanda()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
+                     @if (isUpdatingTanda()) { <span class="animate-spin italic">⌛</span> } @else { Guardar Cambios ✨ }
+                  </button>
+               </div>
+            </div>
           </div>
         </div>
       }
@@ -590,31 +903,207 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
              </div>
 
              <div class="space-y-3">
-                <button (click)="editingTurnId.set(p.id); selectedParticipantActions.set(null)" 
+                <button (click)="openParticipantEditor(p)"
                         class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
-                  <span class="text-lg">🔢</span> Cambiar Turno
-                </button>
-                <button (click)="editingVariantId.set(p.id); editVariantValue = p.variant || ''; selectedParticipantActions.set(null)" 
-                        class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
-                  <span class="text-lg">🎨</span> Editar Variante
-                </button>
-                <button (click)="openItemsModal(p); selectedParticipantActions.set(null)"
-                        class="w-full py-4 bg-purple-50 hover:bg-purple-100 text-purple-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-purple-100">
-                  <span class="text-lg">🛍️</span> Editar Artículos y Cobro
-                </button>
-                <button (click)="onCopyParticipantLink(p); selectedParticipantActions.set(null)"
-                        class="w-full py-4 bg-amber-50 hover:bg-amber-100 text-amber-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-amber-100">
-                  <span class="text-lg">🔗</span> Copiar enlace individual
+                  <span class="text-lg">✎</span> Editar participante
                 </button>
                 <button (click)="showRemoveConfirm.set(p); selectedParticipantActions.set(null)" 
                         class="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-500 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-rose-100">
                   <span class="text-lg">🗑️</span> Quitar de esta Tanda
+                </button>
+                <button (click)="copyParticipantMessage(p)"
+                        class="w-full py-4 bg-purple-50 hover:bg-purple-100 text-purple-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-purple-100">
+                  <span class="text-lg">💌</span> Copiar instrucciones de pago
+                </button>
+                <button (click)="openItemsModal(p)"
+                        class="w-full py-4 bg-purple-50 hover:bg-purple-100 text-purple-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-purple-100">
+                  <span class="text-lg">🛍️</span> Editar artículos y cobro
                 </button>
                 <button (click)="selectedParticipantActions.set(null)" 
                         class="w-full py-4 text-pink-300 font-bold rounded-2xl flex items-center justify-center gap-3 transition-all">
                   Cancelar
                 </button>
              </div>
+          </div>
+        </div>
+      }
+
+      @if (editingItemsParticipant(); as participant) {
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="participant-items-title">
+          <div class="absolute inset-0 bg-pink-950/35" (click)="editingItemsParticipant.set(null)"></div>
+          <div class="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-purple-100 bg-white p-5 shadow-2xl sm:p-7">
+            <div class="mb-5 flex items-start justify-between gap-4 border-b border-purple-100 pb-3">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-purple-500">Cobro personalizado</p>
+                <h3 id="participant-items-title" class="text-xl font-black text-pink-950">Artículos de {{ participant.customerName }}</h3>
+                <p class="text-xs font-medium text-pink-600">Agrega artículos mixtos; el abono semanal se calcula por cantidad.</p>
+              </div>
+              <button type="button" (click)="editingItemsParticipant.set(null)" class="h-9 w-9 rounded-full bg-purple-50 text-lg font-black text-purple-700">×</button>
+            </div>
+
+            <div class="space-y-3">
+              @for (item of itemDrafts; track $index) {
+                <div class="rounded-2xl border border-purple-100 bg-purple-50/50 p-4">
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                      <label class="label-coquette">Artículo</label>
+                      <input [(ngModel)]="item.productName" class="input-coquette" placeholder="Ej. Set de cosmetiqueras" />
+                    </div>
+                    <div>
+                      <label class="label-coquette">Cantidad</label>
+                      <input [(ngModel)]="item.quantity" type="number" min="1" class="input-coquette" />
+                    </div>
+                    <div>
+                      <label class="label-coquette">Variante</label>
+                      <input [(ngModel)]="item.variant" class="input-coquette" placeholder="Color, talla..." />
+                    </div>
+                    <div>
+                      <label class="label-coquette">Precio unitario</label>
+                      <input [(ngModel)]="item.unitPrice" type="number" min="0" step="0.01" class="input-coquette" />
+                    </div>
+                    <div>
+                      <label class="label-coquette">Cobro semanal por unidad</label>
+                      <input [(ngModel)]="item.weeklyAmount" type="number" min="0" step="0.01" class="input-coquette" />
+                    </div>
+                  </div>
+                  <button type="button" (click)="removeItemDraft($index)" [disabled]="itemDrafts.length === 1" class="mt-3 text-xs font-black text-rose-600 disabled:opacity-30">Quitar artículo</button>
+                </div>
+              }
+            </div>
+
+            <button type="button" (click)="addItemDraft()" class="mt-4 w-full rounded-2xl border border-dashed border-purple-200 py-3 text-xs font-black text-purple-600 hover:bg-purple-50">＋ Agregar otro artículo</button>
+
+            <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" (click)="editingItemsParticipant.set(null)" class="btn-coquette btn-ghost justify-center">Cancelar</button>
+              <button type="button" (click)="saveParticipantItems()" [disabled]="isSavingItems()" class="btn-coquette btn-pink justify-center">
+                {{ isSavingItems() ? 'Guardando...' : 'Guardar artículos y cobro ✨' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (editingParticipant(); as participant) {
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="participant-editor-title">
+          <div class="absolute inset-0 bg-pink-950/35" (click)="editingParticipant.set(null)"></div>
+          <div class="relative z-10 max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-pink-100 bg-white p-5 shadow-2xl sm:p-7">
+            <div class="mb-6">
+              <p class="text-[11px] font-black uppercase tracking-wider text-pink-500">Lugar {{ participant.assignedTurn }}</p>
+              <h3 id="participant-editor-title" class="text-xl font-black text-pink-950">Editar participante</h3>
+              <p class="text-sm text-pink-600">Todos los datos y lugares pueden modificarse.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="sm:col-span-2 relative">
+                <label class="label-coquette" for="edit-participant-search">Clienta</label>
+                <div class="relative">
+                  <input id="edit-participant-search"
+                         type="text"
+                         class="input-coquette pl-10 text-xs sm:text-sm font-bold"
+                         [ngModel]="editParticipantClientSearch()"
+                         (ngModelChange)="onEditParticipantSearch($event)"
+                         (focus)="showEditParticipantSuggestions.set(true)"
+                         (blur)="hideEditParticipantSuggestionsWithDelay()"
+                         placeholder="Escribe el nombre de la clienta..." />
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
+                  @if (participantForm().customerId) {
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-pink-700 bg-pink-100 px-2 py-0.5 rounded-full">
+                      Seleccionada
+                    </span>
+                  }
+                </div>
+
+                @if (showEditParticipantSuggestions() && filteredEditParticipantClients().length > 0) {
+                  <div class="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-2xl border border-pink-100 bg-white p-2 shadow-2xl animate-slide-down">
+                    @for (cl of filteredEditParticipantClients(); track cl.id) {
+                      <div (mousedown)="$event.preventDefault()"
+                           (click)="selectClientForEditParticipant(cl)"
+                           class="flex cursor-pointer items-center justify-between gap-2 rounded-xl p-2.5 transition-colors hover:bg-pink-50"
+                           [class.bg-pink-50]="participantForm().customerId === cl.id">
+                        <div class="min-w-0">
+                          <p class="truncate text-xs font-bold text-pink-900">{{ cl.name }}</p>
+                          <p class="text-[10px] text-pink-400">{{ cl.tag || 'Clienta' }} {{ cl.phone ? '· ' + cl.phone : '' }}</p>
+                        </div>
+                        <span class="text-[11px] font-black text-pink-500">
+                          {{ participantForm().customerId === cl.id ? '✓' : 'Elegir' }}
+                        </span>
+                      </div>
+                    }
+                  </div>
+                } @else if (showEditParticipantSuggestions() && editParticipantClientSearch().trim().length >= 2) {
+                  <div class="absolute top-full left-0 right-0 z-50 mt-1 rounded-2xl border border-pink-100 bg-white p-3 text-center shadow-2xl animate-slide-down">
+                    <p class="text-xs text-pink-400 italic">No se encontraron clientas con ese nombre 🔍</p>
+                  </div>
+                }
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-turn">Lugar</label>
+                <input id="participant-turn" type="number" min="1" [max]="tanda()?.totalWeeks ?? 52"
+                       [(ngModel)]="participantForm().assignedTurn" class="input-coquette" />
+                <p class="mt-1 text-[10px] text-pink-500">Si está ocupado, ambas participantes intercambian lugar.</p>
+              </div>
+
+              <div>
+                <label class="label-coquette" for="participant-amount">Abono Semanal (MXN)</label>
+                <input id="participant-amount" type="number" min="0.01" step="0.01"
+                       [(ngModel)]="participantForm().weeklyAmount" class="input-coquette"
+                       [placeholder]="tanda()?.weeklyAmount?.toString() || 'General'" />
+              </div>
+
+              <div>
+                <label class="label-coquette" for="participant-cost">Valor del Artículo</label>
+                <input id="participant-cost" type="number" min="0" step="0.01"
+                       [(ngModel)]="participantForm().itemCost" class="input-coquette"
+                       placeholder="Ej. 1200" />
+              </div>
+
+              <div>
+                <label class="label-coquette" for="participant-curr">Moneda / Tipo de Cambio</label>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <select id="participant-curr" [(ngModel)]="participantForm().currency" class="input-coquette">
+                    <option value="">(Heredar de Tanda)</option>
+                    <option value="MXN">MXN</option>
+                    <option value="USD">USD</option>
+                  </select>
+                  <input type="number" step="0.01" [(ngModel)]="participantForm().exchangeRate" class="input-coquette" placeholder="T.C." />
+                </div>
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-status">Estado</label>
+                <select id="participant-status" [(ngModel)]="participantForm().status" class="input-coquette">
+                  <option value="Active">Al corriente</option>
+                  <option value="Delinquent">Con retraso</option>
+                  <option value="Completed">Completada</option>
+                </select>
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-variant">Variante</label>
+                <input id="participant-variant" type="text" [(ngModel)]="participantForm().variant" class="input-coquette" placeholder="Color, talla o modelo" />
+              </div>
+              <div>
+                <label class="label-coquette" for="participant-amount">Abono personalizado</label>
+                <input id="participant-amount" type="number" min="0.01" step="0.01"
+                       [(ngModel)]="participantForm().weeklyAmount" class="input-coquette"
+                       [placeholder]="'General: $' + (tanda()?.weeklyAmount ?? 0)" />
+              </div>
+              <label class="flex min-h-12 items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50 px-4 font-bold text-pink-800">
+                <input type="checkbox" [(ngModel)]="participantForm().isDelivered" class="h-4 w-4" />
+                Producto entregado
+              </label>
+              @if (participantForm().isDelivered) {
+                <div>
+                  <label class="label-coquette" for="participant-delivery-date">Fecha de entrega</label>
+                  <input id="participant-delivery-date" type="date" [(ngModel)]="participantForm().deliveryDate" class="input-coquette" />
+                </div>
+              }
+            </div>
+
+            <div class="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button (click)="editingParticipant.set(null)" class="btn-coquette btn-ghost justify-center">Cancelar</button>
+              <button (click)="saveParticipant()" [disabled]="isUpdatingParticipant()" class="btn-coquette btn-pink justify-center">
+                {{ isUpdatingParticipant() ? 'Guardando...' : 'Guardar participante' }}
+              </button>
+            </div>
           </div>
         </div>
       }
@@ -666,11 +1155,11 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
         </div>
       }
 
-      <!-- CUSTOM DELIVERY CONFIRMATION MODAL -->
+      <!-- CUSTOM DELIVERY CONFIRMATION MODAL (Mobile Centered) -->
       @if (confirmingDelivery(); as p) {
-        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-md"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-sm relative z-10 animate-scale-in">
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div class="fixed inset-0 bg-pink-950/40 backdrop-blur-md" (click)="confirmingDelivery.set(null)"></div>
+          <div class="card-coquette bg-white p-6 sm:p-8 w-full max-w-sm relative z-10 my-auto shadow-2xl animate-scale-in">
              <div class="w-20 h-20 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-pink-500 text-4xl mb-6 animate-bounce-subtle">
                 🎁
              </div>
@@ -706,13 +1195,13 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
 
     <!-- Modal de Reordenamiento Drag & Drop -->
     @if (showReorderModal()) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div class="fixed inset-0 bg-pink-950/50 z-[100] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
           <!-- Header -->
           <div class="p-6 border-b flex justify-between items-center bg-gradient-to-r from-purple-50 to-pink-50">
             <div>
-              <h3 class="text-xl font-bold text-gray-800">Reordenar Participantes</h3>
-              <p class="text-xs text-gray-500">Arrastra para cambiar el orden de los turnos</p>
+              <h3 class="text-xl font-bold text-pink-950">Mover lugares</h3>
+              <p class="text-xs text-pink-600">Arrastra participantes o espacios vacíos. Todo el orden es editable.</p>
             </div>
             <button (click)="showReorderModal.set(false)" class="p-2 hover:bg-white rounded-full transition-colors">
               <span class="text-2xl text-gray-400">×</span>
@@ -724,24 +1213,32 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
             <div cdkDropList 
                  (cdkDropListDropped)="drop($event)"
                  class="space-y-3">
-              @for (p of reorderList(); track p.id) {
+              @for (p of reorderSlots(); track $index) {
                 <div cdkDrag 
-                     class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 cursor-move hover:border-purple-300 transition-colors group">
-                  <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors">
+                     class="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm flex items-center gap-4 cursor-move hover:border-pink-300 transition-colors group">
+                  <div class="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-xs font-bold text-pink-500 group-hover:bg-pink-100 group-hover:text-pink-700 transition-colors">
                     {{ $index + 1 }}
                   </div>
                   <div class="flex-1">
-                    <p class="font-semibold text-gray-800">{{ p.customerName }}</p>
-                    <p class="text-xs text-gray-400">{{ p.variant || 'Sin variante' }}</p>
+                    @if (p; as participant) {
+                      <p class="font-semibold text-pink-950">{{ participant.customerName }}</p>
+                      <p class="text-xs text-pink-500">
+                        {{ participant.variant || 'Sin variante' }}
+                        @if (participant.isDelivered) { · Entregado }
+                      </p>
+                    } @else {
+                      <p class="font-semibold text-pink-400">Lugar disponible</p>
+                      <p class="text-xs text-pink-300">Puedes mover este espacio entre participantes</p>
+                    }
                   </div>
-                  <div class="text-gray-300 group-hover:text-purple-400">
+                  <div class="text-pink-300 group-hover:text-pink-500" aria-hidden="true">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
                     </svg>
                   </div>
 
                   <!-- Placeholder while dragging -->
-                  <div *cdkDragPlaceholder class="bg-purple-50 border-2 border-dashed border-purple-200 h-16 rounded-2xl"></div>
+                  <div *cdkDragPlaceholder class="bg-pink-50 border-2 border-dashed border-pink-200 h-16 rounded-2xl"></div>
                 </div>
               }
             </div>
@@ -774,13 +1271,32 @@ export class TandaDetailComponent implements OnInit {
   private tandaService = inject(TandaService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
+  private destroyRef = inject(DestroyRef);
 
   tanda = signal<TandaDto | null>(null);
   participants = signal<TandaParticipantDto[]>([]);
+  paymentProofs = signal<TandaPaymentProofAdminDto[]>([]);
+  reviewingProofId = signal<string | null>(null);
   weeksArray = signal<number[]>([]);
   sundayParticipant = signal<TandaParticipantDto | null>(null);
   loading = signal(true);
   viewMode = signal<'table' | 'visual'>('table');
+  selectedWeekMobile = signal<number>(1);
+
+  mobileWeekStats = computed(() => {
+    const w = this.selectedWeekMobile();
+    const parts = this.participants();
+    let collected = 0;
+    let paidCount = 0;
+    for (const p of parts) {
+      const paid = this.getWeekPaidAmount(p, w);
+      collected += paid;
+      if (paid >= this.getParticipantWeeklyAmount(p)) {
+        paidCount++;
+      }
+    }
+    return { collected, paidCount };
+  });
 
   currentWeek = computed(() => {
     const t = this.tanda();
@@ -826,6 +1342,7 @@ export class TandaDetailComponent implements OnInit {
 
   // Inscripción
   allClients = signal<ClientDto[]>([]);
+  tandaProducts = signal<TandaProductDto[]>([]);
   clientSearch = signal('');
   showOnlyFrequent = signal(true);
   confirmingDelivery = signal<TandaParticipantDto | null>(null);
@@ -836,11 +1353,14 @@ export class TandaDetailComponent implements OnInit {
   enrollTurn = 1;
   enrollVariant = '';
   enrollWeeklyAmount?: number;
+  enrollCurrency = 'MXN';
+  enrollItemCost?: number;
+  enrollExchangeRate?: number;
   isEnrolling = signal(false);
 
   // Reordenamiento y Sorteo
   showReorderModal = signal(false);
-  reorderList = signal<TandaParticipantDto[]>([]);
+  reorderSlots = signal<Array<TandaParticipantDto | null>>([]);
   isSavingReorder = signal(false);
 
   showRoulette = signal(false);
@@ -854,23 +1374,29 @@ export class TandaDetailComponent implements OnInit {
   showPaymentModal = signal(false);
   isSavingPay = signal(false);
   activePayment = signal<{ participant: TandaParticipantDto, week: number } | null>(null);
-  reviewPayment = signal<{ participant: TandaParticipantDto, payment: TandaPaymentDto } | null>(null);
-  reviewAmount = 0;
-  isVerifyingPayment = signal(false);
+  editingPaymentId = signal<string | null>(null);
+  pendingDeletePaymentId = signal<string | null>(null);
+  paymentForm = signal<PaymentForm>(this.createEmptyPaymentForm());
 
-  editingItemsParticipant = signal<TandaParticipantDto | null>(null);
-  itemDrafts = signal<CreateTandaParticipantItemDto[]>([]);
-  isSavingItems = signal(false);
+  paymentsForActiveWeek = computed(() => {
+    const active = this.activePayment();
+    if (!active) return [];
+    return (active.participant.payments ?? [])
+      .filter(payment => payment.weekNumber === active.week)
+      .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+  });
 
   // Edición
   showEditModal = signal(false);
   isUpdatingTanda = signal(false);
-  editForm = signal({
+  editForm = signal<TandaEditForm>({
+    productId: '',
     name: '',
     totalWeeks: 10,
     weeklyAmount: 0,
     penaltyAmount: 0,
-    startDate: ''
+    startDate: '',
+    status: 'Active'
   });
 
   // Reordenamiento y Eliminación
@@ -880,6 +1406,33 @@ export class TandaDetailComponent implements OnInit {
   isUpdatingVariant = signal(false);
   selectedParticipantActions = signal<TandaParticipantDto | null>(null);
   showRemoveConfirm = signal<TandaParticipantDto | null>(null);
+  editingParticipant = signal<TandaParticipantDto | null>(null);
+  editingItemsParticipant = signal<TandaParticipantDto | null>(null);
+  itemDrafts: CreateTandaParticipantItemDto[] = [];
+  isSavingItems = signal(false);
+  isUpdatingParticipant = signal(false);
+  editParticipantClientSearch = signal('');
+  showEditParticipantSuggestions = signal(false);
+  participantForm = signal<ParticipantForm>({
+    customerId: 0,
+    assignedTurn: 1,
+    variant: '',
+    weeklyAmount: undefined,
+    status: 'Active',
+    isDelivered: false,
+    deliveryDate: ''
+  });
+
+  filteredEditParticipantClients = computed(() => {
+    const s = this.editParticipantClientSearch().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const clients = this.allClients();
+    if (!s) return clients.slice(0, 10);
+    return clients.filter(cl => {
+      const name = (cl.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const phone = cl.phone || '';
+      return name.includes(s) || phone.includes(s);
+    }).slice(0, 12);
+  });
 
   filteredClientsSearch = computed(() => {
     const s = this.clientSearch().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -896,10 +1449,11 @@ export class TandaDetailComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.route.params.subscribe(params => {
-      this.loadTanda(params['id']);
-    });
+    this.route.params
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => this.loadTanda(params['id']));
     this.loadAllClients();
+    this.loadTandaProducts();
   }
 
   loadAllClients() {
@@ -918,7 +1472,12 @@ export class TandaDetailComponent implements OnInit {
           this.participants.set([...data.participants].sort((a, b) => a.assignedTurn - b.assignedTurn));
         }
         this.weeksArray.set(Array.from({ length: data.totalWeeks }, (_, i) => i + 1));
+        const cw = this.currentWeek();
+        if (cw > 0 && cw <= data.totalWeeks) {
+          this.selectedWeekMobile.set(cw);
+        }
         this.loading.set(false);
+        this.loadPaymentProofs(id);
 
         this.tandaService.getSundayDelivery(id).subscribe({
           next: (p) => this.sundayParticipant.set(p),
@@ -932,16 +1491,56 @@ export class TandaDetailComponent implements OnInit {
     });
   }
 
-  hasPaid(participant: TandaParticipantDto, week: number): boolean {
-    return participant.payments?.some(p => p.weekNumber === week) || false;
+  loadPaymentProofs(tandaId: string) {
+    this.tandaService.getPaymentProofs(tandaId).subscribe({
+      next: proofs => this.paymentProofs.set(proofs),
+      error: () => this.paymentProofs.set([])
+    });
   }
 
-  getPayment(participant: TandaParticipantDto, week: number): TandaPaymentDto | undefined {
-    return participant.payments?.find(payment => payment.weekNumber === week);
+  reviewPaymentProof(proof: TandaPaymentProofAdminDto, approve: boolean, rejectionReason?: string) {
+    if (this.reviewingProofId()) return;
+    this.reviewingProofId.set(proof.id);
+    this.tandaService.reviewPaymentProof(proof.id, approve, rejectionReason).subscribe({
+      next: () => {
+        this.reviewingProofId.set(null);
+        this.toastService.success(approve ? 'Comprobante aprobado y pago registrado ✨' : 'Comprobante rechazado');
+        this.loadPaymentProofs(proof.tandaId);
+        this.loadTanda(proof.tandaId);
+      },
+      error: error => {
+        this.reviewingProofId.set(null);
+        this.toastService.error(error.error?.message || 'No se pudo revisar el comprobante');
+      }
+    });
+  }
+
+  rejectPaymentProof(proof: TandaPaymentProofAdminDto) {
+    const reason = window.prompt('Indica brevemente por qué se rechaza el comprobante:')?.trim();
+    if (reason) this.reviewPaymentProof(proof, false, reason);
+  }
+
+  prevSelectedWeek() {
+    this.selectedWeekMobile.update(w => Math.max(1, w - 1));
+  }
+
+  nextSelectedWeek() {
+    const total = this.tanda()?.totalWeeks ?? 52;
+    this.selectedWeekMobile.update(w => Math.min(total, w + 1));
+  }
+
+  hasPaid(participant: TandaParticipantDto, week: number): boolean {
+    return this.getWeekPaidAmount(participant, week) >= this.getParticipantWeeklyAmount(participant);
+  }
+
+  getWeekPaidAmount(participant: TandaParticipantDto, week: number): number {
+    return getVerifiedWeekPaidAmount(participant.payments, week);
   }
 
   getParticipantWeeklyAmount(p: TandaParticipantDto): number {
-    return p.weeklyAmount ?? this.tanda()?.weeklyAmount ?? 0;
+    if (p.weeklyAmount != null) return p.weeklyAmount;
+    const itemAmount = (p.items ?? []).reduce((sum, item) => sum + (item.weeklyAmount ?? 0) * Math.max(1, item.quantity), 0);
+    return itemAmount > 0 ? itemAmount : this.tanda()?.weeklyAmount ?? 0;
   }
 
   onClientSearch(term: string) {
@@ -989,6 +1588,13 @@ export class TandaDetailComponent implements OnInit {
     this.showRoulette.set(true);
   }
 
+  loadTandaProducts() {
+    this.tandaService.getTandaProducts().subscribe({
+      next: products => this.tandaProducts.set(products),
+      error: () => this.toastService.error('No se pudo cargar el catálogo de productos')
+    });
+  }
+
   handleRouletteStart() {
     const winnerNames = this.rouletteWinnerNames();
     if (winnerNames.length > 0) {
@@ -997,22 +1603,25 @@ export class TandaDetailComponent implements OnInit {
   }
 
   openReorderModal() {
-    this.reorderList.set([...this.participants()].sort((a, b) => a.assignedTurn - b.assignedTurn));
+    this.reorderSlots.set(buildTandaSlots(
+      this.participants(),
+      this.tanda()?.totalWeeks ?? 0
+    ));
     this.showReorderModal.set(true);
   }
 
-  drop(event: CdkDragDrop<TandaParticipantDto[]>) {
-    const list = [...this.reorderList()];
+  drop(event: CdkDragDrop<Array<TandaParticipantDto | null>>) {
+    const list = [...this.reorderSlots()];
     moveItemInArray(list, event.previousIndex, event.currentIndex);
-    this.reorderList.set(list);
+    this.reorderSlots.set(list);
   }
 
   onSaveReorder() {
     const t = this.tanda();
     if (t && !this.isSavingReorder()) {
       this.isSavingReorder.set(true);
-      const ids = this.reorderList().map(p => p.id);
-      this.tandaService.reorderParticipants(t.id, ids).subscribe({
+      const assignments = buildPlaceAssignments(this.reorderSlots());
+      this.tandaService.updatePlaces(t.id, assignments).subscribe({
         next: () => {
           this.toastService.success('Orden actualizado con éxito ✨');
           this.showReorderModal.set(false);
@@ -1032,7 +1641,7 @@ export class TandaDetailComponent implements OnInit {
     this.clientSearch.set('');
     this.showSuggestions.set(false);
     this.selectedSuggestionIdx.set(-1);
-    this.enrollTurn = this.participants().length + 1;
+    this.enrollTurn = this.findFirstAvailableTurn();
     this.enrollVariant = '';
     this.enrollWeeklyAmount = undefined;
   }
@@ -1047,7 +1656,10 @@ export class TandaDetailComponent implements OnInit {
         customerId: sc.id,
         assignedTurn: this.enrollTurn,
         variant: this.enrollVariant,
-        weeklyAmount: this.enrollWeeklyAmount || undefined
+        weeklyAmount: this.enrollWeeklyAmount || undefined,
+        currency: this.enrollCurrency || undefined,
+        itemCost: this.enrollItemCost || undefined,
+        exchangeRate: this.enrollExchangeRate || undefined
       }).subscribe({
         next: () => {
           this.toastService.success(`${sc.name} inscrita con éxito ✨`);
@@ -1055,6 +1667,8 @@ export class TandaDetailComponent implements OnInit {
           this.selectedClient.set(null);
           this.enrollVariant = '';
           this.enrollWeeklyAmount = undefined;
+          this.enrollItemCost = undefined;
+          this.enrollExchangeRate = undefined;
           this.isEnrolling.set(false);
         },
         error: (err) => {
@@ -1086,57 +1700,32 @@ export class TandaDetailComponent implements OnInit {
     });
   }
 
-  onCopyParticipantLink(participant: TandaParticipantDto) {
-    if (!participant.publicToken) {
-      this.toastService.error('Esta participante aún no tiene enlace individual');
+  copyParticipantMessage(participant: TandaParticipantDto) {
+    const tanda = this.tanda();
+    if (!tanda || !participant.publicAccessToken) {
+      this.toastService.error('Esta participante aún no tiene enlace personal');
       return;
     }
-
-    const url = `${window.location.origin}/tanda-view/${participant.publicToken}`;
-    navigator.clipboard.writeText(url).then(() => {
-      this.toastService.success(`Enlace individual de ${participant.customerName} copiado 🎀`);
+    const link = `${window.location.origin}/tanda-view/${participant.publicAccessToken}`;
+    const weekly = this.getParticipantWeeklyAmount(participant).toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
+    const message = `Hola ${participant.customerName || 'hermosa'} 💕\n\nTu abono semanal de la tanda es de ${weekly}. Cuando realices tu transferencia, entra a tu enlace personal para consultar tu avance y subir la foto del comprobante:\n\n${link}\n\nToca “Enviar comprobante” y nosotros revisaremos tu pago. ✨`;
+    navigator.clipboard.writeText(message).then(() => {
+      this.selectedParticipantActions.set(null);
+      this.toastService.success('Instrucciones copiadas para enviar por Messenger 💌');
     });
   }
 
-  openPaymentModal(participant: TandaParticipantDto, week: number) {
-    this.activePayment.set({ participant, week });
-    this.showPaymentModal.set(true);
-    this.isSavingPay.set(false);
-  }
-
-  openPaymentReview(participant: TandaParticipantDto, payment: TandaPaymentDto) {
-    this.reviewAmount = payment.ocrAmount ?? payment.amountPaid ?? this.getParticipantWeeklyAmount(participant);
-    this.reviewPayment.set({ participant, payment });
-    this.isVerifyingPayment.set(false);
-  }
-
-  verifyPayment(isVerified: boolean) {
-    const review = this.reviewPayment();
-    if (!review || this.isVerifyingPayment()) return;
-
-    this.isVerifyingPayment.set(true);
-    this.tandaService.verifyPayment(review.payment.id, {
-      isVerified,
-      amountPaid: this.reviewAmount,
-      depositDate: review.payment.depositDate,
-      notes: isVerified ? 'Comprobante revisado y aprobado por administración.' : 'Comprobante rechazado por administración.'
-    }).subscribe({
-      next: () => {
-        this.toastService.success(isVerified ? 'Pago aprobado ✨' : 'Pago marcado para revisión');
-        this.reviewPayment.set(null);
-        this.isVerifyingPayment.set(false);
-        this.loadTanda(review.participant.tandaId);
-      },
-      error: (err) => {
-        this.isVerifyingPayment.set(false);
-        this.toastService.error(err.error?.message || 'No se pudo actualizar el pago');
-      }
-    });
+  itemSummary(participant: TandaParticipantDto): string {
+    return (participant.items ?? [])
+      .map(item => `${item.quantity}× ${item.productName}${item.variant ? ` (${item.variant})` : ''}`)
+      .join(' · ');
   }
 
   openItemsModal(participant: TandaParticipantDto) {
-    const items = participant.items?.length
-      ? participant.items.map(item => ({
+    const tanda = this.tanda();
+    const existingItems = participant.items ?? [];
+    this.itemDrafts = existingItems.length > 0
+      ? existingItems.map(item => ({
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantity,
@@ -1145,59 +1734,84 @@ export class TandaDetailComponent implements OnInit {
           variant: item.variant
         }))
       : [{
-          productName: this.tanda()?.product?.name || 'Artículo de tanda',
+          productId: tanda?.productId,
+          productName: tanda?.product?.name || 'Artículo de tanda',
           quantity: 1,
-          unitPrice: 0,
+          unitPrice: participant.itemCost ?? tanda?.itemCost ?? 0,
           weeklyAmount: this.getParticipantWeeklyAmount(participant),
           variant: participant.variant
         }];
-
-    this.itemDrafts.set(items);
     this.editingItemsParticipant.set(participant);
-    this.isSavingItems.set(false);
+    this.selectedParticipantActions.set(null);
   }
 
   addItemDraft() {
-    this.itemDrafts.update(items => [...items, {
-      productName: '',
-      quantity: 1,
-      unitPrice: 0,
-      weeklyAmount: 0,
-      variant: ''
-    }]);
+    this.itemDrafts = [...this.itemDrafts, { productName: '', quantity: 1, unitPrice: 0, weeklyAmount: 0 }];
   }
 
   removeItemDraft(index: number) {
-    this.itemDrafts.update(items => items.filter((_, i) => i !== index));
+    if (this.itemDrafts.length > 1) this.itemDrafts = this.itemDrafts.filter((_, itemIndex) => itemIndex !== index);
   }
 
   saveParticipantItems() {
     const participant = this.editingItemsParticipant();
-    const items = this.itemDrafts().map(item => ({
-      ...item,
-      productName: item.productName.trim(),
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice || 0),
-      weeklyAmount: item.weeklyAmount == null ? undefined : Number(item.weeklyAmount)
-    }));
-
-    if (!participant || items.some(item => !item.productName || item.quantity < 1)) {
-      this.toastService.error('Completa el nombre y la cantidad de cada artículo');
+    const tanda = this.tanda();
+    if (!participant || !tanda || this.isSavingItems()) return;
+    if (this.itemDrafts.some(item => !item.productName.trim() || item.quantity < 1 || item.unitPrice < 0 || (item.weeklyAmount ?? 0) < 0)) {
+      this.toastService.error('Completa correctamente los artículos y cobros.');
       return;
     }
 
     this.isSavingItems.set(true);
-    this.tandaService.replaceParticipantItems(participant.id, items).subscribe({
+    this.tandaService.replaceParticipantItems(participant.id, { items: this.itemDrafts }).subscribe({
       next: () => {
-        this.toastService.success('Artículos y cobros actualizados ✨');
+        this.isSavingItems.set(false);
         this.editingItemsParticipant.set(null);
-        this.isSavingItems.set(false);
-        this.loadTanda(participant.tandaId);
+        this.toastService.success('Artículos y cobro actualizados ✨');
+        this.loadTanda(tanda.id);
       },
-      error: (err) => {
+      error: error => {
         this.isSavingItems.set(false);
-        this.toastService.error(err.error?.message || 'No se pudieron guardar los artículos');
+        this.toastService.error(error.error?.message || 'No se pudieron actualizar los artículos.');
       }
+    });
+  }
+
+  openPaymentModal(participant: TandaParticipantDto, week: number) {
+    this.activePayment.set({ participant, week });
+    const remaining = Math.max(
+      0,
+      this.getParticipantWeeklyAmount(participant) - this.getWeekPaidAmount(participant, week)
+    );
+    this.paymentForm.set({
+      ...this.createEmptyPaymentForm(),
+      amountPaid: remaining || this.getParticipantWeeklyAmount(participant)
+    });
+    this.editingPaymentId.set(null);
+    this.pendingDeletePaymentId.set(null);
+    this.showPaymentModal.set(true);
+    this.isSavingPay.set(false);
+  }
+
+  editPayment(payment: TandaPaymentDto) {
+    this.editingPaymentId.set(payment.id);
+    this.pendingDeletePaymentId.set(null);
+    this.paymentForm.set({
+      amountPaid: payment.amountPaid,
+      penaltyPaid: payment.penaltyPaid,
+      paymentDate: this.toDateTimeLocal(payment.paymentDate),
+      isVerified: payment.isVerified,
+      notes: payment.notes ?? ''
+    });
+  }
+
+  cancelPaymentEdit() {
+    const active = this.activePayment();
+    this.editingPaymentId.set(null);
+    this.pendingDeletePaymentId.set(null);
+    this.paymentForm.set({
+      ...this.createEmptyPaymentForm(),
+      amountPaid: active ? this.getParticipantWeeklyAmount(active.participant) : 0
     });
   }
 
@@ -1205,14 +1819,36 @@ export class TandaDetailComponent implements OnInit {
     const pay = this.activePayment();
     const t = this.tanda();
     if (pay && t && !this.isSavingPay()) {
+      const form = this.paymentForm();
+      if (form.amountPaid <= 0) {
+        this.toastService.error('Captura un monto mayor a cero');
+        return;
+      }
+
       this.isSavingPay.set(true);
-      this.tandaService.registerPayment({
+      const editingId = this.editingPaymentId();
+      const request = editingId
+        ? this.tandaService.updatePayment(editingId, {
+            weekNumber: pay.week,
+            amountPaid: form.amountPaid,
+            penaltyPaid: form.penaltyPaid,
+            paymentDate: new Date(form.paymentDate).toISOString(),
+            isVerified: form.isVerified,
+            notes: form.notes.trim() || undefined
+          })
+        : this.tandaService.registerPayment({
         participantId: pay.participant.id,
         weekNumber: pay.week,
-        amountPaid: this.getParticipantWeeklyAmount(pay.participant)
-      }).subscribe({
+            amountPaid: form.amountPaid,
+            penaltyPaid: form.penaltyPaid,
+            paymentDate: new Date(form.paymentDate).toISOString(),
+            isVerified: form.isVerified,
+            notes: form.notes.trim() || undefined
+          });
+
+      request.subscribe({
         next: () => {
-          this.toastService.success('Abono registrado correctamente 💅');
+          this.toastService.success(editingId ? 'Abono actualizado' : 'Abono registrado correctamente');
           this.showPaymentModal.set(false);
           this.loadTanda(t.id);
           this.isSavingPay.set(false);
@@ -1225,15 +1861,42 @@ export class TandaDetailComponent implements OnInit {
     }
   }
 
+  setEditCurrency(curr: string) {
+    this.editForm.update(f => {
+      const exchangeRate = curr === 'USD' && !f.exchangeRate ? 19.50 : f.exchangeRate;
+      return { ...f, currency: curr, exchangeRate };
+    });
+    this.onEditItemCostOrRateChange();
+  }
+
+  onEditItemCostOrRateChange() {
+    const f = this.editForm();
+    if (f.itemCost && f.itemCost > 0 && f.totalWeeks > 0) {
+      let totalMxn = f.itemCost;
+      if (f.currency === 'USD' && f.exchangeRate) {
+        totalMxn = f.itemCost * f.exchangeRate;
+      }
+      this.editForm.update(form => ({
+        ...form,
+        weeklyAmount: Math.ceil(totalMxn / form.totalWeeks)
+      }));
+    }
+  }
+
   openEditModal() {
     const t = this.tanda();
     if (t) {
       this.editForm.set({
+        productId: t.productId,
         name: t.name,
         totalWeeks: t.totalWeeks,
         weeklyAmount: t.weeklyAmount,
         penaltyAmount: t.penaltyAmount || 0,
-        startDate: new Date(t.startDate).toISOString().split('T')[0]
+        startDate: t.startDate.split('T')[0],
+        currency: t.currency || 'MXN',
+        itemCost: t.itemCost,
+        exchangeRate: t.exchangeRate,
+        status: t.status
       });
       this.showEditModal.set(true);
     }
@@ -1258,8 +1921,9 @@ export class TandaDetailComponent implements OnInit {
     }
   }
 
-  onUpdateTurn(p: TandaParticipantDto, event: any) {
-    const newTurn = parseInt(event.target.value);
+  onUpdateTurn(p: TandaParticipantDto, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const newTurn = Number.parseInt(input.value, 10);
     if (isNaN(newTurn) || newTurn === p.assignedTurn) {
       this.editingTurnId.set(null);
       return;
@@ -1387,18 +2051,156 @@ export class TandaDetailComponent implements OnInit {
   }
 
   onRemovePayment(participant: TandaParticipantDto, week: number) {
-    const payment = participant.payments?.find(pay => pay.weekNumber === week);
-    if (!payment) return;
+    this.openPaymentModal(participant, week);
+  }
 
-    if (confirm(`¿Quieres quitar el pago de la semana ${week} para ${participant.customerName}? Se borrará del historial.`)) {
-      this.tandaService.deletePayment(payment.id).subscribe({
-        next: () => {
-          this.toastService.success('Pago eliminado ✨');
-          const t = this.tanda();
-          if (t) this.loadTanda(t.id);
-        },
-        error: (err) => this.toastService.error(err.error?.message || 'Error al eliminar pago')
-      });
+  requestDeletePayment(paymentId: string) {
+    if (this.pendingDeletePaymentId() !== paymentId) {
+      this.pendingDeletePaymentId.set(paymentId);
+      return;
     }
+
+    this.tandaService.deletePayment(paymentId).subscribe({
+      next: () => {
+        this.toastService.success('Pago eliminado');
+        this.showPaymentModal.set(false);
+        const tanda = this.tanda();
+        if (tanda) this.loadTanda(tanda.id);
+      },
+      error: err => this.toastService.error(err.error?.message || 'Error al eliminar pago')
+    });
+  }
+
+  onEditParticipantSearch(term: string) {
+    this.editParticipantClientSearch.set(term);
+    this.showEditParticipantSuggestions.set(true);
+  }
+
+  selectClientForEditParticipant(client: ClientDto) {
+    this.participantForm.update(form => ({ ...form, customerId: client.id }));
+    this.editParticipantClientSearch.set(client.name);
+    this.showEditParticipantSuggestions.set(false);
+  }
+
+  hideEditParticipantSuggestionsWithDelay() {
+    setTimeout(() => this.showEditParticipantSuggestions.set(false), 250);
+  }
+
+  openParticipantEditor(participant: TandaParticipantDto) {
+    this.editingParticipant.set(participant);
+    this.editParticipantClientSearch.set(participant.customerName || '');
+    this.showEditParticipantSuggestions.set(false);
+    this.participantForm.set({
+      customerId: participant.customerId,
+      assignedTurn: participant.assignedTurn,
+      variant: participant.variant ?? '',
+      weeklyAmount: participant.weeklyAmount,
+      currency: participant.currency ?? '',
+      itemCost: participant.itemCost,
+      exchangeRate: participant.exchangeRate,
+      status: participant.status,
+      isDelivered: participant.isDelivered,
+      deliveryDate: participant.deliveryDate?.split('T')[0] ?? ''
+    });
+    this.selectedParticipantActions.set(null);
+  }
+
+  saveParticipant() {
+    const participant = this.editingParticipant();
+    const tanda = this.tanda();
+    if (!participant || !tanda || this.isUpdatingParticipant()) return;
+
+    const form = this.participantForm();
+    const dto: UpdateTandaParticipantDto = {
+      customerId: form.customerId,
+      assignedTurn: form.assignedTurn,
+      variant: form.variant.trim() || undefined,
+      weeklyAmount: form.weeklyAmount || undefined,
+      currency: form.currency?.trim() || undefined,
+      itemCost: form.itemCost || undefined,
+      exchangeRate: form.exchangeRate || undefined,
+      status: form.status,
+      isDelivered: form.isDelivered,
+      deliveryDate: form.isDelivered && form.deliveryDate
+        ? new Date(`${form.deliveryDate}T12:00:00`).toISOString()
+        : undefined
+    };
+
+    this.isUpdatingParticipant.set(true);
+    this.tandaService.updateParticipant(participant.id, dto).subscribe({
+      next: () => {
+        this.toastService.success('Participante actualizada');
+        this.editingParticipant.set(null);
+        this.isUpdatingParticipant.set(false);
+        this.loadTanda(tanda.id);
+      },
+      error: err => {
+        this.isUpdatingParticipant.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo actualizar la participante');
+      }
+    });
+  }
+
+  setTandaStatus(status: TandaStatus) {
+    const tanda = this.tanda();
+    if (!tanda || this.isUpdatingTanda()) return;
+    this.isUpdatingTanda.set(true);
+    this.tandaService.updateTanda(tanda.id, {
+      productId: tanda.productId,
+      name: tanda.name,
+      totalWeeks: tanda.totalWeeks,
+      weeklyAmount: tanda.weeklyAmount,
+      penaltyAmount: tanda.penaltyAmount,
+      startDate: tanda.startDate,
+      currency: tanda.currency,
+      itemCost: tanda.itemCost,
+      exchangeRate: tanda.exchangeRate,
+      status
+    }).subscribe({
+      next: () => {
+        this.isUpdatingTanda.set(false);
+        this.toastService.success('Estado de la tanda actualizado');
+        this.loadTanda(tanda.id);
+      },
+      error: err => {
+        this.isUpdatingTanda.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo cambiar el estado');
+      }
+    });
+  }
+
+  private findFirstAvailableTurn(): number {
+    const occupied = new Set(this.participants().map(participant => participant.assignedTurn));
+    const totalWeeks = this.tanda()?.totalWeeks ?? 1;
+    return Array.from({ length: totalWeeks }, (_, index) => index + 1)
+      .find(turn => !occupied.has(turn)) ?? totalWeeks;
+  }
+
+  private createEmptyPaymentForm(): PaymentForm {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return {
+      amountPaid: 0,
+      penaltyPaid: 0,
+      paymentDate: now.toISOString().slice(0, 16),
+      isVerified: true,
+      notes: ''
+    };
+  }
+
+  private toDateTimeLocal(value: string): string {
+    const date = new Date(value);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 16);
+  }
+
+  statusLabel(status: TandaStatus): string {
+    const labels: Record<TandaStatus, string> = {
+      Draft: 'Borrador',
+      Active: 'Activa',
+      Completed: 'Completada',
+      Cancelled: 'Cancelada'
+    };
+    return labels[status];
   }
 }

@@ -232,7 +232,8 @@ type CandidateFilter = 'Pending' | 'Confirmed' | 'Ignored' | 'conflict' | 'all';
       border-radius: 999px;
       padding: 9px 14px;
       color: #9d174d;
-      white-space: nowrap;
+       white-space: normal;
+       overflow-wrap: anywhere;
     }
     .progress-pill strong { font-size: 1.2rem; }
     .diagnostic-strip {
@@ -249,7 +250,8 @@ type CandidateFilter = 'Pending' | 'Confirmed' | 'Ignored' | 'conflict' | 'all';
     }
     .diagnostic-strip strong {
       color: #831843;
-      white-space: nowrap;
+       white-space: normal;
+       overflow-wrap: anywhere;
     }
     .diagnostic-strip.warn {
       background: #fff7ed;

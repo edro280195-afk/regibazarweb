@@ -7,6 +7,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { ApiService } from '../../../core/services/api.service';
 import { environment } from '../../../../environments/environment';
 import { gsap } from 'gsap';
+import { TandaPaymentProofPublicDto, TandaViewDto } from '../../../core/models';
 
 const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
@@ -104,48 +105,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                   </p>
                   <div class="bg-pink-100/50 px-4 py-2 rounded-2xl flex items-center gap-2">
                     <span class="text-lg">💰</span>
-                    <span class="text-xs font-black text-pink-700">Abono Semanal: {{ getParticipantAmount(t) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="text-xs font-black text-pink-700">Abono Semanal: {{ (t.currentParticipant?.weeklyAmount ?? t.weeklyAmount) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                   </div>
                 </div>
               </div>
-
-              @if (currentParticipant(t); as me) {
-                <div class="card-coquette bg-white/90 p-6 shadow-xl border-purple-100">
-                  <div class="flex items-center justify-between gap-3 mb-4">
-                    <div>
-                      <p class="text-[10px] font-black text-purple-400 uppercase tracking-widest">Mis artículos</p>
-                      <h3 class="text-lg font-black text-purple-900">{{ me.name }}</h3>
-                    </div>
-                    <span class="px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-black uppercase">Turno {{ me.assignedTurn }}</span>
-                  </div>
-                  <div class="space-y-2">
-                    @for (item of me.items; track item.id) {
-                      <div class="flex items-center justify-between gap-3 rounded-2xl bg-purple-50/70 border border-purple-100 px-4 py-3">
-                        <div>
-                          <p class="text-sm font-black text-purple-900">{{ item.quantity }}× {{ item.productName }}</p>
-                          @if (item.variant) { <p class="text-[10px] text-purple-500 font-bold">{{ item.variant }}</p> }
-                        </div>
-                        <span class="text-sm font-black text-purple-700">{{ (item.weeklyAmount ?? 0) * item.quantity | currency:'MXN':'symbol-narrow':'1.0-0' }}<small class="text-[9px]">/sem</small></span>
-                      </div>
-                    } @empty {
-                      <p class="text-xs text-purple-500">{{ t.productName }}</p>
-                    }
-                  </div>
-                  @if (me.payments?.length) {
-                    <div class="mt-5 pt-4 border-t border-purple-100">
-                      <p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-2">Últimos comprobantes</p>
-                      <div class="space-y-1.5">
-                        @for (payment of me.payments.slice(0, 3); track payment.id) {
-                          <div class="flex items-center justify-between text-[10px] font-bold">
-                            <span class="text-purple-700">Semana {{ payment.weekNumber }} · {{ (payment.amountPaid || payment.ocrAmount || 0) | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
-                            <span [class]="payment.isVerified ? 'text-emerald-600' : 'text-amber-600'">{{ payment.isVerified ? 'Aprobado ✓' : 'En revisión ⏳' }}</span>
-                          </div>
-                        }
-                      </div>
-                    </div>
-                  }
-                </div>
-              }
 
               <!-- Delivery Turn Hero -->
               @if (isWinnerThisWeek()) {
@@ -154,6 +117,89 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                    <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡ES TU TURNO! ✨</h3>
                    <p class="text-xs font-medium opacity-90">Esta semana el producto es para ti. ¡Abre tu regalo de tanda! 💖</p>
                 </div>
+              }
+
+              @if (t.currentParticipant; as me) {
+                <section class="rounded-[2.5rem] border-2 border-pink-200 bg-white/95 p-6 shadow-xl shadow-pink-100/40 animate-fade-in-up" aria-label="Enviar comprobante de pago">
+                  <div class="flex items-start gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-pink-100 text-xl">📸</div>
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-black uppercase tracking-widest text-pink-500">Tu comprobante</p>
+                      <h3 class="text-lg font-black text-pink-950">Sube tu pago de esta semana</h3>
+                      <p class="mt-1 text-xs font-medium leading-relaxed text-pink-700">1. Realiza tu transferencia · 2. toma una foto · 3. súbela aquí. Revisaremos el comprobante y el pago se aplicará automáticamente. 💖</p>
+                    </div>
+                  </div>
+
+                  @if (me.items.length > 0) {
+                    <div class="mt-5 rounded-2xl border border-purple-100 bg-purple-50/60 p-4">
+                      <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-purple-600">Tus artículos</p>
+                      <div class="space-y-2">
+                        @for (item of me.items; track item.id) {
+                          <div class="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs">
+                            <span class="font-bold text-pink-900">{{ item.quantity }}× {{ item.productName }}{{ item.variant ? ' · ' + item.variant : '' }}</span>
+                            <span class="shrink-0 font-black text-purple-700">{{ ((item.weeklyAmount ?? 0) * item.quantity) | currency:'MXN':'symbol-narrow':'1.0-0' }}/sem</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  @if (me.hasPaidCurrentWeek) {
+                    <div class="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-700">✅ Tu pago de la semana {{ t.currentWeek }} ya está registrado</div>
+                  } @else {
+                    <div class="mt-5 rounded-2xl bg-pink-50 px-4 py-3">
+                      <div class="flex items-center justify-between gap-3 text-xs">
+                        <span class="font-bold text-pink-700">Semana {{ t.currentWeek }}</span>
+                        <span class="font-black text-pink-900">{{ me.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                      </div>
+                    </div>
+
+                    @if (getProofForWeek(me.paymentProofs, t.currentWeek); as proof) {
+                      <div class="mt-4 rounded-2xl border px-4 py-3 text-xs"
+                           [ngClass]="proof.status === 'Pending' ? 'border-amber-200 bg-amber-50 text-amber-800' : proof.status === 'Rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'">
+                        @if (proof.status === 'Pending') {
+                          <p class="font-black">⏳ Comprobante en revisión</p>
+                          <p class="mt-1 font-medium">Te avisaremos cuando tu pago quede aplicado.</p>
+                        } @else if (proof.status === 'Rejected') {
+                          <p class="font-black">💌 Necesitamos otra foto</p>
+                          <p class="mt-1 font-medium">{{ proof.rejectionReason || 'El comprobante no pudo validarse.' }} Puedes enviar uno nuevo abajo.</p>
+                        } @else {
+                          <p class="font-black">✅ Comprobante aprobado y pago aplicado</p>
+                        }
+                        @if (proof.ocrAmount || proof.depositDate) {
+                          <p class="mt-2 text-[10px] font-bold opacity-80">OCR: {{ proof.ocrAmount || proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.2-2' }}{{ proof.depositDate ? ' · ' + (proof.depositDate | date:'dd/MM/yyyy HH:mm') : '' }}</p>
+                        }
+                      </div>
+                    }
+
+                    @if (!getProofForWeek(me.paymentProofs, t.currentWeek) || getProofForWeek(me.paymentProofs, t.currentWeek)?.status === 'Rejected') {
+                      <div class="mt-4 space-y-3">
+                        <div class="rounded-2xl border border-dashed border-pink-300 bg-pink-50/60 p-3">
+                          <p class="mb-2 text-center text-[10px] font-black uppercase tracking-widest text-pink-500">¿Cómo quieres agregarlo?</p>
+                          <div class="grid grid-cols-2 gap-2">
+                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
+                              <span class="text-xl">📷</span>
+                              <span>Tomar foto</span>
+                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" capture="environment" (change)="onProofSelected($event)">
+                            </label>
+                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
+                              <span class="text-xl">🖼️</span>
+                              <span class="truncate">{{ proofFileName() || 'Galería' }}</span>
+                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
+                            </label>
+                          </div>
+                        </div>
+                        @if (proofError()) {
+                          <p class="text-xs font-bold text-rose-600">{{ proofError() }}</p>
+                        }
+                        <button type="button" (click)="submitPaymentProof()" [disabled]="!proofFile() || proofUploading()"
+                                class="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 py-3.5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-pink-200 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">
+                          {{ proofUploading() ? 'ENVIANDO... ✨' : 'ENVIAR COMPROBANTE 💖' }}
+                        </button>
+                      </div>
+                    }
+                  }
+                </section>
               }
 
               <!-- Payment Methods Section -->
@@ -187,28 +233,26 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                         
                         @if (!mpResult()) {
                           <div class="space-y-4">
-                            @if (t.participant; as me) {
-                              <div class="rounded-2xl bg-pink-50 px-4 py-3 border border-pink-100">
-                                <p class="text-[9px] font-black text-pink-400 uppercase tracking-widest">Enlace individual</p>
-                                <p class="text-sm font-black text-pink-900">{{ me.name }}</p>
-                              </div>
+                            <!-- Participant Selector -->
+                            @if (!t.currentParticipant) {
+                            <div class="space-y-2">
+                              <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">¿Quién eres? ✨</label>
+                              <select class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl px-4 py-3 text-sm font-bold text-pink-900 focus:outline-none focus:border-pink-300 transition-all"
+                                      [(ngModel)]="selectedParticipantId">
+                                <option [value]="null" disabled>Selecciona tu nombre...</option>
+                                @for (p of t.participants; track p.id) {
+                                  <option [value]="p.id">{{ p.name }} (Semana {{ p.assignedTurn }})</option>
+                                }
+                              </select>
+                            </div>
                             } @else {
-                              <div class="space-y-2">
-                                <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">¿Quién eres? ✨</label>
-                                <select class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl px-4 py-3 text-sm font-bold text-pink-900 focus:outline-none focus:border-pink-300 transition-all"
-                                        [(ngModel)]="selectedParticipantId">
-                                  <option [value]="null" disabled>Selecciona tu nombre...</option>
-                                  @for (p of t.participants; track p.id) {
-                                    <option [value]="p.id">{{ p.name }} (Semana {{ p.assignedTurn }})</option>
-                                  }
-                                </select>
-                              </div>
+                              <div class="rounded-2xl bg-pink-50 px-4 py-3 text-xs font-bold text-pink-700">Pagando como <strong>{{ t.currentParticipant.name }}</strong> · semana {{ t.currentWeek }}</div>
                             }
 
                             <!-- MP Form -->
                             <form id="mp-card-form" class="space-y-3">
                               <div id="mp-cardNumber" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
-                              <div class="grid grid-cols-2 gap-3">
+                              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div id="mp-expirationDate" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                                 <div id="mp-securityCode" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
                               </div>
@@ -299,30 +343,6 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                   }
                 </div>
 
-                <!-- Payment Proof Upload -->
-                <div class="mt-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-[2rem] p-6 border border-purple-100 shadow-sm">
-                  <div class="flex items-center gap-3 mb-3">
-                    <span class="text-3xl">🧾</span>
-                    <div>
-                      <h4 class="font-black text-purple-900 text-xs uppercase tracking-widest">Enviar comprobante</h4>
-                      <p class="text-[10px] text-purple-500 font-medium">Leemos fecha, hora e importe automáticamente.</p>
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 mb-3">
-                    <select [(ngModel)]="proofWeek" class="bg-white border border-purple-100 rounded-xl px-3 py-2 text-xs font-bold text-purple-900">
-                      @for (week of weeksArray(); track week) { <option [ngValue]="week">Semana {{ week }}</option> }
-                    </select>
-                    <label class="bg-white border border-purple-100 rounded-xl px-3 py-2 text-xs font-bold text-purple-600 cursor-pointer text-center">
-                      {{ selectedProofFile ? 'Cambiar imagen' : 'Elegir imagen' }}
-                      <input type="file" accept="image/*" (change)="onProofSelected($event)" class="hidden" />
-                    </label>
-                  </div>
-                  @if (selectedProofFile) { <p class="text-[10px] text-purple-600 font-bold mb-3 truncate">{{ selectedProofFile.name }}</p> }
-                  <button (click)="submitPaymentProof()" [disabled]="!selectedProofFile || proofProcessing() || !selectedParticipantId()" class="w-full py-3 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg disabled:opacity-40">
-                    {{ proofProcessing() ? 'Analizando comprobante...' : 'Enviar para revisión ✨' }}
-                  </button>
-                </div>
-
                 <!-- General Contact -->
                 <div class="mt-6 pt-6 border-t border-pink-100/50">
                   <p class="text-center text-[10px] text-pink-400 font-black uppercase tracking-[0.2em] mb-4">¿Dudas o Comprobantes? ✨</p>
@@ -381,6 +401,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                <div class="flex items-center gap-1.5 mt-0.5">
                                  @if (p.variant) {
                                     <span class="text-[9px] font-black text-pink-400 uppercase tracking-widest">{{ p.variant }}</span>
+                                    <span class="text-pink-200 text-[8px]">•</span>
+                                 }
+                                 @if (p.items.length > 0) {
+                                    <span class="text-[9px] font-bold text-purple-500">🛍️ {{ p.items.length }} artículos</span>
                                     <span class="text-pink-200 text-[8px]">•</span>
                                  }
                                  <span class="text-[9px] font-bold text-pink-500 uppercase tracking-tight">
@@ -494,7 +518,7 @@ export class TandaViewComponent implements OnInit {
   private tandaService = inject(TandaService);
   private api = inject(ApiService);
 
-  tanda = signal<any | null>(null);
+  tanda = signal<TandaViewDto | null>(null);
   loading = signal(true);
   error = signal(false);
   scrollY = signal(0);
@@ -511,9 +535,10 @@ export class TandaViewComponent implements OnInit {
   mpResult = signal<{ status: string; message: string } | null>(null);
   mpFetching = signal(false);
   selectedParticipantId = signal<string | null>(null);
-  selectedProofFile: File | null = null;
-  proofWeek = 1;
-  proofProcessing = signal(false);
+  proofFile = signal<File | null>(null);
+  proofFileName = signal('');
+  proofUploading = signal(false);
+  proofError = signal('');
   showAssistantBubble = signal(true);
   private bubbleTimeout: any;
 
@@ -538,9 +563,7 @@ export class TandaViewComponent implements OnInit {
 
   isWinnerThisWeek = computed(() => {
     const t = this.tanda();
-    if (!t) return false;
-    const participant = this.currentParticipant(t);
-    return participant?.isWinnerThisWeek ?? false;
+    return !!t?.currentParticipant && t.currentParticipant.assignedTurn === t.currentWeek;
   });
 
   @HostListener('window:scroll', ['$event'])
@@ -661,7 +684,7 @@ export class TandaViewComponent implements OnInit {
 
     try {
       this.cardFormInstance = this.mp.cardForm({
-        amount: String(this.getParticipantAmount(this.tanda()) || '0'),
+        amount: String(this.tanda()?.weeklyAmount || '0'),
         iframe: true,
         form: {
           id: 'mp-card-form',
@@ -751,8 +774,10 @@ export class TandaViewComponent implements OnInit {
     this.tandaService.getPublicTanda(token).subscribe({
       next: (data) => {
         this.tanda.set(data);
-        this.selectedParticipantId.set(data.participant?.id ?? (data.participants?.length === 1 ? data.participants[0].id : null));
-        this.proofWeek = data.currentWeek > 0 ? Math.min(data.currentWeek, data.totalWeeks) : 1;
+        this.selectedParticipantId.set(data.currentParticipant?.id ?? null);
+        this.proofFile.set(null);
+        this.proofFileName.set('');
+        this.proofError.set('');
         this.loading.set(false);
       },
       error: () => {
@@ -762,37 +787,55 @@ export class TandaViewComponent implements OnInit {
     });
   }
 
-  currentParticipant(t: any): any | null {
-    if (t?.participant) return t.participant;
-    const id = this.selectedParticipantId();
-    return t?.participants?.find((participant: any) => participant.id === id) ?? null;
-  }
-
-  getParticipantAmount(t: any): number {
-    return this.currentParticipant(t)?.weeklyAmount ?? t?.weeklyAmount ?? 0;
+  getProofForWeek(proofs: TandaPaymentProofPublicDto[], week: number): TandaPaymentProofPublicDto | undefined {
+    return proofs.find(proof => proof.weekNumber === week);
   }
 
   onProofSelected(event: Event) {
     const input = event.target as HTMLInputElement;
-    this.selectedProofFile = input.files?.[0] ?? null;
+    const file = input.files?.[0];
+    this.proofError.set('');
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      this.proofFile.set(null);
+      this.proofFileName.set('');
+      this.proofError.set('Selecciona una imagen JPG, PNG o WEBP.');
+      return;
+    }
+    if (file.size > 8_000_000) {
+      this.proofFile.set(null);
+      this.proofFileName.set('');
+      this.proofError.set('La imagen no puede superar 8 MB.');
+      return;
+    }
+    this.proofFile.set(file);
+    this.proofFileName.set(file.name);
   }
 
   submitPaymentProof() {
-    if (!this.selectedProofFile || !this.selectedParticipantId() || this.proofProcessing()) return;
+    const tanda = this.tanda();
+    const participant = tanda?.currentParticipant;
+    const file = this.proofFile();
+    if (!tanda || !participant || !file || this.proofUploading()) return;
 
-    this.proofProcessing.set(true);
-    this.tandaService.submitPaymentProof(this.accessToken, this.proofWeek, this.selectedProofFile).subscribe({
-      next: (result) => {
-        this.proofProcessing.set(false);
-        this.selectedProofFile = null;
-        this.showToast(result.amount != null
-          ? `Comprobante recibido: $${Number(result.amount).toFixed(2)}. Revisaremos los datos ✨`
-          : 'Comprobante recibido. Revisaremos los datos ✨');
+    this.proofUploading.set(true);
+    this.proofError.set('');
+    this.tandaService.uploadTandaPaymentProof(
+      this.accessToken,
+      tanda.currentWeek,
+      participant.weeklyAmount,
+      file
+    ).subscribe({
+      next: result => {
+        this.proofUploading.set(false);
+        this.proofFile.set(null);
+        this.proofFileName.set('');
+        this.showToast(result.message + ' ✨');
         this.loadTanda(this.accessToken);
       },
-      error: (err) => {
-        this.proofProcessing.set(false);
-        this.showToast(err.error?.message || 'No se pudo enviar el comprobante');
+      error: error => {
+        this.proofUploading.set(false);
+        this.proofError.set(error.error?.message || 'No se pudo enviar el comprobante. Intenta nuevamente.');
       }
     });
   }

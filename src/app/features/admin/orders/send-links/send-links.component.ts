@@ -28,7 +28,7 @@ import { buildMessengerLink, buildOrderMessage } from '../../../../core/utils/me
       <!-- Controls -->
       <div class="card-coquette p-4 animate-slide-up" style="opacity:0">
         <div class="flex flex-wrap gap-3 items-end">
-          <div class="min-w-[220px]">
+          <div class="w-full min-w-0 md:min-w-[220px] md:flex-1">
             <label class="label-coquette">📋 Corte de venta</label>
             <select class="input-coquette" [(ngModel)]="selectedPeriodId" (change)="loadOrders()">
               <option [ngValue]="null">Todos los cortes</option>
@@ -37,7 +37,7 @@ import { buildMessengerLink, buildOrderMessage } from '../../../../core/utils/me
               }
             </select>
           </div>
-          <div class="flex-1 min-w-[200px]">
+          <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette">🔍 Buscar clienta</label>
             <input class="input-coquette" placeholder="Nombre de clienta..." [(ngModel)]="search" />
           </div>
@@ -230,7 +230,12 @@ export class SendLinksComponent implements OnInit {
       clientName: o.clientName,
       publicLink: link,
       scheduledDeliveryDate: o.scheduledDeliveryDate,
-      expiresAt: o.expiresAt
+      expiresAt: o.expiresAt,
+      status: o.status,
+      total: o.total,
+      amountPaid: o.amountPaid,
+      balanceDue: o.balanceDue,
+      clientAddress: o.clientAddress
     });
 
     navigator.clipboard.writeText(msg).then(() => {

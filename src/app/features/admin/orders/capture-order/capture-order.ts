@@ -1186,7 +1186,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   // ═════════════════ RESULTS METHODS ═════════════════
   copyAllLinks() {
     if (!this.result()) return;
-    const text = this.result()!.orders.map((o: any) => `¡Hola bonita! Aquí está el ticket de tu pedido (total: $${o.total.toFixed(2)}): \n${o.link}`).join('\n\n');
+    const text = this.result()!.orders.map((o: any) => `¡Hola bonita! Aquí está el enlace de tu pedido (dentro del enlace encontrarás toda la información): \n${o.link}`).join('\n\n');
     navigator.clipboard.writeText(text);
     this.toast.success('¡Todos los enlaces copiados! 📋');
   }

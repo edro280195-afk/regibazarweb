@@ -48,7 +48,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
       <!-- Filters -->
       <div class="card-coquette p-4 animate-slide-up delay-100" style="opacity:0">
         <div class="flex flex-wrap gap-3 items-end">
-          <div class="flex-1 min-w-[200px]">
+          <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette">🔍 Buscar</label>
             <input class="input-coquette" placeholder="Clienta, artículo o #123..." [(ngModel)]="search" (input)="loadOrders()" />
           </div>
@@ -1235,7 +1235,12 @@ export class OrdersComponent implements OnInit {
       clientName: o.clientName,
       publicLink: link,
       scheduledDeliveryDate: o.scheduledDeliveryDate,
-      expiresAt: o.expiresAt
+      expiresAt: o.expiresAt,
+      status: o.status,
+      total: o.total,
+      amountPaid: o.amountPaid,
+      balanceDue: o.balanceDue,
+      clientAddress: o.clientAddress
     });
 
     navigator.clipboard.writeText(msg).then(() => {
@@ -1262,7 +1267,7 @@ export class OrdersComponent implements OnInit {
     const o = this.selectedOrder();
     if (!o || !o.clientPhone) return this.toast.error('Sin teléfono');
     const link = o.link.replace('/o/', '/pedido/');
-    const msg = encodeURIComponent(`Hola hermosa! 🎀 Aquí tienes tu nota: ${link}`);
+    const msg = encodeURIComponent(`Hola hermosa! 🎀 Aquí tienes el enlace de tu pedido, dentro del enlace encontrarás toda la información: ${link}`);
     window.open(`https://wa.me/52${o.clientPhone.replace(/\D/g, '')}?text=${msg}`, '_blank');
   }
 
