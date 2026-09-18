@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, HostListener, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, HostListener, computed, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -7,7 +7,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { ApiService } from '../../../core/services/api.service';
 import { environment } from '../../../../environments/environment';
 import { gsap } from 'gsap';
-import { TandaPaymentProofPublicDto, TandaViewDto } from '../../../core/models';
+import { TandaPaymentProofPublicDto, TandaViewDto, TandaParticipantPublicViewDto } from '../../../core/models';
 
 const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
@@ -120,17 +120,25 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               }
 
               @if (t.currentParticipant; as me) {
-                <section class="rounded-[2.5rem] border-2 border-pink-200 bg-white/95 p-6 shadow-xl shadow-pink-100/40 animate-fade-in-up" aria-label="Enviar comprobante de pago">
+                <section class="rounded-[2.5rem] border-2 border-pink-200 bg-white/95 p-6 shadow-xl shadow-pink-100/40 animate-fade-in-up space-y-5" aria-label="Enviar comprobante de pago">
+                  <!-- Encabezado -->
                   <div class="flex items-start gap-3">
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-pink-100 text-xl">📸</div>
-                    <div class="min-w-0">
-                      <p class="text-[10px] font-black uppercase tracking-widest text-pink-500">Tu comprobante</p>
-                      <h3 class="text-lg font-black text-pink-950">Sube tu pago de esta semana</h3>
-                      <p class="mt-1 text-xs font-medium leading-relaxed text-pink-700">1. Realiza tu transferencia · 2. toma una foto · 3. súbela aquí. Revisaremos el comprobante y el pago se aplicará automáticamente. 💖</p>
+                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-100 to-rose-200 text-2xl shadow-inner">
+                      📸
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-pink-500">Tu comprobante</span>
+                        <span class="rounded-full bg-pink-100 px-2 py-0.5 text-[9px] font-bold text-pink-700">Cualquier día ✨</span>
+                      </div>
+                      <h3 class="text-lg font-black text-pink-950 leading-tight mt-0.5">Sube tu comprobante de abono</h3>
+                      <p class="mt-1 text-xs font-medium leading-relaxed text-pink-700">
+                        Transfiere el día que prefieras, tómale foto a tu ticket y elígelo aquí. Nosotros validaremos tu pago con mucho cariño. 💕
+                      </p>
                     </div>
                   </div>
 
-                  @if (me.items.length > 0) {
+                  @if (me.items && me.items.length > 0) {
                     <div class="mt-5 rounded-2xl border border-purple-100 bg-purple-50/60 p-4">
                       <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-purple-600">Tus artículos</p>
                       <div class="space-y-2">
@@ -144,60 +152,212 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                     </div>
                   }
 
-                  @if (me.hasPaidCurrentWeek) {
-                    <div class="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-center text-xs font-black text-emerald-700">✅ Tu pago de la semana {{ t.currentWeek }} ya está registrado</div>
+                  @if (isAllWeeksPaid()) {
+                    <!-- Estado: Tanda Liquidada 100% -->
+                    <div class="rounded-3xl bg-gradient-to-br from-emerald-50 via-teal-50 to-white p-6 text-center border-2 border-emerald-200 shadow-sm space-y-2 animate-bounce-in">
+                      <span class="text-4xl inline-block animate-wiggle">🎉🎀</span>
+                      <h4 class="text-base font-black text-emerald-950">¡Tanda 100% Pagada!</h4>
+                      <p class="text-xs font-medium text-emerald-700 leading-relaxed">
+                        ¡Felicidades, hermosa! Has completado todas las semanas de esta tanda. Muchísimas gracias por tu confianza y cumplimiento. ✨
+                      </p>
+                    </div>
                   } @else {
-                    <div class="mt-5 rounded-2xl bg-pink-50 px-4 py-3">
-                      <div class="flex items-center justify-between gap-3 text-xs">
-                        <span class="font-bold text-pink-700">Semana {{ t.currentWeek }}</span>
-                        <span class="font-black text-pink-900">{{ me.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                    <!-- Selector de Semana a Reportar -->
+                    <div class="space-y-2 rounded-2xl bg-pink-50/70 p-4 border border-pink-100">
+                      <div class="flex items-center justify-between gap-2">
+                        <label for="proof-week-select" class="text-[10px] font-black uppercase tracking-widest text-pink-700 flex items-center gap-1.5">
+                          <span>🗓️</span> ¿Qué semana estás pagando?
+                        </label>
+                        @if (selectedWeekStatus(); as status) {
+                          <span class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight"
+                                [ngClass]="status.badgeClass">
+                            {{ status.badge }}
+                          </span>
+                        }
+                      </div>
+
+                      <div class="relative">
+                        <select id="proof-week-select"
+                                [ngModel]="selectedProofWeek()"
+                                (ngModelChange)="selectWeekForProof($event)"
+                                class="w-full appearance-none bg-white border-2 border-pink-200 rounded-2xl px-4 py-3 text-xs font-black text-pink-900 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all cursor-pointer shadow-sm pr-10">
+                          @for (opt of weekOptions(); track opt.week) {
+                            <option [value]="opt.week">
+                              {{ opt.label }}
+                            </option>
+                          }
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-pink-400">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                      </div>
+
+                      <!-- Resumen de la Semana Seleccionada -->
+                      <div class="flex items-center justify-between pt-1 px-1 text-xs">
+                        <span class="text-[11px] font-bold text-pink-600">
+                          Abono correspondiente:
+                        </span>
+                        <span class="font-black text-pink-950 text-sm">
+                          {{ me.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                        </span>
                       </div>
                     </div>
 
-                    @if (getProofForWeek(me.paymentProofs, t.currentWeek); as proof) {
-                      <div class="mt-4 rounded-2xl border px-4 py-3 text-xs"
-                           [ngClass]="proof.status === 'Pending' ? 'border-amber-200 bg-amber-50 text-amber-800' : proof.status === 'Rejected' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'">
-                        @if (proof.status === 'Pending') {
-                          <p class="font-black">⏳ Comprobante en revisión</p>
-                          <p class="mt-1 font-medium">Te avisaremos cuando tu pago quede aplicado.</p>
-                        } @else if (proof.status === 'Rejected') {
-                          <p class="font-black">💌 Necesitamos otra foto</p>
-                          <p class="mt-1 font-medium">{{ proof.rejectionReason || 'El comprobante no pudo validarse.' }} Puedes enviar uno nuevo abajo.</p>
-                        } @else {
-                          <p class="font-black">✅ Comprobante aprobado y pago aplicado</p>
-                        }
-                        @if (proof.ocrAmount || proof.depositDate) {
-                          <p class="mt-2 text-[10px] font-bold opacity-80">OCR: {{ proof.ocrAmount || proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.2-2' }}{{ proof.depositDate ? ' · ' + (proof.depositDate | date:'dd/MM/yyyy HH:mm') : '' }}</p>
-                        }
-                      </div>
-                    }
-
-                    @if (!getProofForWeek(me.paymentProofs, t.currentWeek) || getProofForWeek(me.paymentProofs, t.currentWeek)?.status === 'Rejected') {
-                      <div class="mt-4 space-y-3">
-                        <div class="rounded-2xl border border-dashed border-pink-300 bg-pink-50/60 p-3">
-                          <p class="mb-2 text-center text-[10px] font-black uppercase tracking-widest text-pink-500">¿Cómo quieres agregarlo?</p>
-                          <div class="grid grid-cols-2 gap-2">
-                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
-                              <span class="text-xl">📷</span>
-                              <span>Tomar foto</span>
-                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" capture="environment" (change)="onProofSelected($event)">
-                            </label>
-                            <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-white px-2 py-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm transition-colors hover:bg-pink-100">
-                              <span class="text-xl">🖼️</span>
-                              <span class="truncate">{{ proofFileName() || 'Galería' }}</span>
-                              <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
-                            </label>
+                    <!-- Detalle de estado para la semana seleccionada -->
+                    @if (selectedWeekStatus(); as status) {
+                      @if (status.status === 'paid') {
+                        <div class="rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3.5 text-xs text-emerald-800 flex items-center gap-3">
+                          <span class="text-2xl">✅</span>
+                          <div>
+                            <p class="font-black">Semana {{ status.week }} ya está liquidada</p>
+                            <p class="mt-0.5 text-[11px] font-medium text-emerald-700">Tu pago de esta semana ya quedó registrado. Si deseas adelantar un abono futuro, selecciona otra semana arriba. 💕</p>
                           </div>
                         </div>
-                        @if (proofError()) {
-                          <p class="text-xs font-bold text-rose-600">{{ proofError() }}</p>
+                      } @else if (status.status === 'pending_review') {
+                        <div class="rounded-2xl border-2 border-amber-200 bg-amber-50 px-4 py-3.5 text-xs text-amber-800 space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="text-base animate-pulse">⏳</span>
+                            <p class="font-black">Comprobante en revisión para la Semana {{ status.week }}</p>
+                          </div>
+                          <p class="text-[11px] font-medium leading-relaxed pl-6 text-amber-700">
+                            Ya tenemos tu foto y estamos revisándola. Te avisaremos en cuanto tu pago quede aplicado automáticamente. ¡Gracias por avisar, hermosa! 💖
+                          </p>
+                          @if (status.proof) {
+                            <p class="text-[10px] font-bold text-amber-600 pl-6 pt-1">
+                              Enviado: {{ status.proof.submittedAt | date:'dd MMM yyyy, HH:mm' }} · Monto: {{ status.proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                            </p>
+                          }
+                        </div>
+                      } @else {
+                        <!-- Habilitado para subir comprobante (actual, atrasada, adelanto o rechazada) -->
+                        @if (status.status === 'rejected') {
+                          <div class="rounded-2xl border-2 border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 space-y-1">
+                            <p class="font-black flex items-center gap-1.5">
+                              <span>💌</span> Necesitamos una nueva foto para la Semana {{ status.week }}
+                            </p>
+                            <p class="text-[11px] font-medium text-rose-700 pl-5">
+                              Motivo: {{ status.proof?.rejectionReason || 'El comprobante previo no se pudo validar con claridad.' }}
+                            </p>
+                            <p class="text-[10px] font-bold text-rose-600 pl-5">
+                              Toma una nueva foto nítida de tu comprobante a continuación 👇
+                            </p>
+                          </div>
                         }
-                        <button type="button" (click)="submitPaymentProof()" [disabled]="!proofFile() || proofUploading()"
-                                class="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 py-3.5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-pink-200 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">
-                          {{ proofUploading() ? 'ENVIANDO... ✨' : 'ENVIAR COMPROBANTE 💖' }}
-                        </button>
-                      </div>
+
+                        <!-- Zona de Carga de Foto -->
+                        <div class="space-y-3 pt-1">
+                          @if (!proofPreviewUrl()) {
+                            <div class="rounded-2xl border-2 border-dashed border-pink-300 bg-gradient-to-b from-pink-50/70 to-rose-50/40 p-4 transition-all">
+                              <p class="mb-3 text-center text-[10px] font-black uppercase tracking-widest text-pink-500">
+                                Adjuntar foto del comprobante
+                              </p>
+                              <div class="grid grid-cols-2 gap-3">
+                                <label class="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-white p-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm border border-pink-100 hover:bg-pink-50 active:scale-95 transition-all">
+                                  <span class="text-2xl">📷</span>
+                                  <span>Tomar foto</span>
+                                  <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" capture="environment" (change)="onProofSelected($event)">
+                                </label>
+                                <label class="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-white p-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm border border-pink-100 hover:bg-pink-50 active:scale-95 transition-all">
+                                  <span class="text-2xl">🖼️</span>
+                                  <span>Galería</span>
+                                  <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
+                                </label>
+                              </div>
+                              <p class="mt-3 text-center text-[9px] font-bold text-pink-400">
+                                Formatos permitidos: JPG, PNG, WEBP (hasta 8 MB)
+                              </p>
+                            </div>
+                          } @else {
+                            <!-- Vista previa de foto seleccionada -->
+                            <div class="relative rounded-2xl border-2 border-pink-300 bg-white p-3 shadow-md space-y-2 animate-fade-in">
+                              <div class="flex items-center justify-between gap-2 pb-1 border-b border-pink-100">
+                                <span class="text-[10px] font-black uppercase tracking-wider text-pink-600 flex items-center gap-1.5">
+                                  <span>✨</span> Vista previa de tu foto
+                                </span>
+                                <button type="button" (click)="clearSelectedProof()"
+                                        class="rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 px-2.5 py-1 text-[10px] font-black transition-colors flex items-center gap-1"
+                                        title="Quitar foto">
+                                  <span>✕</span> Cambiar foto
+                                </button>
+                              </div>
+
+                              <div class="relative max-h-52 overflow-hidden rounded-xl bg-pink-50 flex items-center justify-center border border-pink-100">
+                                <img [src]="proofPreviewUrl()" alt="Comprobante seleccionado" class="max-h-52 w-full object-contain rounded-xl">
+                              </div>
+
+                              <div class="flex items-center justify-between text-[10px] text-pink-700 font-bold px-1">
+                                <span class="truncate max-w-[200px]">{{ proofFileName() }}</span>
+                                <span class="text-pink-500 font-black">Lista para enviar ✨</span>
+                              </div>
+                            </div>
+                          }
+
+                          @if (proofError()) {
+                            <div class="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 animate-fade-in flex items-center gap-2">
+                              <span>⚠️</span>
+                              <span>{{ proofError() }}</span>
+                            </div>
+                          }
+
+                          <button type="button"
+                                  (click)="submitPaymentProof()"
+                                  [disabled]="!proofFile() || proofUploading()"
+                                  class="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 py-4 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-pink-200 hover:shadow-pink-300 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center gap-2">
+                            @if (proofUploading()) {
+                              <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span>ENVIANDO COMPROBANTE... ✨</span>
+                            } @else {
+                              <span>ENVIAR COMPROBANTE (SEMANA {{ status.week }}) 💖</span>
+                            }
+                          </button>
+                        </div>
+                      }
                     }
+                  }
+
+                  <!-- Acordeón / Historial de Comprobantes de la Clienta -->
+                  @if (me.paymentProofs && me.paymentProofs.length > 0) {
+                    <div class="pt-3 border-t border-pink-100">
+                      <button type="button"
+                              (click)="showProofHistory.update(v => !v)"
+                              class="w-full flex items-center justify-between text-left py-1 text-pink-700 hover:text-pink-950 transition-colors">
+                        <span class="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                          <span>💌</span> Historial de comprobantes ({{ me.paymentProofs.length }})
+                        </span>
+                        <span class="text-xs font-black text-pink-400 transition-transform duration-300"
+                              [class.rotate-180]="showProofHistory()">
+                          ▼
+                        </span>
+                      </button>
+
+                      @if (showProofHistory()) {
+                        <div class="mt-3 space-y-2 animate-fade-in">
+                          @for (p of me.paymentProofs; track p.id) {
+                            <div class="rounded-xl border p-3 text-xs flex items-center justify-between gap-2"
+                                 [ngClass]="p.status === 'Pending' ? 'border-amber-200 bg-amber-50/60' : p.status === 'Rejected' ? 'border-rose-200 bg-rose-50/60' : 'border-emerald-200 bg-emerald-50/60'">
+                              <div class="min-w-0">
+                                <p class="font-black text-pink-950">
+                                  Semana {{ p.weekNumber }} · {{ p.amountClaimed | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                                </p>
+                                @if (p.ocrAmount || p.depositDate) {
+                                  <p class="text-[10px] font-bold text-pink-600 opacity-80">OCR: {{ p.ocrAmount || p.amountClaimed | currency:'MXN':'symbol-narrow':'1.2-2' }}{{ p.depositDate ? ' · ' + (p.depositDate | date:'dd/MM/yyyy HH:mm') : '' }}</p>
+                                }
+                                <p class="text-[10px] text-pink-600 font-medium">
+                                  {{ p.submittedAt | date:'dd MMM yyyy, HH:mm' }}
+                                  @if (p.rejectionReason) {
+                                    <span class="block text-rose-700 font-bold mt-0.5">Motivo: {{ p.rejectionReason }}</span>
+                                  }
+                                </p>
+                              </div>
+                              <span class="shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-tight"
+                                    [ngClass]="p.status === 'Pending' ? 'bg-amber-100 text-amber-800' : p.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'">
+                                {{ p.status === 'Pending' ? 'En revisión ⏳' : p.status === 'Rejected' ? 'Rechazado 💌' : 'Aprobado ✅' }}
+                              </span>
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
                   }
                 </section>
               }
@@ -246,7 +406,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               </select>
                             </div>
                             } @else {
-                              <div class="rounded-2xl bg-pink-50 px-4 py-3 text-xs font-bold text-pink-700">Pagando como <strong>{{ t.currentParticipant.name }}</strong> · semana {{ t.currentWeek }}</div>
+                              <div class="rounded-2xl bg-pink-50 px-4 py-3 text-xs font-bold text-pink-700">Pagando como <strong>{{ t.currentParticipant.name }}</strong> · semana {{ selectedProofWeek() || t.currentWeek }}</div>
                             }
 
                             <!-- MP Form -->
@@ -284,7 +444,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                             @if (mpResult()?.status === 'approved') {
                               <div class="text-5xl mb-4">🎉</div>
                               <h4 class="text-xl font-black text-pink-900 mb-1">¡Abono Realizado!</h4>
-                              <p class="text-pink-600 text-xs font-medium px-4 mb-6">Tu pago de la semana {{ t.currentWeek }} ha sido registrado con éxito. ✨</p>
+                              <p class="text-pink-600 text-xs font-medium px-4 mb-6">Tu pago de la semana {{ selectedProofWeek() || t.currentWeek }} ha sido registrado con éxito. ✨</p>
                               
                               <a [href]="messengerUrl" target="_blank" rel="noopener"
                                  class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-xs py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl w-full">
@@ -513,7 +673,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
     .animate-bounce-up-y-only { animation: bounce-up-y-only 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
   `]
 })
-export class TandaViewComponent implements OnInit {
+export class TandaViewComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private tandaService = inject(TandaService);
   private api = inject(ApiService);
@@ -535,10 +695,13 @@ export class TandaViewComponent implements OnInit {
   mpResult = signal<{ status: string; message: string } | null>(null);
   mpFetching = signal(false);
   selectedParticipantId = signal<string | null>(null);
+  selectedProofWeek = signal<number>(1);
   proofFile = signal<File | null>(null);
   proofFileName = signal('');
+  proofPreviewUrl = signal<string | null>(null);
   proofUploading = signal(false);
   proofError = signal('');
+  showProofHistory = signal(false);
   showAssistantBubble = signal(true);
   private bubbleTimeout: any;
 
@@ -564,6 +727,92 @@ export class TandaViewComponent implements OnInit {
   isWinnerThisWeek = computed(() => {
     const t = this.tanda();
     return !!t?.currentParticipant && t.currentParticipant.assignedTurn === t.currentWeek;
+  });
+
+  weekOptions = computed(() => {
+    const t = this.tanda();
+    const me = t?.currentParticipant;
+    if (!t || !me) return [];
+
+    const options = [];
+    for (let w = 1; w <= t.totalWeeks; w++) {
+      const isPaid = me.paidWeeks?.includes(w) ?? false;
+      const proof = me.paymentProofs?.find(p => p.weekNumber === w);
+      const isPendingProof = proof?.status === 'Pending';
+      const isRejectedProof = proof?.status === 'Rejected';
+
+      let status: 'paid' | 'pending_review' | 'rejected' | 'current' | 'overdue' | 'future_advance';
+      let label: string;
+      let badge: string;
+      let badgeClass: string;
+      let canUpload: boolean;
+
+      if (isPaid) {
+        status = 'paid';
+        label = `Semana ${w} · Pagada ✅`;
+        badge = 'Pagada ✅';
+        badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+        canUpload = false;
+      } else if (isPendingProof) {
+        status = 'pending_review';
+        label = `Semana ${w} · En revisión ⏳`;
+        badge = 'En revisión ⏳';
+        badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+        canUpload = false;
+      } else if (isRejectedProof) {
+        status = 'rejected';
+        label = `Semana ${w} · Foto rechazada (Reenviar) 💌`;
+        badge = 'Requiere foto 💌';
+        badgeClass = 'bg-rose-100 text-rose-800 border border-rose-200';
+        canUpload = true;
+      } else if (w === t.currentWeek) {
+        status = 'current';
+        label = `Semana ${w} · Abono de esta semana ⭐`;
+        badge = 'Semana actual ⭐';
+        badgeClass = 'bg-pink-100 text-pink-800 border border-pink-200';
+        canUpload = true;
+      } else if (w < t.currentWeek) {
+        status = 'overdue';
+        label = `Semana ${w} · Semana pendiente / atrasada ⚠️`;
+        badge = 'Abono pendiente ⚠️';
+        badgeClass = 'bg-orange-100 text-orange-800 border border-orange-200';
+        canUpload = true;
+      } else {
+        status = 'future_advance';
+        label = `Semana ${w} · Adelantar abono 🚀`;
+        badge = 'Adelanto 🚀';
+        badgeClass = 'bg-purple-100 text-purple-800 border border-purple-200';
+        canUpload = true;
+      }
+
+      options.push({
+        week: w,
+        status,
+        label,
+        badge,
+        badgeClass,
+        canUpload,
+        proof
+      });
+    }
+
+    return options;
+  });
+
+  selectedWeekStatus = computed(() => {
+    const week = this.selectedProofWeek();
+    const options = this.weekOptions();
+    return options.find(o => o.week === week) || options[0] || null;
+  });
+
+  isAllWeeksPaid = computed(() => {
+    const t = this.tanda();
+    const me = t?.currentParticipant;
+    if (!t || !me || t.totalWeeks <= 0) return false;
+    for (let w = 1; w <= t.totalWeeks; w++) {
+      if (!me.paidWeeks?.includes(w)) return false;
+    }
+    return true;
   });
 
   @HostListener('window:scroll', ['$event'])
@@ -743,7 +992,7 @@ export class TandaViewComponent implements OnInit {
 
     this.api.publicTandaCardPayment(this.accessToken, {
       participantId: participantId,
-      weekNumber: t.currentWeek,
+      weekNumber: this.selectedProofWeek() || t.currentWeek,
       cardToken: data.token,
       paymentMethodId: data.paymentMethodId
     }).subscribe({
@@ -769,15 +1018,30 @@ export class TandaViewComponent implements OnInit {
     setTimeout(() => this.mountCardForm(), 150);
   }
 
+  ngOnDestroy() {
+    if (this.bubbleTimeout) clearTimeout(this.bubbleTimeout);
+    if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    this.revokePreviewUrl();
+  }
+
+  private revokePreviewUrl() {
+    const url = this.proofPreviewUrl();
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.proofPreviewUrl.set(null);
+    }
+  }
+
   loadTanda(token: string) {
     this.loading.set(true);
     this.tandaService.getPublicTanda(token).subscribe({
       next: (data) => {
         this.tanda.set(data);
         this.selectedParticipantId.set(data.currentParticipant?.id ?? null);
-        this.proofFile.set(null);
-        this.proofFileName.set('');
-        this.proofError.set('');
+        this.clearSelectedProof();
+        if (data.currentParticipant) {
+          this.autoSelectBestWeek(data.currentParticipant, data.currentWeek, data.totalWeeks);
+        }
         this.loading.set(false);
       },
       error: () => {
@@ -787,8 +1051,39 @@ export class TandaViewComponent implements OnInit {
     });
   }
 
-  getProofForWeek(proofs: TandaPaymentProofPublicDto[], week: number): TandaPaymentProofPublicDto | undefined {
-    return proofs.find(proof => proof.weekNumber === week);
+  autoSelectBestWeek(participant: TandaParticipantPublicViewDto, currentWeek: number, totalWeeks: number) {
+    // 1. Verificar si la semana actual está pendiente y sin comprobante en revisión
+    const isCurrentPaid = participant.paidWeeks?.includes(currentWeek) ?? false;
+    const hasPendingCurrent = participant.paymentProofs?.some(p => p.weekNumber === currentWeek && p.status === 'Pending') ?? false;
+    if (!isCurrentPaid && !hasPendingCurrent && currentWeek >= 1 && currentWeek <= totalWeeks) {
+      this.selectedProofWeek.set(currentWeek);
+      return;
+    }
+
+    // 2. Buscar la primera semana pendiente de pago sin comprobante en revisión
+    for (let w = 1; w <= totalWeeks; w++) {
+      const isPaid = participant.paidWeeks?.includes(w) ?? false;
+      const hasPending = participant.paymentProofs?.some(p => p.weekNumber === w && p.status === 'Pending') ?? false;
+      if (!isPaid && !hasPending) {
+        this.selectedProofWeek.set(w);
+        return;
+      }
+    }
+
+    // 3. Fallback a la semana actual o 1
+    this.selectedProofWeek.set(currentWeek >= 1 && currentWeek <= totalWeeks ? currentWeek : 1);
+  }
+
+  selectWeekForProof(week: any) {
+    const num = typeof week === 'string' ? parseInt(week, 10) : week;
+    if (!isNaN(num)) {
+      this.selectedProofWeek.set(num);
+      this.clearSelectedProof();
+    }
+  }
+
+  getProofForWeek(proofs: TandaPaymentProofPublicDto[] | undefined, week: number): TandaPaymentProofPublicDto | undefined {
+    return proofs?.find(proof => proof.weekNumber === week);
   }
 
   onProofSelected(event: Event) {
@@ -797,39 +1092,46 @@ export class TandaViewComponent implements OnInit {
     this.proofError.set('');
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      this.proofFile.set(null);
-      this.proofFileName.set('');
+      this.clearSelectedProof();
       this.proofError.set('Selecciona una imagen JPG, PNG o WEBP.');
       return;
     }
     if (file.size > 8_000_000) {
-      this.proofFile.set(null);
-      this.proofFileName.set('');
+      this.clearSelectedProof();
       this.proofError.set('La imagen no puede superar 8 MB.');
       return;
     }
+    this.revokePreviewUrl();
     this.proofFile.set(file);
     this.proofFileName.set(file.name);
+    this.proofPreviewUrl.set(URL.createObjectURL(file));
+  }
+
+  clearSelectedProof() {
+    this.revokePreviewUrl();
+    this.proofFile.set(null);
+    this.proofFileName.set('');
+    this.proofError.set('');
   }
 
   submitPaymentProof() {
     const tanda = this.tanda();
     const participant = tanda?.currentParticipant;
     const file = this.proofFile();
+    const week = this.selectedProofWeek();
     if (!tanda || !participant || !file || this.proofUploading()) return;
 
     this.proofUploading.set(true);
     this.proofError.set('');
     this.tandaService.uploadTandaPaymentProof(
       this.accessToken,
-      tanda.currentWeek,
+      week,
       participant.weeklyAmount,
       file
     ).subscribe({
       next: result => {
         this.proofUploading.set(false);
-        this.proofFile.set(null);
-        this.proofFileName.set('');
+        this.clearSelectedProof();
         this.showToast(result.message + ' ✨');
         this.loadTanda(this.accessToken);
       },
