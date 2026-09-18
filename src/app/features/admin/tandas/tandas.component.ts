@@ -1,12 +1,29 @@
-import { Component, inject, signal, OnInit, HostListener, effect } from '@angular/core';
+import { Component, computed, inject, signal, OnInit, HostListener, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TandaDto, ClientDto, TandaProductDto } from '../../../core/models';
+import { CreateTandaDto, TandaDto, ClientDto, TandaProductDto, TandaStatus } from '../../../core/models';
 import { RouterLink } from '@angular/router';
 import { gsap } from 'gsap';
+import {
+  areTandaPlacesComplete,
+  assignClientToPlace,
+  resizeTandaPlaces,
+  swapTandaPlaces,
+  TandaPlaceDraft
+} from './tanda-places.util';
+
+interface TandaForm {
+  name: string;
+  totalWeeks: number;
+  weeklyAmount: number;
+  startDate: string;
+  currency: string;
+  itemCost?: number;
+  exchangeRate?: number;
+}
 
 @Component({
   selector: 'app-tandas',
@@ -46,26 +63,56 @@ import { gsap } from 'gsap';
           </button>
         </div>
 
+        @if (!loadingTandas()) {
+          <section class="rounded-3xl border border-pink-100 bg-white/90 px-5 py-4 shadow-sm" aria-label="Resumen de tandas">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Activas</p>
+                <p class="mt-1 text-2xl font-black text-pink-950">{{ activeTandasCount() }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Lugares ocupados</p>
+                <p class="mt-1 text-2xl font-black text-pink-950">{{ occupiedPlacesCount() }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Cobrado</p>
+                <p class="mt-1 text-xl font-black text-pink-950">{{ totalCollected() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Por cobrar</p>
+                <p class="mt-1 text-xl font-black text-rose-700">{{ totalBalance() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              </div>
+            </div>
+          </section>
+        }
+
         <!-- Filters & Search (Integrated) -->
         <div class="card-coquette p-5 animate-slide-up delay-100" style="opacity:0; animation-fill-mode: forwards;">
           <div class="flex flex-wrap gap-4 items-end">
-            <div class="flex-1 min-w-[300px] relative">
+            <div class="w-full min-w-0 md:flex-1 md:min-w-[300px] relative">
               <label class="label-coquette">🔍 Buscar Tanda o Producto</label>
               <div class="relative">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
-                <input class="input-coquette pl-10" 
+                <input class="input-coquette pl-10"
+                       type="search"
+                       [ngModel]="searchQuery()"
+                       (ngModelChange)="searchQuery.set($event)"
                        placeholder="Nombre de tanda o producto..." 
-                       [(ngModel)]="searchQuery" />
+                       aria-label="Buscar tanda o producto" />
               </div>
             </div>
-            
+
             <div class="w-48">
               <label class="label-coquette">📋 Estado</label>
-              <select class="input-coquette py-2">
+              <select class="input-coquette py-2"
+                      [ngModel]="statusFilter()"
+                      (ngModelChange)="statusFilter.set($event)"
+                      aria-label="Filtrar por estado">
                 <option value="">Todas</option>
                 <option value="Active">🟢 Activas</option>
                 <option value="Draft">📝 Borradores</option>
                 <option value="Completed">💖 Completadas</option>
+                <option value="Cancelled">Canceladas</option>
               </select>
             </div>
           </div>
@@ -88,11 +135,14 @@ import { gsap } from 'gsap';
                   
                   <!-- Card Header -->
                   <div class="flex justify-between items-start mb-4">
-                    <div class="flex flex-col gap-1.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
                       <span class="text-[10px] font-black text-pink-400 tracking-[0.2em] uppercase">Tanda #{{ tanda.id.slice(0,4) }}</span>
+                      @if (tanda.currency === 'USD') {
+                        <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200">USD</span>
+                      }
                     </div>
-                    <span class="badge shadow-sm" [class]="tanda.status === 'Active' ? 'badge-confirmed' : 'badge-pending'">
-                      {{ tanda.status === 'Active' ? '🟢 Activa' : '⏳ Borrador' }}
+                    <span class="badge shadow-sm" [class]="statusClass(tanda.status)">
+                      {{ statusLabel(tanda.status) }}
                     </span>
                   </div>
 
@@ -112,7 +162,7 @@ import { gsap } from 'gsap';
                     <div class="flex justify-between items-end">
                       <div>
                         <p class="text-[10px] text-pink-400 font-bold mb-1 uppercase tracking-wider">Abono Semanal</p>
-                        <p class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500">
+                        <p class="text-2xl font-black text-pink-700">
                           {{ tanda.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
                         </p>
                       </div>
@@ -120,7 +170,27 @@ import { gsap } from 'gsap';
                         <p class="text-[10px] font-black text-pink-500 bg-white/80 px-2 py-1 rounded-xl shadow-sm border border-pink-100 inline-block">
                         {{ tanda.totalWeeks }} Semanas
                         </p>
+                        @if (tanda.itemCost) {
+                          <p class="text-[10px] font-bold text-purple-700 mt-1">
+                            Valor: {{ tanda.itemCost | currency:(tanda.currency || 'MXN'):'symbol-narrow':'1.0-0' }}
+                          </p>
+                        }
                       </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-5 space-y-2" aria-label="Avance de cobro">
+                    <div class="flex items-center justify-between text-[11px] font-bold text-pink-700">
+                      <span>{{ tanda.participantCount }} de {{ tanda.totalWeeks }} lugares</span>
+                      <span>{{ tanda.progressPercentage | number:'1.0-0' }}% cobrado</span>
+                    </div>
+                    <div class="h-2 overflow-hidden rounded-full bg-pink-100">
+                      <div class="h-full rounded-full bg-pink-600 transition-[width] duration-300"
+                           [style.width.%]="tanda.progressPercentage"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] font-semibold text-pink-500">
+                      <span>{{ tanda.collectedAmount | currency:'MXN':'symbol-narrow':'1.0-0' }} recibidos</span>
+                      <span>{{ tanda.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }} pendientes</span>
                     </div>
                   </div>
 
@@ -149,71 +219,252 @@ import { gsap } from 'gsap';
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-sm" (click)="showCreateModal.set(false)"></div>
           
-          <div class="card-coquette bg-white p-8 w-full max-w-md relative z-10 animate-scale-in max-h-[90vh] overflow-y-auto scrollbar-hide">
-            <h3 class="text-2xl font-black text-pink-900 mb-6 flex items-center gap-3">
-              <span class="text-3xl animate-heartbeat">🎀</span> Configurar Tanda
-            </h3>
-            
-            <form (submit)="onCreateTanda($event)" class="space-y-4">
+          <div class="card-coquette bg-white p-6 lg:p-8 w-full max-w-6xl relative z-10 animate-scale-in max-h-[94vh] overflow-y-auto scrollbar-hide">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-6">
               <div>
-                <label class="label-coquette">🌸 Nombre de la Tanda</label>
-                <input class="input-coquette" name="name" [(ngModel)]="newTanda.name" placeholder="Ej. Tanda #1 Sartenes" required />
+                <h3 class="text-2xl font-black text-pink-900 flex items-center gap-3">
+                  <span class="text-3xl animate-heartbeat">🎀</span> Configurar Tanda
+                </h3>
+                <p class="text-xs font-semibold text-pink-400 mt-1">
+                  Define desde ahora quién ocupará cada lugar de entrega.
+                </p>
               </div>
+              <div class="rounded-2xl bg-pink-50 px-4 py-2 text-right border border-pink-100">
+                <p class="text-[10px] uppercase tracking-widest font-black text-pink-400">Lugares asignados</p>
+                <p class="text-xl font-black text-pink-700">
+                  {{ assignedPlacesCount() }} / {{ newTanda.totalWeeks }}
+                </p>
+              </div>
+            </div>
 
-              <!-- PRODUCT SELECTION -->
-              <div class="relative">
-                <label class="label-coquette">🎁 Producto del Catálogo</label>
-                <div class="relative">
-                   <input class="input-coquette pr-10" 
-                          placeholder="Buscar o capturar producto..." 
-                          [(ngModel)]="productSearch" 
-                          name="productSearch"
-                          (input)="onProductSearch()" />
-                   @if (selectedProduct(); as sp) {
-                     <span class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">✔</span>
-                   }
-                </div>
+            <form (submit)="onCreateTanda($event)" class="space-y-5">
+              <div class="grid grid-cols-1 lg:grid-cols-[minmax(280px,0.8fr)_minmax(420px,1.2fr)] gap-6">
+                <div class="space-y-4">
+                  <div>
+                    <label class="label-coquette">🌸 Nombre de la Tanda</label>
+                    <input class="input-coquette" name="name" [(ngModel)]="newTanda.name" placeholder="Ej. Tanda #1 Sartenes" required />
+                  </div>
 
-                @if (productResults().length > 0) {
-                  <div class="absolute top-full left-0 right-0 z-50 mt-1 glass-strong rounded-xl p-2 border border-pink-100 shadow-xl overflow-y-auto max-h-40">
-                    @for (p of productResults(); track p.id) {
-                      <div (click)="selectProduct(p)" class="p-2 hover:bg-pink-50 rounded-lg cursor-pointer text-xs font-bold text-pink-900 flex justify-between">
-                        <span>{{ p.name }}</span>
-                        <span class="text-[10px] text-pink-400 opacity-50">{{ p.id.slice(0,4) }}</span>
+                  <div class="relative">
+                    <label class="label-coquette">🎁 Producto del Catálogo</label>
+                    <div class="relative">
+                      <input class="input-coquette pr-10"
+                             placeholder="Buscar o capturar producto..."
+                             [(ngModel)]="productSearch"
+                             name="productSearch"
+                             (input)="onProductSearch()" />
+                      @if (selectedProduct()) {
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">✔</span>
+                      }
+                    </div>
+
+                    @if (productResults().length > 0) {
+                      <div class="absolute top-full left-0 right-0 z-50 mt-1 glass-strong rounded-xl p-2 border border-pink-100 shadow-xl overflow-y-auto max-h-40">
+                        @for (p of productResults(); track p.id) {
+                          <button type="button" (click)="selectProduct(p)" class="w-full p-2 hover:bg-pink-50 rounded-lg text-left text-xs font-bold text-pink-900 flex justify-between">
+                            <span>{{ p.name }}</span>
+                            <span class="text-[10px] text-pink-400 opacity-50">{{ p.id.slice(0,4) }}</span>
+                          </button>
+                        }
+                      </div>
+                    }
+
+                    @if (productSearch.length > 2 && !selectedProduct() && productResults().length === 0) {
+                      <p class="text-[10px] text-pink-400 mt-1 italic">✨ Nuevo: "{{ productSearch }}" se agregará al catálogo.</p>
+                    }
+                  </div>
+
+                  <!-- Moneda y Valor del Artículo -->
+                  <div class="p-3 bg-pink-50/70 border border-pink-100 rounded-2xl space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-black text-pink-900">💵 Moneda y Valor del Artículo</span>
+                      <div class="flex rounded-xl bg-white p-0.5 border border-pink-200">
+                        <button type="button" (click)="setCurrency('MXN')"
+                                [class.bg-pink-500]="newTanda.currency === 'MXN'"
+                                [class.text-white]="newTanda.currency === 'MXN'"
+                                [class.text-pink-700]="newTanda.currency !== 'MXN'"
+                                class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">MXN ($)</button>
+                        <button type="button" (click)="setCurrency('USD')"
+                                [class.bg-pink-500]="newTanda.currency === 'USD'"
+                                [class.text-white]="newTanda.currency === 'USD'"
+                                [class.text-pink-700]="newTanda.currency !== 'USD'"
+                                class="px-2.5 py-1 text-xs font-black rounded-lg transition-all">USD ($)</button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label class="text-[10px] font-bold text-pink-700">Valor Artículo ({{ newTanda.currency }})</label>
+                        <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                               placeholder="Ej. 1200"
+                               [(ngModel)]="newTanda.itemCost"
+                               (ngModelChange)="onItemCostOrRateChange()"
+                               name="itemCost" />
+                      </div>
+                      @if (newTanda.currency === 'USD') {
+                        <div>
+                          <label class="text-[10px] font-bold text-pink-700">Tipo de Cambio (MXN/USD)</label>
+                          <input class="input-coquette py-1.5 text-xs font-bold" type="number" step="0.01" min="0"
+                                 placeholder="Ej. 19.50"
+                                 [(ngModel)]="newTanda.exchangeRate"
+                                 (ngModelChange)="onItemCostOrRateChange()"
+                                 name="exchangeRate" />
+                        </div>
+                      } @else {
+                        <div class="flex flex-col justify-end">
+                          <p class="text-[11px] text-pink-500 italic pb-1.5">Pago regular en moneda nacional</p>
+                        </div>
+                      }
+                    </div>
+
+                    @if (newTanda.currency === 'USD' && newTanda.itemCost && newTanda.exchangeRate) {
+                      <div class="text-[11px] font-semibold text-purple-700 bg-purple-50/80 px-2.5 py-1.5 rounded-xl border border-purple-100 flex justify-between">
+                        <span>Equivalente en pesos:</span>
+                        <span class="font-black">{{ (newTanda.itemCost * newTanda.exchangeRate) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                       </div>
                     }
                   </div>
-                }
-                
-                @if (productSearch.length > 2 && !selectedProduct() && productResults().length === 0) {
-                  <p class="text-[10px] text-pink-400 mt-1 italic italic">✨ Nuevo: "{{ productSearch }}" se agregará al catálogo.</p>
-                }
-              </div>
-              
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="label-coquette">📅 Semanas</label>
-                  <input class="input-coquette" type="number" name="weeks" [(ngModel)]="newTanda.totalWeeks" min="1" required />
+
+                  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label class="label-coquette">📅 Lugares / semanas</label>
+                      <input class="input-coquette" type="number" name="weeks"
+                             [ngModel]="newTanda.totalWeeks"
+                             (ngModelChange)="onTotalWeeksChange($event)"
+                             min="1" max="52" required />
+                    </div>
+                    <div>
+                      <label class="label-coquette">💰 Abono semanal (MXN)</label>
+                      <input class="input-coquette" type="number" name="amount" [(ngModel)]="newTanda.weeklyAmount" min="0" required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="label-coquette">📅 Fecha de inicio</label>
+                    <input class="input-coquette" type="date" name="startDate" [(ngModel)]="newTanda.startDate" required />
+                  </div>
+
+                  <div class="rounded-2xl border border-purple-100 bg-purple-50/70 p-4">
+                    <p class="text-xs font-black text-purple-800">Cómo se usará este orden</p>
+                    <p class="text-[11px] leading-relaxed text-purple-600 mt-1">
+                      La ruleta mostrará estos lugares exactamente como los captures. No volverá a mezclarlos.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label class="label-coquette">💰 Abono Semanal</label>
-                  <input class="input-coquette" type="number" name="amount" [(ngModel)]="newTanda.weeklyAmount" min="0" required />
+
+                <div class="rounded-3xl border border-pink-100 bg-gradient-to-br from-pink-50/80 to-white p-4 lg:p-5">
+                  <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+                    <div>
+                      <p class="text-sm font-black text-pink-900">Orden de lugares</p>
+                      <p class="text-[11px] text-pink-500">
+                        Selecciona un lugar y busca la clienta que lo ocupará.
+                      </p>
+                    </div>
+                    <span class="rounded-full bg-white px-3 py-1 text-[10px] font-black text-pink-600 border border-pink-100">
+                      Capturando lugar #{{ selectedPlaceTurn() }}
+                    </span>
+                  </div>
+
+                  <div class="relative mb-4">
+                    <input class="input-coquette pl-10"
+                           name="placeClientSearch"
+                           [(ngModel)]="placeSearch"
+                           (focus)="showPlaceSuggestions.set(true)"
+                           (blur)="hidePlaceSuggestions()"
+                           placeholder="Buscar clienta por nombre o teléfono..." />
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
+
+                    @if (showPlaceSuggestions()) {
+                      <div class="absolute top-full left-0 right-0 z-50 mt-1 rounded-2xl bg-white p-2 border border-pink-100 shadow-2xl overflow-y-auto max-h-52">
+                        @if (loadingClients()) {
+                          <p class="p-3 text-xs font-bold text-pink-400">Cargando clientas...</p>
+                        } @else {
+                          @for (client of filteredPlaceClients(); track client.id) {
+                            <button type="button" (mousedown)="$event.preventDefault()" (click)="assignClient(client)"
+                                    class="w-full p-3 hover:bg-pink-50 rounded-xl text-left flex items-center justify-between gap-3">
+                              <div class="min-w-0">
+                                <p class="text-xs font-black text-pink-900 truncate">{{ client.name }}</p>
+                                <p class="text-[10px] text-pink-400">{{ client.phone || 'Sin teléfono' }}</p>
+                              </div>
+                              <span class="text-[10px] font-black text-pink-500">Asignar #{{ selectedPlaceTurn() }}</span>
+                            </button>
+                          } @empty {
+                            <p class="p-3 text-xs font-bold text-pink-400">No encontré clientas con esa búsqueda.</p>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+
+                  <div class="space-y-2 max-h-[44vh] overflow-y-auto pr-1 scrollbar-hide">
+                    @for (place of tandaPlaces(); track place.assignedTurn) {
+                      <div (click)="selectPlace(place.assignedTurn)"
+                           class="rounded-2xl border p-3 transition-all cursor-pointer"
+                           [class.border-pink-400]="selectedPlaceTurn() === place.assignedTurn"
+                           [class.ring-2]="selectedPlaceTurn() === place.assignedTurn"
+                           [class.ring-pink-100]="selectedPlaceTurn() === place.assignedTurn"
+                           [class.bg-white]="place.client"
+                           [class.bg-pink-50/50]="!place.client"
+                           [class.border-pink-100]="selectedPlaceTurn() !== place.assignedTurn">
+                          <div class="flex flex-wrap items-center gap-3">
+                          <div class="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-pink-500 to-rose-400 text-white flex items-center justify-center font-black shadow-sm">
+                            {{ place.assignedTurn }}
+                          </div>
+
+                          <div class="min-w-0 flex-1">
+                            @if (place.client; as client) {
+                              <p class="text-sm font-black text-pink-900 truncate">{{ client.name }}</p>
+                              <p class="text-[10px] font-semibold text-pink-400">{{ client.phone || 'Sin teléfono' }}</p>
+                            } @else {
+                              <p class="text-sm font-black text-pink-400">Selecciona una clienta</p>
+                              <p class="text-[10px] text-pink-300">Este lugar es obligatorio</p>
+                            }
+                          </div>
+
+                          <div class="ml-auto flex items-center gap-1">
+                            <button type="button" title="Subir" [disabled]="place.assignedTurn === 1"
+                                    (click)="movePlace(place.assignedTurn, -1, $event)"
+                                    class="w-8 h-8 rounded-lg bg-pink-50 text-pink-500 font-black disabled:opacity-30">↑</button>
+                            <button type="button" title="Bajar" [disabled]="place.assignedTurn === newTanda.totalWeeks"
+                                    (click)="movePlace(place.assignedTurn, 1, $event)"
+                                    class="w-8 h-8 rounded-lg bg-pink-50 text-pink-500 font-black disabled:opacity-30">↓</button>
+                            @if (place.client) {
+                              <button type="button" title="Quitar clienta"
+                                      (click)="clearPlace(place.assignedTurn, $event)"
+                                      class="w-8 h-8 rounded-lg bg-rose-50 text-rose-500 font-black">×</button>
+                            }
+                          </div>
+                        </div>
+
+                        @if (place.client) {
+                          <div class="mt-3 ml-[52px] grid grid-cols-1 sm:grid-cols-2 gap-2" (click)="$event.stopPropagation()">
+                            <input class="input-coquette py-1.5 text-xs"
+                                   [name]="'variant-' + place.assignedTurn"
+                                   [ngModel]="place.variant"
+                                   (ngModelChange)="updatePlaceVariant(place.assignedTurn, $event)"
+                                   placeholder="Variante, color o talla" />
+                            <input class="input-coquette py-1.5 text-xs font-bold"
+                                   type="number"
+                                   [name]="'weeklyAmount-' + place.assignedTurn"
+                                   [ngModel]="place.weeklyAmount"
+                                   (ngModelChange)="updatePlaceWeeklyAmount(place.assignedTurn, $event)"
+                                   placeholder="Abono ($/sem opcional)" />
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label class="label-coquette">📅 Fecha de Inicio</label>
-                <input class="input-coquette" type="date" name="startDate" [(ngModel)]="newTanda.startDate" required />
-              </div>
-
-              <div class="pt-6 flex gap-3">
-                <button type="button" (click)="showCreateModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Regresar</button>
-                <button type="submit" [disabled]="isSaving()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg disabled:opacity-50">
-                   @if (isSaving()) {
-                     <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                   } @else {
-                     Crear Tanda ✨
-                   }
+              <div class="pt-2 flex flex-col-reverse sm:flex-row gap-3 justify-end border-t border-pink-100">
+                <button type="button" (click)="showCreateModal.set(false)" class="btn-coquette btn-ghost sm:min-w-36 justify-center">Regresar</button>
+                <button type="submit" [disabled]="isSaving() || !canCreateTanda()" class="btn-coquette btn-pink sm:min-w-52 justify-center shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                  @if (isSaving()) {
+                    <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  } @else {
+                    Crear con {{ newTanda.totalWeeks }} lugares ✨
+                  }
                 </button>
               </div>
             </form>
@@ -226,6 +477,7 @@ import { gsap } from 'gsap';
 })
 export class TandasComponent implements OnInit {
   private tandaService = inject(TandaService);
+  private apiService = inject(ApiService);
   private toastService = inject(ToastService);
   
   tandas = signal<TandaDto[]>([]);
@@ -235,28 +487,64 @@ export class TandasComponent implements OnInit {
   scrollY = signal(0);
   
   // Filtros / Búsqueda
-  searchQuery = '';
+  searchQuery = signal('');
+  statusFilter = signal<TandaStatus | ''>('');
   
   // Gestión de Productos en Modal
   productSearch = '';
   productResults = signal<TandaProductDto[]>([]);
   selectedProduct = signal<TandaProductDto | null>(null);
-  
-  newTanda: any = {
+
+  allClients = signal<ClientDto[]>([]);
+  loadingClients = signal(false);
+  placeSearch = '';
+  showPlaceSuggestions = signal(false);
+  selectedPlaceTurn = signal(1);
+  tandaPlaces = signal<TandaPlaceDraft[]>(resizeTandaPlaces([], 10));
+
+  newTanda: TandaForm = {
     name: '',
     totalWeeks: 10,
     weeklyAmount: 100,
-    startDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
+    startDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local
+    currency: 'MXN',
+    itemCost: undefined,
+    exchangeRate: undefined
   };
 
-  filteredTandas = () => {
-    const q = this.searchQuery.toLowerCase().trim();
-    if (!q) return this.tandas();
-    return this.tandas().filter(t => 
-      t.name.toLowerCase().includes(q) || 
-      t.product?.name.toLowerCase().includes(q)
-    );
-  }
+  filteredTandas = computed(() => {
+    const q = this.searchQuery().toLowerCase().trim();
+    const status = this.statusFilter();
+    return this.tandas().filter(t => {
+      const matchesSearch = !q
+        || t.name.toLowerCase().includes(q)
+        || t.product?.name.toLowerCase().includes(q);
+      return matchesSearch && (!status || t.status === status);
+    });
+  });
+
+  activeTandasCount = computed(() => this.tandas().filter(t => t.status === 'Active').length);
+  occupiedPlacesCount = computed(() => this.tandas().reduce((total, t) => total + t.participantCount, 0));
+  totalCollected = computed(() => this.tandas().reduce((total, t) => total + t.collectedAmount, 0));
+  totalBalance = computed(() => this.tandas().reduce((total, t) => total + t.balanceDue, 0));
+
+  filteredPlaceClients = () => {
+    const query = this.placeSearch.toLowerCase().trim();
+    if (!query) {
+      return this.allClients().slice(0, 12);
+    }
+
+    return this.allClients()
+      .filter(client =>
+        client.name.toLowerCase().includes(query)
+        || client.phone?.toLowerCase().includes(query)
+      )
+      .slice(0, 20);
+  };
+
+  assignedPlacesCount = computed(() =>
+    this.tandaPlaces().filter(place => place.client !== null).length
+  );
 
   constructor() {
     effect(() => {
@@ -269,11 +557,30 @@ export class TandasComponent implements OnInit {
 
   @HostListener('window:scroll')
   onScroll() {
-    this.scrollY.set(window.scrollY);
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.scrollY.set(window.scrollY);
+    }
   }
 
   ngOnInit() {
     this.loadTandas();
+    this.loadClients();
+  }
+
+  loadClients() {
+    this.loadingClients.set(true);
+    this.apiService.getClients().subscribe({
+      next: clients => {
+        this.allClients.set(
+          [...clients].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+        );
+        this.loadingClients.set(false);
+      },
+      error: () => {
+        this.loadingClients.set(false);
+        this.toastService.error('No se pudieron cargar las clientas');
+      }
+    });
   }
 
   loadTandas() {
@@ -291,6 +598,10 @@ export class TandasComponent implements OnInit {
   }
 
   animateList() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      gsap.set('.tanda-card-anim', { opacity: 1, y: 0 });
+      return;
+    }
     gsap.set('.tanda-card-anim', { opacity: 0, y: 30 });
     gsap.to('.tanda-card-anim', {
       opacity: 1,
@@ -324,15 +635,93 @@ export class TandasComponent implements OnInit {
   }
 
   openCreateModal() {
+    this.resetForm();
     this.showCreateModal.set(true);
-    this.selectedProduct.set(null);
-    this.productSearch = '';
     this.isSaving.set(false);
+  }
+
+  onTotalWeeksChange(value: number | string) {
+    const parsed = Number(value);
+    const totalWeeks = Number.isFinite(parsed)
+      ? Math.min(52, Math.max(1, Math.trunc(parsed)))
+      : 1;
+
+    this.newTanda.totalWeeks = totalWeeks;
+    this.tandaPlaces.update(places => resizeTandaPlaces(places, totalWeeks));
+
+    if (this.selectedPlaceTurn() > totalWeeks) {
+      this.selectedPlaceTurn.set(totalWeeks);
+    }
+    this.onItemCostOrRateChange();
+  }
+
+  selectPlace(assignedTurn: number) {
+    this.selectedPlaceTurn.set(assignedTurn);
+    this.placeSearch = '';
+    this.showPlaceSuggestions.set(true);
+  }
+
+  assignClient(client: ClientDto) {
+    const assignedTurn = this.selectedPlaceTurn();
+    this.tandaPlaces.update(places =>
+      assignClientToPlace(places, assignedTurn, client)
+    );
+
+    const nextEmpty = this.tandaPlaces().find(place =>
+      place.assignedTurn > assignedTurn && place.client === null
+    ) ?? this.tandaPlaces().find(place => place.client === null);
+
+    if (nextEmpty) {
+      this.selectedPlaceTurn.set(nextEmpty.assignedTurn);
+    }
+
+    this.placeSearch = '';
+    this.showPlaceSuggestions.set(false);
+  }
+
+  clearPlace(assignedTurn: number, event: Event) {
+    event.stopPropagation();
+    this.tandaPlaces.update(places =>
+      assignClientToPlace(places, assignedTurn, null)
+    );
+    this.selectedPlaceTurn.set(assignedTurn);
+  }
+
+  movePlace(assignedTurn: number, direction: -1 | 1, event: Event) {
+    event.stopPropagation();
+    this.tandaPlaces.update(places =>
+      swapTandaPlaces(places, assignedTurn, direction)
+    );
+  }
+
+  updatePlaceVariant(assignedTurn: number, variant: string) {
+    this.tandaPlaces.update(places => places.map(place =>
+      place.assignedTurn === assignedTurn ? { ...place, variant } : place
+    ));
+  }
+
+  hidePlaceSuggestions() {
+    window.setTimeout(() => this.showPlaceSuggestions.set(false), 150);
+  }
+
+  canCreateTanda(): boolean {
+    return this.newTanda.name.trim().length > 0
+      && this.productSearch.trim().length > 0
+      && this.newTanda.totalWeeks >= 1
+      && this.newTanda.weeklyAmount > 0
+      && this.newTanda.startDate.length > 0
+      && areTandaPlacesComplete(this.tandaPlaces(), this.newTanda.totalWeeks);
   }
 
   onCreateTanda(event: Event) {
     event.preventDefault();
     if (this.isSaving()) return;
+
+    if (!this.canCreateTanda()) {
+      this.toastService.error('Completa los datos y asigna una clienta a cada lugar');
+      return;
+    }
+
     this.isSaving.set(true);
 
     // 1. Asegurar el producto
@@ -354,10 +743,22 @@ export class TandasComponent implements OnInit {
   }
 
   private finishCreateTanda(productId: string) {
-    const dto = {
+    const dto: CreateTandaDto = {
       ...this.newTanda,
       productId,
-      penaltyAmount: 0 
+      penaltyAmount: 0,
+      currency: this.newTanda.currency,
+      itemCost: this.newTanda.itemCost || undefined,
+      exchangeRate: this.newTanda.currency === 'USD' ? this.newTanda.exchangeRate : undefined,
+      participants: this.tandaPlaces().map(place => ({
+        customerId: place.client!.id,
+        assignedTurn: place.assignedTurn,
+        variant: place.variant.trim() || undefined,
+        weeklyAmount: place.weeklyAmount,
+        currency: place.currency || undefined,
+        itemCost: place.itemCost || undefined,
+        exchangeRate: place.exchangeRate || undefined
+      }))
     };
 
     this.tandaService.createTanda(dto).subscribe({
@@ -375,14 +776,66 @@ export class TandasComponent implements OnInit {
     });
   }
 
+  setCurrency(curr: string) {
+    this.newTanda.currency = curr;
+    if (curr === 'USD' && !this.newTanda.exchangeRate) {
+      this.newTanda.exchangeRate = 19.50;
+    }
+    this.onItemCostOrRateChange();
+  }
+
+  onItemCostOrRateChange() {
+    if (this.newTanda.itemCost && this.newTanda.itemCost > 0 && this.newTanda.totalWeeks > 0) {
+      let totalMxn = this.newTanda.itemCost;
+      if (this.newTanda.currency === 'USD' && this.newTanda.exchangeRate) {
+        totalMxn = this.newTanda.itemCost * this.newTanda.exchangeRate;
+      }
+      this.newTanda.weeklyAmount = Math.ceil(totalMxn / this.newTanda.totalWeeks);
+    }
+  }
+
+  updatePlaceWeeklyAmount(assignedTurn: number, amount: any) {
+    const val = amount ? Number(amount) : undefined;
+    this.tandaPlaces.update(places => places.map(place =>
+      place.assignedTurn === assignedTurn ? { ...place, weeklyAmount: val } : place
+    ));
+  }
+
   resetForm() {
     this.newTanda = {
       name: '',
       totalWeeks: 10,
       weeklyAmount: 100,
-      startDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
+      startDate: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local
+      currency: 'MXN',
+      itemCost: undefined,
+      exchangeRate: undefined
     };
     this.productSearch = '';
     this.selectedProduct.set(null);
+    this.placeSearch = '';
+    this.selectedPlaceTurn.set(1);
+    this.showPlaceSuggestions.set(false);
+    this.tandaPlaces.set(resizeTandaPlaces([], this.newTanda.totalWeeks));
+  }
+
+  statusLabel(status: TandaStatus): string {
+    const labels: Record<TandaStatus, string> = {
+      Draft: 'Borrador',
+      Active: 'Activa',
+      Completed: 'Completada',
+      Cancelled: 'Cancelada'
+    };
+    return labels[status];
+  }
+
+  statusClass(status: TandaStatus): string {
+    const classes: Record<TandaStatus, string> = {
+      Draft: 'badge-pending',
+      Active: 'badge-confirmed',
+      Completed: 'badge-delivered',
+      Cancelled: 'badge-canceled'
+    };
+    return classes[status];
   }
 }

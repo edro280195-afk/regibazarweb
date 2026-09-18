@@ -94,8 +94,8 @@ interface NavItem {
           <div class="user-chip">
             <div class="user-avatar">{{ userInitial() }}</div>
             <div class="user-info">
-              <span class="user-role">Administradora</span>
-              <span class="user-name">Regi Bazar</span>
+              <span class="user-role">{{ userRoleLabel() }}</span>
+              <span class="user-name">{{ auth.userName() || 'Regi Bazar' }}</span>
             </div>
           </div>
         </header>
@@ -353,12 +353,14 @@ interface NavItem {
       align-items: flex-end;
       justify-content: space-between;
       gap: 1rem;
+      min-width: 0;
     }
 
     .top-left {
       display: flex;
       align-items: center;
       gap: 1rem;
+      min-width: 0;
     }
 
     .greeting {
@@ -379,8 +381,8 @@ interface NavItem {
     }
 
     .mobile-toggle {
-      width: 2.5rem;
-      height: 2.5rem;
+      width: 2.75rem;
+      height: 2.75rem;
       border-radius: 0.75rem;
       border: 1px solid rgba(0, 0, 0, 0.06);
       background: white;
@@ -409,6 +411,8 @@ interface NavItem {
       border: 1px solid rgba(0, 0, 0, 0.04);
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
       transition: all 0.3s ease;
+      min-width: 0;
+      max-width: 100%;
     }
 
     .user-chip:hover {
@@ -433,6 +437,7 @@ interface NavItem {
     .user-info {
       display: flex;
       flex-direction: column;
+      min-width: 0;
     }
 
     .user-role {
@@ -448,11 +453,15 @@ interface NavItem {
       font-size: 0.8rem;
       font-weight: 600;
       color: #9d174d;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .page-content {
       flex: 1;
       padding: 0 2rem 2rem;
+      min-width: 0;
     }
 
     /* ═══ MOBILE ═══ */
@@ -478,10 +487,21 @@ interface NavItem {
         left: 0;
       }
 
-      .top-bar { padding: 1rem; }
+      .top-bar { padding: 1rem; align-items: center; flex-wrap: wrap; }
       .page-content { padding: 0 1rem 1rem; }
       .date-title { font-size: 1.5rem; }
       .greeting { font-size: 1.1rem; }
+      .top-left { flex: 1 1 13rem; }
+      .user-chip { flex: 0 1 auto; }
+    }
+
+    @media (max-width: 480px) {
+      .top-bar { gap: .75rem; }
+      .top-left { gap: .65rem; }
+      .user-chip { padding-right: .65rem; }
+      .user-info { max-width: 7.5rem; }
+      .date-title { font-size: 1.2rem; }
+      .greeting { font-size: .95rem; }
     }
 
     /* ═══ ANIMATIONS ═══ */
@@ -502,7 +522,7 @@ interface NavItem {
   `]
 })
 export class LayoutComponent {
-  private auth = inject(AuthService);
+  readonly auth = inject(AuthService);
 
   sidebarOpen = signal(window.innerWidth > 1024);
   isMobile = signal(window.innerWidth <= 1024);
@@ -520,11 +540,13 @@ export class LayoutComponent {
     const allItems: NavItem[] = [
       { label: 'Dashboard', icon: '🏠', route: '/admin' },
       { label: 'Pedidos', icon: '📦', route: '/admin/orders' },
-      { label: 'Lives', icon: 'LV', route: '/admin/live/import' },
-      { label: 'Tandas', icon: '🔄', route: '/admin/tandas' },
-      { label: 'Sorteos', icon: '🎉', route: '/admin/raffles' },
+      { label: 'Inventario', icon: '🧺', route: '/admin/inventory' },
+      { label: 'Etiquetas', icon: '🏷️', route: '/admin/labels' },
+      { label: 'Enviar Enlaces', icon: '💌', route: '/admin/send-links' },
       { label: 'Clientas', icon: '👩‍💼', route: '/admin/clients' },
       { label: 'Rutas', icon: '🚗', route: '/admin/routes' },
+      { label: 'Tandas', icon: '🔄', route: '/admin/tandas' },
+      { label: 'Sorteos', icon: '🎉', route: '/admin/raffles' },
       { label: 'Proveedores', icon: '🏭', route: '/admin/suppliers' },
       { label: 'Finanzas', icon: '💰', route: '/admin/financials' },
       { label: 'Reportes', icon: '📊', route: '/admin/reports' },
@@ -535,6 +557,10 @@ export class LayoutComponent {
 
     if (role === 'Driver') {
       return allItems.filter(i => i.route === '/admin/routes');
+    }
+
+    if (role === 'Bodega') {
+      return allItems.filter(i => i.route === '/admin/inventory' || i.route === '/admin/labels');
     }
 
     return allItems;
@@ -558,6 +584,10 @@ export class LayoutComponent {
   userInitial(): string {
     const name = this.auth.userName();
     return name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  userRoleLabel(): string {
+    return this.auth.userRole() === 'Bodega' ? 'Bodega' : 'Administradora';
   }
 
   onNavClick(): void {
