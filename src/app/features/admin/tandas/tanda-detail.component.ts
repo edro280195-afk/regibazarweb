@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TandaDto, TandaParticipantDto, ClientDto, CLIENT_TAG_LABELS, CamiChatResponse } from '../../../core/models';
+import { TandaDto, TandaParticipantDto, TandaPaymentDto, CreateTandaParticipantItemDto, ClientDto, CLIENT_TAG_LABELS, CamiChatResponse } from '../../../core/models';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-animation.component';
@@ -160,11 +160,24 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                                 ⚙️
                             </button>
                           </div>
+                          @if (p.items?.length) {
+                            <div class="mt-2 ml-9 flex flex-wrap gap-1">
+                              @for (item of p.items; track item.id) {
+                                <span class="px-2 py-1 rounded-lg bg-purple-50 text-purple-600 text-[9px] font-bold border border-purple-100">
+                                  {{ item.quantity }}× {{ item.productName }}@if (item.variant) { · {{ item.variant }} }
+                                </span>
+                              }
+                            </div>
+                          }
                         </td>
                         @for (w of weeksArray(); track w) {
                           <td class="text-center p-2">
-                            @if (hasPaid(p, w)) {
-                              <button (click)="onRemovePayment(p, w)" class="text-lg drop-shadow-sm animate-bounce-in inline-block hover:scale-125 transition-transform" title="Quitar pago">💖</button>
+                            @if (getPayment(p, w); as payment) {
+                              @if (payment.isVerified) {
+                                <button (click)="onRemovePayment(p, w)" class="text-lg drop-shadow-sm animate-bounce-in inline-block hover:scale-125 transition-transform" title="Quitar pago verificado">💖</button>
+                              } @else {
+                                <button (click)="openPaymentReview(p, payment)" class="text-lg inline-block hover:scale-125 transition-transform" title="Revisar comprobante">🕘</button>
+                              }
                             } @else {
                               <button (click)="openPaymentModal(p, w)" 
                                       class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
@@ -242,6 +255,13 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                                    <div class="mt-1 flex items-center gap-1">
                                       <span class="text-[8px] bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full font-black uppercase tracking-wider border border-pink-200">💎 {{ p.variant || 'Sin Variante' }}</span>
                                    </div>
+                                   @if (p.items?.length) {
+                                     <div class="mt-2 flex flex-wrap gap-1">
+                                       @for (item of p.items; track item.id) {
+                                         <span class="text-[8px] bg-purple-50 text-purple-600 px-2 py-1 rounded-lg font-bold border border-purple-100">{{ item.quantity }}× {{ item.productName }}</span>
+                                       }
+                                     </div>
+                                   }
                                 </div>
                              </div>
                           </div>
@@ -287,12 +307,21 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                 </div>
               </div>
 
-              <!-- Enlace de Clienta -->
-              @if (t.accessToken) {
-                <button (click)="onCopyLink(t.accessToken)" class="mt-6 w-full py-3 bg-pink-100 hover:bg-pink-200 text-pink-600 text-[10px] font-black rounded-2xl uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm border border-pink-200">
-                  🔗 Copiar Enlace Clientas
-                </button>
-              }
+              <!-- Enlaces individuales por clienta -->
+              <div class="mt-6 pt-5 border-t border-pink-100">
+                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-2">🔗 Enlaces individuales</p>
+                <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  @for (participant of participants(); track participant.id) {
+                    <button (click)="onCopyParticipantLink(participant)" class="w-full py-2.5 px-3 bg-pink-50 hover:bg-pink-100 text-pink-700 text-[10px] font-black rounded-xl transition-all flex items-center justify-between gap-2 border border-pink-100">
+                      <span class="truncate">{{ participant.customerName }}</span>
+                      <span class="shrink-0">Copiar</span>
+                    </button>
+                  }
+                </div>
+                @if (t.accessToken) {
+                  <button (click)="onCopyLink(t.accessToken)" class="mt-2 w-full py-2 text-[9px] font-bold text-pink-300 hover:text-pink-500">Usar enlace grupal anterior</button>
+                }
+              </div>
             </div>
 
             <!-- Enrollment Panel -->
@@ -430,6 +459,74 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
         </div>
       }
 
+      <!-- REVIEW PAYMENT PROOF MODAL -->
+      @if (reviewPayment(); as review) {
+        <div class="fixed inset-0 z-[115] flex items-center justify-center p-4 animate-fade-in">
+          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="reviewPayment.set(null)"></div>
+          <div class="card-coquette bg-white p-7 w-full max-w-md relative z-10 animate-scale-in">
+            <h3 class="text-xl font-black text-pink-900 mb-2 flex items-center gap-2">🧾 Revisar comprobante</h3>
+            <p class="text-xs text-pink-500 font-bold mb-5">{{ review.participant.customerName }} · Semana {{ review.payment.weekNumber }}</p>
+            @if (review.payment.proofUrl) {
+              <a [href]="review.payment.proofUrl" target="_blank" rel="noopener" class="block rounded-2xl overflow-hidden border border-pink-100 mb-5 bg-pink-50 text-center">
+                <img [src]="review.payment.proofUrl" alt="Comprobante de pago" class="max-h-56 w-full object-contain" />
+                <span class="block py-2 text-[10px] font-black text-pink-600 uppercase tracking-widest">Abrir comprobante</span>
+              </a>
+            }
+            <div class="grid grid-cols-2 gap-3 mb-5">
+              <div class="rounded-2xl bg-purple-50 p-3 border border-purple-100">
+                <p class="text-[9px] font-black text-purple-400 uppercase">Importe OCR</p>
+                <p class="text-lg font-black text-purple-700">{{ (review.payment.ocrAmount ?? review.payment.amountPaid) | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
+              </div>
+              <div class="rounded-2xl bg-amber-50 p-3 border border-amber-100">
+                <p class="text-[9px] font-black text-amber-500 uppercase">Fecha / hora OCR</p>
+                <p class="text-xs font-black text-amber-700">{{ review.payment.depositDate ? (review.payment.depositDate | date:'dd/MM/yyyy HH:mm') : 'No detectada' }}</p>
+              </div>
+            </div>
+            <div class="mb-5">
+              <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Importe confirmado</label>
+              <input type="number" [(ngModel)]="reviewAmount" class="input-coquette" min="0" step="0.01" />
+            </div>
+            <div class="flex gap-3">
+              <button (click)="reviewPayment.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cerrar</button>
+              <button (click)="verifyPayment(false)" [disabled]="isVerifyingPayment()" class="btn-coquette btn-rose flex-1 justify-center">Rechazar</button>
+              <button (click)="verifyPayment(true)" [disabled]="isVerifyingPayment()" class="btn-coquette btn-pink flex-1 justify-center">Aprobar ✨</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- EDIT PARTICIPANT ITEMS MODAL -->
+      @if (editingItemsParticipant(); as p) {
+        <div class="fixed inset-0 z-[115] flex items-center justify-center p-4 animate-fade-in">
+          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="editingItemsParticipant.set(null)"></div>
+          <div class="card-coquette bg-white p-7 w-full max-w-lg relative z-10 animate-scale-in max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-black text-pink-900 mb-1 flex items-center gap-2">🛍️ Artículos de {{ p.customerName }}</h3>
+            <p class="text-xs text-pink-400 font-medium mb-5">Cada artículo puede tener una cantidad y un cobro semanal diferente.</p>
+            <div class="space-y-3">
+              @for (item of itemDrafts(); track $index; let i = $index) {
+                <div class="rounded-2xl bg-pink-50/60 border border-pink-100 p-3">
+                  <div class="flex gap-2 items-start">
+                    <input [(ngModel)]="item.productName" [name]="'item-name-' + i" class="input-coquette py-2 text-xs flex-1" placeholder="Artículo" />
+                    <input [(ngModel)]="item.quantity" [name]="'item-qty-' + i" type="number" min="1" class="input-coquette py-2 text-xs w-16 text-center" title="Cantidad" />
+                    <button (click)="removeItemDraft(i)" [disabled]="itemDrafts().length === 1" class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 font-black disabled:opacity-30">×</button>
+                  </div>
+                  <div class="grid grid-cols-3 gap-2 mt-2">
+                    <input [(ngModel)]="item.unitPrice" [name]="'item-price-' + i" type="number" min="0" step="0.01" class="input-coquette py-2 text-xs" placeholder="Precio" />
+                    <input [(ngModel)]="item.weeklyAmount" [name]="'item-weekly-' + i" type="number" min="0" step="0.01" class="input-coquette py-2 text-xs" placeholder="Cobro semanal" />
+                    <input [(ngModel)]="item.variant" [name]="'item-variant-' + i" class="input-coquette py-2 text-xs" placeholder="Variante" />
+                  </div>
+                </div>
+              }
+            </div>
+            <button (click)="addItemDraft()" class="mt-4 w-full py-3 rounded-2xl border border-dashed border-purple-200 text-purple-600 text-xs font-black hover:bg-purple-50">＋ Agregar otro artículo</button>
+            <div class="flex gap-3 mt-6">
+              <button (click)="editingItemsParticipant.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
+              <button (click)="saveParticipantItems()" [disabled]="isSavingItems()" class="btn-coquette btn-pink flex-1 justify-center">Guardar artículos ✨</button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- EDIT TANDA MODAL -->
       @if (showEditModal()) {
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -500,6 +597,14 @@ import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-ani
                 <button (click)="editingVariantId.set(p.id); editVariantValue = p.variant || ''; selectedParticipantActions.set(null)" 
                         class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
                   <span class="text-lg">🎨</span> Editar Variante
+                </button>
+                <button (click)="openItemsModal(p); selectedParticipantActions.set(null)"
+                        class="w-full py-4 bg-purple-50 hover:bg-purple-100 text-purple-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-purple-100">
+                  <span class="text-lg">🛍️</span> Editar Artículos y Cobro
+                </button>
+                <button (click)="onCopyParticipantLink(p); selectedParticipantActions.set(null)"
+                        class="w-full py-4 bg-amber-50 hover:bg-amber-100 text-amber-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-amber-100">
+                  <span class="text-lg">🔗</span> Copiar enlace individual
                 </button>
                 <button (click)="showRemoveConfirm.set(p); selectedParticipantActions.set(null)" 
                         class="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-500 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-rose-100">
@@ -749,6 +854,13 @@ export class TandaDetailComponent implements OnInit {
   showPaymentModal = signal(false);
   isSavingPay = signal(false);
   activePayment = signal<{ participant: TandaParticipantDto, week: number } | null>(null);
+  reviewPayment = signal<{ participant: TandaParticipantDto, payment: TandaPaymentDto } | null>(null);
+  reviewAmount = 0;
+  isVerifyingPayment = signal(false);
+
+  editingItemsParticipant = signal<TandaParticipantDto | null>(null);
+  itemDrafts = signal<CreateTandaParticipantItemDto[]>([]);
+  isSavingItems = signal(false);
 
   // Edición
   showEditModal = signal(false);
@@ -822,6 +934,10 @@ export class TandaDetailComponent implements OnInit {
 
   hasPaid(participant: TandaParticipantDto, week: number): boolean {
     return participant.payments?.some(p => p.weekNumber === week) || false;
+  }
+
+  getPayment(participant: TandaParticipantDto, week: number): TandaPaymentDto | undefined {
+    return participant.payments?.find(payment => payment.weekNumber === week);
   }
 
   getParticipantWeeklyAmount(p: TandaParticipantDto): number {
@@ -970,10 +1086,119 @@ export class TandaDetailComponent implements OnInit {
     });
   }
 
+  onCopyParticipantLink(participant: TandaParticipantDto) {
+    if (!participant.publicToken) {
+      this.toastService.error('Esta participante aún no tiene enlace individual');
+      return;
+    }
+
+    const url = `${window.location.origin}/tanda-view/${participant.publicToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      this.toastService.success(`Enlace individual de ${participant.customerName} copiado 🎀`);
+    });
+  }
+
   openPaymentModal(participant: TandaParticipantDto, week: number) {
     this.activePayment.set({ participant, week });
     this.showPaymentModal.set(true);
     this.isSavingPay.set(false);
+  }
+
+  openPaymentReview(participant: TandaParticipantDto, payment: TandaPaymentDto) {
+    this.reviewAmount = payment.ocrAmount ?? payment.amountPaid ?? this.getParticipantWeeklyAmount(participant);
+    this.reviewPayment.set({ participant, payment });
+    this.isVerifyingPayment.set(false);
+  }
+
+  verifyPayment(isVerified: boolean) {
+    const review = this.reviewPayment();
+    if (!review || this.isVerifyingPayment()) return;
+
+    this.isVerifyingPayment.set(true);
+    this.tandaService.verifyPayment(review.payment.id, {
+      isVerified,
+      amountPaid: this.reviewAmount,
+      depositDate: review.payment.depositDate,
+      notes: isVerified ? 'Comprobante revisado y aprobado por administración.' : 'Comprobante rechazado por administración.'
+    }).subscribe({
+      next: () => {
+        this.toastService.success(isVerified ? 'Pago aprobado ✨' : 'Pago marcado para revisión');
+        this.reviewPayment.set(null);
+        this.isVerifyingPayment.set(false);
+        this.loadTanda(review.participant.tandaId);
+      },
+      error: (err) => {
+        this.isVerifyingPayment.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo actualizar el pago');
+      }
+    });
+  }
+
+  openItemsModal(participant: TandaParticipantDto) {
+    const items = participant.items?.length
+      ? participant.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          weeklyAmount: item.weeklyAmount,
+          variant: item.variant
+        }))
+      : [{
+          productName: this.tanda()?.product?.name || 'Artículo de tanda',
+          quantity: 1,
+          unitPrice: 0,
+          weeklyAmount: this.getParticipantWeeklyAmount(participant),
+          variant: participant.variant
+        }];
+
+    this.itemDrafts.set(items);
+    this.editingItemsParticipant.set(participant);
+    this.isSavingItems.set(false);
+  }
+
+  addItemDraft() {
+    this.itemDrafts.update(items => [...items, {
+      productName: '',
+      quantity: 1,
+      unitPrice: 0,
+      weeklyAmount: 0,
+      variant: ''
+    }]);
+  }
+
+  removeItemDraft(index: number) {
+    this.itemDrafts.update(items => items.filter((_, i) => i !== index));
+  }
+
+  saveParticipantItems() {
+    const participant = this.editingItemsParticipant();
+    const items = this.itemDrafts().map(item => ({
+      ...item,
+      productName: item.productName.trim(),
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice || 0),
+      weeklyAmount: item.weeklyAmount == null ? undefined : Number(item.weeklyAmount)
+    }));
+
+    if (!participant || items.some(item => !item.productName || item.quantity < 1)) {
+      this.toastService.error('Completa el nombre y la cantidad de cada artículo');
+      return;
+    }
+
+    this.isSavingItems.set(true);
+    this.tandaService.replaceParticipantItems(participant.id, items).subscribe({
+      next: () => {
+        this.toastService.success('Artículos y cobros actualizados ✨');
+        this.editingItemsParticipant.set(null);
+        this.isSavingItems.set(false);
+        this.loadTanda(participant.tandaId);
+      },
+      error: (err) => {
+        this.isSavingItems.set(false);
+        this.toastService.error(err.error?.message || 'No se pudieron guardar los artículos');
+      }
+    });
   }
 
   confirmPayment() {

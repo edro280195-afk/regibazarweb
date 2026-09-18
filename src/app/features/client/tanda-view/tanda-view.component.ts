@@ -104,10 +104,48 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                   </p>
                   <div class="bg-pink-100/50 px-4 py-2 rounded-2xl flex items-center gap-2">
                     <span class="text-lg">💰</span>
-                    <span class="text-xs font-black text-pink-700">Abono Semanal: {{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="text-xs font-black text-pink-700">Abono Semanal: {{ getParticipantAmount(t) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                   </div>
                 </div>
               </div>
+
+              @if (currentParticipant(t); as me) {
+                <div class="card-coquette bg-white/90 p-6 shadow-xl border-purple-100">
+                  <div class="flex items-center justify-between gap-3 mb-4">
+                    <div>
+                      <p class="text-[10px] font-black text-purple-400 uppercase tracking-widest">Mis artículos</p>
+                      <h3 class="text-lg font-black text-purple-900">{{ me.name }}</h3>
+                    </div>
+                    <span class="px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-black uppercase">Turno {{ me.assignedTurn }}</span>
+                  </div>
+                  <div class="space-y-2">
+                    @for (item of me.items; track item.id) {
+                      <div class="flex items-center justify-between gap-3 rounded-2xl bg-purple-50/70 border border-purple-100 px-4 py-3">
+                        <div>
+                          <p class="text-sm font-black text-purple-900">{{ item.quantity }}× {{ item.productName }}</p>
+                          @if (item.variant) { <p class="text-[10px] text-purple-500 font-bold">{{ item.variant }}</p> }
+                        </div>
+                        <span class="text-sm font-black text-purple-700">{{ (item.weeklyAmount ?? 0) * item.quantity | currency:'MXN':'symbol-narrow':'1.0-0' }}<small class="text-[9px]">/sem</small></span>
+                      </div>
+                    } @empty {
+                      <p class="text-xs text-purple-500">{{ t.productName }}</p>
+                    }
+                  </div>
+                  @if (me.payments?.length) {
+                    <div class="mt-5 pt-4 border-t border-purple-100">
+                      <p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-2">Últimos comprobantes</p>
+                      <div class="space-y-1.5">
+                        @for (payment of me.payments.slice(0, 3); track payment.id) {
+                          <div class="flex items-center justify-between text-[10px] font-bold">
+                            <span class="text-purple-700">Semana {{ payment.weekNumber }} · {{ (payment.amountPaid || payment.ocrAmount || 0) | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+                            <span [class]="payment.isVerified ? 'text-emerald-600' : 'text-amber-600'">{{ payment.isVerified ? 'Aprobado ✓' : 'En revisión ⏳' }}</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
 
               <!-- Delivery Turn Hero -->
               @if (isWinnerThisWeek()) {
@@ -149,17 +187,23 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                         
                         @if (!mpResult()) {
                           <div class="space-y-4">
-                            <!-- Participant Selector -->
-                            <div class="space-y-2">
-                              <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">¿Quién eres? ✨</label>
-                              <select class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl px-4 py-3 text-sm font-bold text-pink-900 focus:outline-none focus:border-pink-300 transition-all"
-                                      [(ngModel)]="selectedParticipantId">
-                                <option [value]="null" disabled>Selecciona tu nombre...</option>
-                                @for (p of t.participants; track p.id) {
-                                  <option [value]="p.id">{{ p.name }} (Semana {{ p.assignedTurn }})</option>
-                                }
-                              </select>
-                            </div>
+                            @if (t.participant; as me) {
+                              <div class="rounded-2xl bg-pink-50 px-4 py-3 border border-pink-100">
+                                <p class="text-[9px] font-black text-pink-400 uppercase tracking-widest">Enlace individual</p>
+                                <p class="text-sm font-black text-pink-900">{{ me.name }}</p>
+                              </div>
+                            } @else {
+                              <div class="space-y-2">
+                                <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest ml-2">¿Quién eres? ✨</label>
+                                <select class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl px-4 py-3 text-sm font-bold text-pink-900 focus:outline-none focus:border-pink-300 transition-all"
+                                        [(ngModel)]="selectedParticipantId">
+                                  <option [value]="null" disabled>Selecciona tu nombre...</option>
+                                  @for (p of t.participants; track p.id) {
+                                    <option [value]="p.id">{{ p.name }} (Semana {{ p.assignedTurn }})</option>
+                                  }
+                                </select>
+                              </div>
+                            }
 
                             <!-- MP Form -->
                             <form id="mp-card-form" class="space-y-3">
@@ -253,6 +297,30 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                       </div>
                     }
                   }
+                </div>
+
+                <!-- Payment Proof Upload -->
+                <div class="mt-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-[2rem] p-6 border border-purple-100 shadow-sm">
+                  <div class="flex items-center gap-3 mb-3">
+                    <span class="text-3xl">🧾</span>
+                    <div>
+                      <h4 class="font-black text-purple-900 text-xs uppercase tracking-widest">Enviar comprobante</h4>
+                      <p class="text-[10px] text-purple-500 font-medium">Leemos fecha, hora e importe automáticamente.</p>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 mb-3">
+                    <select [(ngModel)]="proofWeek" class="bg-white border border-purple-100 rounded-xl px-3 py-2 text-xs font-bold text-purple-900">
+                      @for (week of weeksArray(); track week) { <option [ngValue]="week">Semana {{ week }}</option> }
+                    </select>
+                    <label class="bg-white border border-purple-100 rounded-xl px-3 py-2 text-xs font-bold text-purple-600 cursor-pointer text-center">
+                      {{ selectedProofFile ? 'Cambiar imagen' : 'Elegir imagen' }}
+                      <input type="file" accept="image/*" (change)="onProofSelected($event)" class="hidden" />
+                    </label>
+                  </div>
+                  @if (selectedProofFile) { <p class="text-[10px] text-purple-600 font-bold mb-3 truncate">{{ selectedProofFile.name }}</p> }
+                  <button (click)="submitPaymentProof()" [disabled]="!selectedProofFile || proofProcessing() || !selectedParticipantId()" class="w-full py-3 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg disabled:opacity-40">
+                    {{ proofProcessing() ? 'Analizando comprobante...' : 'Enviar para revisión ✨' }}
+                  </button>
                 </div>
 
                 <!-- General Contact -->
@@ -443,6 +511,9 @@ export class TandaViewComponent implements OnInit {
   mpResult = signal<{ status: string; message: string } | null>(null);
   mpFetching = signal(false);
   selectedParticipantId = signal<string | null>(null);
+  selectedProofFile: File | null = null;
+  proofWeek = 1;
+  proofProcessing = signal(false);
   showAssistantBubble = signal(true);
   private bubbleTimeout: any;
 
@@ -468,12 +539,8 @@ export class TandaViewComponent implements OnInit {
   isWinnerThisWeek = computed(() => {
     const t = this.tanda();
     if (!t) return false;
-    // En una tanda real, necesitaríamos identificar qué participante es la que abrió el link.
-    // Como es un link genérico por ahora, podríamos basarlo en algún parámetro opcional, 
-    // pero para demos mostramos si alguna participante tiene su turno esta semana.
-    // Pero el usuario pidió "vista de la clienta", así que por ahora lo dejamos genérico o 
-    // basado en URL si pasamos el participantId.
-    return false;
+    const participant = this.currentParticipant(t);
+    return participant?.isWinnerThisWeek ?? false;
   });
 
   @HostListener('window:scroll', ['$event'])
@@ -594,7 +661,7 @@ export class TandaViewComponent implements OnInit {
 
     try {
       this.cardFormInstance = this.mp.cardForm({
-        amount: String(this.tanda()?.weeklyAmount || '0'),
+        amount: String(this.getParticipantAmount(this.tanda()) || '0'),
         iframe: true,
         form: {
           id: 'mp-card-form',
@@ -684,11 +751,48 @@ export class TandaViewComponent implements OnInit {
     this.tandaService.getPublicTanda(token).subscribe({
       next: (data) => {
         this.tanda.set(data);
+        this.selectedParticipantId.set(data.participant?.id ?? (data.participants?.length === 1 ? data.participants[0].id : null));
+        this.proofWeek = data.currentWeek > 0 ? Math.min(data.currentWeek, data.totalWeeks) : 1;
         this.loading.set(false);
       },
       error: () => {
         this.loading.set(false);
         this.error.set(true);
+      }
+    });
+  }
+
+  currentParticipant(t: any): any | null {
+    if (t?.participant) return t.participant;
+    const id = this.selectedParticipantId();
+    return t?.participants?.find((participant: any) => participant.id === id) ?? null;
+  }
+
+  getParticipantAmount(t: any): number {
+    return this.currentParticipant(t)?.weeklyAmount ?? t?.weeklyAmount ?? 0;
+  }
+
+  onProofSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.selectedProofFile = input.files?.[0] ?? null;
+  }
+
+  submitPaymentProof() {
+    if (!this.selectedProofFile || !this.selectedParticipantId() || this.proofProcessing()) return;
+
+    this.proofProcessing.set(true);
+    this.tandaService.submitPaymentProof(this.accessToken, this.proofWeek, this.selectedProofFile).subscribe({
+      next: (result) => {
+        this.proofProcessing.set(false);
+        this.selectedProofFile = null;
+        this.showToast(result.amount != null
+          ? `Comprobante recibido: $${Number(result.amount).toFixed(2)}. Revisaremos los datos ✨`
+          : 'Comprobante recibido. Revisaremos los datos ✨');
+        this.loadTanda(this.accessToken);
+      },
+      error: (err) => {
+        this.proofProcessing.set(false);
+        this.showToast(err.error?.message || 'No se pudo enviar el comprobante');
       }
     });
   }

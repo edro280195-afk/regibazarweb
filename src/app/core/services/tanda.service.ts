@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 import { 
   TandaDto, CreateTandaDto, AddParticipantDto, 
   RegisterPaymentDto, TandaParticipantDto, TandaPaymentDto,
-  TandaProductDto
+  TandaProductDto, VerifyTandaPaymentDto, CreateTandaParticipantItemDto
 } from '../models';
 
 @Injectable({
@@ -51,6 +51,21 @@ export class TandaService {
   // ── Pagos ──
   registerPayment(dto: RegisterPaymentDto): Observable<TandaPaymentDto> {
     return this.http.post<TandaPaymentDto>(`${this.base}/payments`, dto);
+  }
+
+  verifyPayment(paymentId: string, dto: VerifyTandaPaymentDto): Observable<TandaPaymentDto> {
+    return this.http.patch<TandaPaymentDto>(`${this.base}/payments/${paymentId}/verification`, dto);
+  }
+
+  replaceParticipantItems(participantId: string, items: CreateTandaParticipantItemDto[]): Observable<any> {
+    return this.http.put(`${this.base}/participants/${participantId}/items`, { items });
+  }
+
+  submitPaymentProof(token: string, weekNumber: number, file: File): Observable<any> {
+    const form = new FormData();
+    form.append('weekNumber', String(weekNumber));
+    form.append('proof', file, file.name);
+    return this.http.post(`${environment.apiUrl}/public-tanda/${token}/payment/proof`, form);
   }
 
   deletePayment(paymentId: string): Observable<any> {

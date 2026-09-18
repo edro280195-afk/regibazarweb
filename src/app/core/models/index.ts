@@ -1216,6 +1216,7 @@ export interface TandaParticipantDto {
     tandaId: string;
     customerId: number;
     customerName?: string;
+    publicToken: string;
     assignedTurn: number;
     weeklyAmount?: number;
     isDelivered: boolean;
@@ -1223,6 +1224,19 @@ export interface TandaParticipantDto {
     status: string; // Active, Delinquent, Completed
     variant?: string;
     payments?: TandaPaymentDto[];
+    items?: TandaParticipantItemDto[];
+}
+
+export interface TandaParticipantItemDto {
+    id: string;
+    participantId: string;
+    productId?: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    weeklyAmount?: number;
+    lineTotal: number;
+    variant?: string;
 }
 
 export interface TandaPaymentDto {
@@ -1232,6 +1246,12 @@ export interface TandaPaymentDto {
     amountPaid: number;
     penaltyPaid: number;
     paymentDate: string;
+    depositDate?: string;
+    ocrAmount?: number;
+    proofUrl?: string;
+    ocrText?: string;
+    ocrConfidence?: number;
+    paymentMethod?: string;
     isVerified: boolean;
     notes?: string;
 }
@@ -1245,6 +1265,7 @@ export interface TandaViewDto {
     startDate: string;
     currentWeek: number;
     participants: TandaParticipantViewDto[];
+    participant?: TandaParticipantViewDto;
 }
 
 export interface TandaParticipantViewDto {
@@ -1257,6 +1278,9 @@ export interface TandaParticipantViewDto {
     isWinnerThisWeek: boolean;
     isDelivered: boolean;
     variant?: string;
+    publicToken: string;
+    items: TandaParticipantItemDto[];
+    payments: TandaPaymentDto[];
 }
 
 export interface CreateTandaDto {
@@ -1274,6 +1298,16 @@ export interface CreateTandaParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    items?: CreateTandaParticipantItemDto[];
+}
+
+export interface CreateTandaParticipantItemDto {
+    productId?: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    weeklyAmount?: number;
+    variant?: string;
 }
 
 export interface AddParticipantDto {
@@ -1282,6 +1316,7 @@ export interface AddParticipantDto {
     assignedTurn: number;
     variant?: string;
     weeklyAmount?: number;
+    items?: CreateTandaParticipantItemDto[];
 }
 
 export interface RegisterPaymentDto {
@@ -1289,6 +1324,13 @@ export interface RegisterPaymentDto {
     weekNumber: number;
     amountPaid: number;
     penaltyPaid?: number;
+    notes?: string;
+}
+
+export interface VerifyTandaPaymentDto {
+    isVerified: boolean;
+    amountPaid?: number;
+    depositDate?: string;
     notes?: string;
 }
 
@@ -1466,4 +1508,3 @@ export interface TandaShuffleResultDto {
     turnAssignments: TandaTurnAssignmentDto[];
     shuffleDate: string;
 }
-
