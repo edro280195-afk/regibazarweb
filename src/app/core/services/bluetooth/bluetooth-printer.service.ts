@@ -42,6 +42,21 @@ export class BluetoothPrinterService {
         return Capacitor.isNativePlatform();
     }
 
+    /**
+     * Pedido best-effort al iniciar la app, para no interrumpir con el diálogo
+     * de permiso justo cuando ya se quiere imprimir. Si la usuaria lo niega
+     * aquí, el error real (con mensaje claro) aparece recién cuando de verdad
+     * intente escanear o imprimir.
+     */
+    async requestPermissions(): Promise<void> {
+        if (!this.isSupported()) return;
+        try {
+            await this.ensureReady();
+        } catch {
+            // silencioso a propósito
+        }
+    }
+
     getPairedPrinter(): PairedPrinter | null {
         const deviceId = localStorage.getItem(PRINTER_DEVICE_ID_KEY);
         const name = localStorage.getItem(PRINTER_NAME_KEY);
