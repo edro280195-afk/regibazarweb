@@ -17,6 +17,7 @@ function createParticipant(id: string, assignedTurn: number): TandaParticipantDt
     expectedAmount: 1000,
     collectedAmount: 0,
     balanceDue: 1000,
+    items: [],
     paidInstallments: 0,
     payments: []
   };
