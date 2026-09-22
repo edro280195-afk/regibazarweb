@@ -7,6 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
+import { BluetoothPrinterService } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
 import { gsap } from 'gsap';
@@ -693,6 +694,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 export class OrdersComponent implements OnInit {
   private api = inject(ApiService);
   private labelPrint = inject(LabelPrintService);
+  private bluetoothPrinter = inject(BluetoothPrinterService);
   private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
   private couponService = inject(CouponService);
@@ -1365,12 +1367,28 @@ export class OrdersComponent implements OnInit {
           this.loadPackages(order.id);
         }
         this.toast.success(`${createdPackages.length} bolsa${createdPackages.length === 1 ? '' : 's'} creada${createdPackages.length === 1 ? '' : 's'} con QR 🛍️`);
+        this.autoPrintPackages(createdPackages);
       },
       error: () => {
         this.savingQuickBags.set(false);
         this.toast.error('No se pudieron generar las bolsas 🥺');
       }
     });
+  }
+
+  /**
+   * Imprime las bolsas recién creadas sin pedir confirmación, solo cuando ya
+   * hay una impresora Bluetooth emparejada (Centro de impresión → Ajustes).
+   * Sin impresora emparejada no hace nada: no queremos abrir el diálogo de
+   * impresión del sistema como efecto secundario sorpresa de generar bolsas.
+   */
+  private async autoPrintPackages(packages: OrderPackageDto[]): Promise<void> {
+    if (!packages.length || !this.bluetoothPrinter.getPairedPrinter()) return;
+    try {
+      await this.labelPrint.printPackages(packages.map(pkg => pkg.id));
+    } catch (error) {
+      this.toast.error(`No pudimos imprimir las etiquetas automáticamente: ${this.labelPrintError(error)}`);
+    }
   }
 
   /** Marca que el pedido se entrega sin bolsas físicas. */

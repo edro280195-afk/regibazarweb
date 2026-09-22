@@ -19,6 +19,7 @@ import { LabelDesignIssue, LabelDesignService } from '../../../core/services/lab
 import { LabelRendererService } from '../../../core/services/label-renderer.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { BluetoothPrinterService, PairedPrinter } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { alignSelection, distributeSelection } from './label-layout.util';
 
 type SidebarTab = 'elements' | 'fields' | 'images' | 'layers' | 'properties';
@@ -112,6 +113,39 @@ interface TemplateStarter {
                         </div>
                     }
                 </section>
+
+                @if (bluetoothSupported) {
+                    <section class="library-card printer-card" aria-label="Impresora Bluetooth">
+                        <div class="library-heading">
+                            <div>
+                                <p class="eyebrow">IMPRESORA</p>
+                                <h3>🖨️ AIYIN E40 Pro por Bluetooth</h3>
+                            </div>
+                        </div>
+
+                        @if (pairedPrinter(); as printer) {
+                            <div class="printer-status">
+                                <span>Conectada: <strong>{{ printer.name }}</strong></span>
+                                <button type="button" class="secondary-action" (click)="forgetBluetoothPrinter()">Olvidar</button>
+                            </div>
+                        } @else {
+                            <p class="panel-copy">Conecta tu impresora una vez y las etiquetas de bolsa saldrán solas al generarlas, sin diálogo de impresión.</p>
+                            <button type="button" class="primary-action" [disabled]="isScanningPrinters()" (click)="scanBluetoothPrinters()">
+                                {{ isScanningPrinters() ? 'Buscando…' : 'Buscar impresoras' }}
+                            </button>
+                            @if (discoveredPrinters().length > 0) {
+                                <div class="existing-list">
+                                    @for (printer of discoveredPrinters(); track printer.deviceId) {
+                                        <button type="button" class="existing-template" (click)="selectBluetoothPrinter(printer)">
+                                            <span><strong>{{ printer.name }}</strong></span>
+                                            <span class="template-status">Conectar</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        }
+                    </section>
+                }
             } @else {
                 <section class="editor-shell" [class.mobile-panel-open]="mobilePanelOpen()">
                     <aside class="tool-rail" aria-label="Herramientas del diseñador">
@@ -494,6 +528,7 @@ interface TemplateStarter {
         .starter-card::after { content:''; position:absolute; right:-45px; bottom:-60px; width:160px; height:160px; border-radius:50%; background:color-mix(in srgb,var(--accent) 18%,transparent); }
         .starter-card h4 { position:relative; z-index:1; margin:.8rem 0 .45rem; font-size:1.25rem; } .starter-card p { position:relative; z-index:1; color:#79556a; line-height:1.45; font-size:.86rem; } .starter-size { position:relative; z-index:1; align-self:flex-start; padding:.28rem .55rem; border-radius:999px; background:white; color:#7a3157; font-size:.68rem; font-weight:750; }
         .card-action { position:relative; z-index:1; min-height:42px; align-self:flex-start; margin-top:auto; border:1px solid var(--accent); border-radius:11px; padding:.5rem .75rem; color:#642442; background:white; font-weight:750; font-size:.78rem; }
+        .printer-card { margin-top:1rem; } .printer-status { display:flex; align-items:center; justify-content:space-between; gap:1rem; color:#4e263a; font-size:.82rem; }
         .existing-list { margin-top:1.6rem; border-top:1px solid #f0d9e4; padding-top:1.1rem; } .existing-title { color:#83536c; font-size:.78rem; font-weight:700; } .existing-template { width:100%; display:flex; justify-content:space-between; align-items:center; gap:1rem; text-align:left; padding:.85rem .2rem; border:0; border-bottom:1px solid #f6e5ec; color:#4e263a; background:transparent; } .existing-template strong, .existing-template small { display:block; } .existing-template small { margin-top:.18rem; color:#94627b; font-size:.72rem; } .template-status { padding:.32rem .55rem; border-radius:999px; color:#7d2854; background:#fce6f0; font-size:.67rem; font-weight:750; white-space:nowrap; } .template-status.unpublished { color:#7a6070; background:#f5eef1; } .template-status.default-template, .default-chip { color:#5f3c08; background:#fff2c9; } .default-chip { display:inline-block; margin-left:.35rem; padding:.16rem .36rem; border-radius:999px; font-size:.57rem; font-weight:800; }
         .editor-shell { position:relative; display:grid; grid-template-columns:74px 250px minmax(0,1fr) 270px; min-height:710px; overflow:hidden; border-radius:24px; }
         .tool-rail { padding:.7rem .45rem; display:flex; flex-direction:column; gap:.35rem; border-right:1px solid #f0d9e4; background:rgba(253,239,246,.72); } .tool-rail button { min-height:51px; border:1px solid transparent; border-radius:12px; color:#83536c; background:transparent; font-size:.7rem; font-weight:750; } .tool-rail button.active { border-color:#e8b4cc; color:#8e2155; background:#fff; box-shadow:0 7px 18px rgba(144,45,85,.10); }
@@ -521,6 +556,7 @@ export class LabelDesignerComponent {
     private readonly designService = inject(LabelDesignService);
     private readonly renderer = inject(LabelRendererService);
     private readonly labelPrint = inject(LabelPrintService);
+    private readonly bluetoothPrinter = inject(BluetoothPrinterService);
     private readonly destroyRef = inject(DestroyRef);
     private autosaveTimer: number | null = null;
     private pointerState: PointerState | null = null;
@@ -561,6 +597,11 @@ export class LabelDesignerComponent {
     readonly inlineEditingElementId = signal<string | null>(null);
     readonly inlineTextValue = signal('');
 
+    readonly bluetoothSupported = this.bluetoothPrinter.isSupported();
+    readonly pairedPrinter = signal<PairedPrinter | null>(null);
+    readonly isScanningPrinters = signal(false);
+    readonly discoveredPrinters = signal<PairedPrinter[]>([]);
+
     readonly selectedElement = computed(() => this.design().elements.find(element => element.id === this.selectedElementId()) ?? null);
     readonly selectedElements = computed(() => {
         const selectedIds = new Set(this.selectedElementIds());
@@ -584,6 +625,40 @@ export class LabelDesignerComponent {
 
     constructor() {
         this.loadLibrary();
+        this.pairedPrinter.set(this.bluetoothPrinter.getPairedPrinter());
+    }
+
+    async scanBluetoothPrinters(): Promise<void> {
+        if (this.isScanningPrinters()) return;
+        this.isScanningPrinters.set(true);
+        this.discoveredPrinters.set([]);
+        try {
+            const printers = await this.bluetoothPrinter.scanForPrinters();
+            this.discoveredPrinters.set(printers);
+            if (!printers.length) {
+                this.toast.error('No encontramos impresoras cerca. Enciéndela y acércala al dispositivo.');
+            }
+        } catch (error) {
+            this.toast.error(this.bluetoothErrorMessage(error));
+        } finally {
+            this.isScanningPrinters.set(false);
+        }
+    }
+
+    selectBluetoothPrinter(printer: PairedPrinter): void {
+        this.bluetoothPrinter.pairPrinter(printer);
+        this.pairedPrinter.set(printer);
+        this.discoveredPrinters.set([]);
+        this.toast.success(`Impresora conectada: ${printer.name}`);
+    }
+
+    forgetBluetoothPrinter(): void {
+        this.bluetoothPrinter.forgetPrinter();
+        this.pairedPrinter.set(null);
+    }
+
+    private bluetoothErrorMessage(error: unknown): string {
+        return error instanceof Error && error.message ? error.message : 'No pudimos buscar impresoras Bluetooth.';
     }
 
     templateFor(kind: LabelTemplateKind): LabelTemplateSummaryDto | undefined {

@@ -8,6 +8,7 @@ import {
 import { ApiService } from './api.service';
 import { LabelDesignService } from './label-design.service';
 import { LabelRendererService } from './label-renderer.service';
+import { BluetoothPrinterService } from './bluetooth/bluetooth-printer.service';
 
 export type LabelOutputMethod = 'browser' | 'download' | 'share';
 
@@ -16,6 +17,12 @@ export class LabelPrintService {
     private readonly api = inject(ApiService);
     private readonly designService = inject(LabelDesignService);
     private readonly renderer = inject(LabelRendererService);
+    private readonly bluetoothPrinter = inject(BluetoothPrinterService);
+
+    /** Solo la AIYIN E40 (bolsas) tiene impresión Bluetooth directa por ahora; NIIMBOT sigue por el diálogo del SO. */
+    private canPrintViaBluetooth(profile: 'NiimbotB1_50x50' | 'AiyinE40_4x6'): boolean {
+        return profile === 'AiyinE40_4x6' && this.bluetoothPrinter.isSupported() && !!this.bluetoothPrinter.getPairedPrinter();
+    }
 
     async printBox(boxId: string, method: LabelOutputMethod = 'browser'): Promise<void> {
         await this.printTarget('InventoryBox', boxId, method);
@@ -50,18 +57,29 @@ export class LabelPrintService {
             });
         }));
 
+        const printerProfile = contexts[0].template.printerProfile;
+        const viaBluetooth = this.canPrintViaBluetooth(printerProfile);
+
         await Promise.all(contexts.map(context => {
             const event: CreateLabelPrintEventDto = {
                 labelTemplateVersionId: context.template.versionId,
                 targetKind: 2,
                 targetId: context.targetId,
                 printerProfile: context.template.printerProfile === 'NiimbotB1_50x50' ? 0 : 1,
-                method: 0,
+                method: viaBluetooth ? 2 : 0, // 2 = LabelPrintMethod.NativeBluetooth (ver backend)
                 copies: 1
             };
             return firstValueFrom(this.api.createLabelPrintEvent(event));
         }));
-        await this.renderer.printManyInBrowser(canvases, contexts[0].template.printerProfile, 'Etiquetas de bolsas · Regi Bazar');
+
+        if (viaBluetooth) {
+            const profileSpec = this.renderer.getProfile(printerProfile);
+            for (const canvas of canvases) {
+                await this.bluetoothPrinter.printCanvas(canvas, profileSpec);
+            }
+            return;
+        }
+        await this.renderer.printManyInBrowser(canvases, printerProfile, 'Etiquetas de bolsas · Regi Bazar');
     }
 
     async renderDraft(
@@ -96,12 +114,13 @@ export class LabelPrintService {
             monochrome: true
         });
 
+        const viaBluetooth = method === 'browser' && this.canPrintViaBluetooth(context.template.printerProfile);
         const event: CreateLabelPrintEventDto = {
             labelTemplateVersionId: context.template.versionId,
             targetKind: this.kindValue(kind),
             targetId,
             printerProfile: context.template.printerProfile === 'NiimbotB1_50x50' ? 0 : 1,
-            method: this.methodValue(method),
+            method: viaBluetooth ? 2 : this.methodValue(method), // 2 = LabelPrintMethod.NativeBluetooth (ver backend)
             copies: 1
         };
         await firstValueFrom(this.api.createLabelPrintEvent(event));
@@ -109,6 +128,10 @@ export class LabelPrintService {
         const title = `${this.kindLabel(kind)} · Regi Bazar`;
         if (method === 'download') {
             this.renderer.downloadPng(canvas, title);
+            return;
+        }
+        if (viaBluetooth) {
+            await this.bluetoothPrinter.printCanvas(canvas, this.renderer.getProfile(context.template.printerProfile));
             return;
         }
         if (method === 'share') {
