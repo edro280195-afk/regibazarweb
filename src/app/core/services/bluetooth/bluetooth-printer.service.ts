@@ -93,9 +93,11 @@ export class BluetoothPrinterService {
         }
         await this.ensureReady();
 
+        console.log('[BluetoothPrinter] escaneando…');
         const found = new Map<string, PairedPrinter>();
         await BleClient.requestLEScan({}, result => {
             const name = (result.device.name ?? result.localName ?? '').trim();
+            console.log(`[BluetoothPrinter] visto: "${name || '(sin nombre)'}" (${result.device.deviceId})`);
             if (name && this.isAiyinName(name)) {
                 found.set(result.device.deviceId, { deviceId: result.device.deviceId, name });
             }
@@ -103,6 +105,7 @@ export class BluetoothPrinterService {
         await new Promise(resolve => setTimeout(resolve, timeoutMs));
         await BleClient.stopLEScan();
 
+        console.log(`[BluetoothPrinter] fin del escaneo, ${found.size} impresora(s) AIYIN encontrada(s)`);
         return Array.from(found.values()).sort((a, b) => a.name.localeCompare(b.name));
     }
 
@@ -135,7 +138,9 @@ export class BluetoothPrinterService {
             try {
                 await BleClient.initialize();
                 this.initialized = true;
-            } catch {
+                console.log('[BluetoothPrinter] BLE inicializado');
+            } catch (error) {
+                console.error('[BluetoothPrinter] BleClient.initialize() falló:', error);
                 throw new BluetoothPrintError(
                     'Regi Bazar necesita permiso de Bluetooth para conectar la impresora. Actívalo en los ajustes del teléfono.',
                     'permission_denied'
@@ -149,7 +154,8 @@ export class BluetoothPrinterService {
         if (Capacitor.getPlatform() === 'android') {
             try {
                 await BleClient.requestEnable();
-            } catch {
+            } catch (error) {
+                console.error('[BluetoothPrinter] requestEnable() falló:', error);
                 throw new BluetoothPrintError('Activa Bluetooth para conectar la impresora.', 'bluetooth_disabled');
             }
         } else {
@@ -163,10 +169,13 @@ export class BluetoothPrinterService {
      * dos veces si una parte del comando ya llegó a la impresora.
      */
     private async sendCommand(printer: PairedPrinter, command: Uint8Array): Promise<void> {
+        console.log(`[BluetoothPrinter] enviando comando de ${command.length} bytes a ${printer.name} (${printer.deviceId})`);
         await this.withConnectRetry(() => this.getOrOpenConnection(printer));
         try {
             await this.writeInChunks(printer.deviceId, command);
+            console.log('[BluetoothPrinter] comando enviado completo');
         } catch (error) {
+            console.error('[BluetoothPrinter] falló el envío del comando:', error);
             await this.discardConnection(printer.deviceId);
             throw error instanceof BluetoothPrintError
                 ? error
@@ -182,11 +191,15 @@ export class BluetoothPrinterService {
         if (this.connectedDeviceId === printer.deviceId) return;
         if (this.connectedDeviceId) await this.discardConnection(this.connectedDeviceId);
 
+        console.log(`[BluetoothPrinter] conectando a ${printer.name} (${printer.deviceId})…`);
         try {
             await BleClient.connect(printer.deviceId, deviceId => {
+                console.warn(`[BluetoothPrinter] la impresora se desconectó (${deviceId})`);
                 if (this.connectedDeviceId === deviceId) this.connectedDeviceId = null;
             });
-        } catch {
+            console.log('[BluetoothPrinter] conectado');
+        } catch (error) {
+            console.error('[BluetoothPrinter] connect() falló:', error);
             throw new BluetoothPrintError(
                 'No encontramos la impresora. Enciéndela y acércala al teléfono.',
                 'device_not_found'
@@ -195,18 +208,21 @@ export class BluetoothPrinterService {
 
         try {
             const services = await BleClient.getServices(printer.deviceId);
+            console.log('[BluetoothPrinter] servicios GATT:', services.map(s => s.uuid));
             const hasPrintCharacteristic = services.some(
                 service =>
                     service.uuid.toLowerCase() === SERVICE_UUID &&
                     service.characteristics.some(characteristic => characteristic.uuid.toLowerCase() === WRITE_CHARACTERISTIC_UUID)
             );
             if (!hasPrintCharacteristic) {
+                console.error(`[BluetoothPrinter] no se encontró el servicio ${SERVICE_UUID} / característica ${WRITE_CHARACTERISTIC_UUID}`);
                 throw new BluetoothPrintError(
                     'Esta impresora no tiene el servicio de impresión Bluetooth esperado.',
                     'characteristic_not_found'
                 );
             }
         } catch (error) {
+            console.error('[BluetoothPrinter] descubrimiento de servicios falló:', error);
             await this.discardConnection(printer.deviceId);
             throw error instanceof BluetoothPrintError
                 ? error
@@ -224,15 +240,19 @@ export class BluetoothPrinterService {
             // se usa el valor por defecto conservador
         }
         const chunkSize = Math.min(512, Math.max(20, mtu - 3));
+        console.log(`[BluetoothPrinter] mtu=${mtu} chunkSize=${chunkSize} total=${command.length} bytes`);
 
         let offset = 0;
+        let chunkIndex = 0;
         while (offset < command.length) {
             const end = Math.min(offset + chunkSize, command.length);
             const chunk = command.subarray(offset, end);
             const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
             await BleClient.writeWithoutResponse(deviceId, SERVICE_UUID, WRITE_CHARACTERISTIC_UUID, view);
+            chunkIndex++;
             offset = end;
         }
+        console.log(`[BluetoothPrinter] ${chunkIndex} chunk(s) escritos`);
     }
 
     private async discardConnection(deviceId: string): Promise<void> {
