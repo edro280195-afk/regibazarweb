@@ -47,18 +47,21 @@ export class LabelPrintService {
             Promise.all(packageIds.map(packageId => firstValueFrom(this.api.getPackageLabelPrintContext(template.id, packageId))))
         ]);
         const assetUrls = new Map(assets.map(asset => [asset.id, asset.url]));
+        const printerProfile = contexts[0].template.printerProfile;
+        const viaBluetooth = this.canPrintViaBluetooth(printerProfile);
+        // La impresión BLE manda el bitmap dot-por-dot al cabezal (203 dpi real);
+        // el escalado 1.5x es solo para nitidez en pantalla/impresión del SO, que
+        // sí reescala la imagen al tamaño físico declarado. Si se reusa ese mismo
+        // canvas para BLE, la etiqueta sale ~1.5x más grande de lo debido.
         const canvases = await Promise.all(contexts.map(async context => {
             const design = this.designService.parseDesign(context.template.designJson);
             return this.renderer.render(design, context.template.printerProfile, {
                 data: context.data,
                 assetUrls,
-                scale: 1.5,
+                scale: viaBluetooth ? 1 : 1.5,
                 monochrome: true
             });
         }));
-
-        const printerProfile = contexts[0].template.printerProfile;
-        const viaBluetooth = this.canPrintViaBluetooth(printerProfile);
 
         await Promise.all(contexts.map(context => {
             const event: CreateLabelPrintEventDto = {
@@ -107,14 +110,16 @@ export class LabelPrintService {
         const context = await this.loadContext(kind, template.id, targetId);
         const assets = await firstValueFrom(this.api.getLabelAssets());
         const design = this.designService.parseDesign(context.template.designJson);
+        const viaBluetooth = method === 'browser' && this.canPrintViaBluetooth(context.template.printerProfile);
+        // Ver comentario equivalente en printPackages: el canvas para BLE debe
+        // quedar a la resolución nativa del cabezal, sin el supersampleo 1.5x
+        // que solo sirve para nitidez en pantalla/impresión del SO.
         const canvas = await this.renderer.render(design, context.template.printerProfile, {
             data: context.data,
             assetUrls: new Map(assets.map(asset => [asset.id, asset.url])),
-            scale: 1.5,
+            scale: viaBluetooth ? 1 : 1.5,
             monochrome: true
         });
-
-        const viaBluetooth = method === 'browser' && this.canPrintViaBluetooth(context.template.printerProfile);
         const event: CreateLabelPrintEventDto = {
             labelTemplateVersionId: context.template.versionId,
             targetKind: this.kindValue(kind),
