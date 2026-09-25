@@ -39,16 +39,16 @@ import { EChartsOption } from 'echarts';
       <!-- Filters Panel -->
       <div class="card-coquette p-6 border-pink-100 bg-white/60 backdrop-blur-md sticky top-0 z-30 shadow-sm animate-slide-up">
         <div class="flex flex-wrap gap-6 items-end">
-          <div class="flex-1 min-w-[200px]">
+          <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette text-pink-800 font-bold mb-2 block text-xs tracking-widest uppercase">📅 Rango Personalizado</label>
-            <div class="flex items-center gap-2 group">
+            <div class="flex flex-col gap-2 group sm:flex-row sm:items-center">
               <input type="date" class="input-coquette flex-1 shadow-inner focus:ring-pink-300 transition-all border-pink-50" [(ngModel)]="startDate" (change)="onDateChange()" />
               <span class="text-pink-200 font-black">/</span>
               <input type="date" class="input-coquette flex-1 shadow-inner focus:ring-pink-300 transition-all border-pink-50" [(ngModel)]="endDate" (change)="onDateChange()" />
             </div>
           </div>
           
-          <div class="min-w-[240px]">
+          <div class="w-full min-w-0 md:min-w-[240px] md:flex-1">
             <label class="label-coquette text-pink-800 font-bold mb-2 block text-xs tracking-widest uppercase">✂️ Por Corte de Venta</label>
             <select class="input-coquette w-full bg-white/50 border-pink-50" (change)="onPeriodChange($any($event.target).value)">
               <option value="">Selecciona un corte...</option>
@@ -58,8 +58,8 @@ import { EChartsOption } from 'echarts';
             </select>
           </div>
 
-          <div class="flex gap-2">
-            <button class="btn-coquette btn-pink h-[42px] px-8 flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg active:shadow-inner" 
+          <div class="flex w-full flex-wrap gap-2 sm:w-auto">
+            <button class="btn-coquette btn-pink flex-1 h-[42px] px-4 sm:flex-none sm:px-8 flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg active:shadow-inner"
                     [disabled]="loading()"
                     (click)="loadReport()">
               @if(loading()){ <span class="animate-spin text-xl">🦄</span> }
@@ -67,7 +67,7 @@ import { EChartsOption } from 'echarts';
               <span class="font-black text-xs uppercase tracking-tighter">Consultar</span>
             </button>
 
-            <button (click)="exportToExcel()" class="btn-coquette bg-green-500 text-white h-[42px] px-4 hover:bg-green-600 shadow-md group">
+            <button (click)="exportToExcel()" class="btn-coquette flex-1 bg-green-500 text-white h-[42px] px-4 hover:bg-green-600 shadow-md group sm:flex-none">
               <span class="group-hover:scale-110 transition-transform block italic font-black">📥 XL</span>
             </button>
           </div>
@@ -237,7 +237,7 @@ import { EChartsOption } from 'echarts';
                   + Registrar Gasto
                 </button>
               </div>
-              <div class="overflow-x-auto">
+              <div class="hidden md:block overflow-x-auto">
                 <table class="table-coquette">
                   <thead>
                     <tr>
@@ -268,6 +268,37 @@ import { EChartsOption } from 'echarts';
                     }
                   </tbody>
                 </table>
+              </div>
+              <div class="md:hidden space-y-3">
+                @for (exp of report()!.details.expenses; track exp.id) {
+                  <article class="rounded-2xl border border-amber-100 bg-white/80 p-4 shadow-sm">
+                    <div class="flex min-w-0 items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <h4 class="break-words text-sm font-black text-amber-900">{{ exp.expenseType }}</h4>
+                        <p class="mt-1 text-[11px] font-bold text-pink-400">{{ exp.date | date:'dd/MM/yyyy' }}</p>
+                      </div>
+                      <button (click)="deleteExpense(exp.id)" aria-label="Eliminar gasto"
+                              class="min-h-11 min-w-11 shrink-0 rounded-xl bg-rose-50 text-lg text-red-500">
+                        🗑️
+                      </button>
+                    </div>
+                    <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div class="min-w-0 rounded-xl bg-amber-50/70 p-2">
+                        <p class="text-[9px] font-bold uppercase text-amber-400">Ruta</p>
+                        <p class="break-words font-bold text-amber-700">{{ exp.routeName || 'General' }}</p>
+                      </div>
+                      <div class="min-w-0 rounded-xl bg-amber-50/70 p-2">
+                        <p class="text-[9px] font-bold uppercase text-amber-400">Monto</p>
+                        <p class="break-words font-black text-amber-900">{{ exp.amount | currency:'MXN' }}</p>
+                      </div>
+                    </div>
+                    @if (exp.notes) {
+                      <p class="mt-3 break-words text-xs italic text-amber-500">{{ exp.notes }}</p>
+                    }
+                  </article>
+                } @empty {
+                  <p class="py-10 text-center text-sm italic text-amber-400">No hay gastos en este periodo</p>
+                }
               </div>
             </div>
           </div>
@@ -307,7 +338,7 @@ import { EChartsOption } from 'echarts';
                 </select>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label class="label-coquette text-[10px]">🏷️ Tipo</label>
                   <select class="input-coquette" [(ngModel)]="expenseForm.expenseType">

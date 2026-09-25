@@ -115,7 +115,8 @@ Chart.register(...registerables);
           </div>
 
           <!-- Pending Amount -->
-          <div class="kpi-card card-coquette p-5 relative overflow-hidden group opacity-0 translate-y-10">
+          <a routerLink="/admin/reports" [queryParams]="{ tab: 'porCobrar' }"
+             class="kpi-card card-coquette p-5 relative overflow-hidden group opacity-0 translate-y-10 block cursor-pointer hover:-translate-y-1 transition-transform">
             <div class="absolute top-0 right-0 w-20 h-20 bg-amber-100 rounded-full -translate-y-6 translate-x-6 group-hover:scale-150 transition-transform duration-500"></div>
             <div class="relative">
               <div class="flex items-center gap-2 mb-3">
@@ -126,8 +127,11 @@ Chart.register(...registerables);
                 <span class="text-2xl font-medium">$</span>
                 <span class="count-val" [attr.data-value]="data()?.pendingAmount">0</span>
               </p>
+              <p class="text-[10px] font-bold text-amber-400 mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                Ver lista para cobrar →
+              </p>
             </div>
-          </div>
+          </a>
         </div>
 
         <!-- Active Period Card -->
@@ -228,7 +232,7 @@ Chart.register(...registerables);
               </div>
               <div class="text-center p-3 rounded-xl bg-purple-50 border border-purple-100">
                 <p class="text-2xl font-bold text-purple-700">{{ data()!.totalDepositOrders }}</p>
-                <p class="text-xs text-purple-500 font-medium">💳 Depósito</p>
+                <p class="text-xs text-purple-500 font-medium">💳 Otros</p>
                 <p class="text-sm font-semibold text-purple-600">{{ data()!.totalDepositAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
               </div>
             </div>

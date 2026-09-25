@@ -101,7 +101,7 @@ interface Participant {
                                 @if (spinning()) {
                                     ⚡ ¡MUCHA SUERTE!
                                 } @else {
-                                    ✨ ¡INICIAR SORTEO!
+                                    {{ turnNumbers().length > 0 ? '✨ ¡MOSTRAR LUGARES!' : '✨ ¡INICIAR SORTEO!' }}
                                 }
                             </span>
                         </button>
@@ -116,7 +116,7 @@ interface Participant {
                         <div class="sparkles-bg"></div>
                         <p class="winner-badge">
                            @if (currentWinnerNames().length > 1) {
-                              Turno asignado # {{ currentWinnerIndex() + 1 }}
+                              Lugar asignado # {{ getTurnNumber(currentWinnerIndex()) }}
                            } @else {
                               🏆 ¡TENEMOS GANADORA! 🏆
                            }
@@ -138,12 +138,14 @@ interface Participant {
                     <div class="summary-card">
                         <div class="sparkles-bg"></div>
                         <p class="winner-badge mb-2">✨ RESULTADO FINAL ✨</p>
-                        <h3 class="summary-title mb-6">Todos los lugares han sido asignados</h3>
+                        <h3 class="summary-title mb-6">
+                            {{ turnNumbers().length > 0 ? 'Orden de lugares definido al crear la tanda' : 'Todos los lugares han sido asignados' }}
+                        </h3>
                         
                         <div class="summary-list scrollbar-hide">
                             @for (name of currentWinnerNames(); track $index) {
                                 <div class="summary-item">
-                                    <div class="turn-bubble">#{{ $index + 1 }}</div>
+                                    <div class="turn-bubble">#{{ getTurnNumber($index) }}</div>
                                     <div class="name-label">{{ name }}</div>
                                 </div>
                             }
@@ -368,7 +370,7 @@ interface Participant {
             }
             .main-title {
                 color: white;
-                font-size: 4rem;
+                font-size: clamp(2.2rem, 8vw, 4rem);
                 font-weight: 900;
                 margin-top: 0.5rem;
                 text-shadow: 0 0 20px rgba(236, 72, 153, 0.5);
@@ -376,7 +378,8 @@ interface Participant {
             
             .animation-workspace {
                 width: 100%;
-                height: 500px;
+                min-height: 0;
+                height: min(500px, 70vw);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -385,8 +388,9 @@ interface Participant {
             /* Roulette Styles */
             .roulette-container {
                 position: relative;
-                width: 500px;
-                height: 500px;
+                width: min(500px, 100%);
+                height: auto;
+                aspect-ratio: 1;
             }
             .roulette-pointer {
                 position: absolute;
@@ -444,6 +448,7 @@ interface Participant {
             /* Slot Styles */
             .slot-machine {
                 display: flex;
+                max-width: 100%;
                 gap: 1.5rem;
                 background: #111;
                 padding: 2rem;
@@ -452,7 +457,7 @@ interface Participant {
                 box-shadow: 0 0 50px rgba(236, 72, 153, 0.2);
             }
             .slot-column {
-                width: 150px;
+                width: clamp(70px, 24vw, 150px);
                 height: 250px;
                 background: black;
                 border-radius: 1.5rem;
@@ -471,6 +476,7 @@ interface Participant {
                 font-size: 1.5rem;
                 text-align: center;
                 padding: 1rem;
+                overflow-wrap: anywhere;
             }
             .slot-overlay {
                 position: absolute;
@@ -511,6 +517,15 @@ interface Participant {
             }
             .card-inner { z-index: 2; padding: 2px; text-align: center; }
             .card-name { color: white; font-weight: 700; line-height: 1; }
+
+            @media (max-width: 600px) {
+                .animation-workspace { height: min(420px, 86vw); }
+                .slot-machine { gap: .5rem; padding: .75rem; border-width: 4px; border-radius: 1.5rem; }
+                .slot-column { height: 180px; border-radius: 1rem; }
+                .slot-item { height: 180px; font-size: 1rem; padding: .5rem; }
+                .center-piece { width: 72px; height: 72px; border-width: 5px; }
+                .center-emoji { font-size: 2rem; }
+            }
             .card-x {
                 position: absolute;
                 inset: 0;
@@ -564,6 +579,7 @@ interface Participant {
 export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
     participants = input<Participant[]>([]);
     winnerNames = input<string[]>([]);
+    turnNumbers = input<number[]>([]);
     animationType = input<'roulette' | 'slot' | 'elimination' | 'confetti'>('roulette');
     rouletteColors = input<string[]>(['#ec4899', '#be185d', '#831843', '#fbbf24', '#f472b6']);
     isPreview = input<boolean>(false);
@@ -874,10 +890,9 @@ export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
     setWinnerAndStart(winnerNames: string[]) {
         this.currentWinnerNames.set(winnerNames);
         this.currentWinnerIndex.set(0);
-        
-        if (this.activeParticipants().length === 0) {
-            this.activeParticipants.set([...this.participants()]);
-        }
+        this.summaryMode.set(false);
+        this.winner.set(null);
+        this.activeParticipants.set([...this.participants()]);
 
         this.spinForCurrentIndex();
     }
@@ -909,7 +924,15 @@ export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
 
     nextWinner() {
         const lastWinner = this.winner()!.name;
-        const remaining = this.activeParticipants().filter(p => p.name !== lastWinner);
+        let removed = false;
+        const remaining = this.activeParticipants().filter(participant => {
+            if (!removed && participant.name === lastWinner) {
+                removed = true;
+                return false;
+            }
+
+            return true;
+        });
         this.activeParticipants.set(remaining);
         
         this.winner.set(null);
@@ -920,6 +943,10 @@ export class RaffleAnimationComponent implements AfterViewInit, OnDestroy {
         setTimeout(() => {
             this.spinForCurrentIndex();
         }, 1500);
+    }
+
+    getTurnNumber(index: number): number {
+        return this.turnNumbers()[index] ?? index + 1;
     }
 
     private spinRouletteFinal(winnerName: string) {

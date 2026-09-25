@@ -62,6 +62,6 @@ export class RaffleService {
     }
 
     shuffleTandaTurns(id: string, dto: SelectWinnerDto): Observable<TandaShuffleResultDto> {
-        return this.http.post<TandaShuffleResultDto>(`${this.apiUrl}/raffles/${id}/shuffle-tanda`, dto);
+        return this.http.post<TandaShuffleResultDto>(`${this.apiUrl}/raffles/${id}/shuffle-tanda-turns`, dto);
     }
 }

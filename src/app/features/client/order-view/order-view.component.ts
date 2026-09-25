@@ -7,6 +7,7 @@ import { SignalRService } from '../../../core/services/signalr.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OrderSummaryDto, OrderStatus, ORDER_STATUS_LABELS, ORDER_STATUS_EMOJI } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import confetti from 'canvas-confetti';
@@ -112,10 +113,16 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               {{ greeting() }}, {{ o.clientName }}! 💖
             </h1>
             <p class="text-rose-500 font-medium mt-1">
-              @if (o.status === 'Delivered') {
-                ¡Abre tu regalito, esperamos que te encante! 🌸
+              @if (o.publicViewMode === 'DeliveredWithBalance') {
+                ¡Tu regalito ya llegó, solo falta liquidarlo! 💗
+              } @else if (o.status === 'Delivered') {
+                ¡Tu regalito llegó! Esperamos que te encante 🌸
+              } @else if (o.publicViewMode === 'Tracking') {
+                Tu pedido va en camino y puedes seguirlo aquí 🚗✨
               } @else if (o.status === 'NotDelivered') {
                 Hubo un pequeñito problema con tu entrega 💌
+              } @else if (o.status === 'Postponed') {
+                Tu entrega quedó pendiente de reprogramar 💌
               } @else {
                 Aquí está el detalle de tu compra ✨
               }
@@ -131,25 +138,55 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <!-- RegiPuntos (Gamification) -->
             <div class="mt-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-100 to-pink-100 px-4 py-1.5 rounded-full border border-pink-200 shadow-sm animate-fade-in-up group cursor-pointer hover:scale-105 transition-transform" title="¡Gana más puntos compartiendo tu foto!">
               <span class="text-lg animate-pulse-slow">💎</span>
-              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} Puntos VIP</span>
+              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} RegiPuntos</span>
             </div>
           </div>
 
-          <!-- Smart Dashboard Top Bar (Sticky) -->
-          <div id="balance-summary" class="sticky top-2 z-30 px-2 -mx-2 mb-6" [style.opacity]="isUnboxed() ? 1 : 0">
-            <div class="bg-white/95 backdrop-blur-2xl rounded-3xl p-3 shadow-md border border-pink-100 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-pink-100 flex items-center justify-center text-xl">💰</div>
-                <div>
-                  <p class="text-[9px] text-pink-500 font-black uppercase tracking-widest leading-none mb-1">Balance</p>
-                  <p class="text-xl font-black font-display text-pink-900 leading-none Irish Grover">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</p>
+          <!-- Smart Dashboard Top Bar (Sticky): permanece visible mientras exista saldo -->
+          @if (o.paymentVisible !== false && o.balanceDue > 0) {
+            <div id="balance-summary" class="sticky top-2 z-30 px-2 -mx-2 mb-4" [style.opacity]="isUnboxed() ? 1 : 0">
+              <div class="bg-white/95 backdrop-blur-2xl rounded-3xl p-3 shadow-md border border-pink-100 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-10 h-10 shrink-0 rounded-2xl bg-pink-100 flex items-center justify-center text-xl">💰</div>
+                  <div class="min-w-0">
+                    <p class="text-[9px] text-pink-500 font-black uppercase tracking-widest leading-none mb-1">
+                      @if (o.publicViewMode === 'DeliveredWithBalance') {
+                        Saldo pendiente
+                      } @else {
+                        Balance
+                      }
+                    </p>
+                    <p class="text-xl font-black font-display text-pink-900 leading-none truncate">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</p>
+                  </div>
+                </div>
+                @if (activeTab() !== 'payment') {
+                  <button (click)="activeTab.set('payment')" class="shrink-0 bg-pink-500 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg active:scale-95 transition-transform">
+                    @if (o.publicViewMode === 'DeliveredWithBalance') {
+                      Liquidar ✨
+                    } @else {
+                      Pagar ✨
+                    }
+                  </button>
+                }
+            </div>
+            </div>
+          }
+
+          @if (o.publicViewMode === 'DeliveredWithBalance') {
+            <div class="mb-6 rounded-[2rem] bg-gradient-to-r from-rose-500 via-pink-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-pink-200 animate-fade-in-up">
+              <div class="flex items-start gap-3">
+                <span class="text-3xl shrink-0">⚠️</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[10px] font-black uppercase tracking-[0.18em] text-pink-100">Pedido entregado · acción pendiente</p>
+                  <h2 class="mt-1 text-xl font-black font-display leading-tight">Tu pedido ya fue entregado</h2>
+                  <p class="mt-1 text-sm font-semibold text-white/90">Aún tienes un saldo de {{ o.balanceDue | currency:'MXN':'symbol-narrow' }} por liquidar.</p>
                 </div>
               </div>
-              @if (activeTab() !== 'payment' && (o.balanceDue > 0)) {
-                <button (click)="activeTab.set('payment')" class="bg-pink-500 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg">Pagar ✨</button>
-              }
+              <button (click)="activeTab.set('payment')" class="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-pink-600 shadow-lg active:scale-[.98] transition-transform">
+                Liquidar mi pedido ahora 💳
+              </button>
             </div>
-          </div>
+          }
 
           <!-- Quick Action Tabs -->
           <div id="nav-tabs" class="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-[2rem] mb-6 border border-white sticky top-24 z-20" [style.opacity]="isUnboxed() ? 1 : 0">
@@ -157,13 +194,15 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               <span class="text-xl">🛍️</span>
               <span class="text-[10px] font-black uppercase tracking-widest">Pedido</span>
             </button>
-            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'payment' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('payment')">
-              <span class="text-xl">💸</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Pago</span>
-            </button>
+            @if (o.paymentVisible !== false) {
+              <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'payment' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('payment')">
+                <span class="text-xl">💸</span>
+                <span class="text-[10px] font-black uppercase tracking-widest">Pago</span>
+              </button>
+            }
             <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'status' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('status')">
-              <span class="text-xl">🏠</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Estado</span>
+              <span class="text-xl">{{ o.publicViewMode === 'Tracking' ? '🚗' : '🏠' }}</span>
+              <span class="text-[10px] font-black uppercase tracking-widest">{{ o.publicViewMode === 'Tracking' ? 'Rastreo' : 'Estado' }}</span>
             </button>
           </div>
 
@@ -171,15 +210,13 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <!-- ════════════ TAB: ESTADO ════════════ -->
             <div class="animate-fade-in-up space-y-6">
               
-              <!-- C.A.M.I. AI Greeting (Movida a Widget Flotante) -->
-
               <!-- Map View (Only if InRoute) -->
-              @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.deliveriesAhead === 0 && (o.clientLatitude || clientCoords()?.lat)) {
+              @if ((o.publicViewMode === 'Tracking' || o.status === 'InRoute' || o.status === 'InTransit') && (o.clientLatitude || clientCoords()?.lat)) {
                 <div class="rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl relative h-[420px] bg-gray-100 group">
                   <div id="client-live-map" class="absolute inset-0 z-0"></div>
                   <div class="absolute top-4 inset-x-4 z-10 flex flex-col gap-2">
-                    <div class="bg-blue-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full font-black text-[10px] text-center shadow-xl border border-white/20 animate-bounce-subtle tracking-[0.2em]">
-                       ¡TU PAQUETE ESTÁ LLEGANDO! 🚗💨
+                    <div class="bg-pink-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full font-black text-[10px] text-center shadow-xl border border-white/20 animate-bounce-subtle tracking-[0.2em]">
+                       @if ((o.deliveriesAhead || 0) > 0) { TU PEDIDO VA EN CAMINO 🚗💨 } @else { ¡TU PAQUETE ESTÁ LLEGANDO! 🚗💨 }
                     </div>
                     <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-3 shadow-xl border border-pink-50 flex items-center justify-between">
                        <div class="flex items-center gap-3">
@@ -196,10 +233,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               }
 
               <!-- Queue Info -->
-              @if ((o.status === 'InRoute' || o.status === 'InTransit') && o.queuePosition) {
-                <div id="queue-info" class="bg-blue-50/80 rounded-[2rem] p-6 border border-blue-100 text-center shadow-inner">
-                  <div class="text-5xl font-black text-blue-500 font-display mb-2">{{ o.deliveriesAhead }}</div>
-                  <p class="text-[10px] font-black uppercase text-blue-400 tracking-[0.2em] mb-4">Entregas antes que la tuya</p>
+              @if ((o.publicViewMode === 'Tracking' || o.status === 'InRoute' || o.status === 'InTransit') && o.queuePosition) {
+                <div id="queue-info" class="bg-violet-50/80 rounded-[2rem] p-6 border border-violet-100 text-center shadow-inner">
+                  <div class="text-5xl font-black text-violet-500 font-display mb-2">{{ o.deliveriesAhead }}</div>
+                  <p class="text-[10px] font-black uppercase text-violet-400 tracking-[0.2em] mb-4">Entregas antes que la tuya</p>
                   <div class="flex justify-center gap-2 mb-4 h-8 items-center">
                     @for (i of getQueueDots(o); track $index) {
                       <div class="rounded-full transition-all duration-500"
@@ -213,7 +250,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                       </div>
                     }
                   </div>
-                  <p class="text-xs text-blue-800/60 font-medium">Eres la parada #{{ o.queuePosition }} de hoy 📍</p>
+                  <p class="text-xs text-violet-800/60 font-medium">Eres la parada #{{ o.queuePosition }} de hoy 📍</p>
                 </div>
               }
 
@@ -241,16 +278,120 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           <div class="w-1 flex-grow bg-gray-100 rounded-full my-2" [class.bg-pink-300]="step.done"></div>
                         }
                       </div>
-                      <div class="flex-1 pt-1.5">
-                        <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                       <div class="flex-1 pt-1.5">
+                         <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
+                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
+                       </div>
+                     </div>
+                   }
+                 </div>
+               </div>
+
+              <!-- ═══════════ EVIDENCIA DE ENTREGA ═══════════ -->
+              @if (o.status === 'Delivered') {
+                <div id="delivery-evidence" class="animate-fade-in-up space-y-4">
+                  <div class="bg-gradient-to-br from-emerald-50 via-white to-pink-50 rounded-[2.5rem] p-6 border-2 border-emerald-200 shadow-sm text-center">
+                    <div class="text-5xl mb-2 animate-bounce-subtle">🎉</div>
+                    <h3 class="text-xl font-black text-emerald-700 font-display">¡Tu pedido fue entregado!</h3>
+                    @if (o.deliveredAt) {
+                      <p class="text-xs text-emerald-600/80 font-medium mt-1">
+                        Entregado el {{ o.deliveredAt | date:"EEEE d 'de' MMMM 'a las' h:mm a" }}
+                      </p>
+                    }
+                  </div>
+
+                  <!-- Fotos de evidencia -->
+                  @if (o.evidenceUrls && o.evidenceUrls.length > 0) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                        📸 Fotos de la entrega
+                        <span class="bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full text-[9px]">{{ o.evidenceUrls.length }}</span>
+                      </h4>
+                      <div class="grid grid-cols-3 gap-2">
+                        @for (url of o.evidenceUrls; track url) {
+                          <button (click)="evidenceLightbox.set(url)" class="aspect-square rounded-2xl overflow-hidden border-2 border-pink-100 active:scale-95 transition-transform">
+                            <img [src]="resolveImageUrl(url)" alt="Foto de entrega" class="w-full h-full object-cover">
+                          </button>
+                        }
                       </div>
+                    </div>
+                  } @else {
+                    <div class="bg-white/60 rounded-2xl p-4 border border-dashed border-pink-200 text-center">
+                      <p class="text-xs text-pink-400 font-medium">📷 No se capturaron fotos en la entrega</p>
+                    </div>
+                  }
+
+                  <!-- Firma de quien recibió -->
+                  @if (o.signatureSvg) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3">✍️ Firma de quien recibió</h4>
+                      <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100" [innerHTML]="sanitizeSvg(o.signatureSvg)"></div>
+                      <div class="flex items-center justify-between mt-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <span>👤 {{ o.signedByName || 'Sin nombre' }}</span>
+                        @if (o.signedAt) { <span>{{ o.signedAt | date:'d MMM, h:mm a' }}</span> }
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="bg-white/60 rounded-2xl p-4 border border-dashed border-pink-200 text-center">
+                      <p class="text-xs text-pink-400 font-medium">✍️ No se capturó firma en la entrega</p>
                     </div>
                   }
                 </div>
-              </div>
-            </div>
-          }
+              }
+
+              <!-- ═══════════ PEDIDO NO ENTREGADO ═══════════ -->
+              @if (o.status === 'NotDelivered') {
+                <div id="delivery-failed" class="animate-fade-in-up space-y-4">
+                  <div class="bg-gradient-to-br from-rose-50 via-white to-pink-50 rounded-[2.5rem] p-6 border-2 border-rose-200 shadow-sm text-center">
+                    <div class="text-5xl mb-2">😿</div>
+                    <h3 class="text-xl font-black text-rose-700 font-display">No se pudo entregar tu pedido</h3>
+                    <p class="text-xs text-rose-600/80 font-medium mt-2">No te preocupes, vamos a solucionarlo 💌</p>
+                  </div>
+
+                  <!-- Motivo del repartidor -->
+                  <div class="bg-white/95 rounded-[2.5rem] p-6 border border-rose-100 shadow-sm">
+                    <h4 class="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-3">¿Por qué no se entregó?</h4>
+                    <div class="bg-rose-50/70 border-l-4 border-rose-400 rounded-xl p-4">
+                      <p class="text-sm text-rose-900 font-medium leading-relaxed italic">
+                        "{{ o.failureReason || 'El repartidor no dejó un motivo específico. Contáctanos para saber más.' }}"
+                      </p>
+                    </div>
+                    @if (o.deliveredAt) {
+                      <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-3">
+                        Intento: {{ o.deliveredAt | date:"EEEE d 'de' MMMM 'a las' h:mm a" }}
+                      </p>
+                    }
+                  </div>
+
+                  <!-- Foto de no-entrega si existe -->
+                  @if (o.nonDeliveryEvidenceUrls && o.nonDeliveryEvidenceUrls.length > 0) {
+                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-rose-100 shadow-sm">
+                      <h4 class="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-3">📸 Evidencia del intento</h4>
+                      <div class="grid grid-cols-3 gap-2">
+                        @for (url of o.nonDeliveryEvidenceUrls; track url) {
+                          <button (click)="evidenceLightbox.set(url)" class="aspect-square rounded-2xl overflow-hidden border-2 border-rose-100 active:scale-95 transition-transform">
+                            <img [src]="resolveImageUrl(url)" alt="Foto del intento" class="w-full h-full object-cover">
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <!-- CTAs de recuperación -->
+                  <div class="grid grid-cols-1 gap-3">
+                    <a [href]="messengerUrl" target="_blank" rel="noopener"
+                       class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-sm py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl">
+                      <svg class="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
+                      💬 ESCRIBIRLE A REGI BAZAR
+                    </a>
+                    <p class="text-center text-xs text-rose-500/80 font-medium px-2">
+                      Te ayudamos a reagendar la entrega lo antes posible 🎀
+                    </p>
+                  </div>
+                </div>
+              }
+             </div>
+           }
 
           @if (activeTab() === 'payment') {
             <!-- ════════════ TAB: PAGAR ════════════ -->
@@ -526,7 +667,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 </h4>
                 
                 @if (isEditingInstructions()) {
-                  <textarea [(ngModel)]="localInstructions" rows="3" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-sm focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
+                  <textarea [(ngModel)]="localInstructions" rows="3" inputmode="text" enterkeyhint="done" style="font-size:16px" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-base focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
                   <div class="flex gap-2 mt-3">
                     <button (click)="saveInstructions()" class="flex-1 bg-pink-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg">Guardar✨</button>
                     <button (click)="isEditingInstructions.set(false)" class="px-4 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest">Cerrar</button>
@@ -606,7 +747,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 <!-- Input -->
                 <div class="p-4 bg-white border-t border-pink-50">
                   <div class="flex gap-2">
-                    <input type="text" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
+                    <input type="text" inputmode="text" enterkeyhint="send" style="font-size:16px" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
                            class="flex-1 bg-pink-50/50 border-2 border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 font-medium"
                            placeholder="Escribe algo... ✨" />
                     <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
@@ -629,7 +770,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               <div class="animate-bounce-up-y-only pointer-events-auto">
                 <div class="bg-gray-900/90 backdrop-blur-md text-white text-sm font-medium px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30">
                   <span class="text-xl">✨</span>
-                  <span class="whitespace-nowrap font-bold">{{ toastMessage() }}</span>
+                  <span class="max-w-[calc(100vw-5rem)] break-words text-center font-bold">{{ toastMessage() }}</span>
                 </div>
               </div>
             </div>
@@ -648,114 +789,18 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             </div>
           }
 
-          <!-- ✦ C.A.M.I. Floating Assistant Widget (Z-40) ✦ -->
+          <!-- Chat de ayuda -->
           @if (order()) {
-            <div id="cami-fab" class="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
-              
-              <!-- Chat Floating Bubble (New) -->
-              <button id="chat-fab" (click)="isChatOpen.set(true); unreadMessages.set(false)" 
-                      class="pointer-events-auto w-14 h-14 bg-white rounded-full flex items-center justify-center text-2xl shadow-xl border-2 border-pink-100 hover:scale-110 active:scale-95 transition-all relative group animate-float">
-                💬
-                @if (unreadMessages()) {
-                  <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-                }
-                <!-- Tooltip -->
-                <span class="absolute right-full mr-3 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Chat de Ayuda 💬
-                </span>
-              </button>
-
-              @if (isUnboxed()) {
-                <!-- Speech Bubble (existing) -->
-                @if (!isLoadingCami() && camiMessage() && showCamiBubble()) {
-                  <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[250px] pointer-events-auto animate-fade-in-up origin-bottom-right relative transition-all group/bubble">
-                    <!-- Close Button -->
-                    <button (click)="showCamiBubble.set(false)" 
-                            class="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white text-pink-500 shadow-lg border border-pink-50 flex items-center justify-center hover:bg-pink-500 hover:text-white transition-all z-30 active:scale-90" 
-                            title="Cerrar mensaje">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-
-                    <!-- Tail of the speech bubble -->
-                    <div class="absolute -right-1 bottom-4 w-4 h-4 bg-white border-b border-r border-pink-100 rotate-[-45deg] transform origin-center"></div>
-                    
-                    <div class="flex items-center gap-2 mb-1.5 relative z-10">
-                      <span class="text-[9px] font-black text-pink-500 uppercase tracking-widest leading-none">C.A.M.I. AI</span>
-                      <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                    </div>
-                    <p class="text-xs text-pink-900 font-medium leading-relaxed italic relative z-10 pr-6">"{{ camiMessage() }}"</p>
-                    
-                    @if (camiAudioUrl()) {
-                      <button (click)="playCamiAudio()" class="mt-3 bg-pink-50 hover:bg-pink-100 text-pink-600 w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm">
-                         {{ isPlayingCami() ? '🔊 Escuchando...' : '▶️ Escuchar' }}
-                      </button>
-                    }
-                  </div>
-                }
-
-                <!-- The Avatar Interactive Button -->
-                <button (click)="startTour()" class="shrink-0 w-16 h-16 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-4xl shadow-[0_15px_30px_rgba(244,114,182,0.4)] border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all relative animate-bounce-subtle z-20 group">
-                  👩🏻‍💻
-                  <!-- Status Dots -->
-                  @if (isLoadingCami()) {
-                    <span class="absolute -top-1 -right-1 w-4 h-4 bg-pink-400 rounded-full border-2 border-white animate-pulse"></span>
-                  } @else if (camiMessage()) {
-                    <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-sm"></span>
-                  }
-                  
-                  <!-- Hover Tooltip -->
-                  <span class="absolute -top-8 right-0 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                    Ver Tour ✨
-                  </span>
-                </button>
+            <button id="chat-fab" (click)="isChatOpen.set(true); unreadMessages.set(false)"
+                    class="fixed bottom-6 right-6 z-40 w-14 h-14 bg-white rounded-full flex items-center justify-center text-2xl shadow-xl border-2 border-pink-100 hover:scale-110 active:scale-95 transition-all relative group animate-float">
+              💬
+              @if (unreadMessages()) {
+                <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
               }
-            </div>
-          }
-
-          <!-- ✦ C.A.M.I. TOUR OVERLAY ✦ -->
-          @if (tourActive()) {
-            <div class="fixed inset-0 z-[100] pointer-events-none overflow-hidden animate-fade-in">
-              <!-- Spotlight Path Overlay (Even-Odd logic for robust masking) -->
-              <svg class="w-full h-full pointer-events-auto">
-                <path [attr.d]="tourPath()" 
-                      fill="rgba(80, 7, 36, 0.75)" 
-                      fill-rule="evenodd"
-                      class="backdrop-blur-[2px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]" />
-              </svg>
-
-              <div class="fixed left-0 right-0 z-[101] pointer-events-auto flex justify-center px-4 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-bounce-up-y-only" 
-                   [class.top-28]="tourPlacement() === 'top'"
-                   [class.bottom-8]="tourPlacement() === 'bottom'">
-                <div class="w-full max-w-[380px] bg-white rounded-[2.5rem] p-6 shadow-[0_20px_50px_rgba(244,114,182,0.4)] border-4 border-pink-300 relative">
-                   
-                   <div class="flex items-center gap-4 mb-4">
-                     <div class="w-16 h-16 rounded-full bg-gradient-to-br from-pink-100 to-rose-200 flex items-center justify-center text-4xl border-4 border-white shadow-md animate-bounce-subtle shrink-0">👩🏻‍💻</div>
-                     <div>
-                       <div class="flex items-center gap-2 mb-1">
-                         <span class="text-[10px] font-black text-pink-500 uppercase tracking-[0.2em] leading-none">C.A.M.I. Guía</span>
-                         <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                       </div>
-                       <p class="font-black text-pink-950 leading-none font-display text-lg">Paso {{ currentTourStep() + 1 }} de {{ dynamicTourSteps().length }}</p>
-                     </div>
-                   </div>
-                   
-                   <p class="text-[15px] text-pink-900 font-medium leading-relaxed mb-6">
-                     {{ dynamicTourSteps()[currentTourStep()].msg }}
-                   </p>
-
-                   <div class="flex gap-2">
-                     <button (click)="closeTour()" class="px-5 py-3 bg-gray-50 hover:bg-gray-100 text-gray-500 text-xs font-black rounded-2xl uppercase tracking-widest transition-colors">Omitir</button>
-                     <div class="flex-grow"></div>
-                     @if (currentTourStep() > 0) {
-                       <button (click)="prevStep()" class="px-5 py-3 bg-pink-50 hover:bg-pink-100 text-pink-600 text-xs font-black rounded-2xl uppercase tracking-widest transition-colors">Atrás</button>
-                     }
-                     <button (click)="nextStep()" class="px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-black rounded-2xl uppercase tracking-widest shadow-xl shadow-pink-200 active:scale-95 transition-all outline-none focus:ring-4 focus:ring-pink-200">
-                       {{ currentTourStep() === dynamicTourSteps().length - 1 ? '¡Listo! ✨' : 'Siguiente ✨' }}
-                     </button>
-                   </div>
-                </div>
-              </div>
-            </div>
+              <span class="absolute right-full mr-3 hidden max-w-48 bg-gray-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-normal sm:block">
+                Chat de Ayuda 💬
+              </span>
+            </button>
           }
         }
       </div>
@@ -920,190 +965,14 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   sendingChat = signal(false);
   unreadMessages = signal(false);
 
-  // --- TOUR STATE ---
-  tourActive = signal(false);
-  currentTourStep = signal(0);
-  tourHole = signal({ top: 0, left: 0, width: 0, height: 0, radius: 24 });
-  tourPlacement = signal<'top' | 'bottom'>('bottom');
-
-  // Spotlight Path (Root fix: Even-Odd cutout)
-  tourPath = computed(() => {
-    const h = this.tourHole();
-    const wW = window.innerWidth;
-    const wH = window.innerHeight;
-    
-    // Outer Rectangle (Screen)
-    const d0 = `M 0 0 H ${wW} V ${wH} H 0 Z`;
-    
-    // Inner Rounded Rectangle (Hole with padding and radius)
-    const padding = 10;
-    const x = h.left - padding;
-    const y = h.top - padding;
-    const w = h.width + (padding * 2);
-    const height = h.height + (padding * 2);
-    const r = h.radius || 24;
-
-    const d1 = `M ${x} ${y + r} ` +
-               `A ${r} ${r} 0 0 1 ${x + r} ${y} ` +
-               `H ${x + w - r} ` +
-               `A ${r} ${r} 0 0 1 ${x + w} ${y + r} ` +
-               `V ${y + height - r} ` +
-               `A ${r} ${r} 0 0 1 ${x + w - r} ${y + height} ` +
-               `H ${x + r} ` +
-               `A ${r} ${r} 0 0 1 ${x} ${y + height - r} ` +
-               `Z`;
-               
-    return `${d0} ${d1}`;
-  });
-  
-  dynamicTourSteps = computed(() => {
-    const o = this.order();
-    if (!o) return [];
-
-    const steps: { target: string, msg: string, tab?: 'status' | 'payment' | 'details', modal?: boolean }[] = [
-      { target: '#view-header', msg: '¡Hola hermosa! Soy C.A.M.I. ✨ He diseñado este panel para que tengas todo a la mano. ¡Déjame enseñarte!' },
-      { target: '#nav-tabs', msg: 'Aquí tienes tus 3 pestañas principales: Detalle de Pedido, Métodos de Pago y Rastreo en Vivo. 🛍️💸🏠' },
-      { target: '#ticket-content', msg: 'En "Pedido" tienes tu ticket detallado. ¡Revisa que todo esté perfecto! 🧾', tab: 'details' }
-    ];
-
-    // Confirm Step (Relocated)
-    if (o.status === 'Pending') {
-      steps.push({ target: '#confirm-card', msg: 'Una vez que revises tus productos, no olvides confirmar tu pedido aquí abajo. ¡Es el paso más importante! 🎀', tab: 'details' });
-    }
-
-    // Payment Tab Specifics
-    if (o.balanceDue > 0) {
-      steps.push({ target: '#payment-methods', msg: 'En la pestaña de "Pago" encontrarás las cuentas para liquidar tu saldo de forma segura. 💸', tab: 'payment' });
-    }
-
-    // Status Tab Specifics
-    if (o.status === 'InRoute' || o.status === 'InTransit') {
-       steps.push({ target: '#nav-tabs', msg: 'En "Estado" podrás seguir al repartidor en tiempo real y ver cuántas entregas faltan. 🚗💨', tab: 'status' });
-    }
-
-    // Chat Step (New FAB)
-    steps.push({ target: '#chat-fab', msg: 'Si tienes alguna duda, usa esta burbuja para chatear directamente con nosotros o el repartidor. 💬' });
-
-    // Final
-    steps.push({ target: '#cami-fab', msg: '¡Eso es todo! Estaré aquí flotando por si necesitas algo más. ¡Que disfrutes tu compra! 👩🏻‍💻✨' });
-
-    return steps;
-  });
-
-  startTour() {
-    this.tourActive.set(true);
-    this.currentTourStep.set(0);
-    this.updateHole();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  nextStep() {
-    if (this.currentTourStep() < this.dynamicTourSteps().length - 1) {
-      this.currentTourStep.update(s => s + 1);
-      this.updateHole();
-    } else {
-      this.closeTour();
-    }
-  }
-
-  prevStep() {
-    if (this.currentTourStep() > 0) {
-      this.currentTourStep.update(s => s - 1);
-      this.updateHole();
-    }
-  }
-
-  closeTour() {
-    this.tourActive.set(false);
-    localStorage.setItem('cami_tour_done', 'true');
-  }
-
-  private checkAndStartTour() {
-    const done = localStorage.getItem('cami_tour_done');
-    if (!done && this.order() && this.isUnboxed()) {
-      // Small delay to let the 'unboxing' fade-out finish and elements settle in DOM
-      setTimeout(() => {
-        if (!this.tourActive()) {
-          this.startTour();
-        }
-      }, 800); 
-    }
-  }
-
-  private updateHole(forceTabSwitch = true) {
-    if (!this.tourActive()) return;
-
-    // Use requestAnimationFrame to ensure we measure after the last layout pass
-    requestAnimationFrame(() => {
-      const steps = this.dynamicTourSteps();
-      const step = steps[this.currentTourStep()];
-      if (!step) return;
-
-      // Auto-switch tabs if the step requires it
-      if (forceTabSwitch && step.tab && this.activeTab() !== step.tab) {
-        this.activeTab.set(step.tab);
-        // Wait for Angular change detection and DOM update
-        setTimeout(() => this.updateHole(false), 300); 
-        return;
-      }
-
-      // Root Fix: Exhaustive Element Search
-      const el = document.querySelector(step.target) as HTMLElement;
-      
-      if (el) {
-        const calculateCoordinates = () => {
-          const rect = el.getBoundingClientRect();
-          
-          // Debugging logging if needed (internal)
-          // console.log(`[Tour] Highlight target ${step.target}:`, rect);
-
-          // If element is not actually visible or in layout (dimensions 0), retry
-          if (rect.width === 0 && rect.height === 0) {
-             setTimeout(() => this.updateHole(false), 200);
-             return;
-          }
-
-          this.tourPlacement.set(rect.top > window.innerHeight / 2 ? 'top' : 'bottom');
-          this.tourHole.set({
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-            radius: 24
-          });
-        };
-
-        const rect = el.getBoundingClientRect();
-        // Handle scrolling if element is not fully in view
-        if (rect.top < 100 || rect.bottom > window.innerHeight - 100) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Wait for smooth scroll to finish before final calculation
-          setTimeout(calculateCoordinates, 600);
-        } else {
-          calculateCoordinates();
-        }
-      } else {
-        // Fallback: If element not found, retry once or highlight safe area
-        if (forceTabSwitch) {
-           setTimeout(() => this.updateHole(false), 500);
-        }
-      }
-    });
-  }
-
-  // Señales para C.A.M.I.
-  camiMessage = signal<string>('');
-  camiAudioUrl = signal<string>('');
-  isPlayingCami = signal(false);
-  isLoadingCami = signal(true);
-  showCamiBubble = signal(true);
   // Stratospheric features
   regiPuntos = computed(() => {
     const o = this.order();
     if (!o) return 0;
-    return Math.floor((o.total || 0) / 10); // 1 point per $10 MXN spent
+    // Saldo real acumulado de la clienta (viene del backend). Respaldo: estimación por el total.
+    return o.clientPoints ?? Math.floor((o.total || 0) / 10);
   });
-  
+
 
 
 
@@ -1117,13 +986,12 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   // Countdown State
   countdownText = signal<string>('');
   private countdownInterval: any;
-  private bubbleTimeout: any;
+  private hasLoadedOrder = false;
 
   // --- MAP STEROIDS ---
   private mapInitialized = false;
   private map: any;
-  private directionsService: any;
-  private directionsRenderer: any;
+  private routePolyline: any;
   private driverMarker: any;
   private geofenceCircle: any;
   private geofenceTriggered = false;
@@ -1133,8 +1001,17 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     private api: ApiService,
     private signalr: SignalRService,
     private toast: ToastService,
-    private push: PushNotificationService
+    private push: PushNotificationService,
+    private sanitizer: DomSanitizer
   ) { }
+
+  /** Limpia y sanitiza el SVG de la firma para poder renderizarlo con [innerHTML]. */
+  sanitizeSvg(svg: string): SafeHtml {
+    if (!svg) return '';
+    // El SVG viene del canvas y puede contener data:image/png en base64.
+    // Confiamos en él porque lo generamos nosotros mismos en la app del conductor.
+    return this.sanitizer.bypassSecurityTrustHtml(svg);
+  }
 
   @HostListener('window:scroll', ['$event'])
   onScroll(event: Event) {
@@ -1259,7 +1136,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.signalr.locationUpdate$.subscribe((loc: any) => {
       this.driverLocation.set(loc);
       const o = this.order();
-      if (o && (o.status === 'InRoute' || o.status === 'InTransit') && o.deliveriesAhead === 0) {
+      if (o && (o.publicViewMode === 'Tracking' || o.status === 'InRoute' || o.status === 'InTransit')) {
         if (this.mapInitialized) {
           this.updateMap();
         } else {
@@ -1273,35 +1150,16 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.signalr.clientChatUpdate$.subscribe((msg) => {
       this.chatMessages.update(msgs => {
-         if (msgs.find(m => m.id === msg.id)) return msgs;
-         return [...msgs, msg];
+        if (msgs.find(m => m.id === msg.id)) return msgs;
+        return [...msgs, msg];
       });
       if (!this.isChatOpen()) {
-         this.unreadMessages.set(true);
-         this.showToast('¡Escribieron en tu chat! 💬💌');
+        this.unreadMessages.set(true);
+        this.showToast('¡Escribieron en tu chat! 💬💌');
       }
       this.scrollToBottomChat();
     });
 
-    // Feature #9 — CAMI greeting pushed when driver marks InTransit
-    this.signalr.camiGreeting$.subscribe((greeting) => {
-      this.displayCamiMessage(greeting.message, greeting.audioBase64);
-      this.showToast('¡C.A.M.I. tiene un mensaje para ti! 💌');
-    });
-  }
-
-  displayCamiMessage(text: string, audioBase64?: string) {
-    this.camiMessage.set(text);
-    if (audioBase64) {
-      this.camiAudioUrl.set('data:audio/mp3;base64,' + audioBase64);
-    }
-    this.isLoadingCami.set(false);
-    this.showCamiBubble.set(true);
-
-    if (this.bubbleTimeout) clearTimeout(this.bubbleTimeout);
-    this.bubbleTimeout = setTimeout(() => {
-      this.showCamiBubble.set(false);
-    }, 8000); // 8 seconds for better readability, but can be closed manually
   }
 
   // Generate Greeting based on time
@@ -1325,6 +1183,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       case 'InTransit': return '¡Prepárate, el auto va directo a tu casa! 🎉';
       case 'Delivered': return 'Tu pedido fue entregado, muchas gracias por hacernos parte de tu estilo 🌸';
       case 'NotDelivered': return 'No se logró entregar. Porfa contacta a tu vendedora 💌';
+      case 'Postponed': return 'Tu entrega quedó pendiente de reprogramar. Escríbenos y te ayudamos 💌';
       case 'Canceled': return 'Este pedido ha sido cancelado. 💔';
       default: return 'Estamos procesando tu pedido, pronto tendrás novedades 💕';
     }
@@ -1340,12 +1199,17 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.api.publicGetOrder(this.accessToken).subscribe({
       next: (data) => {
         this.order.set(data);
+        this.driverLocation.set(data.driverLocation ?? null);
         this.buildTimeline(data.status);
         this.loading.set(false);
         this.loadChat();
 
+        if (data.estimatedArrival) {
+          this.etaText.set(this.formatEtaFromDate(data.estimatedArrival));
+        }
+
         // Check Unboxing Session Status
-        const unboxedKey = `regibazar_unboxed_${data.id}`;
+        const unboxedKey = `regibazar_unboxed_${this.accessToken}`;
         if (!sessionStorage.getItem(unboxedKey)) {
           this.isUnboxed.set(false);
         } else {
@@ -1356,31 +1220,34 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           setTimeout(() => {
             this.animateTicketReveal();
             if (data.status === 'Delivered') this.fireConfetti('unboxing');
-            this.checkAndStartTour();
           }, 500);
         }
 
-        // Note: Default tab is 'details' (Pedido) as requested by user.
-        this.activeTab.set('details');
+        // Seguimiento y evidencia deben ser lo primero que vea la clienta.
+        if (!this.hasLoadedOrder) {
+          this.activeTab.set(this.getPreferredTab(data));
+          this.hasLoadedOrder = true;
+        } else if (data.publicViewMode === 'Tracking' || data.status === 'Delivered' || data.status === 'NotDelivered') {
+          this.activeTab.set('status');
+        }
 
-        if (data.expiresAt) {
+        if (data.expiresAt && data.publicAccessUntil !== null) {
           // Fallback if API hasn't updated its DTO yet or sync Issues
           if (!data.scheduledDeliveryDate) {
             const date = new Date(data.expiresAt);
             date.setDate(date.getDate() - 1);
             data.scheduledDeliveryDate = date.toISOString();
           }
-          this.startCountdown(data.expiresAt);
+          this.startCountdown(data.publicAccessUntil || data.expiresAt);
+        } else if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+          this.countdownText.set('');
         }
 
 
-        // Initialize Map if active route and it is their exact turn.
-        // Geocode client address first if coordinates are missing from the backend response.
-        if ((data.status === 'InRoute' || data.status === 'InTransit') && data.deliveriesAhead === 0) {
-          if (!data.clientLatitude && data.clientAddress) {
-            this.geocodeClientAddress(data.clientAddress);
-          } else {
-            // Give Angular a frame to render the map div before init
+        // Initialize Map as soon as the order is in tracking mode, aunque haya paradas antes.
+        if (data.publicViewMode === 'Tracking' || data.status === 'InRoute' || data.status === 'InTransit') {
+          if (data.clientLatitude || this.clientCoords()?.lat) {
             setTimeout(() => this.initMap(), 300);
           }
           // Reset geofence trigger if route loaded fresh
@@ -1397,48 +1264,42 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
 
-    this.api.publicGetCamiGreeting(this.accessToken).subscribe({
-      next: (res) => {
-        this.displayCamiMessage(res.message, res.audioBase64);
-      },
-      error: () => this.isLoadingCami.set(false) // Si falla la IA, simplemente no mostramos la tarjeta
-    });
   }
 
   loadChat() {
-     this.api.publicGetChat(this.accessToken).subscribe(msgs => {
-        this.chatMessages.set(msgs);
-        this.scrollToBottomChat();
-     });
+    this.api.publicGetChat(this.accessToken).subscribe(msgs => {
+      this.chatMessages.set(msgs);
+      this.scrollToBottomChat();
+    });
   }
 
   sendChatMessage() {
-     if (!this.newChatMessage.trim() || this.sendingChat()) return;
-     this.sendingChat.set(true);
-     this.api.publicSendChatMessage(this.accessToken, this.newChatMessage).subscribe({
-        next: (msg) => {
-           this.chatMessages.update(msgs => {
-              if (msgs.find(m => m.id === msg.id)) return msgs;
-              return [...msgs, msg];
-           });
-           this.newChatMessage = '';
-           this.sendingChat.set(false);
-           this.scrollToBottomChat();
-        },
-        error: () => {
-           this.sendingChat.set(false);
-           this.showToast('No se pudo enviar el mensaje. 😿');
-        }
-     });
+    if (!this.newChatMessage.trim() || this.sendingChat()) return;
+    this.sendingChat.set(true);
+    this.api.publicSendChatMessage(this.accessToken, this.newChatMessage).subscribe({
+      next: (msg) => {
+        this.chatMessages.update(msgs => {
+          if (msgs.find(m => m.id === msg.id)) return msgs;
+          return [...msgs, msg];
+        });
+        this.newChatMessage = '';
+        this.sendingChat.set(false);
+        this.scrollToBottomChat();
+      },
+      error: () => {
+        this.sendingChat.set(false);
+        this.showToast('No se pudo enviar el mensaje. 😿');
+      }
+    });
   }
 
   scrollToBottomChat() {
-     setTimeout(() => {
-        const box = document.getElementById('modal-chat-box');
-        if (box) {
-           box.scrollTop = box.scrollHeight;
-        }
-     }, 100);
+    setTimeout(() => {
+      const box = document.getElementById('modal-chat-box');
+      if (box) {
+        box.scrollTop = box.scrollHeight;
+      }
+    }, 100);
   }
 
   confirmOrder(event?: MouseEvent | TouchEvent) {
@@ -1626,21 +1487,20 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       styles: this.getCoquetteMapStyles() // Custom cute map theme
     });
 
-    this.directionsService = new (window as any).google.maps.DirectionsService();
-
-    // We will render the polyline ourselves, but hide default markers
-    this.directionsRenderer = new (window as any).google.maps.DirectionsRenderer({
-      map: this.map,
-      suppressMarkers: true,
-      polylineOptions: {
-        strokeColor: '#db2777', // Magenta pink
-        strokeWeight: 5,
-        strokeOpacity: 0.8
-      }
-    });
-
     this.mapInitialized = true;
     this.updateMap();
+  }
+
+  private getPreferredTab(data: { publicViewMode?: string | null; status?: string }): 'status' | 'payment' | 'details' {
+    if (data.publicViewMode === 'Tracking' ||
+        data.status === 'InRoute' ||
+        data.status === 'InTransit' ||
+        data.status === 'Delivered' ||
+        data.status === 'NotDelivered' ||
+        data.status === 'Postponed') {
+      return 'status';
+    }
+    return 'details';
   }
 
   private updateMap() {
@@ -1652,7 +1512,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const clientLat = o?.clientLatitude || coords?.lat;
     const clientLng = o?.clientLongitude || coords?.lng;
 
-    if (!o || !clientLat || !clientLng || o.deliveriesAhead !== 0) return;
+    if (!o || !clientLat || !clientLng) return;
 
     const dest = new (window as any).google.maps.LatLng(clientLat, clientLng);
 
@@ -1683,7 +1543,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       });
     }
 
-    if (distMeters <= 300 && !this.geofenceTriggered) {
+    if (distMeters <= 300 && (o.deliveriesAhead || 0) === 0 && !this.geofenceTriggered) {
       this.geofenceTriggered = true;
       this.playArrivalSound();
       this.fireConfetti('celebration');
@@ -1736,27 +1596,20 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       this.animateMarker(this.driverMarker, this.driverMarker.getPosition(), origin, heading);
     }
 
-    // Calculate Route and ETA
-    this.directionsService.route({
-      origin: origin,
-      destination: dest,
-      travelMode: (window as any).google.maps.TravelMode.DRIVING
-    }, (result: any, status: string) => {
-      if (status === 'OK') {
-        this.directionsRenderer.setDirections(result);
-
-        const leg = result.routes[0].legs[0];
-        if (leg && leg.duration) {
-          this.etaText.set(leg.duration.text);
-        }
-
-        // Frame the map smoothly (pan/fit)
-        const bounds = new (window as any).google.maps.LatLngBounds();
-        bounds.extend(origin);
-        bounds.extend(dest);
-        this.map.fitBounds(bounds, { top: 30, bottom: 40, left: 20, right: 20 });
-      }
+    this.etaText.set(this.formatApproxEta(distMeters, o.deliveriesAhead || 0));
+    this.routePolyline?.setMap(null);
+    this.routePolyline = new (window as any).google.maps.Polyline({
+      path: [origin, dest],
+      map: this.map,
+      strokeColor: '#db2777',
+      strokeWeight: 5,
+      strokeOpacity: 0.8
     });
+
+    const bounds = new (window as any).google.maps.LatLngBounds();
+    bounds.extend(origin);
+    bounds.extend(dest);
+    this.map.fitBounds(bounds, { top: 30, bottom: 40, left: 20, right: 20 });
   }
 
   // --- MAP MATH UTILS ---
@@ -1767,6 +1620,17 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  }
+
+  private formatApproxEta(meters: number, deliveriesAhead = 0): string {
+    const drivingMinutes = Math.max(5, Math.round((meters / 1000) / 25 * 60));
+    const minutes = drivingMinutes + Math.max(0, deliveriesAhead) * 10;
+    return `${minutes} min aprox.`;
+  }
+
+  private formatEtaFromDate(estimatedArrival: string): string {
+    const remainingMinutes = Math.max(1, Math.round((new Date(estimatedArrival).getTime() - Date.now()) / 60000));
+    return `${remainingMinutes} min aprox.`;
   }
 
   private getHeading(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -1883,9 +1747,9 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         return;
       }
       const script = document.createElement('script');
-      script.id  = 'mp-sdk-script';
+      script.id = 'mp-sdk-script';
       script.src = 'https://sdk.mercadopago.com/js/v2';
-      script.onload  = () => resolve();
+      script.onload = () => resolve();
       script.onerror = () => reject(new Error('No se pudo cargar el SDK de Mercado Pago'));
       document.body.appendChild(script);
     });
@@ -1915,13 +1779,13 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       iframe: true,
       form: {
         id: 'mp-card-form',
-        cardNumber:     { id: 'mp-cardNumber',     placeholder: 'Número de tarjeta' },
+        cardNumber: { id: 'mp-cardNumber', placeholder: 'Número de tarjeta' },
         expirationDate: { id: 'mp-expirationDate', placeholder: 'MM/AA' },
-        securityCode:   { id: 'mp-securityCode',   placeholder: 'CVV' },
+        securityCode: { id: 'mp-securityCode', placeholder: 'CVV' },
         cardholderName: { id: 'mp-cardholderName', placeholder: 'Nombre en la tarjeta' },
-        issuer:         { id: 'mp-issuer',         placeholder: 'Banco emisor' },
-        installments:   { id: 'mp-installments',   placeholder: 'Cuotas' },
-        cardholderEmail:{ id: 'mp-cardholderEmail',placeholder: 'Email (para tu comprobante)' },
+        issuer: { id: 'mp-issuer', placeholder: 'Banco emisor' },
+        installments: { id: 'mp-installments', placeholder: 'Cuotas' },
+        cardholderEmail: { id: 'mp-cardholderEmail', placeholder: 'Email (para tu comprobante)' },
       },
       callbacks: {
         onFormMounted: (error: any) => {
@@ -1958,10 +1822,10 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.mpProcessing.set(true);
 
     this.api.publicCardPayment(this.accessToken, {
-      cardToken:       data.token,
+      cardToken: data.token,
       paymentMethodId: data.paymentMethodId,
-      issuerId:        data.issuerId ?? null,
-      installments:    Number(data.installments) || 1
+      issuerId: data.issuerId ?? null,
+      installments: Number(data.installments) || 1
     }).subscribe({
       next: (result) => {
         this.mpProcessing.set(false);
@@ -1970,8 +1834,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         if (result.status === 'approved') {
           this.mpReceipt.set({
             amount: result.amount,
-            date:   new Date(),
-            ref:    result.paymentId ? `MP-${result.paymentId}` : '—'
+            date: new Date(),
+            ref: result.paymentId ? `MP-${result.paymentId}` : '—'
           });
           this.fireConfetti('celebration');
           this.order.update(o => o
@@ -2127,7 +1991,6 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
         // Give a tiny frame for Angular to render the ticket before staggering items
         setTimeout(() => {
           this.animateTicketReveal();
-          this.checkAndStartTour();
         }, 50);
       }
     });
@@ -2217,48 +2080,33 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
-  playCamiAudio() {
-    if (this.isPlayingCami() || !this.camiAudioUrl()) return;
-
-    const audio = new Audio(this.camiAudioUrl());
-    this.isPlayingCami.set(true);
-
-    audio.onended = () => this.isPlayingCami.set(false);
-    audio.onerror = () => {
-      this.isPlayingCami.set(false);
-      this.showToast('No se pudo reproducir el audio 💔');
-    };
-
-    audio.play();
-  }
-
   private startCountdown(expiresAt: string) {
     if (this.countdownInterval) clearInterval(this.countdownInterval);
-    
+
     const targetDate = new Date(expiresAt).getTime();
-    
+
     const update = () => {
       const now = new Date().getTime();
       const distance = targetDate - now;
-      
+
       if (distance < 0) {
         this.countdownText.set('¡Llegó el gran día! 🎀');
         clearInterval(this.countdownInterval);
         return;
       }
-      
+
       const days = Math.floor(distance / (1000 * 60 * 60 * 24));
       const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-      
+
       let text = '';
       if (days > 0) text += `${days}d `;
       text += `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      
+
       this.countdownText.set(text);
     };
-    
+
     update();
     this.countdownInterval = setInterval(update, 1000);
   }

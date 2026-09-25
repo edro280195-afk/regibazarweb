@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, Output, OnInit, ViewChild, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { GoogleMapsModule, GoogleMap, MapMarker, MapDirectionsRenderer, MapPolyline } from '@angular/google-maps';
+import { GoogleMapsModule, GoogleMap } from '@angular/google-maps';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { OrderSummaryDto } from '../../../../core/models';
 import { environment } from '../../../../../environments/environment';
@@ -83,7 +83,7 @@ export class RouteOptimizerComponent implements OnInit {
     // Google Maps Variables
     center: google.maps.LatLngLiteral = { lat: GEOCODE_CONFIG.defaultLat, lng: GEOCODE_CONFIG.defaultLng };
     zoom = 13;
-    directionsResult = signal<google.maps.DirectionsResult | undefined>(undefined);
+    polylinePath = signal<google.maps.LatLngLiteral[]>([]);
     mapOptions: google.maps.MapOptions = {
         disableDefaultUI: false,
         zoomControl: true,
@@ -100,13 +100,11 @@ export class RouteOptimizerComponent implements OnInit {
     distances: number[] = [];
 
     // Coquette Aesthetics
-    directionsOptions: google.maps.DirectionsRendererOptions = {
-        suppressMarkers: true, // Hide default ugly Google markers
-        polylineOptions: {
-            strokeColor: '#d946ef', // Fuchsia-500
-            strokeWeight: 6,
-            strokeOpacity: 0.8,
-        }
+    polylineOptions: google.maps.PolylineOptions = {
+        strokeColor: '#d946ef',
+        strokeWeight: 5,
+        strokeOpacity: 0.75,
+        clickable: false
     };
 
     depotOptions: google.maps.MarkerOptions = {
@@ -135,25 +133,12 @@ export class RouteOptimizerComponent implements OnInit {
             console.warn('GPS no disponible, usando centro base');
         }
 
-        // 1. Geocode all addresses
-        const geocoded: GeocodedOrder[] = await Promise.all(
-            this.orders.map(async (o) => {
-                const address = (o.alternativeAddress || o.clientAddress)?.trim();
-                if (!address || address.length < 5) {
-                    return { ...o, _geocoded: false, _geocodeError: 'Sin dirección' } as GeocodedOrder;
-                }
-
-                try {
-                    const coords = await this.geocodeAddress(address);
-                    if (coords) {
-                        return { ...o, _lat: coords.lat, _lng: coords.lng, _geocoded: true, _isGoogleResolved: true } as GeocodedOrder;
-                    }
-                    return { ...o, _geocoded: false, _geocodeError: 'No encontrada por Google' } as GeocodedOrder;
-                } catch {
-                    return { ...o, _geocoded: false, _geocodeError: 'Error de red' } as GeocodedOrder;
-                }
-            })
-        );
+        const geocoded: GeocodedOrder[] = this.orders.map((o) => {
+            if (o.clientLatitude != null && o.clientLongitude != null) {
+                return { ...o, _lat: o.clientLatitude, _lng: o.clientLongitude, _geocoded: true, _isGoogleResolved: true } as GeocodedOrder;
+            }
+            return { ...o, _geocoded: false, _geocodeError: 'Sin coordenadas guardadas' } as GeocodedOrder;
+        });
 
         // 2. Nearest Neighbor Algorithm (TSP)
         const withCoords = geocoded.filter((o) => o._geocoded);
@@ -192,7 +177,6 @@ export class RouteOptimizerComponent implements OnInit {
 
         this.sortedOrders.set(optimized);
 
-        // 3. Plot them on the Map using DirectionsService (which recalculates the real street distances)
         this.plotRoute(optimized);
     }
 
@@ -226,7 +210,7 @@ export class RouteOptimizerComponent implements OnInit {
             this.calculateDirections(path);
             setTimeout(() => { if (this.map) this.map.fitBounds(bounds, 80); }, 300);
         } else {
-            this.directionsResult.set(undefined);
+            this.polylinePath.set([]);
             this.totalDistance.set(0);
             this.estimatedTime.set(0);
             this.distances = new Array(currentOrder.length).fill(0);
@@ -235,49 +219,25 @@ export class RouteOptimizerComponent implements OnInit {
     }
 
     private calculateDirections(path: google.maps.LatLngLiteral[]) {
-        const directionsService = new google.maps.DirectionsService();
+        this.polylinePath.set(path);
 
-        const origin = path[0];
-        const destination = path[path.length - 1];
-
-        const MAX_WAYPOINTS = 25;
-        const allWaypoints = path.slice(1, -1);
-        const waypoints = allWaypoints.slice(0, MAX_WAYPOINTS).map(p => ({
-            location: p,
-            stopover: true
-        }));
-
-        directionsService.route({
-            origin: origin,
-            destination: destination,
-            waypoints: waypoints,
-            travelMode: google.maps.TravelMode.DRIVING,
-        }, (response, status) => {
-            if (status === google.maps.DirectionsStatus.OK && response && response.routes[0]) {
-                this.directionsResult.set(response);
-
-                // Extract real distances and times from Google Directions legs
-                const legs = response.routes[0].legs;
-                let distMeters = 0;
-                let durationSeconds = 0;
-
-                // Match lengths to sortedOrders array to show per-leg distance in UI
-                let legIndex = 0;
-                this.distances = this.sortedOrders().map(o => {
-                    if (o._isGoogleResolved && legIndex < legs.length) {
-                        const leg = legs[legIndex++];
-                        distMeters += leg.distance?.value || 0;
-                        durationSeconds += leg.duration?.value || 0;
-                        return Number(((leg.distance?.value || 0) / 1000).toFixed(1));
-                    }
-                    return 0; // Ungocoded or out of waypoints limit
-                });
-
-                this.totalDistance.set(distMeters / 1000);
-                this.estimatedTime.set(Math.round(durationSeconds / 60));
+        let distMeters = 0;
+        let durationSeconds = 0;
+        let previous = path[0];
+        this.distances = this.sortedOrders().map(o => {
+            if (o._isGoogleResolved && o._lat != null && o._lng != null) {
+                const meters = this.haversineKm(previous.lat, previous.lng, o._lat, o._lng) * 1000;
+                previous = { lat: o._lat, lng: o._lng };
+                distMeters += meters;
+                durationSeconds += meters / (25_000 / 3600);
+                return Number((meters / 1000).toFixed(1));
             }
-            this.optimizing.set(false);
+            return 0;
         });
+
+        this.totalDistance.set(distMeters / 1000);
+        this.estimatedTime.set(Math.round(durationSeconds / 60));
+        this.optimizing.set(false);
     }
 
     getMarkerOptions(index: number, order: GeocodedOrder): google.maps.MarkerOptions {
