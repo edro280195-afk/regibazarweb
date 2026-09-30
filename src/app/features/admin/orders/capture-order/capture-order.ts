@@ -127,10 +127,18 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
 
   filteredClients = computed(() => {
     const s = this.manualClient().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    if (!s) return [];
+    // Evitar ruido mientras se escribe: el autocompletado arranca desde la tercera letra.
+    if (s.length < 3) return [];
     return this.clients().filter(c => {
       const clientName = c.name?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "";
       return clientName.includes(s);
+    }).sort((a, b) => {
+      const aName = (a.name ?? '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const bName = (b.name ?? '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      // Primero los nombres que empiezan con lo escrito; después coincidencias internas.
+      const aStarts = aName.startsWith(s) ? 0 : 1;
+      const bStarts = bName.startsWith(s) ? 0 : 1;
+      return aStarts - bStarts || aName.localeCompare(bName);
     }).slice(0, 8);
   });
 
@@ -335,6 +343,7 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     });
     if (exactMatch) {
       this.autoDetected.set(true);
+      this.showSuggestions.set(false);
       this.manualType = (exactMatch.ordersCount && exactMatch.ordersCount >= 1) ? 'Frecuente' : 'Nueva';
       this.manualResolvedClientId.set(exactMatch.id);
       this.manualResolvedCanonicalName.set(exactMatch.name);

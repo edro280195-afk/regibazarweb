@@ -30,184 +30,107 @@ interface TandaForm {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="relative min-h-[80vh] overflow-hidden -m-4 lg:-m-8 p-4 lg:p-8">
-      <!-- Parallax Background Elements (Identidad Regi Bazar) -->
-      <div class="absolute inset-0 pointer-events-none z-[-1] overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-br from-pink-50/50 via-purple-50/50 to-rose-50/50"></div>
-        
-        <div class="absolute inset-0 opacity-40 transition-transform duration-75 ease-out"
-             [style.transform]="'translateY(' + scrollY() * 0.1 + 'px)'">
-          <div class="absolute top-[10%] left-[5%] text-6xl animate-pulse-slow blur-[1px]">🌸</div>
-          <div class="absolute top-[60%] right-[10%] text-5xl opacity-50">✨</div>
-        </div>
-        
-        <div class="absolute inset-0 opacity-60 transition-transform duration-75 ease-out"
-             [style.transform]="'translateY(' + scrollY() * 0.25 + 'px)'">
-          <div class="absolute top-[20%] right-[20%] text-4xl animate-float-delayed">💖</div>
-          <div class="absolute top-[75%] left-[15%] text-5xl animate-bounce-slow blur-[1px]">🎀</div>
-        </div>
+    <div class="relative min-h-[calc(100dvh-6rem)] overflow-hidden -m-4 p-3 sm:p-4 lg:-m-8 lg:p-8 bg-gradient-to-br from-pink-50/70 via-white to-purple-50/70">
+      <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div class="absolute -right-16 top-16 text-7xl opacity-25 blur-[1px]">✨</div>
+        <div class="absolute -left-10 bottom-32 text-7xl opacity-20">🌸</div>
+        <div class="absolute right-[18%] top-[35%] text-4xl opacity-20">♡</div>
       </div>
 
-      <div class="space-y-6 relative z-10 max-w-7xl mx-auto">
-        <!-- Header Section -->
-        <div class="flex flex-wrap items-center justify-between gap-4 animate-slide-down">
-          <div>
-            <h1 class="text-3xl font-black text-pink-900 font-display flex items-center gap-3">
-              <span class="animate-wiggle inline-block drop-shadow-md">🤝</span> 
-              Módulo de Tandas
-            </h1>
-            <p class="text-sm text-pink-500 font-medium ml-1 mt-1">Creciendo juntas, paso a paso 💕</p>
+      <div class="relative z-10 mx-auto max-w-6xl space-y-5 pb-28 lg:pb-8">
+        <header class="flex items-center justify-between gap-3 animate-slide-down">
+          <div class="min-w-0">
+            <p class="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-pink-500">Organización bonita</p>
+            <h1 class="font-display text-3xl font-black leading-none text-pink-950 sm:text-4xl">Mis tandas 💕</h1>
+            <p class="mt-2 text-xs font-medium text-pink-500 sm:text-sm">Pagos y turnos, pasito a pasito.</p>
           </div>
-          <button (click)="openCreateModal()" class="btn-coquette btn-pink shadow-lg">
-            <span>✨</span> Nueva Tanda
+          <button (click)="openCreateModal()" class="btn-coquette btn-pink shrink-0 !min-h-11 !rounded-2xl px-3 text-xs shadow-lg sm:px-5 sm:text-sm">
+            <span class="text-base">＋</span> <span class="hidden sm:inline">Nueva tanda</span><span class="sm:hidden">Nueva</span>
           </button>
-        </div>
+        </header>
 
         @if (!loadingTandas()) {
-          <section class="rounded-3xl border border-pink-100 bg-white/90 px-5 py-4 shadow-sm" aria-label="Resumen de tandas">
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Activas</p>
-                <p class="mt-1 text-2xl font-black text-pink-950">{{ activeTandasCount() }}</p>
+          <section class="overflow-x-auto rounded-[1.4rem] border border-white/80 bg-white/70 p-2 shadow-[8px_10px_24px_rgba(193,106,161,0.1)] backdrop-blur-md" aria-label="Resumen de tandas">
+            <div class="grid min-w-[345px] grid-cols-3 gap-2">
+              <div class="rounded-2xl bg-white/80 px-3 py-3 shadow-[inset_2px_3px_8px_rgba(193,106,161,0.06)]">
+                <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Activas</p>
+                <p class="mt-1 text-2xl font-black leading-none text-pink-950">{{ activeTandasCount() }}</p>
               </div>
-              <div>
-                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Lugares ocupados</p>
-                <p class="mt-1 text-2xl font-black text-pink-950">{{ occupiedPlacesCount() }}</p>
+              <div class="rounded-2xl bg-white/80 px-3 py-3 shadow-[inset_2px_3px_8px_rgba(193,106,161,0.06)]">
+                <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Lugares</p>
+                <p class="mt-1 text-2xl font-black leading-none text-pink-950">{{ occupiedPlacesCount() }}</p>
               </div>
-              <div>
-                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Cobrado</p>
-                <p class="mt-1 text-xl font-black text-pink-950">{{ totalCollected() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
-              </div>
-              <div>
-                <p class="text-[11px] font-bold uppercase tracking-wider text-pink-500">Por cobrar</p>
-                <p class="mt-1 text-xl font-black text-rose-700">{{ totalBalance() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+              <div class="rounded-2xl bg-white/80 px-3 py-3 shadow-[inset_2px_3px_8px_rgba(193,106,161,0.06)]">
+                <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Por cobrar</p>
+                <p class="mt-1 text-xl font-black leading-none text-rose-700">{{ totalBalance() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
               </div>
             </div>
           </section>
         }
 
-        <!-- Filters & Search (Integrated) -->
-        <div class="card-coquette p-5 animate-slide-up delay-100" style="opacity:0; animation-fill-mode: forwards;">
-          <div class="flex flex-wrap gap-4 items-end">
-            <div class="w-full min-w-0 md:flex-1 md:min-w-[300px] relative">
-              <label class="label-coquette">🔍 Buscar Tanda o Producto</label>
-              <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
-                <input class="input-coquette pl-10"
-                       type="search"
-                       [ngModel]="searchQuery()"
-                       (ngModelChange)="searchQuery.set($event)"
-                       placeholder="Nombre de tanda o producto..." 
-                       aria-label="Buscar tanda o producto" />
-              </div>
-            </div>
-
-            <div class="w-48">
-              <label class="label-coquette">📋 Estado</label>
-              <select class="input-coquette py-2"
-                      [ngModel]="statusFilter()"
-                      (ngModelChange)="statusFilter.set($event)"
-                      aria-label="Filtrar por estado">
-                <option value="">Todas</option>
-                <option value="Active">🟢 Activas</option>
-                <option value="Draft">📝 Borradores</option>
-                <option value="Completed">💖 Completadas</option>
-                <option value="Cancelled">Canceladas</option>
-              </select>
-            </div>
+        <section class="rounded-[1.45rem] border border-white/80 bg-white/65 p-3 shadow-[inset_2px_3px_10px_rgba(193,106,161,0.08),8px_10px_24px_rgba(193,106,161,0.08)] backdrop-blur-md" aria-label="Buscar y filtrar tandas">
+          <label class="relative block">
+            <span class="sr-only">Buscar tanda o producto</span>
+            <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg text-pink-400">⌕</span>
+            <input class="input-coquette !h-11 !rounded-2xl !bg-white/90 pl-11 text-sm"
+                   type="search"
+                   [ngModel]="searchQuery()"
+                   (ngModelChange)="searchQuery.set($event)"
+                   placeholder="Busca una tanda o producto..."
+                   aria-label="Buscar tanda o producto" />
+          </label>
+          <div class="mt-3 flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide" aria-label="Estados de tandas">
+            <button type="button" (click)="statusFilter.set('')" [class.bg-pink-200]="statusFilter() === ''" [class.text-pink-800]="statusFilter() === ''" class="min-h-8 shrink-0 rounded-full border border-pink-100 bg-white/80 px-3 text-[11px] font-black text-pink-400 transition-colors">Todas</button>
+            <button type="button" (click)="statusFilter.set('Active')" [class.bg-pink-200]="statusFilter() === 'Active'" [class.text-pink-800]="statusFilter() === 'Active'" class="min-h-8 shrink-0 rounded-full border border-pink-100 bg-white/80 px-3 text-[11px] font-black text-pink-400 transition-colors">Activas</button>
+            <button type="button" (click)="statusFilter.set('Draft')" [class.bg-pink-200]="statusFilter() === 'Draft'" [class.text-pink-800]="statusFilter() === 'Draft'" class="min-h-8 shrink-0 rounded-full border border-pink-100 bg-white/80 px-3 text-[11px] font-black text-pink-400 transition-colors">Por revisar</button>
+            <button type="button" (click)="statusFilter.set('Completed')" [class.bg-pink-200]="statusFilter() === 'Completed'" [class.text-pink-800]="statusFilter() === 'Completed'" class="min-h-8 shrink-0 rounded-full border border-pink-100 bg-white/80 px-3 text-[11px] font-black text-pink-400 transition-colors">Finalizadas</button>
+            <button type="button" (click)="statusFilter.set('Cancelled')" [class.bg-pink-200]="statusFilter() === 'Cancelled'" [class.text-pink-800]="statusFilter() === 'Cancelled'" class="min-h-8 shrink-0 rounded-full border border-pink-100 bg-white/80 px-3 text-[11px] font-black text-pink-400 transition-colors">Canceladas</button>
           </div>
+        </section>
+
+        <div class="flex items-center justify-between gap-3 px-1">
+          <h2 class="text-base font-black text-pink-950 sm:text-lg">Tus tandas</h2>
+          @if (!loadingTandas()) {
+            <span class="text-[11px] font-bold text-pink-400">{{ filteredTandas().length }} en total</span>
+          }
         </div>
 
-        <!-- Tandas Grid -->
         @if (loadingTandas()) {
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @for (i of [1,2,3]; track i) {
-              <div class="shimmer h-64 rounded-3xl"></div>
+          <div class="space-y-3" aria-label="Cargando tandas">
+            @for (i of [1,2,3,4]; track i) {
+              <div class="shimmer h-24 rounded-[1.35rem]"></div>
             }
           </div>
         } @else {
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 pb-8">
+          <div class="space-y-3 pb-8">
             @for (tanda of filteredTandas(); track tanda.id) {
-              <div [routerLink]="['/admin/tandas', tanda.id]" 
-                   class="tanda-card-anim group relative rounded-[1.75rem] p-[1px] bg-gradient-to-br from-pink-200/60 via-white to-rose-200/60 hover:from-pink-300/80 hover:to-rose-300/80 transition-all duration-500 opacity-0 translate-y-8 cursor-pointer">
-                
-                <div class="relative bg-white/90 backdrop-blur-xl rounded-[1.7rem] p-6 flex flex-col h-full shadow-[0_8px_32px_rgba(244,114,182,0.08)] group-hover:shadow-[0_20px_50px_rgba(244,114,182,0.18)] transition-shadow duration-500 overflow-hidden">
-                  
-                  <!-- Card Header -->
-                  <div class="flex justify-between items-start mb-4">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                      <span class="text-[10px] font-black text-pink-400 tracking-[0.2em] uppercase">Tanda #{{ tanda.id.slice(0,4) }}</span>
-                      @if (tanda.currency === 'USD') {
-                        <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200">USD</span>
-                      }
-                    </div>
-                    <span class="badge shadow-sm" [class]="statusClass(tanda.status)">
-                      {{ statusLabel(tanda.status) }}
-                    </span>
-                  </div>
-
-                  <!-- Tanda Name -->
-                  <div class="flex-1 mb-5">
-                    <h3 class="text-xl font-black text-pink-900 leading-tight mb-2 group-hover:text-pink-600 transition-colors">
-                      {{ tanda.name }}
-                    </h3>
-                    <div class="flex items-center gap-2">
-                      <span class="w-8 h-8 rounded-lg bg-pink-50 flex items-center justify-center text-lg">🎁</span>
-                      <span class="text-xs text-pink-500 font-medium">{{ tanda.product?.name || 'Producto por definir' }}</span>
-                    </div>
-                  </div>
-
-                  <!-- Financial Stats -->
-                  <div class="bg-gradient-to-br from-pink-50/70 via-rose-50/40 to-purple-50/30 rounded-2xl p-4 mb-5 border border-pink-100/40 group-hover:border-pink-200/60 transition-colors shadow-inner">
-                    <div class="flex justify-between items-end">
-                      <div>
-                        <p class="text-[10px] text-pink-400 font-bold mb-1 uppercase tracking-wider">Abono Semanal</p>
-                        <p class="text-2xl font-black text-pink-700">
-                          {{ tanda.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
-                        </p>
-                      </div>
-                      <div class="text-right">
-                        <p class="text-[10px] font-black text-pink-500 bg-white/80 px-2 py-1 rounded-xl shadow-sm border border-pink-100 inline-block">
-                        {{ tanda.totalWeeks }} Semanas
-                        </p>
-                        @if (tanda.itemCost) {
-                          <p class="text-[10px] font-bold text-purple-700 mt-1">
-                            Valor: {{ tanda.itemCost | currency:(tanda.currency || 'MXN'):'symbol-narrow':'1.0-0' }}
-                          </p>
-                        }
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="mb-5 space-y-2" aria-label="Avance de cobro">
-                    <div class="flex items-center justify-between text-[11px] font-bold text-pink-700">
-                      <span>{{ tanda.participantCount }} de {{ tanda.totalWeeks }} lugares</span>
-                      <span>{{ tanda.progressPercentage | number:'1.0-0' }}% cobrado</span>
-                    </div>
-                    <div class="h-2 overflow-hidden rounded-full bg-pink-100">
-                      <div class="h-full rounded-full bg-pink-600 transition-[width] duration-300"
-                           [style.width.%]="tanda.progressPercentage"></div>
-                    </div>
-                    <div class="flex items-center justify-between text-[10px] font-semibold text-pink-500">
-                      <span>{{ tanda.collectedAmount | currency:'MXN':'symbol-narrow':'1.0-0' }} recibidos</span>
-                      <span>{{ tanda.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }} pendientes</span>
-                    </div>
-                  </div>
-
-                  <button class="btn-coquette btn-pink w-full py-2.5 justify-center text-xs font-black">
-                     Gestionar Tanda ➜
-                  </button>
-                </div>
-
-                <!-- Card Shine Effect -->
-                <div class="absolute inset-0 -translate-x-full group-hover:animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12 pointer-events-none"></div>
-              </div>
+              <a [routerLink]="['/admin/tandas', tanda.id]"
+                 class="tanda-card-anim group flex min-h-[94px] items-center gap-3 rounded-[1.35rem] border border-white/80 bg-white/85 p-3 opacity-0 shadow-[8px_10px_24px_rgba(193,106,161,0.1)] backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[10px_14px_30px_rgba(193,106,161,0.16)] focus:outline-none focus:ring-2 focus:ring-pink-300 sm:gap-4 sm:p-4">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-100 to-purple-100 text-xl shadow-inner sm:h-12 sm:w-12">{{ tanda.product ? '🎁' : '🪄' }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <span class="truncate text-sm font-black text-pink-950 sm:text-base">{{ tanda.name }}</span>
+                    <span class="badge shrink-0 text-[10px]" [class]="statusClass(tanda.status)">{{ statusLabel(tanda.status) }}</span>
+                    @if (tanda.currency === 'USD') {
+                      <span class="shrink-0 rounded-md border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[9px] font-black text-purple-700">USD</span>
+                    }
+                  </span>
+                  <span class="mt-1 block truncate text-[11px] font-medium text-pink-400">{{ tanda.product?.name || 'Producto por definir' }} <span class="mx-1">·</span> Semana {{ tanda.currentWeek > tanda.totalWeeks ? tanda.totalWeeks : (tanda.currentWeek || 0) }} de {{ tanda.totalWeeks }} <span class="mx-1">·</span> {{ tanda.participantCount }} lugares</span>
+                  <span class="mt-2 block h-1.5 overflow-hidden rounded-full bg-pink-100" aria-label="Avance de cobro">
+                    <span class="block h-full rounded-full bg-gradient-to-r from-pink-400 to-purple-400 transition-[width] duration-300" [style.width.%]="tanda.progressPercentage"></span>
+                  </span>
+                </span>
+                <span class="flex shrink-0 items-center gap-2 text-right">
+                  <span class="hidden sm:block"><span class="block text-sm font-black text-pink-700">{{ tanda.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span><span class="mt-0.5 block text-[10px] font-semibold text-pink-400">por semana</span></span>
+                  <span class="text-xl font-light text-pink-300">›</span>
+                </span>
+              </a>
             } @empty {
-              <div class="card-coquette p-16 text-center col-span-full animate-bounce-in">
-                <div class="text-6xl mb-4">🦋</div>
-                <h3 class="text-2xl font-black text-pink-900 mb-2">Aún no hay tandas</h3>
-                <p class="text-pink-500 font-medium mb-6">Comienza tu viaje de ahorro creando la primera tanda.</p>
-                <button (click)="openCreateModal()" class="btn-coquette btn-pink mx-auto">Crear Primera Tanda ✨</button>
+              <div class="card-coquette p-10 text-center sm:p-16">
+                <div class="mb-4 text-5xl">🦋</div>
+                <h3 class="mb-2 text-xl font-black text-pink-900">No encontré tandas</h3>
+                <p class="mb-6 text-sm font-medium text-pink-500">Prueba con otra búsqueda o crea una nueva tanda.</p>
+                <button (click)="openCreateModal()" class="btn-coquette btn-pink mx-auto">Nueva tanda ✨</button>
               </div>
             }
           </div>

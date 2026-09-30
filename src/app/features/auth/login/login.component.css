@@ -1,0 +1,599 @@
+:host {
+  display: block;
+  min-height: 100%;
+  color-scheme: light;
+}
+
+.rb-login-page,
+.rb-login-page *,
+.rb-login-page *::before,
+.rb-login-page *::after {
+  box-sizing: border-box;
+}
+
+.rb-login-page {
+  --rb-pink: #ff5fa2;
+  --rb-pink-dark: #d9367d;
+  --rb-pink-soft: #ffd5e8;
+  --rb-lilac: #e9ddff;
+  --rb-lilac-dark: #9d7bd2;
+  --rb-yellow: #ffe49b;
+  --rb-ink: #66324f;
+  --rb-muted: #a26f8e;
+  --rb-line: #f3cade;
+  --rb-surface: #fff3f9;
+  --rb-highlight: rgba(255, 255, 255, 0.96);
+  --rb-soft-shadow: rgba(207, 137, 171, 0.24);
+  display: flex;
+  min-height: 100svh;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  color: var(--rb-ink);
+  background:
+    radial-gradient(circle at 8% 20%, rgba(255, 255, 255, 0.75) 0 4px, transparent 5px),
+    radial-gradient(circle at 82% 72%, rgba(255, 255, 255, 0.7) 0 3px, transparent 4px),
+    #fff0f7;
+  background-size: 120px 120px, 155px 155px, auto;
+  font-family: var(--font-body, 'Quicksand', sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rb-login-shell {
+  position: relative;
+  display: grid;
+  width: min(100%, 1080px);
+  overflow: hidden;
+  border: 4px solid rgba(255, 255, 255, 0.88);
+  border-radius: 30px;
+  background: #fffafd;
+  box-shadow: 0 17px 0 rgba(217, 54, 125, 0.08), 0 28px 48px rgba(198, 73, 124, 0.2), 8px 8px 20px rgba(207, 137, 171, 0.12), -8px -8px 20px rgba(255, 255, 255, 0.84);
+}
+
+.rb-login-shell::after {
+  position: absolute;
+  top: 15px;
+  right: 19px;
+  color: rgba(255, 255, 255, 0.8);
+  content: '\2665';
+  font-size: 21px;
+  pointer-events: none;
+  transform: rotate(18deg);
+}
+
+.rb-login-poster {
+  position: relative;
+  display: flex;
+  min-height: 365px;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  padding: 25px 21px 27px;
+  text-align: center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.5) 0 7px, transparent 8px),
+    radial-gradient(circle at 88% 70%, rgba(255, 255, 255, 0.45) 0 5px, transparent 6px),
+    linear-gradient(155deg, #ff9bc5 0%, #ff72af 48%, #d990f2 100%);
+  background-size: 106px 106px, 126px 126px, auto;
+}
+
+.rb-login-poster::before,
+.rb-login-poster::after {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.13);
+  content: '';
+  pointer-events: none;
+}
+
+.rb-login-poster::before {
+  width: 260px;
+  height: 260px;
+  top: -130px;
+  left: -105px;
+}
+
+.rb-login-poster::after {
+  width: 220px;
+  height: 220px;
+  right: -115px;
+  bottom: -110px;
+}
+
+.rb-login-brand,
+.rb-login-poster-copy,
+.rb-login-illustration,
+.rb-login-sticker {
+  position: relative;
+  z-index: 1;
+}
+
+.rb-login-brand {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  color: #fff;
+  text-align: left;
+}
+
+.rb-login-brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 3px solid rgba(255, 255, 255, 0.65);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 7px 12px rgba(168, 44, 103, 0.16);
+}
+
+.rb-login-brand-mark svg {
+  width: 23px;
+  height: 23px;
+}
+
+.rb-login-brand-title,
+.rb-login-brand-subtitle {
+  display: block;
+}
+
+.rb-login-brand-title {
+  font-family: var(--font-accent, 'Great Vibes', cursive);
+  font-size: 25px;
+  line-height: 1;
+}
+
+.rb-login-brand-subtitle {
+  margin-top: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.rb-login-illustration {
+  display: grid;
+  width: 178px;
+  height: 178px;
+  margin-top: 22px;
+  place-items: center;
+  border: 7px solid rgba(255, 255, 255, 0.58);
+  border-radius: 46% 54% 50% 50%;
+  background: linear-gradient(145deg, #fff9fd, #ffd9ed);
+  box-shadow: 0 12px 0 rgba(196, 52, 118, 0.12), 0 15px 22px rgba(169, 45, 104, 0.18);
+  transform: rotate(-3deg);
+}
+
+.rb-login-logo-image {
+  width: 168px;
+  height: 168px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 6px rgba(169, 45, 104, 0.14));
+}
+
+.rb-login-poster-copy {
+  margin-top: 20px;
+  color: #fff;
+}
+
+.rb-login-poster-copy h1 {
+  max-width: 310px;
+  margin: 0;
+  font-size: 31px;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.rb-login-poster-copy h1 em {
+  color: #fff6a8;
+  font-style: normal;
+}
+
+.rb-login-poster-copy p {
+  max-width: 270px;
+  margin: 9px auto 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.rb-login-sticker {
+  position: absolute;
+  right: 17px;
+  bottom: 20px;
+  display: grid;
+  width: 57px;
+  height: 57px;
+  place-items: center;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  color: var(--rb-pink-dark);
+  background: var(--rb-yellow);
+  box-shadow: 0 8px 0 rgba(199, 73, 111, 0.14);
+  transform: rotate(11deg);
+}
+
+.rb-login-sticker svg {
+  width: 24px;
+  height: 24px;
+}
+
+.rb-login-form-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 20px 39px;
+  background: var(--rb-surface);
+  box-shadow: inset 10px 10px 24px var(--rb-soft-shadow), inset -10px -10px 24px var(--rb-highlight);
+}
+
+.rb-login-form-wrap {
+  width: min(100%, 370px);
+}
+
+.rb-login-welcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 9px;
+  color: var(--rb-pink-dark);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rb-login-welcome svg {
+  width: 15px;
+  height: 15px;
+}
+
+.rb-login-form-wrap h2 {
+  margin: 0;
+  font-size: 35px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.rb-login-form-intro {
+  margin: 10px 0 27px;
+  color: var(--rb-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rb-login-field {
+  margin-top: 17px;
+}
+
+.rb-login-label {
+  display: block;
+  margin: 0 0 7px 4px;
+  color: var(--rb-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rb-login-input-shell {
+  position: relative;
+}
+
+.rb-login-input {
+  width: 100%;
+  height: 53px;
+  padding: 0 16px 0 45px;
+  border: 1px solid rgba(243, 202, 222, 0.75);
+  border-radius: 17px;
+  outline: 0;
+  color: var(--rb-ink);
+  background: var(--rb-surface);
+  box-shadow: inset 4px 4px 9px rgba(207, 137, 171, 0.18), inset -4px -4px 9px var(--rb-highlight);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.rb-login-input::placeholder {
+  color: #d2a7ba;
+}
+
+.rb-login-input:focus {
+  border-color: var(--rb-pink);
+  background: #fffafd;
+  box-shadow: inset 4px 4px 9px rgba(207, 137, 171, 0.12), inset -4px -4px 9px var(--rb-highlight), 0 0 0 4px rgba(255, 95, 162, 0.13);
+}
+
+.rb-login-input-icon {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 17px;
+  height: 17px;
+  color: var(--rb-pink);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.rb-login-input-password {
+  padding-right: 50px;
+}
+
+.rb-login-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 11px;
+  color: var(--rb-pink-dark);
+  background: var(--rb-surface);
+  box-shadow: 3px 3px 7px rgba(207, 137, 171, 0.18), -3px -3px 7px var(--rb-highlight);
+  cursor: pointer;
+  touch-action: manipulation;
+  transform: translateY(-50%);
+}
+
+.rb-login-password-toggle:hover,
+.rb-login-password-toggle:focus-visible {
+  background: var(--rb-pink-soft);
+  box-shadow: inset 2px 2px 5px rgba(207, 137, 171, 0.18), inset -2px -2px 5px var(--rb-highlight);
+}
+
+.rb-login-password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rb-login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.rb-login-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  color: var(--rb-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rb-login-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--rb-pink);
+}
+
+.rb-login-help {
+  color: var(--rb-pink-dark);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.rb-login-error {
+  margin-top: 16px;
+  padding: 11px 13px;
+  border: 1px solid rgba(218, 74, 117, 0.24);
+  border-radius: 14px;
+  color: #a72e5e;
+  background: #fff0f5;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rb-login-action {
+  display: flex;
+  min-height: 55px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 25px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(105deg, #ff67a8, #e5418b);
+  box-shadow: 0 9px 0 #c62e70, 0 15px 22px rgba(221, 53, 120, 0.22);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.rb-login-action:hover,
+.rb-login-action:focus-visible {
+  box-shadow: 0 11px 0 #c62e70, 0 18px 25px rgba(221, 53, 120, 0.27);
+  transform: translateY(-2px);
+}
+
+.rb-login-action:active {
+  box-shadow: 0 4px 0 #c62e70, 0 8px 13px rgba(221, 53, 120, 0.18);
+  transform: translateY(5px);
+}
+
+.rb-login-action:disabled {
+  cursor: wait;
+  opacity: 0.78;
+  transform: none;
+}
+
+.rb-login-action svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 180ms ease;
+}
+
+.rb-login-action:hover svg {
+  transform: translateX(3px);
+}
+
+.rb-login-spinner {
+  width: 19px;
+  height: 19px;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: rb-login-spin 700ms linear infinite;
+}
+
+.rb-login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 22px 0 0;
+  color: #c18ba7;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rb-login-footer svg {
+  width: 14px;
+  height: 14px;
+  color: var(--rb-pink);
+}
+
+@keyframes rb-login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 760px) {
+  .rb-login-page {
+    align-items: center;
+    padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  }
+
+  .rb-login-shell {
+    grid-template-columns: minmax(310px, 0.92fr) minmax(360px, 1.08fr);
+    min-height: 590px;
+    border-radius: 38px;
+  }
+
+  .rb-login-poster {
+    min-height: 590px;
+    padding: 34px 30px 29px;
+  }
+
+  .rb-login-illustration {
+    width: 255px;
+    height: 255px;
+    margin-top: 30px;
+    border-width: 10px;
+  }
+
+  .rb-login-logo-image {
+    width: 238px;
+    height: 238px;
+  }
+
+  .rb-login-poster-copy {
+    margin-top: 27px;
+  }
+
+  .rb-login-poster-copy h1 {
+    font-size: 42px;
+  }
+
+  .rb-login-poster-copy p {
+    margin-top: 12px;
+    font-size: 13px;
+  }
+
+  .rb-login-sticker {
+    right: 24px;
+    bottom: 27px;
+    width: 70px;
+    height: 70px;
+    border-width: 4px;
+  }
+
+  .rb-login-sticker svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .rb-login-form-side {
+    padding: 50px clamp(32px, 6vw, 78px);
+  }
+
+  .rb-login-form-wrap h2 {
+    font-size: 38px;
+  }
+}
+
+@media (max-width: 370px) {
+  .rb-login-page {
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+
+  .rb-login-poster {
+    min-height: 350px;
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .rb-login-brand-title {
+    font-size: 23px;
+  }
+
+  .rb-login-illustration {
+    width: 162px;
+    height: 162px;
+  }
+
+  .rb-login-logo-image {
+    width: 151px;
+    height: 151px;
+  }
+
+  .rb-login-poster-copy h1 {
+    font-size: 28px;
+  }
+
+  .rb-login-poster-copy p {
+    max-width: 245px;
+  }
+
+  .rb-login-form-side {
+    padding-right: 17px;
+    padding-left: 17px;
+  }
+
+  .rb-login-options {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rb-login-help {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-login-page *,
+  .rb-login-page *::before,
+  .rb-login-page *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

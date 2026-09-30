@@ -1,20 +1,32 @@
-<div class="space-y-6">
+<div class="rb-capture-shell space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-2 animate-slide-down">
-        <h2 class="text-2xl font-bold text-pink-900 m-0">📦 Captura Rápida</h2>
-        <p class="text-pink-400 font-medium m-0">Sube tu Excel del Live o captura a mano, tú decides bewis ✨</p>
+    <div class="rb-capture-header flex flex-col gap-2 animate-slide-down">
+        <div class="rb-capture-heading">
+            <p>Hola, Yadira 💕</p>
+            <h2 class="text-2xl font-bold text-pink-900 m-0">Crear pedido <span aria-hidden="true">✨</span></h2>
+        </div>
+        <p class="rb-capture-subtitle text-pink-400 font-medium m-0">Elige cómo capturarlo y te dejo todo listo para confirmar.</p>
     </div>
 
-    <div class="tab-switch">
-        <button [class.active]="mode() === 'excel'" (click)="mode.set('excel')">📄 Excel</button>
+    <section class="rb-capture-hero" aria-label="Resumen de creación de pedidos">
+        <div>
+            <p class="rb-capture-eyebrow">Captura sin pensar de más</p>
+            <h3>Un pedido = clienta + artículos + entrega</h3>
+            <p>Turbo, Manual, IA o Excel: tú eliges el camino que mejor se adapta a tu Live.</p>
+        </div>
+        <span class="rb-capture-hero-icon" aria-hidden="true">🪄</span>
+    </section>
+
+    <div class="tab-switch rb-capture-methods" role="tablist" aria-label="Método de captura">
         <button [class.active]="mode() === 'manual'" (click)="mode.set('manual')">🚀 Turbo</button>
         <button [class.active]="mode() === 'traditional'" (click)="mode.set('traditional')">✏️ Manual</button>
         <button [class.active]="mode() === 'live'" (click)="mode.set('live')" class="live-tab">✨ IA Gemini</button>
+        <button [class.active]="mode() === 'excel'" (click)="mode.set('excel')">📄 Excel</button>
     </div>
 
     <!-- ═══════════ EXCEL TAB ═══════════ -->
     @if (mode() === 'excel') {
-    <div class="card-coquette p-8 min-h-[400px] flex flex-col items-center justify-center animate-fade-in relative z-10 border-2 border-dashed transition-all duration-300"
+    <div class="rb-capture-mode rb-capture-excel-mode card-coquette p-8 min-h-[400px] flex flex-col items-center justify-center animate-fade-in relative z-10 border-2 border-dashed transition-all duration-300"
         [class.border-pink-400]="dragging()" [class.bg-pink-50]="dragging()" [class.border-pink-200]="!dragging()"
         (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)"
         (click)="fileInput.click()">
@@ -59,7 +71,7 @@
     }
 
     @if (mode() === 'manual') {
-    <div class="animate-fade-in relative z-20 space-y-4">
+    <div class="rb-capture-mode rb-capture-turbo-mode animate-fade-in relative z-20 space-y-4">
         <!-- ORDER TYPE TOGGLE -->
         <div class="flex flex-wrap items-center gap-3 justify-between">
             <div class="flex gap-2">
@@ -244,7 +256,7 @@
 
     <!-- ═══════════ TRADITIONAL MANUAL TAB ═══════════ -->
     @if (mode() === 'traditional') {
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 animate-fade-in relative z-20">
+    <div class="rb-capture-mode rb-capture-manual-mode grid grid-cols-1 md:grid-cols-12 gap-6 animate-fade-in relative z-20">
 
         <!-- DATA ENTRY (Left/Top) -->
         <div class="md:col-span-7 space-y-5">
@@ -290,16 +302,15 @@
                                 @if ((client.ordersCount || 0) >= 1) {
                                 <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
                                 } @else {
-                                <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
+                                <span class="text-xs bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full border border-pink-200">✨ Nueva</span>
                                 }
                             </li>
                             }
                         </ul>
                         }
 
-                        <!-- Resolver multi-señal: aparece cuando hay texto y no es match exacto del autocomplete.
-                             Muestra candidatas con score y permite confirmar identidad con 1 tap. -->
-                        @if (manualClient().trim().length >= 2 && !manualResolvedClientId()) {
+                        <!-- Resolver inteligente: es la única sugerencia visible para confirmar identidad. -->
+                        @if (manualClient().trim().length >= 3 && !manualResolvedClientId() && filteredClients().length === 0) {
                         <div class="mt-2">
                             <app-client-resolver
                                 [name]="manualClient()"
@@ -492,7 +503,7 @@
 
     <!-- ═══════════ AI GEMINI TAB ═══════════ -->
     @if (mode() === 'live') {
-    <div class="animate-fade-in relative z-20">
+    <div class="rb-capture-mode rb-capture-ai-mode animate-fade-in relative z-20">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
             <!-- LEFT: Input Panel -->

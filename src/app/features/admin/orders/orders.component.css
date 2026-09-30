@@ -1,0 +1,430 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.rb-orders-shell {
+  --orders-pink: #ff5fa2;
+  --orders-deep: #bd2b70;
+  --orders-ink: #63314e;
+  --orders-muted: #a57993;
+  --orders-soft: #ffe4ef;
+  --orders-lilac: #e8ddff;
+  min-width: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  color: var(--orders-ink);
+}
+
+.rb-orders-header {
+  position: relative;
+  z-index: 1;
+}
+
+.rb-orders-heading p,
+.rb-orders-eyebrow {
+  margin: 0 0 4px;
+  color: var(--orders-pink);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.rb-orders-heading h1 {
+  margin: 0;
+  color: var(--orders-deep);
+  font-size: clamp(1.65rem, 5vw, 2rem);
+  line-height: 1;
+  letter-spacing: -.05em;
+}
+
+.rb-orders-header-actions label,
+.rb-orders-header-actions a {
+  min-height: 44px;
+  border-radius: 15px;
+  font-weight: 900;
+}
+
+.rb-orders-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) repeat(3, minmax(0, .85fr));
+  gap: 10px;
+}
+
+.rb-orders-summary-card {
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(255, 255, 255, .84);
+  border-radius: 19px;
+  background: rgba(255, 250, 252, .76);
+  box-shadow: inset 2px 2px 7px rgba(255, 255, 255, .92), inset -3px -3px 8px rgba(212, 157, 192, .10);
+}
+
+.rb-orders-summary-card span,
+.rb-orders-summary-card small {
+  display: block;
+  color: var(--orders-muted);
+  font-size: .68rem;
+  font-weight: 900;
+}
+
+.rb-orders-summary-card strong {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  color: var(--orders-deep);
+  font-size: clamp(1.15rem, 4vw, 1.45rem);
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-orders-summary-card small {
+  margin-top: 6px;
+  font-size: .66rem;
+  font-weight: 700;
+}
+
+.rb-orders-summary-card-primary {
+  border-color: transparent;
+  color: white;
+  background: linear-gradient(135deg, #ff82b8, #d83d83);
+  box-shadow: 0 5px 0 #c42e70, 0 10px 18px rgba(214, 57, 125, .16);
+}
+
+.rb-orders-summary-card-primary span,
+.rb-orders-summary-card-primary strong,
+.rb-orders-summary-card-primary small {
+  color: white;
+}
+
+.rb-orders-priority-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, .8);
+  border-radius: 22px;
+  color: white;
+  background: linear-gradient(135deg, #ff82b8, #d83d83 70%, #c14d96);
+  box-shadow: 0 6px 0 rgba(196, 46, 112, .72), 0 12px 22px rgba(214, 57, 125, .12);
+}
+
+.rb-orders-priority-note .rb-orders-eyebrow {
+  margin-bottom: 3px;
+  color: rgba(255, 255, 255, .75);
+  font-size: .62rem;
+  text-transform: uppercase;
+}
+
+.rb-orders-priority-note h2 {
+  margin: 0;
+  font-size: clamp(1.05rem, 4vw, 1.25rem);
+  font-weight: 900;
+  letter-spacing: -.03em;
+}
+
+.rb-orders-priority-note p:last-child {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, .8);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.rb-orders-priority-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 15px;
+  color: white;
+  background: rgba(255, 255, 255, .15);
+  font-size: 1.65rem;
+  font-weight: 900;
+}
+
+.rb-orders-filters {
+  border-radius: 23px;
+  border-color: rgba(255, 255, 255, .82);
+  background: rgba(255, 250, 252, .72);
+  box-shadow: inset 2px 2px 7px rgba(255, 255, 255, .88), inset -3px -3px 9px rgba(212, 157, 192, .08), 0 10px 20px rgba(186, 94, 145, .06);
+}
+
+.rb-orders-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rb-orders-filter-heading .rb-orders-eyebrow {
+  margin-bottom: 1px;
+  font-size: .62rem;
+  text-transform: uppercase;
+}
+
+.rb-orders-filter-heading h2 {
+  margin: 0;
+  color: var(--orders-ink);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.rb-orders-filter-toggle {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 13px;
+  color: var(--orders-deep);
+  background: rgba(255, 255, 255, .74);
+  box-shadow: 3px 3px 7px rgba(199, 140, 173, .10), -3px -3px 7px rgba(255, 255, 255, .85);
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 900;
+}
+
+.rb-orders-filter-toggle.is-open {
+  color: white;
+  background: linear-gradient(145deg, #b78ee7, #e65f9f);
+  box-shadow: 0 4px 0 rgba(144, 93, 189, .20);
+}
+
+.rb-orders-filter-fields {
+  margin: 0;
+}
+
+.rb-orders-filter-fields .label-coquette {
+  margin-bottom: 5px;
+  color: var(--orders-muted);
+  font-size: .66rem;
+  font-weight: 900;
+}
+
+.rb-orders-filter-fields .input-coquette {
+  min-height: 44px;
+  border-color: rgba(235, 194, 216, .72);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .65);
+  color: var(--orders-ink);
+  font-size: 16px;
+}
+
+.rb-orders-filter-chips {
+  display: flex;
+  gap: 7px;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  scrollbar-width: none;
+}
+
+.rb-orders-filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.rb-orders-chip {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, .85);
+  border-radius: 999px;
+  color: var(--orders-muted);
+  background: rgba(255, 250, 252, .54);
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.rb-orders-chip strong {
+  color: var(--orders-ink);
+}
+
+.rb-orders-chip.is-active {
+  color: var(--orders-deep);
+  background: var(--orders-soft);
+  box-shadow: inset 2px 2px 4px rgba(209, 137, 173, .14), inset -2px -2px 4px rgba(255, 255, 255, .8);
+}
+
+.rb-orders-result-count {
+  padding: 0 3px;
+  color: var(--orders-muted);
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.rb-orders-grid {
+  gap: 14px;
+}
+
+.rb-order-card {
+  border-radius: 24px;
+}
+
+.rb-order-card-surface {
+  padding: 18px !important;
+  border-radius: 23px !important;
+  background: rgba(255, 250, 252, .82) !important;
+}
+
+.rb-order-card .text-lg {
+  color: var(--orders-ink);
+  font-size: 1rem;
+}
+
+.rb-order-card .text-2xl {
+  font-size: 1.45rem;
+}
+
+.rb-order-card .status-badge {
+  border-radius: 999px;
+  font-size: .66rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.rb-orders-shell .badge-inroute {
+  color: #795aa4 !important;
+  background: var(--orders-lilac) !important;
+}
+
+.rb-orders-shell .badge-delivered {
+  color: #a14d78 !important;
+  background: #f9d9e8 !important;
+}
+
+.rb-orders-shell .badge-confirmed,
+.rb-orders-shell .badge-postponed {
+  color: var(--orders-deep) !important;
+  background: var(--orders-soft) !important;
+}
+
+.rb-orders-shell .badge-canceled,
+.rb-orders-shell .badge-notdelivered {
+  color: #a24e76 !important;
+  background: #ffe1ec !important;
+}
+
+.rb-order-financials {
+  padding: 13px !important;
+  border-radius: 18px !important;
+  border-color: rgba(235, 194, 216, .6) !important;
+}
+
+.rb-order-actions .btn-coquette,
+.rb-order-actions button {
+  min-height: 42px;
+  border-radius: 15px;
+  font-weight: 900;
+}
+
+.rb-order-delete {
+  border-radius: 12px !important;
+}
+
+@media (min-width: 768px) {
+  .rb-orders-filter-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .rb-orders-shell {
+    padding-right: 1px;
+    padding-left: 1px;
+  }
+
+  .rb-orders-header-actions label,
+  .rb-orders-header-actions a {
+    padding-right: 7px !important;
+    padding-left: 7px !important;
+    font-size: .62rem !important;
+  }
+
+  .rb-orders-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .rb-orders-summary-card-primary {
+    grid-column: 1 / -1;
+  }
+
+  .rb-orders-summary-card {
+    padding: 11px 9px;
+    border-radius: 16px;
+  }
+
+  .rb-orders-summary-card strong {
+    margin-top: 6px;
+    font-size: 1.05rem;
+  }
+
+  .rb-orders-summary-card span,
+  .rb-orders-summary-card small {
+    font-size: .58rem;
+  }
+
+  .rb-orders-priority-note {
+    padding: 14px 15px;
+    border-radius: 19px;
+  }
+
+  .rb-orders-priority-note p:last-child {
+    max-width: 245px;
+    font-size: .66rem;
+  }
+
+  .rb-orders-filter-fields:not(.is-open) > div:not(:first-child) {
+    display: none;
+  }
+
+  .rb-orders-filter-fields > div:first-child {
+    width: 100%;
+  }
+
+  .rb-order-card-surface {
+    padding: 15px !important;
+  }
+
+  .rb-order-card .mb-5 {
+    margin-bottom: 13px;
+  }
+
+  .rb-order-card .text-lg {
+    font-size: .96rem;
+  }
+
+  .rb-order-card .text-2xl {
+    font-size: 1.28rem;
+  }
+
+  .rb-order-delete {
+    top: -7px !important;
+    right: -5px !important;
+    opacity: .9 !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .rb-orders-header-actions label,
+  .rb-orders-header-actions a {
+    font-size: .56rem !important;
+  }
+
+  .rb-orders-summary-card strong {
+    font-size: .98rem;
+  }
+
+  .rb-orders-filter-heading h2 {
+    font-size: .88rem;
+  }
+}

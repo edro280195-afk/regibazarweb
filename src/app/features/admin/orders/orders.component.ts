@@ -2,14 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } 
 import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { BluetoothPrinterService } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, SalesPeriodDto, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto } from '../../../core/models';
+import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
@@ -24,14 +24,18 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 @Component({
   selector: 'app-orders',
   standalone: true,
-  imports: [FormsModule, CurrencyPipe, DatePipe, RouterLink, BirthdayCouponComponent, GoogleAutocompleteDirective],
+  imports: [FormsModule, CurrencyPipe, DatePipe, DecimalPipe, RouterLink, BirthdayCouponComponent, GoogleAutocompleteDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './orders.component.css',
   template: `
-    <div class="space-y-6">
+    <div class="rb-orders-shell space-y-5">
       <!-- Header -->
-      <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between animate-slide-down">
-        <h1 class="text-2xl font-bold text-pink-900">📦 Pedidos</h1>
-        <div class="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+      <div class="rb-orders-header flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-down">
+        <div class="rb-orders-heading">
+          <p>Hola, Yadira 💕</p>
+          <h1 class="text-2xl font-bold text-pink-900">Pedidos <span aria-hidden="true">📦</span></h1>
+        </div>
+        <div class="rb-orders-header-actions grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
           <label class="btn-coquette btn-outline-pink min-w-0 cursor-pointer justify-center px-2 py-2 text-[10px] sm:px-4 sm:text-sm" aria-label="Importar pedidos desde Excel">
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
@@ -47,9 +51,51 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
         </div>
       </div>
 
+      <!-- Clarity-first summary -->
+      <section class="rb-orders-summary" aria-label="Resumen de pedidos">
+        <article class="rb-orders-summary-card rb-orders-summary-card-primary">
+          <span>Total</span>
+          <strong>{{ getOrderTotal() | number:'1.0-0' }}</strong>
+          <small>Pedidos registrados</small>
+        </article>
+        <article class="rb-orders-summary-card">
+          <span>Pendientes</span>
+          <strong>{{ getPendingCount() | number:'1.0-0' }}</strong>
+          <small>Revisar primero</small>
+        </article>
+        <article class="rb-orders-summary-card">
+          <span>En ruta</span>
+          <strong>{{ getInRouteCount() | number:'1.0-0' }}</strong>
+          <small>En camino</small>
+        </article>
+        <article class="rb-orders-summary-card">
+          <span>Por cobrar</span>
+          <strong>{{ getPendingAmount() | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
+          <small>Saldo pendiente</small>
+        </article>
+      </section>
+
+      <section class="rb-orders-priority-note" aria-label="Prioridad de pedidos">
+        <div>
+          <p class="rb-orders-eyebrow">Tu espacio de trabajo</p>
+          <h2>Tu cola de hoy está aquí ✨</h2>
+          <p>Empieza por los pedidos pendientes y deja que lo demás fluya.</p>
+        </div>
+        <span class="rb-orders-priority-icon" aria-hidden="true">↓</span>
+      </section>
+
       <!-- Filters -->
-      <div class="card-coquette p-4 animate-slide-up delay-100" style="opacity:0">
-        <div class="flex flex-wrap gap-3 items-end">
+      <div class="rb-orders-filters card-coquette p-4 animate-slide-up delay-100" style="opacity:0">
+        <div class="rb-orders-filter-heading">
+          <div>
+            <p class="rb-orders-eyebrow">Encuentra rápido</p>
+            <h2>Busca y filtra tus pedidos</h2>
+          </div>
+          <button type="button" class="rb-orders-filter-toggle" [class.is-open]="filtersOpen()" (click)="toggleFilters()" [attr.aria-expanded]="filtersOpen()">
+            {{ filtersOpen() ? 'Ocultar filtros' : 'Más filtros' }}
+          </button>
+        </div>
+        <div class="rb-orders-filter-fields flex flex-wrap gap-3 items-end" [class.is-open]="filtersOpen()">
           <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette">🔍 Buscar</label>
             <input class="input-coquette" placeholder="Clienta, artículo o #123..." [(ngModel)]="search" (input)="loadOrders()" />
@@ -84,11 +130,18 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
             </select>
           </div>
         </div>
+        <div class="rb-orders-filter-chips" aria-label="Filtros de estado rápidos">
+          <button type="button" class="rb-orders-chip" [class.is-active]="!statusFilter" (click)="setStatusFilter('')">Todos <strong>{{ getOrderTotal() | number:'1.0-0' }}</strong></button>
+          <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'Pending'" (click)="setStatusFilter('Pending')">Pendientes <strong>{{ getPendingCount() | number:'1.0-0' }}</strong></button>
+          <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'Confirmed'" (click)="setStatusFilter('Confirmed')">Confirmados</button>
+          <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'InRoute'" (click)="setStatusFilter('InRoute')">En ruta <strong>{{ getInRouteCount() }}</strong></button>
+          <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'Delivered'" (click)="setStatusFilter('Delivered')">Entregados</button>
+        </div>
       </div>
 
       <!-- Order Stats Bar -->
       @if (totalCount() > 0) {
-        <div class="text-sm text-pink-400 font-medium animate-fade-in">
+        <div class="rb-orders-result-count text-sm text-pink-400 font-medium animate-fade-in">
           Mostrando {{ orders().length }} de {{ totalCount() }} pedidos 💕
         </div>
       }
@@ -101,10 +154,10 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           }
         </div>
       } @else {
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7 pb-8">
+        <div class="rb-orders-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7 pb-8">
           @for (order of orders(); track order.id; let i = $index) {
-            <div class="order-card-anim group relative rounded-[1.75rem] p-[1px] bg-gradient-to-br from-pink-200/60 via-white to-rose-200/60 hover:from-pink-300/80 hover:to-rose-300/80 transition-all duration-500 opacity-0 translate-y-8">
-              <div class="relative bg-white/90 backdrop-blur-xl rounded-[1.7rem] p-6 flex flex-col h-full shadow-[0_8px_32px_rgba(244,114,182,0.08),0_2px_8px_rgba(0,0,0,0.04)] group-hover:shadow-[0_20px_50px_rgba(244,114,182,0.18),0_8px_20px_rgba(0,0,0,0.06)] transition-shadow duration-500">
+            <div class="rb-order-card order-card-anim group relative rounded-[1.75rem] p-[1px] bg-gradient-to-br from-pink-200/60 via-white to-rose-200/60 hover:from-pink-300/80 hover:to-rose-300/80 transition-all duration-500 opacity-0 translate-y-8">
+              <div class="rb-order-card-surface relative bg-white/90 backdrop-blur-xl rounded-[1.7rem] p-6 flex flex-col h-full shadow-[0_8px_32px_rgba(244,114,182,0.08),0_2px_8px_rgba(0,0,0,0.04)] group-hover:shadow-[0_20px_50px_rgba(244,114,182,0.18),0_8px_20px_rgba(0,0,0,0.06)] transition-shadow duration-500">
               
                 <!-- Card Header -->
                 <div class="flex justify-between items-start mb-4">
@@ -174,7 +227,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                 </div>
 
                 <!-- Financials & Progress -->
-                <div class="bg-gradient-to-br from-pink-50/70 via-rose-50/40 to-purple-50/30 rounded-2xl p-4 mb-5 border border-pink-100/40 group-hover:border-pink-200/60 transition-colors shadow-inner shadow-pink-100/20">
+                <div class="rb-order-financials bg-gradient-to-br from-pink-50/70 via-rose-50/40 to-purple-50/30 rounded-2xl p-4 mb-5 border border-pink-100/40 group-hover:border-pink-200/60 transition-colors shadow-inner shadow-pink-100/20">
                   <div class="flex justify-between items-end mb-2.5">
                     <div>
                       <p class="text-[10px] text-pink-400 font-bold mb-1 uppercase tracking-wider">Total <span class="text-pink-300">({{ order.itemsCount }} arts)</span></p>
@@ -223,7 +276,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                 </div>
 
                 <!-- Actions (Bottom) -->
-                <div class="flex flex-col gap-2.5 mt-auto">
+                <div class="rb-order-actions flex flex-col gap-2.5 mt-auto">
                   <button class="btn-coquette btn-pink w-full py-3 shadow-md shadow-pink-200/30 hover:shadow-lg hover:shadow-pink-300/40 transition-all flex justify-center items-center gap-2 group/btn text-sm" (click)="selectOrder(order)">
                     <span class="group-hover/btn:scale-125 group-hover/btn:rotate-12 transition-transform duration-300">✨</span> <span class="font-black">Administrar</span>
                   </button>
@@ -239,7 +292,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
               </div>
               
               <!-- Floating Delete Icon -->
-              <button class="absolute -top-2.5 -right-2.5 w-8 h-8 bg-white text-pink-300 hover:text-rose-500 hover:bg-rose-50 rounded-full shadow-lg shadow-pink-200/20 border border-pink-100/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 scale-75 hover:scale-110 active:scale-90" 
+              <button class="rb-order-delete absolute -top-2.5 -right-2.5 w-8 h-8 bg-white text-pink-300 hover:text-rose-500 hover:bg-rose-50 rounded-full shadow-lg shadow-pink-200/20 border border-pink-100/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10 scale-75 hover:scale-110 active:scale-90"
                       title="Eliminar pedido" (click)="deleteOrder(order.id)">
                 🗑️
               </button>
@@ -376,7 +429,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 
             <!-- Delivery & Period Toggles -->
             @if (drawerTab() === 'delivery') {
-            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
               <div>
                 <label class="block text-xs font-bold text-pink-900 mb-2 uppercase">Tipo de Entrega</label>
                 <div class="flex bg-pink-50/50 p-1 rounded-xl border border-pink-100 shadow-inner">
@@ -389,15 +442,6 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                 </div>
               </div>
               
-              <div>
-                <label class="block text-xs font-bold text-pink-900 mb-2 uppercase">Corte de Venta</label>
-                <select class="input-coquette h-[42px] py-1 shadow-sm border-pink-100" [ngModel]="selectedOrder()!.salesPeriodId || 'null'" (change)="changeSalesPeriod($event)">
-                  <option value="null">— Sin asignar —</option>
-                  @for (p of salesPeriods(); track p.id) {
-                    <option [value]="p.id">{{ p.isActive ? '🟢 ' : '' }}{{ p.name }}</option>
-                  }
-                </select>
-              </div>
             </div>
 
             <!-- Scheduled Delivery Date -->
@@ -715,10 +759,13 @@ export class OrdersComponent implements OnInit {
   private signalr = inject(SignalRService);
 
   orders = signal<OrderSummaryDto[]>([]);
+  orderStats = signal<OrderStatsDto | null>(null);
+  inRouteCount = signal<number | null>(null);
   loading = signal(true);
   totalCount = signal(0);
   currentPage = signal(1);
   pageSize = 20;
+  filtersOpen = signal(false);
 
   search = '';
   statusFilter = '';
@@ -751,7 +798,6 @@ export class OrdersComponent implements OnInit {
   newItemQty = 1;
   newItemPrice = 0;
   isProcessingItem = signal(false);
-  salesPeriods = signal<SalesPeriodDto[]>([]);
   totalPages = signal(1);
 
   // Quick Client Edit
@@ -779,10 +825,13 @@ export class OrdersComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadOrders();
-    this.initSignalR();
-    this.api.getSalesPeriods().subscribe({
-      next: (periods) => this.salesPeriods.set(periods)
+    this.api.getOrderStats().subscribe({
+      next: stats => this.orderStats.set(stats)
     });
+    this.api.getOrdersPaged(1, 1, 'InRoute').subscribe({
+      next: result => this.inRouteCount.set(result.totalCount)
+    });
+    this.initSignalR();
     this.api.getLoyaltyRewards().subscribe({
       next: (r) => this.rewards.set(r),
       error: () => { /* el catálogo es opcional; no bloquea el panel */ }
@@ -853,6 +902,49 @@ export class OrdersComponent implements OnInit {
   goToPage(page: number): void {
     this.currentPage.set(page);
     this.loadOrders();
+  }
+
+  setStatusFilter(status: string): void {
+    this.statusFilter = status;
+    this.currentPage.set(1);
+    this.loadOrders();
+  }
+
+  toggleFilters(): void {
+    this.filtersOpen.update(open => !open);
+  }
+
+  getOrderCountForStatus(status: string): number {
+    return this.orders().filter(order => order.status === status).length;
+  }
+
+  getOrderTotal(): number {
+    return this.orderStats()?.total ?? this.totalCount();
+  }
+
+  getPendingCount(): number {
+    return this.orderStats()?.pending ?? this.getOrderCountForStatus('Pending');
+  }
+
+  getPendingAmount(): number {
+    return this.orderStats()?.pendingAmount ?? this.orders().reduce((total, order) => total + Math.max(0, order.balanceDue || 0), 0);
+  }
+
+  getInRouteCount(): number {
+    return this.inRouteCount() ?? this.getOrderCountForStatus('InRoute');
+  }
+
+  getStatusEmoji(status: string): string {
+    switch (status) {
+      case 'Pending': return '⏳';
+      case 'Confirmed': return '💖';
+      case 'InRoute': return '🚗';
+      case 'Delivered': return '✅';
+      case 'Canceled': return '🚫';
+      case 'NotDelivered': return '↩️';
+      case 'Postponed': return '📅';
+      default: return '📦';
+    }
   }
 
   getStatusClass(status: string): string {
@@ -1011,22 +1103,6 @@ export class OrdersComponent implements OnInit {
         this.reloadSelectedOrder();
         this.loadOrders();
       }
-    });
-  }
-
-  changeSalesPeriod(event: any): void {
-    const order = this.selectedOrder();
-    const periodId = event.target.value;
-    if (!order) return;
-
-    this.api.updateOrderDetails(order.id, {
-      salesPeriodId: periodId === 'null' ? undefined : Number(periodId)
-    }).subscribe({
-      next: () => {
-        this.toast.success('Corte de venta asignado 📊');
-        this.loadOrders();
-      },
-      error: () => this.toast.error('Error al asignar corte')
     });
   }
 

@@ -271,7 +271,10 @@ export class LabelRendererService {
         const side = Math.floor(Math.min(width, height));
         const dataUrl = await QRCode.toDataURL(value, {
             errorCorrectionLevel: element.properties.errorCorrection ?? 'M',
-            margin: 0,
+            // Keep a quiet zone around the modules. Thermal printers can blur
+            // the edge of a code, so a zero-module margin makes camera scans
+            // unnecessarily fragile.
+            margin: 1,
             width: side,
             color: { dark: '#000000', light: '#FFFFFF' }
         });
