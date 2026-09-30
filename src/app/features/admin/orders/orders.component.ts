@@ -17,6 +17,7 @@ import { CouponService } from '../../../core/services/coupon.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
 import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messenger.util';
+import { bagLabel, missingPackageCount } from './order-bags.util';
 
 type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 
@@ -521,6 +522,19 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
               @if (isLoadingPackages()) {
                 <div class="shimmer h-12 rounded-xl w-full"></div>
               } @else {
+                <!-- Pedidos capturados antes de que el número creara las bolsas: el número existe pero faltan sus QR -->
+                @if (missingPackages() > 0) {
+                  <div class="mb-3 p-3 rounded-xl bg-rose-50 border border-rose-200 flex flex-wrap items-center gap-2">
+                    <p class="grow text-[11px] font-bold text-rose-600">
+                      🛍️ Capturaste {{ bagLabel(selectedOrder()!.totalPackages ?? 0) }}, pero solo hay {{ packages().length }} con QR generada{{ packages().length === 1 ? '' : 's' }}.
+                    </p>
+                    <button type="button"
+                            class="btn-coquette btn-pink text-[10px] py-2 px-3 font-black shadow-sm disabled:opacity-50"
+                            [disabled]="isLoadingPackages()" (click)="generatePackages(missingPackages())">
+                      Generar {{ missingPackages() === 1 ? 'la faltante' : 'las ' + missingPackages() + ' faltantes' }}
+                    </button>
+                  </div>
+                }
                 <div class="space-y-2 mb-4">
                   @for (pkg of packages(); track pkg.id) {
                     <div class="flex items-center justify-between p-2.5 bg-white/80 rounded-xl border border-pink-100 shadow-sm transition-all hover:shadow-md hover:border-pink-200">
@@ -752,6 +766,9 @@ export class OrdersComponent implements OnInit {
   packages = signal<OrderPackageDto[]>([]);
   isLoadingPackages = signal(false);
   packagesToGenerate = 1;
+  /** Bolsas capturadas (número) que aún no tienen su QR: pedidos anteriores al alta que crea las bolsas. */
+  missingPackages = computed(() => missingPackageCount(this.selectedOrder(), this.packages().length));
+  readonly bagLabel = bagLabel;
 
   // Compatibilidad temporal para órdenes abiertas antes del diseñador. Las
   // acciones visibles de impresión ya usan LabelPrintService y plantillas publicadas.
@@ -1299,11 +1316,17 @@ export class OrdersComponent implements OnInit {
     });
   }
 
-  loadPackages(orderId: number) {
+  /**
+   * `syncCount`: tras generar o borrar bolsas el backend deja el número del pedido igual al de
+   * bolsas reales; lo reflejamos ya para que el aviso de "faltantes" no parpadee (ni ofrezca
+   * regenerar una bolsa recién borrada) mientras se recarga el pedido.
+   */
+  loadPackages(orderId: number, syncCount = false) {
     this.isLoadingPackages.set(true);
     this.api.getPackages(orderId).subscribe({
       next: (pkgs) => {
         this.packages.set(pkgs);
+        if (syncCount) this.syncSelectedOrderBagCount(orderId, pkgs.length);
         this.isLoadingPackages.set(false);
       },
       error: () => {
@@ -1319,7 +1342,7 @@ export class OrdersComponent implements OnInit {
     this.isLoadingPackages.set(true);
     this.api.generatePackages(order.id, { count }).subscribe({
       next: () => {
-        this.loadPackages(order.id);
+        this.loadPackages(order.id, true);
         this.reloadSelectedOrder();
         this.loadOrders();
         this.toast.success('Bolsas agregadas 🏷️');
@@ -1332,6 +1355,11 @@ export class OrdersComponent implements OnInit {
     });
   }
 
+  private syncSelectedOrderBagCount(orderId: number, count: number): void {
+    this.selectedOrder.update(current =>
+      current && current.id === orderId ? { ...current, totalPackages: count, packagesConfirmed: true } : current);
+  }
+
   /** 🗑️ Borra una bolsa generada por error (solo si aún no se ha cargado/entregado). */
   deletePackage(pkg: OrderPackageDto): void {
     const order = this.selectedOrder();
@@ -1341,6 +1369,7 @@ export class OrdersComponent implements OnInit {
     this.api.deletePackage(order.id, pkg.id).subscribe({
       next: (remaining) => {
         this.packages.set(remaining);
+        this.syncSelectedOrderBagCount(order.id, remaining.length);
         this.isLoadingPackages.set(false);
         this.reloadSelectedOrder();
         this.loadOrders();
@@ -1364,7 +1393,7 @@ export class OrdersComponent implements OnInit {
         this.loadOrders();
         if (this.selectedOrder()?.id === order.id) {
           this.reloadSelectedOrder();
-          this.loadPackages(order.id);
+          this.loadPackages(order.id, true);
         }
         this.toast.success(`${createdPackages.length} bolsa${createdPackages.length === 1 ? '' : 's'} creada${createdPackages.length === 1 ? '' : 's'} con QR 🛍️`);
         this.autoPrintPackages(createdPackages);
@@ -1400,7 +1429,12 @@ export class OrdersComponent implements OnInit {
         this.orders.update(list => list.map(current => current.id === updated.id ? updated : current));
         this.savingQuickBags.set(false);
         this.bagsEditFor.set(null);
-        this.toast.success('Marcado sin bolsas 🛍️');
+        if ((updated.totalPackages ?? 0) > 0) {
+          // El backend no borra bolsas que ya tienen QR (pueden estar impresas o pegadas).
+          this.toast.warning(`Este pedido ya tiene ${bagLabel(updated.totalPackages!)} con QR. Bórralas en "Logística y Etiquetas" si de verdad va sin bolsas 🛍️`);
+        } else {
+          this.toast.success('Marcado sin bolsas 🛍️');
+        }
       },
       error: () => {
         this.savingQuickBags.set(false);
