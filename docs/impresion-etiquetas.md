@@ -26,9 +26,12 @@
 - **Artículo:** al dar de alta una mercancía queda con un `RBI…` interno aunque
   no tenga código de fábrica. Imprime la etiqueta desde la caja; el escáner
   acepta QR y código de barras y encuentra la existencia.
-- **Bolsa:** confirma la cantidad de bolsas del pedido, genera las bolsas y
-  desde el pedido imprime una o todas. Cada bolsa conserva un QR propio, por lo
-  que no se intercambian aunque pertenezcan a la misma clienta.
+- **Bolsa:** al confirmar la cantidad de bolsas del pedido (en el alta, en la
+  tarjeta del Kanban o antes de mandarlo a ruta) se crean las bolsas con su QR;
+  desde el pedido, en **Logística y Etiquetas**, imprime una o todas. Cada bolsa
+  conserva un QR propio, por lo que no se intercambian aunque pertenezcan a la
+  misma clienta. Las bolsas con QR son la fuente de verdad: el número del pedido
+  siempre coincide con ellas y nunca se borran solas.
 
 ## Desde iPad/iPhone/Android
 

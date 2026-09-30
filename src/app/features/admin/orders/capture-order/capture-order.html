@@ -459,7 +459,7 @@
                                 class="w-10 h-10 rounded-xl font-black text-lg transition-all active:scale-90"
                                 title="Más bolsas"
                                 [class]="(manualBags() ?? 0) > 5 ? 'bg-pink-500 text-white shadow-md shadow-pink-200' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
-                                (click)="manualBags.set((manualBags() && manualBags()! > 0 ? manualBags()! : 5) + 1)">＋</button>
+                                (click)="bumpManualBags()">＋</button>
                             <button type="button"
                                 class="px-3 h-10 rounded-xl font-bold text-xs transition-all active:scale-90"
                                 [class]="manualBags() === 0 ? 'bg-purple-500 text-white shadow-md' : 'bg-white text-purple-500 border border-purple-100 hover:bg-purple-50'"
@@ -471,6 +471,8 @@
                         </div>
                         @if (manualBags() === null) {
                             <p class="text-[10px] text-pink-400 mt-2">Puedes agregarlas después — te lo recordaremos y te lo pediremos antes de mandarlo a ruta 💕</p>
+                        } @else if (manualBags()! > 0) {
+                            <p class="text-[10px] text-pink-400 mt-2">Se crean con su QR al guardar el pedido y las imprimes desde "Logística y Etiquetas" 🏷️ Si el pedido ya tenía bolsas, se completan hasta este total sin borrar ninguna.</p>
                         }
                     </div>
                     <div class="flex justify-between items-end mb-4 bg-pink-50/50 p-3 rounded-xl border border-pink-100">

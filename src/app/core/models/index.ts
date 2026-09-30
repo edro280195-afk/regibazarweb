@@ -815,7 +815,8 @@ export interface ManualOrderRequest {
     forceNew?: boolean;
     /** Número de bolsas capturado en el alta. undefined/null = "no sé todavía"
      *  (el pedido queda como bolsas pendientes). Un número (incluido 0 = "va sin
-     *  bolsas") marca packagesConfirmed = true. */
+     *  bolsas") marca packagesConfirmed = true y el backend crea las bolsas con QR
+     *  que falten hasta ese total (nunca borra las que ya existen). */
     totalPackages?: number | null;
     /** True cuando la dueña resolvió el tema de bolsas al capturar. */
     packagesConfirmed?: boolean;
@@ -1141,7 +1142,7 @@ export interface UpdateOrderDetailsRequest {
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
     clientFacebookProfileUrl?: string;
-    /** Número de bolsas. Si viene, marca packagesConfirmed = true en el backend. */
+    /** Número de bolsas. Si viene, marca packagesConfirmed = true en el backend y crea las bolsas con QR que falten. */
     totalPackages?: number | null;
     /** Confirmación explícita de bolsas (permite "va sin bolsas" con totalPackages = 0). */
     packagesConfirmed?: boolean;

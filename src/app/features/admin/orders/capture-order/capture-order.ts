@@ -7,6 +7,7 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { ClientDto, ManualOrderRequest, OrderType, ExcelUploadResultDto, OrderSummaryDto, PagedResult, ORDER_STATUS_CSS, CommonProductDto } from '../../../../core/models';
 import { normalizeOptionalAddress } from '../../../../core/utils/address.util';
 import { ClientResolverComponent, ClientResolveResult } from './client-resolver/client-resolver.component';
+import { describeBagsOutcome, MAX_BAGS_PER_ORDER } from '../order-bags.util';
 
 interface LiveCapture {
   id: string; // UUID
@@ -101,8 +102,16 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
   manualScheduledDate = signal('');
   manualType = '';
   // 🛍️ Bolsas capturadas en el alta. null = "no sé todavía" (queda pendiente); un número
-  // (incluido 0 = "va sin bolsas") confirma el dato en el momento.
+  // (incluido 0 = "va sin bolsas") confirma el dato y crea esas bolsas con su QR al guardar.
+  // En un pedido abierto que ya tiene bolsas el número es el total: se completan las que falten.
   manualBags = signal<number | null>(null);
+
+  /** Botón "＋" del selector: arranca en 6 y sube de uno en uno, sin pasar del tope del pedido. */
+  bumpManualBags(): void {
+    const current = this.manualBags();
+    this.manualBags.set(Math.min(MAX_BAGS_PER_ORDER, (current && current > 0 ? current : 5) + 1));
+  }
+
   manualItems: { id: string; productName: string; quantity: number; unitPrice: number }[] = [];
   currentItem = { productName: '', quantity: 1, unitPrice: 0 };
 
@@ -464,9 +473,11 @@ export class CaptureOrderComponent implements OnInit, OnDestroy {
     this.api.createManualOrder(req).subscribe({
       next: (res) => {
         this.uploading.set(false);
-        this.toast.success(decision.targetOrderId
+        // El backend ya creó las bolsas con QR: avisamos cuántas quedaron (o si respetó las que ya había).
+        const bagsNote = describeBagsOutcome(req.totalPackages ?? null, res.totalPackages);
+        this.toast.success((decision.targetOrderId
           ? `Artículos agregados al pedido #${decision.targetOrderId} de ${clientName} 💖`
-          : `Pedido creado para ${clientName} 💖`);
+          : `Pedido creado para ${clientName} 💖`) + (bagsNote ? ` · ${bagsNote}` : ''));
 
         // Reset manual form securely
         this.manualClient.set('');
