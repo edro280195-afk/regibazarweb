@@ -39,14 +39,21 @@ import { buildMessengerLink, buildOrderMessage } from '../../../../core/utils/me
           </div>
           <div class="w-full min-w-0 md:flex-1 md:min-w-[200px]">
             <label class="label-coquette">🔍 Buscar clienta</label>
-            <input class="input-coquette" placeholder="Nombre de clienta..." [(ngModel)]="search" />
+            <div class="relative">
+              <input class="input-coquette pr-8" placeholder="Nombre de clienta o #123..."
+                     [ngModel]="search()" (ngModelChange)="search.set($event)" />
+              @if (search()) {
+                <button type="button" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-pink-400 hover:text-pink-600 font-black text-sm p-1"
+                        (click)="search.set('')" title="Borrar búsqueda">✕</button>
+              }
+            </div>
           </div>
           <label class="flex items-center gap-2 cursor-pointer bg-pink-50/60 px-3 py-2.5 rounded-xl border border-pink-100 select-none">
-            <input type="checkbox" [(ngModel)]="hideNotified" class="accent-pink-500 w-4 h-4" />
+            <input type="checkbox" [ngModel]="hideNotified()" (ngModelChange)="hideNotified.set($event)" class="accent-pink-500 w-4 h-4" />
             <span class="text-xs font-bold text-pink-700">Ocultar ya enviados</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer bg-pink-50/60 px-3 py-2.5 rounded-xl border border-pink-100 select-none">
-            <input type="checkbox" [(ngModel)]="hideClosed" class="accent-pink-500 w-4 h-4" />
+            <input type="checkbox" [ngModel]="hideClosed()" (ngModelChange)="hideClosed.set($event)" class="accent-pink-500 w-4 h-4" />
             <span class="text-xs font-bold text-pink-700">Ocultar entregados/cancelados</span>
           </label>
         </div>
@@ -166,9 +173,9 @@ export class SendLinksComponent implements OnInit {
   loading = signal(true);
 
   selectedPeriodId: number | null = null;
-  search = '';
-  hideNotified = false;
-  hideClosed = true;
+  search = signal('');
+  hideNotified = signal(false);
+  hideClosed = signal(true);
 
   editingFb = signal<number | null>(null);
   fbDraft = '';
@@ -176,14 +183,29 @@ export class SendLinksComponent implements OnInit {
   private readonly CLOSED_STATUSES = ['Delivered', 'Canceled', 'NotDelivered'];
 
   filteredOrders = computed(() => {
-    const term = this.search.trim().toLowerCase();
+    const raw = this.search().trim();
+    const term = this.normalizeText(raw);
+    const hideNotified = this.hideNotified();
+    const hideClosed = this.hideClosed();
+
     return this.orders().filter(o => {
-      if (this.hideNotified && o.notifiedAt) return false;
-      if (this.hideClosed && this.CLOSED_STATUSES.includes(o.status)) return false;
-      if (term && !o.clientName.toLowerCase().includes(term)) return false;
-      return true;
+      if (hideNotified && o.notifiedAt) return false;
+      if (hideClosed && this.CLOSED_STATUSES.includes(o.status)) return false;
+      if (!term) return true;
+
+      const clientNameNorm = this.normalizeText(o.clientName || '');
+      const clientMatch = clientNameNorm.includes(term);
+      const idMatch = o.id?.toString().includes(raw);
+      return clientMatch || idMatch;
     });
   });
+
+  private normalizeText(str: string): string {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
 
   stats = computed(() => {
     const list = this.filteredOrders();

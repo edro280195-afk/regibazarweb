@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -320,17 +320,23 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 
       <!-- Smart Order Drawer -->
       @if (selectedOrder() && drawerOpen()) {
-        <div class="fixed inset-0 z-[90] bg-gradient-to-r from-pink-900/10 to-pink-800/20 backdrop-blur-[6px] transition-opacity" (click)="closeDrawer()"></div>
+        <div class="rb-order-backdrop fixed inset-0 z-[90] bg-gradient-to-r from-pink-900/10 to-pink-800/20 backdrop-blur-[6px] transition-opacity" (click)="closeDrawer()"></div>
         
-        <aside role="dialog" aria-modal="true" aria-label="Detalle del pedido" class="fixed inset-y-0 right-0 z-[100] w-full md:w-[560px] lg:w-[680px] bg-gradient-to-b from-white via-pink-50/20 to-rose-50/30 backdrop-blur-2xl shadow-[-20px_0_60px_-10px_rgba(236,72,153,0.15)] transform transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex flex-col rounded-l-[2rem] overflow-hidden border-l border-pink-100/30"
+        <aside role="dialog" aria-modal="true" aria-label="Detalle del pedido" class="rb-order-drawer fixed inset-y-0 right-0 z-[100] w-full md:w-[560px] lg:w-[680px] bg-gradient-to-b from-white via-pink-50/20 to-rose-50/30 backdrop-blur-2xl shadow-[-20px_0_60px_-10px_rgba(236,72,153,0.15)] transform transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] flex flex-col rounded-none md:rounded-l-[2rem] overflow-hidden border-l border-pink-100/30"
              [class.translate-x-0]="drawerOpen()" [class.translate-x-full]="!drawerOpen()">
              
           <!-- Header -->
-          <div class="px-6 py-5 border-b border-pink-100/50 flex items-center justify-between bg-gradient-to-r from-pink-100/60 via-rose-50/40 to-purple-50/30">
-            <div class="flex-1">
-              <h2 class="text-xl font-black text-pink-900 flex items-center gap-2">
-                <span class="text-2xl">📦</span> Pedido #{{ selectedOrder()!.id }}
-              </h2>
+          <div class="px-5 sm:px-6 py-4 border-b border-pink-100/50 flex items-center justify-between bg-gradient-to-r from-pink-100/60 via-rose-50/40 to-purple-50/30 gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-lg sm:text-xl font-black text-pink-900 flex items-center gap-1.5">
+                  <span class="text-xl sm:text-2xl">📦</span> Pedido #{{ selectedOrder()!.id }}
+                </h2>
+                <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-white/90 hover:bg-pink-100 text-pink-600 border border-pink-200/70 shadow-sm active:scale-95 transition-all"
+                        (click)="copyLink()" title="Copiar enlace para la clienta">
+                  <span>🔗 Copiar enlace</span>
+                </button>
+              </div>
               <div class="mt-2 flex flex-col gap-1">
                 <div class="flex items-center gap-2 group cursor-pointer bg-white/60 backdrop-blur-sm rounded-xl px-3 py-2 border border-pink-100/50 shadow-sm hover:shadow-md hover:border-pink-200 transition-all" (click)="toggleClientEdit()" title="Click para editar datos de clienta">
                   <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-200 to-rose-300 flex items-center justify-center text-sm shadow-sm">👤</div>
@@ -716,24 +722,37 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
             </div>
             }
 
-            <div class="h-16"></div>
+            <div class="h-28"></div>
           </div>
 
           <!-- Quick WhatsApp Toolbar -->
-          <div class="bg-white/90 backdrop-blur-xl border-t border-pink-100/50 p-4 shrink-0 flex items-center justify-between gap-2 shadow-[0_-4px_20px_rgba(236,72,153,0.08)]">
-            <div class="flex flex-col">
+          <div class="rb-order-toolbar bg-white/95 backdrop-blur-xl border-t border-pink-100/60 px-4 pt-3.5 shrink-0 flex items-center justify-between gap-2 shadow-[0_-4px_20px_rgba(236,72,153,0.08)]">
+            <div class="flex flex-col min-w-0 pr-1">
               <span class="text-[9px] text-pink-400 font-black uppercase tracking-widest">Total</span>
-              <span class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-700 to-rose-600">{{ selectedOrder()!.total | currency:'MXN':'symbol-narrow' }}</span>
+              <span class="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-700 to-rose-600 truncate">{{ selectedOrder()!.total | currency:'MXN':'symbol-narrow' }}</span>
             </div>
             
-            <div class="flex gap-1.5">
-              <button class="w-10 h-10 rounded-2xl bg-purple-50 text-purple-500 hover:bg-purple-100 hover:text-purple-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-purple-100/50" title="Copiar Enlace Público" (click)="copyLink()">🔗</button>
-              <button class="w-10 h-10 rounded-2xl bg-[#e8f4ff] hover:bg-[#cce4ff] hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-[#b3d5f5]/50" title="Enviar por Messenger" (click)="sendMessenger()">
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-purple-50 text-purple-600 hover:bg-purple-100 hover:text-purple-800 hover:scale-105 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-purple-200/60"
+                      title="Copiar Enlace Público para Clienta" aria-label="Copiar Enlace para Clienta" (click)="copyLink()">
+                <span class="text-base select-none">🔗</span>
+              </button>
+              <button type="button" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#e8f4ff] hover:bg-[#cce4ff] hover:scale-105 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-[#b3d5f5]/60"
+                      title="Enviar por Messenger" aria-label="Enviar por Messenger" (click)="sendMessenger()">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="#0099FF"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
               </button>
-              <button class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-blue-100/50" title="En Camino" (click)="sendWaOnRoute()">🚗</button>
-              <button class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-rose-100/50" title="Cobrar" (click)="sendWaPaymentRequest()">💸</button>
-              <button class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 hover:bg-amber-100 hover:text-amber-700 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-amber-100/50" title="Regalo Cumpleaños 🎂" (click)="applyBirthdayGift()">🎁</button>
+              <button type="button" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-800 hover:scale-105 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-blue-200/60"
+                      title="Avisar En Camino (WhatsApp)" aria-label="Avisar En Camino por WhatsApp" (click)="sendWaOnRoute()">
+                <span class="text-base select-none">🚗</span>
+              </button>
+              <button type="button" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-800 hover:scale-105 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-rose-200/60"
+                      title="Solicitar Pago / Cobrar" aria-label="Solicitar Pago / Cobrar por WhatsApp" (click)="sendWaPaymentRequest()">
+                <span class="text-base select-none">💸</span>
+              </button>
+              <button type="button" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-800 hover:scale-105 active:scale-95 flex items-center justify-center transition-all shadow-sm border border-amber-200/60"
+                      title="Regalo Cumpleaños 🎂" aria-label="Regalo Cumpleaños" (click)="applyBirthdayGift()">
+                <span class="text-base select-none">🎁</span>
+              </button>
             </div>
           </div>
         </aside>
@@ -749,7 +768,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
     </div>
   `
 })
-export class OrdersComponent implements OnInit {
+export class OrdersComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private labelPrint = inject(LabelPrintService);
   private bluetoothPrinter = inject(BluetoothPrinterService);
@@ -836,6 +855,10 @@ export class OrdersComponent implements OnInit {
       next: (r) => this.rewards.set(r),
       error: () => { /* el catálogo es opcional; no bloquea el panel */ }
     });
+  }
+
+  ngOnDestroy(): void {
+    document.body.style.overflow = '';
   }
 
   /** ¿La clienta del pedido tiene puntos suficientes para este premio? */

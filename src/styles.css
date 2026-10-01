@@ -37,7 +37,8 @@ html {
 body {
   font-family: var(--font-body);
   background: linear-gradient(135deg, #fff5f7 0%, #fffcfd 100%);
-  background-attachment: fixed;
+  /* Use scroll to prevent iOS Safari repaint lag during scrolling */
+  background-attachment: scroll;
   color: #831843;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

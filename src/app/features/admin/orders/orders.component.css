@@ -428,3 +428,20 @@
     font-size: .88rem;
   }
 }
+
+/* ── Order Drawer & Mobile Bottom Actions ── */
+.rb-order-drawer {
+  max-width: 100vw;
+}
+
+.rb-order-toolbar {
+  padding-bottom: max(16px, calc(16px + env(safe-area-inset-bottom, 0px))) !important;
+}
+
+@media (max-width: 767px) {
+  .rb-order-drawer {
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+}
+

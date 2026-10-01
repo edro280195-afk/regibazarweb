@@ -311,7 +311,6 @@
 
 .rb-main-area {
   position: relative;
-  z-index: 1;
   display: flex;
   width: calc(100% - 270px);
   min-width: 0;
@@ -373,15 +372,21 @@
 .rb-more-sheet,
 .rb-more-backdrop { display: none; }
 
-/* The address editor owns the mobile viewport while it is open. Keeping the
-   dock above it makes the map/footer feel clipped and blocks the last touch
-   targets on iOS. */
+/* The address editor and order detail drawer own the mobile viewport while open.
+   Keeping the dock above them covers bottom action buttons (copy link, WhatsApp)
+   and blocks touch targets on iOS. */
 .rb-layout-shell:has(app-address-editor-v2) .rb-bottom-dock,
 .rb-layout-shell:has(app-address-editor-v2) .rb-more-sheet,
-.rb-layout-shell:has(app-address-editor-v2) .rb-more-backdrop { display: none !important; }
+.rb-layout-shell:has(app-address-editor-v2) .rb-more-backdrop,
+.rb-layout-shell:has(.rb-order-drawer) .rb-bottom-dock,
+.rb-layout-shell:has(.rb-order-drawer) .rb-more-sheet,
+.rb-layout-shell:has(.rb-order-drawer) .rb-more-backdrop,
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-bottom-dock,
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-sheet,
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-backdrop { display: none !important; }
 
 @media (max-width: 1024px) {
-  .rb-layout-shell { display: block; min-height: 100svh; padding-bottom: calc(91px + env(safe-area-inset-bottom)); }
+  .rb-layout-shell { display: block; min-height: 100svh; padding-bottom: calc(91px + env(safe-area-inset-bottom, 0px)); }
   .rb-nav-rail { display: none; }
   .rb-main-area { width: 100%; min-height: 100svh; margin-left: 0; }
   .rb-topbar { min-height: 85px; padding: 15px 17px 10px; }
@@ -397,8 +402,10 @@
   .rb-bottom-dock {
     position: fixed;
     z-index: 60;
-    right: 50%;
-    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     display: grid;
     width: min(calc(100% - 20px), 680px);
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -410,7 +417,10 @@
     box-shadow: 0 16px 34px rgba(176, 85, 135, .2), inset 3px 3px 8px rgba(255,255,255,.95), inset -3px -3px 8px rgba(218,164,195,.13);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
-    transform: translateX(50%);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
   .rb-dock-item {
@@ -446,7 +456,26 @@
   .rb-dock-more.is-active { color: var(--rb-pink-deep); background: var(--rb-pink-soft); }
 
   .rb-more-backdrop { position: fixed; z-index: 45; inset: 0; display: block; border: 0; background: rgba(99, 49, 78, .12); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-  .rb-more-sheet { position: fixed; z-index: 55; right: 10px; bottom: calc(82px + env(safe-area-inset-bottom)); left: 10px; display: block; max-height: min(62svh, 420px); overflow: auto; padding: 10px 14px 16px; border: 1px solid rgba(255, 255, 255, .9); border-radius: 26px; background: rgba(255, 250, 252, .96); box-shadow: 0 22px 45px rgba(176,85,135,.24), inset 2px 2px 6px rgba(255,255,255,.94); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); animation: rb-sheet-in .24s cubic-bezier(.34,1.56,.64,1); }
+  .rb-more-sheet {
+    position: fixed;
+    z-index: 55;
+    right: 10px;
+    left: 10px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    display: block;
+    max-height: min(62svh, 420px);
+    overflow: auto;
+    padding: 10px 14px 16px;
+    border: 1px solid rgba(255, 255, 255, .9);
+    border-radius: 26px;
+    background: rgba(255, 250, 252, .96);
+    box-shadow: 0 22px 45px rgba(176,85,135,.24), inset 2px 2px 6px rgba(255,255,255,.94);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    animation: rb-sheet-in .24s cubic-bezier(.34,1.56,.64,1);
+  }
   .rb-sheet-handle { width: 35px; height: 4px; margin: 0 auto 9px; border-radius: 999px; background: #eab5ce; }
   .rb-sheet-heading { display: flex; align-items: center; justify-content: space-between; padding: 3px 2px 12px; color: var(--rb-pink-deep); font-family: var(--font-headings, 'Alice', serif); font-size: 1.1rem; }
   .rb-sheet-heading button { width: 28px; height: 28px; border: 0; border-radius: 50%; color: var(--rb-muted); background: var(--rb-pink-soft); font-size: 1.25rem; line-height: 1; }
