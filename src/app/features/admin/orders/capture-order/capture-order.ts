@@ -3,6 +3,7 @@ import { CommonModule, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../../core/services/api.service';
+import { AuthService } from '../../../../core/services/auth.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { ClientDto, ManualOrderRequest, OrderType, ExcelUploadResultDto, OrderSummaryDto, PagedResult, ORDER_STATUS_CSS, CommonProductDto } from '../../../../core/models';
 import { normalizeOptionalAddress } from '../../../../core/utils/address.util';
@@ -76,6 +77,7 @@ function normalizeForMatch(text: string): string {
   styleUrl: './capture-order.css'
 })
 export class CaptureOrderComponent implements OnInit, OnDestroy {
+  readonly auth = inject(AuthService);
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private cdr = inject(ChangeDetectorRef);

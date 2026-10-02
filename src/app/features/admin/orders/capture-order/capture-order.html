@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="rb-capture-header flex flex-col gap-2 animate-slide-down">
         <div class="rb-capture-heading">
-            <p>Hola, Yadira 💕</p>
+            <p>Hola, {{ auth.userName() || 'Hermosa' }} 💕</p>
             <h2 class="text-2xl font-bold text-pink-900 m-0">Crear pedido <span aria-hidden="true">✨</span></h2>
         </div>
         <p class="rb-capture-subtitle text-pink-400 font-medium m-0">Elige cómo capturarlo y te dejo todo listo para confirmar.</p>

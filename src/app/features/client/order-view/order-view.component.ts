@@ -22,17 +22,23 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
   selector: 'app-order-view',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  styleUrl: './order-view.component.css',
   template: `
-    <div class="relative min-h-screen overflow-hidden bg-gradient-to-b from-pink-50 via-rose-50 to-purple-50 pb-24 font-sans text-stone-800"
-         (scroll)="onScroll($event)">
+    <div class="rb-client-page" (scroll)="onScroll($event)">
+      <!-- Redesign Autumn Sticker Pin -->
+      <div class="fixed top-4 right-4 z-30 pointer-events-none hidden sm:block">
+        <div class="rb-sticker-autumn w-14 h-14 text-xs font-black rotate-12 shadow-lg">
+          <span class="leading-none text-center">🎀<br><small style="font-size:8px">REGI</small></span>
+        </div>
+      </div>
          
-      <!-- Parallax Background Layers -->
+      <!-- Parallax Background Layers (Otoño Girly) -->
       <div class="fixed inset-0 pointer-events-none z-0">
         <!-- Layer 1: Slowest (Far back) -->
         <div class="absolute inset-0 opacity-40 transition-transform duration-75 ease-out"
              [style.transform]="'translateY(' + scrollY() * 0.1 + 'px)'">
-          <div class="absolute top-[10%] left-[5%] text-4xl animate-pulse-slow">✨</div>
-          <div class="absolute top-[40%] right-[10%] text-5xl opacity-50">🌸</div>
+          <div class="absolute top-[10%] left-[5%] text-4xl animate-pulse-slow">🍂</div>
+          <div class="absolute top-[40%] right-[10%] text-5xl opacity-50">✨</div>
           <div class="absolute top-[75%] left-[15%] text-4xl animate-float">🎀</div>
         </div>
         
@@ -40,127 +46,152 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
         <div class="absolute inset-0 opacity-60 transition-transform duration-75 ease-out"
              [style.transform]="'translateY(' + scrollY() * 0.25 + 'px)'">
           <div class="absolute top-[20%] right-[15%] text-3xl animate-float-delayed">💖</div>
-          <div class="absolute top-[60%] left-[8%] text-5xl">✨</div>
-          <div class="absolute top-[85%] right-[20%] text-3xl animate-bounce-slow">🌷</div>
+          <div class="absolute top-[60%] left-[8%] text-5xl">🍁</div>
+          <div class="absolute top-[85%] right-[20%] text-3xl animate-bounce-slow">☕</div>
         </div>
         
         <!-- Layer 3: Fastest (Closest) -->
         <div class="absolute inset-0 opacity-80 transition-transform duration-75 ease-out"
              [style.transform]="'translateY(' + scrollY() * 0.5 + 'px)'">
-          <div class="absolute top-[5%] right-[30%] text-2xl blur-[1px]">🌸</div>
+          <div class="absolute top-[5%] right-[30%] text-2xl blur-[1px]">🎃</div>
           <div class="absolute top-[50%] right-[5%] text-4xl blur-[1px] animate-float">🎀</div>
           <div class="absolute top-[30%] left-[20%] text-2xl blur-[1px]">✨</div>
         </div>
       </div>
 
-      <!-- Unboxing Overlay (Z-40) -->
+      <!-- Unboxing Overlay (Z-40): Poster Style Rediseño -->
       @if (order() && !isUnboxed()) {
         <div id="unboxing-overlay" 
-             class="fixed inset-0 z-40 bg-pink-100/95 backdrop-blur-xl flex flex-col justify-center items-center overflow-hidden">
+             class="fixed inset-0 z-50 bg-[#fef2eb]/98 backdrop-blur-2xl flex flex-col justify-center items-center p-4 sm:p-6 overflow-hidden">
             
-            <div id="unboxing-gift-container" class="text-center cursor-pointer relative" (click)="openBox()">
+            <div id="unboxing-gift-container" class="rb-card-autumn w-full max-w-sm p-6 sm:p-8 text-center cursor-pointer relative overflow-hidden" (click)="openBox()">
+              
+              <!-- Floating autumn corner sticker -->
+              <div class="rb-sticker-autumn absolute -top-1 -right-1 w-14 h-14 text-[10px] font-black rotate-12 shadow-md z-20">
+                <span>Regi 💖</span>
+              </div>
+
               <!-- Glow Aura -->
-              <div id="gift-glow" class="absolute inset-0 bg-pink-400/20 blur-[60px] rounded-full scale-150 opacity-0"></div>
+              <div id="gift-glow" class="absolute inset-0 bg-amber-400/30 blur-[70px] rounded-full scale-150 opacity-0 pointer-events-none"></div>
               
-              <div id="gift-emoji" class="text-9xl relative z-10 drop-shadow-[0_20px_40px_rgba(236,72,153,0.4)] mb-8">🎁</div>
+              <div id="gift-emoji" class="text-8xl sm:text-9xl relative z-10 drop-shadow-[0_20px_35px_rgba(217,83,47,0.4)] mb-4 transition-transform hover:scale-110 active:scale-95 animate-bounce-subtle">🎁</div>
               
-              <div id="gift-text-container">
-                <h2 class="text-3xl font-black text-pink-600 font-display px-6 mb-3">¡Tienes un envío de Regi Bazar!</h2>
-                <p class="text-pink-500 font-medium bg-white/50 inline-block px-5 py-2 rounded-full shadow-sm border border-pink-200">Toca el regalito para abrir 🎀</p>
+              <div id="gift-text-container" class="relative z-10">
+                <span class="inline-block px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-2 bg-[#ffe8db] text-[#ad3924] border border-[#edd5c8]">
+                  ✨ Entrega Especial 🎀
+                </span>
+                <h2 class="text-2xl sm:text-3xl font-bold font-headings text-[#52232b] px-2 mb-2 leading-tight">
+                  ¡Tienes un envío de <em>Regi Bazar</em>! 💕
+                </h2>
+                <p class="text-xs font-bold text-[#9e646d] mb-6">Toca la cajita para desatar el lazo con mucho amor ☕✨</p>
+                
+                <button class="rb-btn-autumn w-full">
+                  ✨ Tocar para abrir
+                </button>
               </div>
             </div>
             
-            <!-- Floating elements in unboxing -->
-            <div class="absolute bottom-10 left-10 text-5xl opacity-40 animate-float">🎉</div>
-            <div class="absolute top-20 right-10 text-4xl opacity-40 animate-float-delayed">✨</div>
-            <div class="absolute bottom-20 right-20 text-5xl opacity-40 animate-float">🌸</div>
+            <!-- Floating autumn leaves in unboxing -->
+            <div class="absolute bottom-8 left-8 text-5xl opacity-40 animate-float-gentle">🍂</div>
+            <div class="absolute top-16 right-10 text-4xl opacity-40 animate-float-gentle-delayed">🍁</div>
+            <div class="absolute bottom-16 right-12 text-5xl opacity-40 animate-float-gentle">☕</div>
+            <div class="absolute top-28 left-12 text-4xl opacity-40 animate-float-gentle-delayed">🎀</div>
         </div>
       }
-
 
       <!-- Main Content (Z-10 relative) -->
       <div class="relative z-10 max-w-md mx-auto p-4 sm:p-6 pt-10">
       
         @if (loading()) {
           <div class="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
-            <div class="w-12 h-12 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin mb-4"></div>
-            <p class="text-pink-600 font-medium animate-pulse">Cargando tu pedido... 🛍️</p>
+            <div class="w-12 h-12 border-4 border-[#F3D5C8] border-t-[#C44558] rounded-full animate-spin mb-4"></div>
+            <p class="text-[#8C3A27] font-medium animate-pulse">Cargando tu pedido... 🛍️✨</p>
           </div>
         }
 
         @if (expired()) {
           <div class="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
             <span class="text-6xl mb-4 drop-shadow-md">⏰</span>
-            <h2 class="text-2xl font-black text-pink-900 mb-2 font-display">Enlace expirado</h2>
-            <p class="text-pink-600 px-4">Este enlace ya no está disponible. Contacta a tu vendedora para más información 💕</p>
+            <h2 class="text-2xl font-black text-[#5C2318] mb-2 font-display">Enlace expirado</h2><p class="text-[#8C3A27] px-4">Este enlace ya no está disponible. Contacta a tu vendedora para más información 💕</p>
           </div>
         }
 
         @if (notFound()) {
           <div class="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
             <span class="text-6xl mb-4 drop-shadow-md">🔍</span>
-            <h2 class="text-2xl font-black text-pink-900 mb-2 font-display">Pedido no encontrado</h2>
-            <p class="text-pink-600 px-4">Verifica que el enlace sea correcto, hermosa 💖</p>
+            <h2 class="text-2xl font-black text-[#5C2318] mb-2 font-display">Pedido no encontrado</h2><p class="text-[#8C3A27] px-4">Verifica que el enlace sea correcto, hermosa 💖</p>
           </div>
         }
 
         @if (order(); as o) {
           
-          <!-- Header -->
-          <div id="view-header" class="text-center mb-8 animate-slide-down relative">
-            <div class="text-5xl mb-2 animate-wiggle inline-block drop-shadow-[0_0_15px_rgba(244,114,182,0.5)]">🎀</div>
-            <h1 class="text-2xl sm:text-3xl font-black text-pink-600 tracking-tight font-display drop-shadow-sm">
+          <!-- Header con estilo Rediseño -->
+          <div id="view-header" class="text-center mb-6 animate-slide-down relative">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-[#fec84d] to-[#f48242] shadow-md shadow-[#f48242]/25 text-3xl mb-2 animate-wiggle">
+              🎀
+            </div>
+            <div class="flex items-center justify-center gap-1.5 mb-1">
+              <span class="text-xs">✨</span>
+              <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[#cf5038]">Tu Pedido Especial</p>
+              <span class="text-xs">✨</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black font-headings text-[#52232b] tracking-tight">
               {{ greeting() }}, {{ o.clientName }}! 💖
             </h1>
-            <p class="text-rose-500 font-medium mt-1">
+            <p class="text-xs font-bold text-[#9e646d] mt-1 max-w-xs mx-auto">
               @if (o.publicViewMode === 'DeliveredWithBalance') {
-                ¡Tu regalito ya llegó, solo falta liquidarlo! 💗
+                ¡Tu regalito ya llegó, solo falta liquidarlo! 💖✨
               } @else if (o.status === 'Delivered') {
-                ¡Tu regalito llegó! Esperamos que te encante 🌸
+                ¡Tu regalito llegó! Esperamos que te encante tanto como a nosotras 💖✨
               } @else if (o.publicViewMode === 'Tracking') {
-                Tu pedido va en camino y puedes seguirlo aquí 🚗✨
+                Tu pedido va en camino y puedes seguirlo aquí 🚗💨
               } @else if (o.status === 'NotDelivered') {
-                Hubo un pequeñito problema con tu entrega 💌
+                Hubo un pequeñito detalle con tu entrega, aquí te ayudamos 💌
               } @else if (o.status === 'Postponed') {
-                Tu entrega quedó pendiente de reprogramar 💌
+                Tu entrega quedó pendiente de reprogramar con mucho amor 💌
               } @else {
-                Aquí está el detalle de tu compra ✨
+                Aquí está el detalle de tu compra con mucho amor ✨
               }
             </p>
             
             @if (o.scheduledDeliveryDate) {
-              <div class="mt-4 bg-white/60 backdrop-blur-sm border border-pink-200 rounded-2xl px-4 py-3 inline-block animate-fade-in-up">
-                <p class="text-[9px] font-black text-pink-500 uppercase tracking-[0.2em] mb-1">📅 Entrega Programada</p>
-                <p class="text-base font-black text-pink-900">{{ o.scheduledDeliveryDate | date:"EEEE d 'de' MMMM" }}</p>
+              <div class="mt-3 bg-white/85 backdrop-blur-md border-2 border-white rounded-2xl px-4 py-2.5 inline-block shadow-sm">
+                <p class="text-[9px] font-black text-[#cf5038] uppercase tracking-[0.2em] mb-0.5">📅 Entrega Programada</p>
+                <p class="text-sm font-black text-[#52232b]">{{ o.scheduledDeliveryDate | date:"EEEE d 'de' MMMM" }}</p>
               </div>
             }
             
             <!-- RegiPuntos (Gamification) -->
-            <div class="mt-4 inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-100 to-pink-100 px-4 py-1.5 rounded-full border border-pink-200 shadow-sm animate-fade-in-up group cursor-pointer hover:scale-105 transition-transform" title="¡Gana más puntos compartiendo tu foto!">
-              <span class="text-lg animate-pulse-slow">💎</span>
-              <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-pink-600 uppercase tracking-widest">{{ regiPuntos() }} RegiPuntos</span>
+            <div class="mt-3 block">
+              <div class="inline-flex items-center gap-2 bg-gradient-to-r from-[#ffe8db] via-white to-[#fcdde4] px-4 py-1.5 rounded-full border-2 border-white shadow-sm animate-fade-in-up group cursor-pointer hover:scale-105 transition-transform" title="¡Gana más puntos compartiendo tu foto!">
+                <span class="text-base animate-pulse-slow">💎</span>
+                <span class="text-xs font-black text-[#ad3924] uppercase tracking-wider">{{ regiPuntos() }} RegiPuntos</span>
+                <span class="text-xs">💖</span>
+              </div>
             </div>
           </div>
 
-          <!-- Smart Dashboard Top Bar (Sticky): permanece visible mientras exista saldo -->
+          <!-- Smart Dashboard Top Bar (Sticky): Estilo Rediseño -->
           @if (o.paymentVisible !== false && o.balanceDue > 0) {
-            <div id="balance-summary" class="sticky top-2 z-30 px-2 -mx-2 mb-4" [style.opacity]="isUnboxed() ? 1 : 0">
-              <div class="bg-white/95 backdrop-blur-2xl rounded-3xl p-3 shadow-md border border-pink-100 flex items-center justify-between gap-3">
+            <div id="balance-summary" class="sticky top-2 z-30 mb-4" [style.opacity]="isUnboxed() ? 1 : 0">
+              <div class="rb-card-autumn p-3.5 flex items-center justify-between gap-3 shadow-lg">
                 <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-10 h-10 shrink-0 rounded-2xl bg-pink-100 flex items-center justify-center text-xl">💰</div>
+                  <div class="w-11 h-11 shrink-0 rounded-2xl bg-gradient-to-br from-[#fec84d] to-[#f48242] text-white flex items-center justify-center text-xl shadow-sm">
+                    🍂
+                  </div>
                   <div class="min-w-0">
-                    <p class="text-[9px] text-pink-500 font-black uppercase tracking-widest leading-none mb-1">
+                    <p class="text-[9px] text-[#cf5038] font-black uppercase tracking-widest leading-none mb-1">
                       @if (o.publicViewMode === 'DeliveredWithBalance') {
                         Saldo pendiente
                       } @else {
-                        Balance
+                        Balance Restante
                       }
                     </p>
-                    <p class="text-xl font-black font-display text-pink-900 leading-none truncate">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</p>
+                    <p class="text-2xl font-black font-headings text-[#52232b] leading-none truncate">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</p>
                   </div>
                 </div>
                 @if (activeTab() !== 'payment') {
-                  <button (click)="activeTab.set('payment')" class="shrink-0 bg-pink-500 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-lg active:scale-95 transition-transform">
+                  <button (click)="activeTab.set('payment')" class="rb-btn-autumn rb-btn-autumn-sm shrink-0">
                     @if (o.publicViewMode === 'DeliveredWithBalance') {
                       Liquidar ✨
                     } @else {
@@ -168,41 +199,41 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                     }
                   </button>
                 }
-            </div>
+              </div>
             </div>
           }
 
           @if (o.publicViewMode === 'DeliveredWithBalance') {
-            <div class="mb-6 rounded-[2rem] bg-gradient-to-r from-rose-500 via-pink-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-pink-200 animate-fade-in-up">
+            <div class="mb-6 rounded-[2rem] bg-gradient-to-r from-[#cf5038] via-[#e0536c] to-[#c43254] p-5 text-white shadow-xl shadow-[#c43254]/20 animate-fade-in-up border-2 border-white">
               <div class="flex items-start gap-3">
                 <span class="text-3xl shrink-0">⚠️</span>
                 <div class="min-w-0 flex-1">
-                  <p class="text-[10px] font-black uppercase tracking-[0.18em] text-pink-100">Pedido entregado · acción pendiente</p>
-                  <h2 class="mt-1 text-xl font-black font-display leading-tight">Tu pedido ya fue entregado</h2>
-                  <p class="mt-1 text-sm font-semibold text-white/90">Aún tienes un saldo de {{ o.balanceDue | currency:'MXN':'symbol-narrow' }} por liquidar.</p>
+                  <p class="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100">Pedido entregado · acción pendiente</p>
+                  <h2 class="mt-1 text-xl font-bold font-headings leading-tight">Tu pedido ya fue entregado</h2>
+                  <p class="mt-1 text-xs font-semibold text-white/95">Aún tienes un saldo de {{ o.balanceDue | currency:'MXN':'symbol-narrow' }} por liquidar.</p>
                 </div>
               </div>
-              <button (click)="activeTab.set('payment')" class="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-pink-600 shadow-lg active:scale-[.98] transition-transform">
+              <button (click)="activeTab.set('payment')" class="rb-btn-cozy-white w-full mt-4 text-xs font-black uppercase tracking-wider">
                 Liquidar mi pedido ahora 💳
               </button>
             </div>
           }
 
-          <!-- Quick Action Tabs -->
-          <div id="nav-tabs" class="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-[2rem] mb-6 border border-white sticky top-24 z-20" [style.opacity]="isUnboxed() ? 1 : 0">
-            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'details' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('details')">
-              <span class="text-xl">🛍️</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Pedido</span>
+          <!-- Quick Action Tabs: Pill Segments Rediseño -->
+          <div id="nav-tabs" class="rb-nav-pill-container sticky top-20 z-20 mb-6" [style.opacity]="isUnboxed() ? 1 : 0">
+            <button class="rb-nav-pill-btn" [class.is-active]="activeTab() === 'details'" (click)="activeTab.set('details')">
+              <span class="text-base">🛍️</span>
+              <span>Pedido</span>
             </button>
             @if (o.paymentVisible !== false) {
-              <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'payment' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('payment')">
-                <span class="text-xl">💸</span>
-                <span class="text-[10px] font-black uppercase tracking-widest">Pago</span>
+              <button class="rb-nav-pill-btn" [class.is-active]="activeTab() === 'payment'" (click)="activeTab.set('payment')">
+                <span class="text-base">💳</span>
+                <span>Pagar</span>
               </button>
             }
-            <button class="flex-1 flex flex-col items-center py-2.5 rounded-2xl" [ngClass]="activeTab() === 'status' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'" (click)="activeTab.set('status')">
-              <span class="text-xl">{{ o.publicViewMode === 'Tracking' ? '🚗' : '🏠' }}</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">{{ o.publicViewMode === 'Tracking' ? 'Rastreo' : 'Estado' }}</span>
+            <button class="rb-nav-pill-btn" [class.is-active]="activeTab() === 'status'" (click)="activeTab.set('status')">
+              <span class="text-base">{{ o.publicViewMode === 'Tracking' ? '🚗' : '🏠' }}</span>
+              <span>{{ o.publicViewMode === 'Tracking' ? 'Rastreo' : 'Estado' }}</span>
             </button>
           </div>
 
@@ -215,17 +246,17 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 <div class="rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl relative h-[420px] bg-gray-100 group">
                   <div id="client-live-map" class="absolute inset-0 z-0"></div>
                   <div class="absolute top-4 inset-x-4 z-10 flex flex-col gap-2">
-                    <div class="bg-pink-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full font-black text-[10px] text-center shadow-xl border border-white/20 animate-bounce-subtle tracking-[0.2em]">
+                    <div class="bg-gradient-to-r from-[#cf5038] via-[#e0536c] to-[#c43254] text-white px-6 py-3 rounded-full font-black text-[10px] text-center shadow-xl border-2 border-white/40 animate-bounce-subtle tracking-[0.2em]">
                        @if ((o.deliveriesAhead || 0) > 0) { TU PEDIDO VA EN CAMINO 🚗💨 } @else { ¡TU PAQUETE ESTÁ LLEGANDO! 🚗💨 }
                     </div>
-                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-3 shadow-xl border border-pink-50 flex items-center justify-between">
+                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-3 shadow-xl border-2 border-white flex items-center justify-between">
                        <div class="flex items-center gap-3">
                          <span class="text-2xl animate-pulse">⏳</span>
-                         <span class="text-lg font-black text-pink-950 font-display">Llega en {{ etaText() || '...' }}</span>
+                         <span class="text-lg font-black text-[#52232b] font-headings">Llega en {{ etaText() || '...' }}</span>
                        </div>
                        <div class="flex gap-1">
-                         <button (click)="mapZoom(1)" class="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 font-black shadow-sm">+</button>
-                         <button (click)="mapZoom(-1)" class="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 font-black shadow-sm">-</button>
+                         <button (click)="mapZoom(1)" class="w-8 h-8 rounded-lg bg-[#ffe8db] text-[#cf5038] font-black shadow-sm">+</button>
+                         <button (click)="mapZoom(-1)" class="w-8 h-8 rounded-lg bg-[#ffe8db] text-[#cf5038] font-black shadow-sm">-</button>
                        </div>
                     </div>
                   </div>
@@ -234,52 +265,52 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
               <!-- Queue Info -->
               @if ((o.publicViewMode === 'Tracking' || o.status === 'InRoute' || o.status === 'InTransit') && o.queuePosition) {
-                <div id="queue-info" class="bg-violet-50/80 rounded-[2rem] p-6 border border-violet-100 text-center shadow-inner">
-                  <div class="text-5xl font-black text-violet-500 font-display mb-2">{{ o.deliveriesAhead }}</div>
-                  <p class="text-[10px] font-black uppercase text-violet-400 tracking-[0.2em] mb-4">Entregas antes que la tuya</p>
+                <div id="queue-info" class="rb-card-autumn p-6 text-center">
+                  <div class="text-5xl font-black text-[#8C3A27] font-display mb-2">{{ o.deliveriesAhead }}</div>
+                  <p class="text-[10px] font-black uppercase text-[#9A503D] tracking-[0.2em] mb-4">Entregas antes que la tuya</p>
                   <div class="flex justify-center gap-2 mb-4 h-8 items-center">
                     @for (i of getQueueDots(o); track $index) {
                       <div class="rounded-full transition-all duration-500"
                            [ngClass]="{
                              'w-4 h-4 bg-emerald-400': i.done,
                              'w-5 h-5 bg-blue-500 animate-pulse': i.current,
-                             'w-10 h-10 bg-pink-500 border-4 border-white shadow-lg flex items-center justify-center text-xs': i.you,
+                             'w-10 h-10 bg-[#C44558] border-4 border-white shadow-lg flex items-center justify-center text-xs': i.you,
                              'w-3 h-3 bg-gray-200': !i.done && !i.current && !i.you
                            }">
                         @if(i.you){💖}
                       </div>
                     }
                   </div>
-                  <p class="text-xs text-violet-800/60 font-medium">Eres la parada #{{ o.queuePosition }} de hoy 📍</p>
+                  <p class="text-xs text-[#8C5D50] font-medium">Eres la parada #{{ o.queuePosition }} de hoy 📍</p>
                 </div>
               }
 
               <!-- Main Status Text -->
-              <div class="p-5 rounded-[2rem] bg-gradient-to-br from-pink-50 to-white border border-pink-100 border-dashed text-center">
-                 <p class="text-sm font-bold text-pink-900 leading-relaxed">{{ getStatusDetailMessage(o.status, o.deliveriesAhead || 0) }}</p>
+              <div class="p-5 rounded-[2rem] bg-gradient-to-br from-amber-50/60 to-white border border-[#E8D1C5] border-dashed text-center">
+                 <p class="text-sm font-bold text-[#5C2318] leading-relaxed">{{ getStatusDetailMessage(o.status, o.deliveriesAhead || 0) }}</p>
               </div>
 
               <!-- Tracking Timeline -->
-              <div id="tracking-timeline" class="bg-white/80 rounded-[2.5rem] p-8 shadow-sm border border-white/50">
-                <h3 class="text-xs font-black text-pink-300 uppercase tracking-[0.3em] mb-8 text-center">Historial del Pedido</h3>
+              <div id="tracking-timeline" class="bg-[#FFFDFB]/95 rounded-[2.5rem] p-8 shadow-sm border border-[#E8D1C5]">
+                <h3 class="text-xs font-black text-[#B85D38] uppercase tracking-[0.3em] mb-8 text-center">Historial del Pedido</h3>
                 <div class="space-y-6">
                   @for (step of timelineSteps(); track $index) {
                     <div class="flex gap-6 relative" [class.opacity-40]="!step.done && !step.active">
                       <div class="flex flex-col items-center w-12">
                         <div class="w-12 h-12 rounded-[1.2rem] flex items-center justify-center text-2xl bg-white border-2 transition-all duration-500 shadow-sm"
                              [ngClass]="{
-                               'border-pink-300 bg-pink-50': step.done,
-                               'border-pink-600 bg-pink-50 scale-110 shadow-lg shadow-pink-100': step.active,
+                               'border-[#D9B8A6] bg-amber-50/60': step.done,
+                               'border-[#C44558] bg-[#FDF0E9] scale-110 shadow-lg shadow-[#C44558]/20': step.active,
                                'border-gray-100': !step.done && !step.active
                              }">
                           {{ step.icon }}
                         </div>
                         @if (!$last) {
-                          <div class="w-1 flex-grow bg-gray-100 rounded-full my-2" [class.bg-pink-300]="step.done"></div>
+                          <div class="w-1 flex-grow bg-gray-100 rounded-full my-2" [class.bg-[#D9B8A6]]="step.done"></div>
                         }
                       </div>
                        <div class="flex-1 pt-1.5">
-                         <p class="font-black text-sm mb-1" [class.text-pink-600]="step.active">{{ step.label }}</p>
+                         <p class="font-black text-sm mb-1" [class.text-[#C44558]]="step.active">{{ step.label }}</p>
                          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ step.date ? (step.date | date:'MMM d, h:mm a') : 'Pendiente' }}</p>
                        </div>
                      </div>
@@ -302,8 +333,8 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                   <!-- Fotos de evidencia -->
                   @if (o.evidenceUrls && o.evidenceUrls.length > 0) {
-                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
-                      <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                    <div class="bg-[#FFFDFB]/95 rounded-[2.5rem] p-6 border border-[#E8D1C5] shadow-sm">
+                      <h4 class="text-[10px] font-black text-[#B85D38] uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
                         📸 Fotos de la entrega
                         <span class="bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full text-[9px]">{{ o.evidenceUrls.length }}</span>
                       </h4>
@@ -323,7 +354,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                   <!-- Firma de quien recibió -->
                   @if (o.signatureSvg) {
-                    <div class="bg-white/90 rounded-[2.5rem] p-6 border border-pink-100 shadow-sm">
+                    <div class="bg-[#FFFDFB]/95 rounded-[2.5rem] p-6 border border-[#E8D1C5] shadow-sm">
                       <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3">✍️ Firma de quien recibió</h4>
                       <div class="bg-pink-50/50 rounded-2xl p-3 border border-pink-100" [innerHTML]="sanitizeSvg(o.signatureSvg)"></div>
                       <div class="flex items-center justify-between mt-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
@@ -398,31 +429,31 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <div class="animate-fade-in-up space-y-6">
               
               <!-- Financial Summary (Small Inline) -->
-              <div class="bg-white/90 rounded-[2.5rem] p-8 border border-pink-100/50 shadow-sm text-center">
+              <div class="rb-card-autumn p-6 text-center space-y-1">
                 <div class="flex justify-between items-end mb-2 max-w-[200px] mx-auto">
-                    <span class="font-black text-pink-950 uppercase text-[10px] tracking-widest">Saldo Restante</span>
-                    <span class="text-4xl font-black text-pink-600 font-display leading-none">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</span>
+                    <span class="font-black text-[#B85D38] uppercase text-[10px] tracking-widest">Saldo Restante</span>
+                    <span class="text-4xl font-black text-[#C44558] font-display leading-none">{{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</span>
                 </div>
               </div>
 
               <!-- Payment Methods -->
               <div id="payment-methods" class="relative z-10">
-                <h3 class="text-center text-pink-900 font-black text-lg font-display mb-1">Formas de Pago 💸</h3>
-                <p class="text-center text-xs text-pink-700/70 font-medium mb-4">Elige cómo quieres pagar tu saldo restante</p>
+                <h3 class="text-center text-[#5C2318] font-black text-lg font-display mb-1">Formas de Pago 💸</h3>
+                <p class="text-center text-xs text-[#8C5D50] font-medium mb-4">Elige cómo quieres pagar tu saldo restante</p>
 
                 <!-- Custom Tabs -->
-                <div class="grid grid-cols-2 gap-1 p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white">
+                <div class="grid grid-cols-2 gap-1.5 p-1.5 bg-white/70 backdrop-blur-md rounded-2xl mb-4 border border-white/80 shadow-sm">
                   <button class="py-2 text-xs font-bold rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                          [ngClass]="paymentTab() === 'cash' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
                           (click)="setPaymentTab('cash')">💵 Efectivo</button>
                   <button class="py-2 text-xs font-bold rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                          [ngClass]="paymentTab() === 'transfer' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
                           (click)="setPaymentTab('transfer')">🏦 Transfer</button>
                   <button class="py-2 text-xs font-bold rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400 hover:text-pink-500'"
+                          [ngClass]="paymentTab() === 'oxxo' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
                           (click)="setPaymentTab('oxxo')">🏪 OXXO</button>
                   <button class="py-2 text-xs font-bold rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'card' ? 'bg-white text-violet-600 shadow-sm' : 'text-violet-400 hover:text-violet-500'"
+                          [ngClass]="paymentTab() === 'card' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
                           (click)="setPaymentTab('card')">💳 Tarjeta</button>
                 </div>
 
@@ -567,7 +598,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               </div>
                             }
                             <form id="mp-card-form" class="space-y-3" [class.hidden]="!mpSdkLoaded()">
-                              <div id="mp-cardNumber" class="mp-iframe-field"></div>
+                              <div id="mp-cardNumber" class="mp-iframe-field rb-input-neumorphic"></div>
                               <div class="flex gap-2">
                                 <div id="mp-expirationDate" class="mp-iframe-field flex-1"></div>
                                 <div id="mp-securityCode"   class="mp-iframe-field flex-1"></div>
@@ -575,7 +606,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               <input type="text" id="mp-cardholderName"
                                      placeholder="Nombre en la tarjeta"
                                      autocomplete="cc-name"
-                                     class="w-full text-sm border border-violet-200 rounded-xl px-4 py-3 bg-white/80 text-violet-900 placeholder-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-300">
+                                     class="rb-input-neumorphic w-full text-sm">
                               <input type="email" id="mp-cardholderEmail" class="hidden" value="pagos@regibazar.com">
                               <select id="mp-issuer" class="hidden"></select>
                               <select id="mp-installments" class="hidden"></select>
@@ -587,7 +618,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               }
                               <button type="submit"
                                       [disabled]="mpProcessing() || mpFetching()"
-                                      class="w-full bg-gradient-to-r from-violet-500 to-pink-500 text-white font-black text-sm py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                      class="rb-btn-autumn w-full py-4 text-xs font-black uppercase tracking-widest shadow-xl disabled:opacity-50">
                                 💳 Pagar {{ o.balanceDue | currency:'MXN':'symbol-narrow' }}
                               </button>
                             </form>
@@ -606,41 +637,41 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <div class="animate-fade-in-up space-y-6">
               
               <!-- Ticket (Order Items) -->
-              <div id="ticket-content" class="bg-white/90 rounded-[2.5rem] p-8 border border-white shadow-sm relative overflow-hidden">
+              <div id="ticket-content" class="rb-ticket-shell p-6 sm:p-8 space-y-4">
                 <div class="absolute -top-10 -right-10 w-40 h-40 bg-pink-50 rounded-full blur-3xl opacity-50"></div>
-                <h3 class="text-lg font-black text-pink-900 font-display mb-6 text-center">Tu Ticket 🧾</h3>
+                <h3 class="text-xl font-bold font-headings text-[#52232b] mb-4 text-center flex items-center justify-center gap-2"><span>🧾</span> Tu Ticket de Compra <span>✨</span></h3>
                 
                 <div class="space-y-4 mb-8">
                   @for (item of o.items; track item.id) {
                     <div class="flex justify-between items-center group order-item">
                       <div class="flex flex-col">
-                        <span class="font-bold text-pink-950 text-sm leading-tight group-hover:text-pink-600 transition-colors">{{ item.productName }}</span>
+                        <span class="font-bold text-[#4A2E2B] text-sm leading-tight group-hover:text-[#B85D38] transition-colors">{{ item.productName }}</span>
                         <div class="flex items-center gap-2">
-                           <span class="text-[10px] font-black text-pink-400 uppercase tracking-widest">x{{ item.quantity }}</span>
+                           <span class="text-[10px] font-black text-[#B85D38] uppercase tracking-widest">x{{ item.quantity }}</span>
                            @if (item.variant) {
-                              <span class="text-[9px] font-black text-white bg-pink-400 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">{{ item.variant }}</span>
+                              <span class="text-[9px] font-black text-white bg-[#E07A5F] px-1.5 py-0.5 rounded-md uppercase tracking-tighter">{{ item.variant }}</span>
                            }
                         </div>
                       </div>
-                      <span class="font-black text-pink-600">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
+                      <span class="font-black text-[#8C3A27]">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
                     </div>
                   }
                 </div>
 
-                <div id="ticket-line" class="w-full border-t-2 border-dashed border-pink-100 my-6"></div>
+                <div id="ticket-line" class="w-full border-t-2 border-dashed border-[#E8D1C5] my-6"></div>
 
                 <div id="ticket-totals" class="space-y-3">
-                  <div class="flex justify-between text-xs font-bold text-pink-800/60 uppercase tracking-widest">
+                  <div class="flex justify-between text-xs font-bold text-[#8C5D50] uppercase tracking-widest">
                     <span>Subtotal</span>
                     <span>{{ o.subtotal | currency:'MXN':'symbol-narrow' }}</span>
                   </div>
                   @if (o.shippingCost > 0) {
-                    <div class="flex justify-between text-xs font-bold text-pink-800/60 uppercase tracking-widest">
+                    <div class="flex justify-between text-xs font-bold text-[#8C5D50] uppercase tracking-widest">
                       <span>Envío 🛵</span>
                       <span>{{ o.shippingCost | currency:'MXN':'symbol-narrow' }}</span>
                     </div>
                   }
-                  <div class="flex justify-between text-xl font-black text-pink-950 pt-3 border-t border-pink-50">
+                  <div class="flex justify-between text-xl font-black text-[#5C2318] pt-3 border-t border-[#E8D1C5]/50">
                     <span class="font-display">Total</span>
                     <span class="font-display">{{ o.total | currency:'MXN':'symbol-narrow' }}</span>
                   </div>
@@ -648,11 +679,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                 <!-- Pending Confirmation Card (Relocated) -->
                 @if (o.status === 'Pending') {
-                  <div id="confirm-card" class="mt-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl group animate-bounce-subtle">
+                  <div id="confirm-card" class="mt-6 bg-gradient-to-br from-[#f48242] via-[#e0536c] to-[#c43254] rounded-[2.5rem] p-6 sm:p-8 text-white text-center shadow-xl border-2 border-white group animate-bounce-subtle">
                     <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡Todo se ve increíble! 🎀</h3>
                     <p class="text-[10px] font-medium opacity-80 mb-6">Confirma tu pedido para empezar a prepararlo con mucho amor.</p>
-                    <button id="confirm-btn" (click)="confirmOrder($event)" 
-                            class="w-full py-5 rounded-2xl bg-white text-pink-600 font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-all text-sm">
+                    <button id="confirm-btn" (click)="confirmOrder($event)" class="rb-btn-cozy-white w-full text-xs font-black uppercase tracking-widest shadow-xl">
                        ✨ SÍ, CONFIRMAR PEDIDO
                     </button>
                   </div>
@@ -660,28 +690,28 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               </div>
 
               <!-- Delivery Instructions -->
-              <div class="bg-white/90 rounded-[2rem] p-6 border border-pink-100 shadow-sm relative overflow-hidden group">
-                <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+              <div class="rb-card-autumn p-6 space-y-2">
+                <h4 class="text-[10px] font-black text-[#B85D38] uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
                   📍 Instrucciones
                   @if (savingInstructions()) { <span class="w-2 h-2 bg-pink-400 rounded-full animate-ping"></span> }
                 </h4>
                 
                 @if (isEditingInstructions()) {
-                  <textarea [(ngModel)]="localInstructions" rows="3" inputmode="text" enterkeyhint="done" style="font-size:16px" class="w-full bg-pink-50/50 border-2 border-pink-100 rounded-2xl p-4 text-base focus:outline-none focus:border-pink-300 transition-all font-medium" placeholder="Escribe aquí señas particulares..."></textarea>
+                  <textarea [(ngModel)]="localInstructions" rows="3" inputmode="text" enterkeyhint="done" style="font-size:16px" class="rb-input-neumorphic w-full p-3 font-medium text-sm" placeholder="Escribe aquí señas particulares..."></textarea>
                   <div class="flex gap-2 mt-3">
-                    <button (click)="saveInstructions()" class="flex-1 bg-pink-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg">Guardar✨</button>
-                    <button (click)="isEditingInstructions.set(false)" class="px-4 py-3 bg-gray-100 text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest">Cerrar</button>
+                    <button (click)="saveInstructions()" class="rb-btn-autumn rb-btn-autumn-sm flex-1">Guardar✨</button>
+                    <button (click)="isEditingInstructions.set(false)" class="px-4 py-2.5 bg-stone-100 text-stone-500 font-bold rounded-xl text-xs uppercase tracking-widest">Cerrar</button>
                   </div>
                 } @else {
                   <div (click)="startEditingInstructions()" class="cursor-pointer min-h-[60px] flex flex-col justify-center">
-                    <p class="text-sm text-pink-900 font-medium italic">{{ o.deliveryInstructions || 'Toca para agregar referencias de tu domicilio 💕' }}</p>
-                    <span class="text-[9px] font-black text-pink-400 mt-2 uppercase tracking-widest group-hover:text-pink-600 transition-all">Editar Instrucciones ✏️</span>
+                    <p class="text-sm text-[#5C2318] font-medium italic">{{ o.deliveryInstructions || 'Toca para agregar referencias de tu domicilio 💕' }}</p>
+                    <span class="text-[9px] font-black text-[#8C3A27] mt-2 uppercase tracking-widest group-hover:text-[#5C2318] transition-all">Editar Instrucciones ✏️</span>
                   </div>
                 }
               </div>
 
               <!-- Social Invite -->
-              <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2.5rem] p-8 text-white text-center shadow-xl relative overflow-hidden group">
+              <div class="bg-gradient-to-br from-[#8C3A27] via-[#A24A35] to-[#5C2318] rounded-[2.5rem] p-8 text-white text-center shadow-xl relative overflow-hidden group">
                 <div class="absolute -right-10 -bottom-10 text-9xl opacity-10 group-hover:scale-125 transition-transform duration-1000">📸</div>
                 <h3 class="text-xl font-black font-display mb-2 drop-shadow-md">¡Presume tu estilo! 📸</h3>
                 <p class="text-[10px] font-bold opacity-80 mb-6 tracking-wide">Etiquétanos en tus historias de Facebook o IG al recibir tu pedido y gana <strong>RegiPuntos extra</strong> ✨</p>
@@ -698,9 +728,9 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fade-in">
               <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-sm" (click)="isChatOpen.set(false)"></div>
               
-              <div class="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl border border-pink-100 overflow-hidden flex flex-col h-[70vh] animate-bounce-up-y-only">
+              <div class="relative w-full max-w-sm bg-[#fffaf6] rounded-[2.5rem] shadow-2xl border-4 border-white overflow-hidden flex flex-col h-[70vh] animate-bounce-up-y-only">
                 <!-- Chat Header -->
-                <div class="bg-gradient-to-r from-pink-500 to-rose-400 p-5 shrink-0 flex items-center justify-between">
+                <div class="bg-gradient-to-r from-[#B85D38] to-[#C44558] p-5 shrink-0 flex items-center justify-between">
                   <div class="flex items-center gap-3 text-white">
                     <span class="text-3xl">💖</span>
                     <div>
@@ -736,8 +766,8 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                        }
                        <div class="p-3 shadow-sm border"
                             [ngClass]="m.sender === 'Client' ? 
-                               'bg-pink-500 text-white rounded-[1.2rem] rounded-tr-md border-pink-400' : 
-                               'bg-white text-pink-900 rounded-[1.2rem] rounded-tl-md border-pink-100'">
+                               'bg-[#C44558] text-white rounded-[1.2rem] rounded-tr-md border-[#B85D38]' : 
+                               'bg-white text-[#4A2E2B] rounded-[1.2rem] rounded-tl-md border-[#E8D1C5]'">
                           <p class="text-sm leading-relaxed">{{ m.text }}</p>
                        </div>
                     </div>
@@ -748,10 +778,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 <div class="p-4 bg-white border-t border-pink-50">
                   <div class="flex gap-2">
                     <input type="text" inputmode="text" enterkeyhint="send" style="font-size:16px" [(ngModel)]="newChatMessage" (keyup.enter)="sendChatMessage()"
-                           class="flex-1 bg-pink-50/50 border-2 border-pink-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-pink-300 font-medium"
+                           class="rb-input-neumorphic flex-1 rounded-full px-5 py-2.5 text-xs font-semibold"
                            placeholder="Escribe algo... ✨" />
                     <button (click)="sendChatMessage()" [disabled]="!newChatMessage.trim() || sendingChat()"
-                            class="w-12 h-12 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-lg disabled:opacity-50">
+                            class="w-11 h-11 bg-gradient-to-r from-[#f48242] to-[#c43254] rounded-full flex items-center justify-center text-white shadow-md disabled:opacity-50">
                       <span class="text-xl">✨</span>
                     </button>
                   </div>
@@ -760,7 +790,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             </div>
           }
 
-          <p class="text-center mt-12 mb-8 font-script text-rose-300 text-xl opacity-60">
+          <p class="text-center mt-12 mb-8 font-script text-[#8C3A27] text-2xl opacity-75">
             Hecho con 🎀 para ti
           </p>
 
@@ -791,8 +821,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
           <!-- Chat de ayuda -->
           @if (order()) {
-            <button id="chat-fab" (click)="isChatOpen.set(true); unreadMessages.set(false)"
-                    class="fixed bottom-6 right-6 z-40 w-14 h-14 bg-white rounded-full flex items-center justify-center text-2xl shadow-xl border-2 border-pink-100 hover:scale-110 active:scale-95 transition-all relative group animate-float">
+            <button id="chat-fab" (click)="isChatOpen.set(true); unreadMessages.set(false)" class="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-white flex items-center justify-center text-2xl shadow-2xl border-4 border-white active:scale-95 hover:scale-105 transition-all animate-bounce-subtle">
               💬
               @if (unreadMessages()) {
                 <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
@@ -869,8 +898,8 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
     /* Custom Scrollbar for a smoother look */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #fbcfe8; border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: #f9a8d4; }
+    ::-webkit-scrollbar-thumb { background: #E8D1C5; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #D9B8A6; }
 
     /* MercadoPago iframe containers */
     .mp-iframe-field {

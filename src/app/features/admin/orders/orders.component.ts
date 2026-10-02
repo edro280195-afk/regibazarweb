@@ -6,6 +6,7 @@ import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Capacitor } from '@capacitor/core';
 import { Printer } from '@capgo/capacitor-printer';
 import { ApiService } from '../../../core/services/api.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { BluetoothPrinterService } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -32,7 +33,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
       <!-- Header -->
       <div class="rb-orders-header flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-down">
         <div class="rb-orders-heading">
-          <p>Hola, Yadira 💕</p>
+          <p>Hola, {{ auth.userName() || 'Hermosa' }} 💕</p>
           <h1 class="text-2xl font-bold text-pink-900">Pedidos <span aria-hidden="true">📦</span></h1>
         </div>
         <div class="rb-orders-header-actions grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
@@ -769,6 +770,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
   `
 })
 export class OrdersComponent implements OnInit, OnDestroy {
+  readonly auth = inject(AuthService);
   private api = inject(ApiService);
   private labelPrint = inject(LabelPrintService);
   private bluetoothPrinter = inject(BluetoothPrinterService);

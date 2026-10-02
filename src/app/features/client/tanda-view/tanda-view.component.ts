@@ -15,23 +15,29 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
   selector: 'app-tanda-view',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  styleUrl: './tanda-view.component.css',
   template: `
-    <div class="relative min-h-screen overflow-hidden bg-gradient-to-b from-pink-50 via-rose-50 to-purple-50 pb-24 font-sans text-stone-800"
-         (scroll)="onScroll($event)">
+    <div class="rb-client-page" (scroll)="onScroll($event)">
+      <!-- Redesign Autumn Sticker Pin -->
+      <div class="fixed top-4 right-4 z-30 pointer-events-none hidden sm:block">
+        <div class="rb-sticker-autumn w-14 h-14 text-xs font-black rotate-12 shadow-lg">
+          <span class="leading-none text-center">🎀<br><small style="font-size:8px">TANDA</small></span>
+        </div>
+      </div>
       
-      <!-- Parallax Background Layers -->
+      <!-- Parallax Background Layers (Otoño Girly) -->
       <div class="fixed inset-0 pointer-events-none z-0">
         <div class="absolute inset-0 opacity-40 transition-transform duration-75 ease-out"
              [style.transform]="'translateY(' + scrollY() * 0.1 + 'px)'">
-          <div class="absolute top-[10%] left-[5%] text-4xl animate-pulse-slow">✨</div>
-          <div class="absolute top-[40%] right-[10%] text-5xl opacity-50">🌸</div>
+          <div class="absolute top-[10%] left-[5%] text-4xl animate-pulse-slow">🍂</div>
+          <div class="absolute top-[40%] right-[10%] text-5xl opacity-50">✨</div>
           <div class="absolute top-[75%] left-[15%] text-4xl animate-float">🎀</div>
         </div>
         <div class="absolute inset-0 opacity-60 transition-transform duration-75 ease-out"
              [style.transform]="'translateY(' + scrollY() * 0.25 + 'px)'">
           <div class="absolute top-[20%] right-[15%] text-3xl animate-float-delayed">💖</div>
-          <div class="absolute top-[60%] left-[8%] text-5xl">✨</div>
-          <div class="absolute top-[85%] right-[20%] text-3xl animate-bounce-slow">🌷</div>
+          <div class="absolute top-[60%] left-[8%] text-5xl">🍁</div>
+          <div class="absolute top-[85%] right-[20%] text-3xl animate-bounce-slow">☕</div>
         </div>
       </div>
 
@@ -39,41 +45,48 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
         
         @if (loading()) {
           <div class="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
-            <div class="w-12 h-12 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin mb-4"></div>
-            <p class="text-pink-600 font-medium animate-pulse Irish Grover">Cargando tu tanda... 🎀</p>
+            <div class="w-12 h-12 border-4 border-[#F3D5C8] border-t-[#C44558] rounded-full animate-spin mb-4"></div>
+            <p class="text-[#8C3A27] font-medium animate-pulse">Cargando tu tanda... 🎀☕</p>
           </div>
         } @else if (error()) {
           <div class="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
             <span class="text-6xl mb-4 drop-shadow-md">🔍</span>
-            <h2 class="text-2xl font-black text-pink-900 mb-2 font-display">Tanda no encontrada</h2>
-            <p class="text-pink-600 px-4">Verifica que el enlace sea correcto, hermosa 💖</p>
+            <h2 class="text-2xl font-black text-[#5C2318] mb-2 font-display">Tanda no encontrada</h2>
+            <p class="text-[#8C3A27] px-4">Verifica que el enlace sea correcto, hermosa 💖</p>
           </div>
         } @else if (tanda(); as t) {
           
-          <!-- Header Hero -->
-          <div class="text-center animate-slide-down relative mb-8">
-             <div class="text-5xl mb-2 animate-wiggle inline-block drop-shadow-sm">🎀</div>
-             <h1 class="text-3xl font-black text-pink-600 tracking-tight font-display mb-1">
+          <!-- Header Hero con estilo Rediseño -->
+          <div class="text-center animate-slide-down relative mb-6">
+             <div class="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-[#fec84d] to-[#f48242] shadow-md shadow-[#f48242]/25 text-3xl mb-2 animate-wiggle">
+               🎀
+             </div>
+             <div class="flex items-center justify-center gap-1.5 mb-1">
+                <span class="text-xs">✨</span>
+                <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[#cf5038]">Tanda Comunitaria</p>
+                <span class="text-xs">✨</span>
+              </div>
+             <h1 class="text-2xl sm:text-3xl font-black font-headings text-[#52232b] tracking-tight mb-1">
                {{ t.name }}
              </h1>
-             <p class="text-rose-500 font-medium text-sm">
-                ¡Creciendo juntas en grupo! ✨
+             <p class="text-xs font-bold text-[#9e646d] max-w-xs mx-auto">
+                ¡Ahorrando juntas para consentirte! 💖✨
              </p>
           </div>
 
-          <!-- Sticky Nav Tabs -->
-          <div id="nav-tabs" class="flex p-1.5 bg-white/60 backdrop-blur-xl rounded-[2rem] mb-8 border border-white sticky top-4 z-30 shadow-sm">
-            <button class="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all duration-300" 
-                    [ngClass]="activeTab() === 'summary' ? 'bg-white text-pink-600 shadow-sm scale-105' : 'text-pink-300'" 
+          <!-- Sticky Nav Tabs: Pill Segments Rediseño -->
+          <div id="nav-tabs" class="rb-nav-pill-container sticky top-4 z-30 mb-6 shadow-sm">
+            <button class="rb-nav-pill-btn" 
+                    [class.is-active]="activeTab() === 'summary'" 
                     (click)="activeTab.set('summary')">
-              <span class="text-lg">🌸</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Mi Tanda</span>
+              <span class="text-base">🌸</span>
+              <span>Mi Tanda</span>
             </button>
-            <button class="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all duration-300" 
-                    [ngClass]="activeTab() === 'transparency' ? 'bg-white text-pink-600 shadow-sm scale-105' : 'text-pink-300'" 
+            <button class="rb-nav-pill-btn" 
+                    [class.is-active]="activeTab() === 'transparency'" 
                     (click)="activeTab.set('transparency')">
-              <span class="text-lg">💎</span>
-              <span class="text-[10px] font-black uppercase tracking-widest">Grupo</span>
+              <span class="text-base">💎</span>
+              <span>Grupo</span>
             </button>
           </div>
 
@@ -81,38 +94,38 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             <!-- ════════════ TAB: MI TANDA (RESUMEN) ════════════ -->
             <div class="animate-fade-in-up space-y-8">
               
-              <!-- Weekly Progress Card -->
-              <div class="card-coquette bg-white/90 p-6 shadow-xl border-pink-100 flex flex-col items-center text-center">
-                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">Estado de la Tanda</p>
+              <!-- Weekly Progress Card: Estilo Rediseño -->
+              <div class="rb-card-autumn p-6 flex flex-col items-center text-center">
+                <span class="text-[10px] font-black uppercase tracking-widest text-[#cf5038] mb-3">Progreso de tu Tanda 💖</span>
                 
-                <div class="relative w-32 h-32 flex items-center justify-center mb-4">
+                <div class="relative w-36 h-36 flex items-center justify-center mb-4">
                   <svg class="w-full h-full -rotate-90">
-                    <circle cx="64" cy="64" r="58" stroke="currentColor" stroke-width="8" fill="transparent" class="text-pink-50" />
-                    <circle cx="64" cy="64" r="58" stroke="currentColor" stroke-width="8" fill="transparent" 
-                            class="text-pink-500 transition-all duration-1000"
-                            [attr.stroke-dasharray]="364.4"
-                            [attr.stroke-dashoffset]="364.4 - (364.4 * (t.currentWeek / t.totalWeeks))" />
+                    <circle cx="72" cy="72" r="62" stroke="#f2ded4" stroke-width="10" fill="transparent" />
+                    <circle cx="72" cy="72" r="62" stroke="#f48242" stroke-width="10" stroke-linecap="round" fill="transparent" 
+                            class="transition-all duration-1000 filter drop-shadow-[0_2px_8px_rgba(244,130,66,0.35)]"
+                            [attr.stroke-dasharray]="389.5"
+                            [attr.stroke-dashoffset]="389.5 - (389.5 * (t.currentWeek / t.totalWeeks))" />
                   </svg>
                   <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-3xl font-black text-pink-950 leading-none">{{ t.currentWeek }}</span>
-                    <span class="text-[9px] font-bold text-pink-400 uppercase tracking-tighter">Semana</span>
+                    <span class="text-3xl font-black font-headings text-[#52232b] leading-none">{{ t.currentWeek }}</span>
+                    <span class="text-[9px] font-bold text-[#9e646d] uppercase tracking-wider mt-0.5">Semana</span>
                   </div>
                 </div>
 
                 <div class="space-y-1">
-                  <p class="text-sm font-bold text-pink-900">
-                    Semana <span class="text-pink-600">{{ t.currentWeek }}</span> de <span class="text-pink-600">{{ t.totalWeeks }}</span>
+                  <p class="text-sm font-bold text-[#52232b]">
+                    Semana <span class="text-[#cf5038] font-black">{{ t.currentWeek }}</span> de <span class="text-[#cf5038] font-black">{{ t.totalWeeks }}</span>
                   </p>
-                  <div class="bg-pink-100/50 px-4 py-2 rounded-2xl flex items-center gap-2">
+                  <div class="bg-gradient-to-r from-[#ffe8db] via-white to-[#fcdde4] px-4 py-2 rounded-2xl flex items-center gap-2 border-2 border-white shadow-sm mt-2">
                     <span class="text-lg">💰</span>
-                    <span class="text-xs font-black text-pink-700">Abono Semanal: {{ (t.currentParticipant?.weeklyAmount ?? t.weeklyAmount) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="text-xs font-black text-[#ad3924]">Abono Semanal: {{ (t.currentParticipant?.weeklyAmount ?? t.weeklyAmount) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- Delivery Turn Hero -->
               @if (isWinnerThisWeek()) {
-                <div class="bg-gradient-to-br from-pink-500 to-rose-500 rounded-[2.5rem] p-8 text-white text-center shadow-xl animate-bounce-in relative overflow-hidden">
+                <div class="bg-gradient-to-br from-[#f48242] via-[#e0536c] to-[#c43254] rounded-[2.5rem] p-6 sm:p-8 text-white text-center shadow-xl border-2 border-white animate-bounce-in relative overflow-hidden">
                    <div class="absolute -right-6 -top-6 text-7xl opacity-20 rotate-12">🎁</div>
                    <h3 class="text-xl font-bold uppercase tracking-widest mb-2 font-display">¡ES TU TURNO! ✨</h3>
                    <p class="text-xs font-medium opacity-90">Esta semana el producto es para ti. ¡Abre tu regalo de tanda! 💖</p>
@@ -120,32 +133,32 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               }
 
               @if (t.currentParticipant; as me) {
-                <section class="rounded-[2.5rem] border-2 border-pink-200 bg-white/95 p-6 shadow-xl shadow-pink-100/40 animate-fade-in-up space-y-5" aria-label="Enviar comprobante de pago">
+                <section class="rb-card-autumn p-6 space-y-5 animate-fade-in-up" aria-label="Enviar comprobante de pago">
                   <!-- Encabezado -->
                   <div class="flex items-start gap-3">
-                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-100 to-rose-200 text-2xl shadow-inner">
+                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-rose-200 text-2xl shadow-inner">
                       📸
                     </div>
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[10px] font-black uppercase tracking-widest text-pink-500">Tu comprobante</span>
-                        <span class="rounded-full bg-pink-100 px-2 py-0.5 text-[9px] font-bold text-pink-700">Cualquier día ✨</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[#B85D38]">Tu comprobante</span>
+                        <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-[#8C3A27]">Cualquier día ✨</span>
                       </div>
-                      <h3 class="text-lg font-black text-pink-950 leading-tight mt-0.5">Sube tu comprobante de abono</h3>
-                      <p class="mt-1 text-xs font-medium leading-relaxed text-pink-700">
+                      <h3 class="text-lg font-black text-[#5C2318] leading-tight mt-0.5">Sube tu comprobante de abono</h3>
+                      <p class="mt-1 text-xs font-medium leading-relaxed text-[#8C5D50]">
                         Transfiere el día que prefieras, tómale foto a tu ticket y elígelo aquí. Nosotros validaremos tu pago con mucho cariño. 💕
                       </p>
                     </div>
                   </div>
 
                   @if (me.items && me.items.length > 0) {
-                    <div class="mt-5 rounded-2xl border border-purple-100 bg-purple-50/60 p-4">
-                      <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-purple-600">Tus artículos</p>
+                    <div class="mt-5 rounded-2xl border border-[#E8D1C5] bg-amber-50/60 p-4">
+                      <p class="mb-2 text-[10px] font-black uppercase tracking-widest text-[#B85D38]">Tus artículos</p>
                       <div class="space-y-2">
                         @for (item of me.items; track item.id) {
                           <div class="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs">
-                            <span class="font-bold text-pink-900">{{ item.quantity }}× {{ item.productName }}{{ item.variant ? ' · ' + item.variant : '' }}</span>
-                            <span class="shrink-0 font-black text-purple-700">{{ ((item.weeklyAmount ?? 0) * item.quantity) | currency:'MXN':'symbol-narrow':'1.0-0' }}/sem</span>
+                            <span class="font-bold text-[#4A2E2B]">{{ item.quantity }}× {{ item.productName }}{{ item.variant ? ' · ' + item.variant : '' }}</span>
+                            <span class="shrink-0 font-black text-[#8C3A27]">{{ ((item.weeklyAmount ?? 0) * item.quantity) | currency:'MXN':'symbol-narrow':'1.0-0' }}/sem</span>
                           </div>
                         }
                       </div>
@@ -163,9 +176,9 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                     </div>
                   } @else {
                     <!-- Selector de Semana a Reportar -->
-                    <div class="space-y-2 rounded-2xl bg-pink-50/70 p-4 border border-pink-100">
+                    <div class="space-y-2 rounded-2xl bg-amber-50/60 p-4 border border-[#E8D1C5]">
                       <div class="flex items-center justify-between gap-2">
-                        <label for="proof-week-select" class="text-[10px] font-black uppercase tracking-widest text-pink-700 flex items-center gap-1.5">
+                        <label for="proof-week-select" class="text-[10px] font-black uppercase tracking-widest text-[#B85D38] flex items-center gap-1.5">
                           <span>🗓️</span> ¿Qué semana estás pagando?
                         </label>
                         @if (selectedWeekStatus(); as status) {
@@ -178,9 +191,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                       <div class="relative">
                         <select id="proof-week-select"
-                                [ngModel]="selectedProofWeek()"
-                                (ngModelChange)="selectWeekForProof($event)"
-                                class="w-full appearance-none bg-white border-2 border-pink-200 rounded-2xl px-4 py-3 text-xs font-black text-pink-900 focus:outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-200 transition-all cursor-pointer shadow-sm pr-10">
+                                class="rb-input-neumorphic w-full appearance-none pr-10 cursor-pointer">
                           @for (opt of weekOptions(); track opt.week) {
                             <option [value]="opt.week">
                               {{ opt.label }}
@@ -194,10 +205,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                       <!-- Resumen de la Semana Seleccionada -->
                       <div class="flex items-center justify-between pt-1 px-1 text-xs">
-                        <span class="text-[11px] font-bold text-pink-600">
+                        <span class="text-[11px] font-bold text-[#A2533F]">
                           Abono correspondiente:
                         </span>
-                        <span class="font-black text-pink-950 text-sm">
+                        <span class="font-black text-[#5C2318] text-sm">
                           {{ me.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
                         </span>
                       </div>
@@ -247,23 +258,23 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                         <!-- Zona de Carga de Foto -->
                         <div class="space-y-3 pt-1">
                           @if (!proofPreviewUrl()) {
-                            <div class="rounded-2xl border-2 border-dashed border-pink-300 bg-gradient-to-b from-pink-50/70 to-rose-50/40 p-4 transition-all">
-                              <p class="mb-3 text-center text-[10px] font-black uppercase tracking-widest text-pink-500">
+                            <div class="rounded-2xl border-2 border-dashed border-[#E8D1C5] bg-gradient-to-b from-amber-50/70 to-rose-50/40 p-4 transition-all">
+                              <p class="mb-3 text-center text-[10px] font-black uppercase tracking-widest text-[#B85D38]">
                                 Adjuntar foto del comprobante
                               </p>
                               <div class="grid grid-cols-2 gap-3">
-                                <label class="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-white p-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm border border-pink-100 hover:bg-pink-50 active:scale-95 transition-all">
+                                <label class="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-white p-3 text-center text-[10px] font-black uppercase tracking-wide text-[#8C3A27] shadow-sm border border-[#E8D1C5] hover:bg-amber-50 active:scale-95 transition-all">
                                   <span class="text-2xl">📷</span>
                                   <span>Tomar foto</span>
                                   <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" capture="environment" (change)="onProofSelected($event)">
                                 </label>
-                                <label class="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-white p-3 text-center text-[10px] font-black uppercase tracking-wide text-pink-600 shadow-sm border border-pink-100 hover:bg-pink-50 active:scale-95 transition-all">
+                                <label class="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-white p-3 text-center text-[10px] font-black uppercase tracking-wide text-[#8C3A27] shadow-sm border border-[#E8D1C5] hover:bg-amber-50 active:scale-95 transition-all">
                                   <span class="text-2xl">🖼️</span>
                                   <span>Galería</span>
                                   <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" (change)="onProofSelected($event)">
                                 </label>
                               </div>
-                              <p class="mt-3 text-center text-[9px] font-bold text-pink-400">
+                              <p class="mt-3 text-center text-[9px] font-bold text-[#A2533F]">
                                 Formatos permitidos: JPG, PNG, WEBP (hasta 8 MB)
                               </p>
                             </div>
@@ -302,7 +313,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           <button type="button"
                                   (click)="submitPaymentProof()"
                                   [disabled]="!proofFile() || proofUploading()"
-                                  class="w-full rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 py-4 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-pink-200 hover:shadow-pink-300 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center gap-2">
+                                  class="rb-btn-autumn w-full py-4 text-xs font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
                             @if (proofUploading()) {
                               <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                               <span>ENVIANDO COMPROBANTE... ✨</span>
@@ -363,25 +374,25 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               }
 
               <!-- Payment Methods Section -->
-              <div id="payment-methods" class="relative z-10">
-                <h3 class="text-center text-pink-950 font-black text-lg font-display mb-1 flex items-center justify-center gap-2">
+              <div id="payment-methods" class="rb-card-autumn p-6 space-y-4">
+                <h3 class="text-center text-[#5C2318] font-black text-lg font-display mb-1 flex items-center justify-center gap-2">
                   <span>💸</span> Formas de Pago
                 </h3>
-                <p class="text-center text-[10px] text-pink-700/70 font-bold uppercase tracking-widest mb-4">Toca para copiar los datos</p>
+                <p class="text-center text-[10px] text-[#8C5D50] font-bold uppercase tracking-widest mb-4">Toca para copiar los datos</p>
 
                 <!-- Payment Tabs -->
-                <div class="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl mb-4 border border-white/50">
+                <div class="grid grid-cols-4 gap-1 p-1 bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm">
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'card' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          [ngClass]="paymentTab() === 'card' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#A2533F]'"
                           (click)="setPaymentTab('card')">💳 Tarjeta</button>
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'transfer' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          [ngClass]="paymentTab() === 'transfer' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#A2533F]'"
                           (click)="setPaymentTab('transfer')">🏦 Transfer</button>
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'oxxo' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          [ngClass]="paymentTab() === 'oxxo' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#A2533F]'"
                           (click)="setPaymentTab('oxxo')">🏪 OXXO</button>
                   <button class="flex-1 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'cash' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-400'"
+                          [ngClass]="paymentTab() === 'cash' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#A2533F]'"
                           (click)="setPaymentTab('cash')">💵 Cash</button>
                 </div>
 
@@ -411,13 +422,12 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
 
                             <!-- MP Form -->
                             <form id="mp-card-form" class="space-y-3">
-                              <div id="mp-cardNumber" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                              <div id="mp-cardNumber" class="rb-input-neumorphic h-12 flex items-center"></div>
                               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div id="mp-expirationDate" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
-                                <div id="mp-securityCode" class="h-12 bg-pink-50/30 border border-pink-100 rounded-xl px-4 flex items-center"></div>
+                                <div id="mp-expirationDate" class="rb-input-neumorphic h-12 flex items-center"></div>
+                                <div id="mp-securityCode" class="rb-input-neumorphic h-12 flex items-center"></div>
                               </div>
-                               <input type="text" id="mp-cardholderName" 
-                                      class="h-12 w-full bg-pink-50/30 border border-pink-100 rounded-xl px-4 text-sm font-bold text-pink-900 placeholder:text-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-200 transition-all"
+                               <input type="text" id="mp-cardholderName" class="rb-input-neumorphic h-12 w-full text-xs font-bold"
                                       placeholder="Nombre en la tarjeta">
                               
                               <select id="mp-issuer" class="hidden"></select>
@@ -432,7 +442,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                               }
 
                               <button type="submit" 
-                                      class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-pink-200 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                                      class="rb-btn-autumn w-full py-4 text-xs font-black uppercase tracking-widest shadow-xl disabled:opacity-50"
                                       [disabled]="mpProcessing() || !selectedParticipantId()">
                                 {{ mpProcessing() ? 'PROCESANDO... ✨' : 'PAGAR MI SEMANA 💖' }}
                               </button>
@@ -515,10 +525,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               </div>
 
               <!-- Rules Section -->
-              <div class="bg-pink-950/5 text-pink-900 border border-pink-200/50 rounded-[2rem] p-6 text-center">
+              <div class="bg-amber-950/5 text-[#5C2318] border border-[#E8D1C5] rounded-[2rem] p-6 text-center">
                  <h4 class="text-xs font-black uppercase tracking-widest mb-3">🌸 Políticas de Tanda</h4>
                  <p class="text-[11px] leading-relaxed font-medium">
-                   Entregas los <strong class="text-pink-600">Domingos</strong> a la ganadora de la semana. <br>
+                   Entregas los <strong class="text-[#B85D38]">Domingos</strong> a la ganadora de la semana. <br>
                    ¡Ahorrar juntas es más divertido! ✨
                  </p>
               </div>
@@ -529,11 +539,11 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
           @if (activeTab() === 'transparency') {
             <!-- ════════════ TAB: GRUPO (TRANSPARENCIA) ════════════ -->
             <div class="animate-fade-in-up space-y-4">
-              <h3 class="text-center text-pink-950 font-black text-lg font-display flex items-center justify-center gap-2">
+              <h3 class="text-center text-[#5C2318] font-black text-lg font-display flex items-center justify-center gap-2">
                 <span>💎</span> Transparencia de Pagos
               </h3>
               
-              <div id="transparency-timeline" class="bg-white/90 rounded-[2.5rem] p-8 shadow-sm border border-white relative overflow-hidden">
+              <div id="transparency-timeline" class="rb-card-autumn p-6 sm:p-8 space-y-6 relative overflow-hidden">
                  <div class="absolute top-0 right-0 w-32 h-32 bg-pink-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
                  
                  <div class="space-y-8 relative z-10">
@@ -543,8 +553,8 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                        <div class="flex flex-col items-center w-10">
                           <div class="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black shadow-sm transition-all duration-500"
                                [ngClass]="{
-                                 'bg-pink-600 text-white scale-110 shadow-lg shadow-pink-100': p.assignedTurn === t.currentWeek,
-                                 'bg-white text-pink-400 border border-pink-100': p.assignedTurn !== t.currentWeek
+                                 'bg-[#B85D38] text-white scale-110 shadow-lg shadow-[#B85D38]/20': p.assignedTurn === t.currentWeek,
+                                 'bg-white text-[#8C3A27] border border-[#E8D1C5]': p.assignedTurn !== t.currentWeek
                                }">
                              {{ p.assignedTurn }}
                           </div>
@@ -557,7 +567,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                        <div class="flex-1 pt-1">
                           <div class="flex justify-between items-start mb-1">
                              <div>
-                               <p class="text-sm font-black text-pink-900 leading-tight">{{ p.name }}</p>
+                               <p class="text-sm font-black text-[#5C2318] leading-tight">{{ p.name }}</p>
                                <div class="flex items-center gap-1.5 mt-0.5">
                                  @if (p.variant) {
                                     <span class="text-[9px] font-black text-pink-400 uppercase tracking-widest">{{ p.variant }}</span>
@@ -585,7 +595,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                         </span>
                                       }
                                    </div>
-                                   <span class="text-[8px] font-black text-pink-400 uppercase tracking-tighter">
+                                   <span class="text-[8px] font-black text-[#B85D38] uppercase tracking-tighter">
                                      {{ p.paidWeeks.length }} de {{ t.totalWeeks }} abonos ✨
                                    </span>
                                 </div>
@@ -600,8 +610,8 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                 }
                              </div>
                           </div>
-                          <div class="h-1 w-full bg-pink-50 rounded-full mt-2 overflow-hidden">
-                             <div class="h-full bg-pink-300 transition-all duration-1000" [style.width]="(p.paidWeeks.length / t.totalWeeks * 100) + '%'"></div>
+                          <div class="h-1 w-full bg-[#EED9CC] rounded-full mt-2 overflow-hidden">
+                             <div class="h-full bg-[#B85D38] transition-all duration-1000" [style.width]="(p.paidWeeks.length / t.totalWeeks * 100) + '%'"></div>
                           </div>
                        </div>
                      </div>
@@ -617,7 +627,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
        @if (tanda() && !loading()) {
         <div class="fixed bottom-6 right-6 z-40 flex items-end justify-end gap-3 pointer-events-none">
           @if (showAssistantBubble()) {
-            <div class="bg-white/95 backdrop-blur-2xl rounded-[1.5rem] p-4 shadow-2xl border border-pink-100 max-w-[200px] pointer-events-auto animate-fade-in-up relative group/bubble">
+            <div class="rb-card-autumn p-4 max-w-[210px] pointer-events-auto animate-fade-in-up relative group/bubble shadow-2xl">
               <button (click)="showAssistantBubble.set(false)" 
                       class="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white text-pink-500 shadow-lg border border-pink-50 flex items-center justify-center hover:bg-pink-500 hover:text-white transition-all z-30 active:scale-90" 
                       title="Cerrar mensaje">
@@ -625,12 +635,12 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
               </button>
 
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-[9px] font-black text-pink-500 uppercase">Asistente Virtual</span>
+                <span class="text-[9px] font-black text-[#B85D38] uppercase">Asistente Virtual</span>
               </div>
-              <p class="text-[10px] text-pink-900 font-medium italic">"¡Recuerda que estamos ahorrando juntas! Si tienes dudas sobre tu pago, escríbenos. ✨"</p>
+              <p class="text-[10px] text-[#5C2318] font-medium italic">"¡Recuerda que estamos ahorrando juntas! Si tienes dudas sobre tu pago, escríbenos. ✨"</p>
             </div>
           }
-          <button (click)="showAssistantBubble.set(true)" class="shrink-0 w-14 h-14 bg-gradient-to-br from-pink-100 to-rose-200 rounded-full flex items-center justify-center text-3xl shadow-xl border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all animate-bounce-subtle">
+          <button (click)="showAssistantBubble.set(true)" class="shrink-0 w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-2xl border-4 border-white pointer-events-auto hover:scale-110 active:scale-95 transition-all animate-bounce-subtle">
             👩🏻‍💻
           </button>
         </div>
@@ -640,7 +650,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
        @if (toastVisible()) {
         <div class="fixed bottom-24 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4">
           <div class="animate-bounce-up-y-only pointer-events-auto">
-            <div class="bg-pink-950/95 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest pl-6 pr-12 py-4 rounded-full shadow-2xl flex items-center gap-2.5 border border-pink-500/30 relative">
+            <div class="bg-[#5C2318]/95 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest pl-6 pr-12 py-4 rounded-full shadow-2xl flex items-center gap-2.5 border border-[#C44558]/30 relative">
               <span class="text-lg">✨</span>
               <span>{{ toastMessage() }}</span>
               <button (click)="toastVisible.set(false)" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all z-20">
