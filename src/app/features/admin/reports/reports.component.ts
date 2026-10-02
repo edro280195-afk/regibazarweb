@@ -1046,6 +1046,9 @@ export class ReportsComponent implements OnInit {
     const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
     if (chatUrl) {
       window.open(chatUrl, '_blank');
+    } else if (o.clientFacebookProfileUrl) {
+      window.open(o.clientFacebookProfileUrl, '_blank');
+      this.toast.info('Abriendo perfil: pulsa "Mensaje" en Facebook y pega el texto 💬');
     } else {
       this.toast.info('Sin Facebook guardado: pega el mensaje en Messenger 💡');
     }

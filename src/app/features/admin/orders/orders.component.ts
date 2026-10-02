@@ -1370,6 +1370,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
     const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
     if (chatUrl) {
       window.open(chatUrl, '_blank');
+    } else if (o.clientFacebookProfileUrl) {
+      window.open(o.clientFacebookProfileUrl, '_blank');
+      this.toast.info('Abriendo perfil: pulsa "Mensaje" en Facebook y pega el texto 💬');
     } else {
       this.toast.info('Pega el mensaje en Messenger. Tip: guarda el Facebook de la clienta para abrir su chat directo 💡');
     }

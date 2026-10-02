@@ -11,7 +11,12 @@ const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', '
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 /** Rutas internas de Facebook que NO son nombres de usuario válidos para m.me */
-const RESERVED_HANDLES = ['profile.php', 'people', 'pages', 'groups', 'marketplace', 'watch', 'gaming', 'events'];
+const RESERVED_HANDLES = [
+    'profile.php', 'people', 'pages', 'groups', 'marketplace',
+    'watch', 'gaming', 'events', 'share', 'messages', 'stories',
+    'reel', 'reels', 'photo', 'photos', 'video', 'videos',
+    'home', 'notifications', 'settings', 'friends'
+];
 
 /**
  * Convierte cualquier referencia de Facebook (URL de perfil, link de m.me,
@@ -25,7 +30,8 @@ const RESERVED_HANDLES = ['profile.php', 'people', 'pages', 'groups', 'marketpla
  *   maria.lopez                              → https://m.me/maria.lopez
  *   100012345                                → https://m.me/100012345
  *
- * Devuelve null si no se pudo interpretar (el llamador decide el fallback).
+ * Devuelve null si no se pudo interpretar o si es un enlace de /share/
+ * (el llamador decide el fallback de abrir el perfil directo).
  */
 export function buildMessengerLink(input?: string | null): string | null {
     if (!input) return null;
@@ -34,11 +40,11 @@ export function buildMessengerLink(input?: string | null): string | null {
 
     // Ya es un link de m.me
     const mme = raw.match(/(?:https?:\/\/)?(?:www\.)?m\.me\/([^/?#\s]+)/i);
-    if (mme) return `https://m.me/${mme[1]}`;
+    if (mme && !RESERVED_HANDLES.includes(mme[1].toLowerCase())) return `https://m.me/${mme[1]}`;
 
     // messenger.com/t/{usuario|id}
     const messenger = raw.match(/messenger\.com\/t\/([^/?#\s]+)/i);
-    if (messenger) return `https://m.me/${messenger[1]}`;
+    if (messenger && !RESERVED_HANDLES.includes(messenger[1].toLowerCase())) return `https://m.me/${messenger[1]}`;
 
     // profile.php?id=123 → ID numérico (m.me acepta IDs)
     const idParam = raw.match(/[?&]id=(\d+)/);
@@ -47,6 +53,11 @@ export function buildMessengerLink(input?: string | null): string | null {
     // /people/Nombre/123456/ → ID numérico
     const people = raw.match(/\/people\/[^/]+\/(\d+)/i);
     if (people) return `https://m.me/${people[1]}`;
+
+    // Si es un enlace de compartir /share/ de la app de Facebook, no es un nombre de usuario directo
+    if (/(?:facebook|fb)\.com\/share\//i.test(raw)) {
+        return null;
+    }
 
     // facebook.com/usuario o fb.com/usuario
     const fb = raw.match(/(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook|fb)\.com\/([^/?#\s]+)/i);
@@ -58,7 +69,7 @@ export function buildMessengerLink(input?: string | null): string | null {
     if (/^\d+$/.test(raw)) return `https://m.me/${raw}`;
 
     // Solo un username (letras, números y puntos — formato válido de FB)
-    if (/^[a-zA-Z0-9.]+$/.test(raw)) return `https://m.me/${raw}`;
+    if (/^[a-zA-Z0-9.]+$/.test(raw) && !RESERVED_HANDLES.includes(raw.toLowerCase())) return `https://m.me/${raw}`;
 
     return null;
 }

@@ -124,19 +124,29 @@ import { buildMessengerLink, buildOrderMessage } from '../../../../core/utils/me
                   <span>Pedido #{{ o.id }}</span>
                   <span class="font-black text-pink-700">{{ o.total | currency:'MXN':'symbol-narrow' }}</span>
                   @if (o.clientFacebookProfileUrl) {
-                    <span class="text-[#0099FF] font-bold">𝓶 Facebook ✓</span>
+                    <div class="inline-flex items-center gap-1.5 flex-wrap">
+                      <span class="text-[#0099FF] font-bold">𝓶 Facebook ✓</span>
+                      <button type="button" class="text-xs text-pink-500 hover:text-pink-700 hover:underline font-bold"
+                              (click)="toggleFbEditor(o.id, o.clientFacebookProfileUrl)"
+                              title="Editar o corregir enlace de Facebook">✏️ Editar</button>
+                    </div>
                   } @else {
-                    <button class="text-rose-400 font-bold hover:text-rose-600 underline" (click)="toggleFbEditor(o.id)">+ Agregar Facebook</button>
+                    <button type="button" class="text-rose-400 font-bold hover:text-rose-600 underline" (click)="toggleFbEditor(o.id)">+ Agregar Facebook</button>
                   }
                 </div>
 
                 <!-- Inline Facebook editor -->
                 @if (editingFb() === o.id) {
-                  <div class="mt-2 flex gap-2 animate-slide-down">
-                    <input class="input-coquette flex-1 text-xs" placeholder="Pega el enlace del perfil de Facebook"
+                  <div class="mt-2 flex flex-col sm:flex-row gap-2 animate-slide-down bg-pink-50/50 p-2.5 rounded-xl border border-pink-100">
+                    <input class="input-coquette flex-1 text-xs" placeholder="Pega el enlace o usuario de Facebook (ej. facebook.com/usuario o solo usuario)"
                            [(ngModel)]="fbDraft" (keyup.enter)="saveFacebook(o)" />
-                    <button class="btn-coquette btn-pink py-1.5 px-3 text-[11px]" (click)="saveFacebook(o)">Guardar</button>
-                    <button class="text-[11px] font-bold text-pink-400 px-2" (click)="editingFb.set(null)">✕</button>
+                    <div class="flex gap-1.5 items-center justify-end">
+                      <button class="btn-coquette btn-pink py-1.5 px-3 text-[11px]" (click)="saveFacebook(o)">Guardar</button>
+                      @if (o.clientFacebookProfileUrl) {
+                        <button class="btn-coquette btn-outline-pink py-1.5 px-2 text-[11px] text-rose-500" (click)="clearFacebook(o)" title="Quitar enlace">🗑️</button>
+                      }
+                      <button class="text-[11px] font-bold text-pink-400 px-2" (click)="editingFb.set(null)">✕</button>
+                    </div>
                   </div>
                 }
               </div>
@@ -267,6 +277,10 @@ export class SendLinksComponent implements OnInit {
     const chatUrl = buildMessengerLink(o.clientFacebookProfileUrl);
     if (chatUrl) {
       window.open(chatUrl, '_blank');
+    } else if (o.clientFacebookProfileUrl) {
+      // Fallback para enlaces tipo share de la app móvil: abrir perfil en Facebook para presionar "Mensaje"
+      window.open(o.clientFacebookProfileUrl, '_blank');
+      this.toast.info('Abriendo perfil: pulsa "Mensaje" en Facebook y pega el texto 💬');
     } else {
       this.toast.info('Sin Facebook guardado: pega el mensaje manualmente y guarda su perfil 💡');
     }
@@ -295,14 +309,22 @@ export class SendLinksComponent implements OnInit {
     });
   }
 
-  toggleFbEditor(orderId: number): void {
-    this.fbDraft = '';
-    this.editingFb.set(this.editingFb() === orderId ? null : orderId);
+  toggleFbEditor(orderId: number, currentUrl?: string | null): void {
+    if (this.editingFb() === orderId) {
+      this.editingFb.set(null);
+      this.fbDraft = '';
+    } else {
+      this.editingFb.set(orderId);
+      this.fbDraft = currentUrl || '';
+    }
   }
 
   saveFacebook(o: OrderSummaryDto): void {
     const url = this.fbDraft.trim();
-    if (!url) { this.editingFb.set(null); return; }
+    if (!url) {
+      this.clearFacebook(o);
+      return;
+    }
 
     // El nombre es obligatorio en el request; lo reenviamos para no borrarlo.
     this.api.updateOrderDetails(o.id, {
@@ -315,6 +337,21 @@ export class SendLinksComponent implements OnInit {
         this.toast.success('Facebook guardado 𝓶✓ — ya puedes enviar directo');
       },
       error: () => this.toast.error('No se pudo guardar el Facebook')
+    });
+  }
+
+  clearFacebook(o: OrderSummaryDto): void {
+    this.api.updateOrderDetails(o.id, {
+      clientName: o.clientName,
+      clientFacebookProfileUrl: ''
+    }).subscribe({
+      next: () => {
+        this.patchLocal(o.id, { clientFacebookProfileUrl: undefined });
+        this.editingFb.set(null);
+        this.fbDraft = '';
+        this.toast.success('Enlace de Facebook removido');
+      },
+      error: () => this.toast.error('No se pudo remover el enlace')
     });
   }
 
