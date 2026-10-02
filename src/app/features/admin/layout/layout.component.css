@@ -383,7 +383,16 @@
 .rb-layout-shell:has(.rb-order-drawer) .rb-more-backdrop,
 .rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-bottom-dock,
 .rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-sheet,
-.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-backdrop { display: none !important; }
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-backdrop,
+.rb-layout-shell:has([role="dialog"]) .rb-bottom-dock,
+.rb-layout-shell:has([role="dialog"]) .rb-more-sheet,
+.rb-layout-shell:has([role="dialog"]) .rb-more-backdrop,
+.rb-layout-shell:has([role="alertdialog"]) .rb-bottom-dock,
+.rb-layout-shell:has([role="alertdialog"]) .rb-more-sheet,
+.rb-layout-shell:has([role="alertdialog"]) .rb-more-backdrop,
+.rb-layout-shell:has(app-raffle-animation) .rb-bottom-dock,
+.rb-layout-shell:has(app-raffle-animation) .rb-more-sheet,
+.rb-layout-shell:has(app-raffle-animation) .rb-more-backdrop { display: none !important; }
 
 @media (max-width: 1024px) {
   .rb-layout-shell { display: block; min-height: 100svh; padding-bottom: calc(91px + env(safe-area-inset-bottom, 0px)); }
