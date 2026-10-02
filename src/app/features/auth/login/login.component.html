@@ -1,0 +1,145 @@
+<main class="rb-login-page">
+  <section class="rb-login-shell" aria-label="Acceso a Regi Bazar">
+    <div class="rb-login-poster">
+      <div class="rb-login-brand">
+        <span class="rb-login-brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 10 9-7 9 7" />
+            <path d="M5 9.5V20h14V9.5" />
+            <path d="M9 20v-6h6v6" />
+          </svg>
+        </span>
+        <span>
+          <span class="rb-login-brand-title">Regi Bazar</span>
+          <span class="rb-login-brand-subtitle">TODO PARA TU HOGAR</span>
+        </span>
+      </div>
+
+      <div class="rb-login-illustration" aria-hidden="true">
+        <img
+          class="rb-login-logo-image"
+          src="assets/regibazar-logo-transparent.png"
+          alt="Regi Bazar, la mejor calidad para tu hogar" />
+      </div>
+
+      <div class="rb-login-poster-copy">
+        <h1>Todo se siente más bonito con <em>amor</em></h1>
+        <p>Tu espacio cute para vender, organizar y consentir a tus clientas.</p>
+      </div>
+
+      <span class="rb-login-sticker" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 3 1.2 4.8L18 9l-4.8 1.2L12 15l-1.2-4.8L6 9l4.8-1.2L12 3Z" />
+          <path d="m19 15 .6 2.4L22 18l-2.4.6L19 21l-.6-2.4L16 18l2.4-.6L19 15Z" />
+        </svg>
+      </span>
+    </div>
+
+    <div class="rb-login-form-side">
+      <div class="rb-login-form-wrap">
+        <p class="rb-login-welcome">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+          </svg>
+          Bienvenida, bonita
+        </p>
+        <h2>¡Hola, preciosa!</h2>
+        <p class="rb-login-form-intro">Qué lindo tenerte de vuelta en Regi Bazar.</p>
+
+        <form (ngSubmit)="onLogin()" class="rb-login-form-fields" novalidate>
+          <div class="rb-login-field">
+            <label class="rb-login-label" for="rb-login-email">Correo electrónico</label>
+            <div class="rb-login-input-shell">
+              <svg class="rb-login-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="m3 7 9 6 9-6" />
+              </svg>
+              <input
+                id="rb-login-email"
+                class="rb-login-input"
+                type="email"
+                placeholder="tu@correo.com"
+                [(ngModel)]="email"
+                name="email"
+                required
+                autocomplete="email"
+                inputmode="email"
+                autocapitalize="none"
+                spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="rb-login-field">
+            <label class="rb-login-label" for="rb-login-password">Contraseña</label>
+            <div class="rb-login-input-shell">
+              <svg class="rb-login-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="5" y="10" width="14" height="10" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+              <input
+                id="rb-login-password"
+                class="rb-login-input rb-login-input-password"
+                [type]="showPassword() ? 'text' : 'password'"
+                placeholder="••••••••"
+                [(ngModel)]="password"
+                name="password"
+                required
+                autocomplete="current-password" />
+              <button
+                type="button"
+                class="rb-login-password-toggle"
+                [attr.aria-label]="showPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                [attr.aria-pressed]="showPassword()"
+                (click)="showPassword.set(!showPassword())">
+                @if (showPassword()) {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                    <circle cx="12" cy="12" r="2.5" />
+                  </svg>
+                } @else {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m3 3 18 18" />
+                    <path d="M10.6 5.2A10.7 10.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3.1 3.7M6.2 6.2C3.8 7.8 2.5 12 2.5 12a17 17 0 0 0 4.1 4.7A9.6 9.6 0 0 0 12 19c1 0 1.9-.2 2.7-.5" />
+                    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+                  </svg>
+                }
+              </button>
+            </div>
+          </div>
+
+          <div class="rb-login-options">
+            <label class="rb-login-check">
+              <input type="checkbox" />
+              <span>Mantener mi sesión</span>
+            </label>
+            <span class="rb-login-help">¿Necesitas ayuda?</span>
+          </div>
+
+          @if (errorMsg()) {
+            <div class="rb-login-error" role="alert">{{ errorMsg() }}</div>
+          }
+
+          <button type="submit" class="rb-login-action" [disabled]="loading()">
+            @if (loading()) {
+              <span class="rb-login-spinner" aria-hidden="true"></span>
+              Entrando...
+            } @else {
+              Entrar a mi espacio
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
+            }
+          </button>
+        </form>
+
+        <p class="rb-login-footer">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+          </svg>
+          Hecho con amor para Regi Bazar
+        </p>
+      </div>
+    </div>
+  </section>
+</main>

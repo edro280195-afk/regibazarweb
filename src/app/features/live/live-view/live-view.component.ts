@@ -134,7 +134,7 @@ import confetti from 'canvas-confetti';
         <style>
             :host {
                 display: block;
-                width: 100vw;
+                width: 100%;
                 height: 100vh;
                 overflow: hidden;
             }
@@ -436,6 +436,8 @@ import confetti from 'canvas-confetti';
                 line-height: 1.1;
                 margin-bottom: 1rem;
                 text-shadow: 0 0 40px rgba(251, 191, 36, 0.5);
+                max-width: 100%;
+                overflow-wrap: anywhere;
             }
 
             .winner-stars {
@@ -483,6 +485,7 @@ import confetti from 'canvas-confetti';
                 display: flex;
                 justify-content: center;
                 gap: 2rem;
+                flex-wrap: wrap;
                 color: rgba(255, 255, 255, 0.4);
                 font-size: 0.875rem;
             }

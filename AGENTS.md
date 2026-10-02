@@ -38,6 +38,14 @@ C:\Codigos\RegiBazar\
 - Los íconos son de Lucide o Material Icons
 - **Nunca uses colores corporativos azul/verde acá** — ese es el tema de PMM
 
+### Prioridad de experiencia y PWA
+- La audiencia usa Regi Bazar aproximadamente **80% en móviles iOS y 20% en desktop**.
+- Todo rediseño debe ser **mobile-first real**: validar primero en anchos de 320–430 px y después escalar a desktop.
+- La interfaz debe comportarse como una PWA: respetar `safe-area-inset`, evitar zoom automático de iOS en inputs, usar áreas táctiles cómodas y no permitir overflow horizontal.
+- Preferir `svh`/`dvh` sobre `vh` cuando una pantalla ocupe el alto disponible y probar teclado virtual, orientación vertical y scroll táctil.
+- Diseño aprobado para el login: **Cute Tactile 3D + Soft Neumorphism**. Los CTA principales usan sombra sólida desplazada y estado presionado; paneles, inputs y controles secundarios usan neumorfismo suave.
+- La estética debe sentirse tierna, juguetona y girly; evitar acabados corporativos, sobrios o editoriales.
+
 ## Módulos principales
 - **Live Mode:** Captura de pedidos por voz durante transmisiones en vivo
 - **Kanban:** Gestión visual de órdenes con drag-drop

@@ -1,0 +1,174 @@
+import { Injectable, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import {
+    CreateLabelPrintEventDto,
+    LabelPrintContextDto,
+    LabelTemplateKind
+} from '../models';
+import { ApiService } from './api.service';
+import { LabelDesignService } from './label-design.service';
+import { LabelRendererService } from './label-renderer.service';
+import { BluetoothPrinterService } from './bluetooth/bluetooth-printer.service';
+
+export type LabelOutputMethod = 'browser' | 'download' | 'share';
+
+@Injectable({ providedIn: 'root' })
+export class LabelPrintService {
+    private readonly api = inject(ApiService);
+    private readonly designService = inject(LabelDesignService);
+    private readonly renderer = inject(LabelRendererService);
+    private readonly bluetoothPrinter = inject(BluetoothPrinterService);
+
+    /** Solo la AIYIN E40 (bolsas) tiene impresión Bluetooth directa por ahora; NIIMBOT sigue por el diálogo del SO. */
+    private canPrintViaBluetooth(profile: 'NiimbotB1_50x50' | 'AiyinE40_4x6'): boolean {
+        return profile === 'AiyinE40_4x6' && this.bluetoothPrinter.isSupported() && !!this.bluetoothPrinter.getPairedPrinter();
+    }
+
+    async printBox(boxId: string, method: LabelOutputMethod = 'browser'): Promise<void> {
+        await this.printTarget('InventoryBox', boxId, method);
+    }
+
+    async printItem(itemId: string, method: LabelOutputMethod = 'browser'): Promise<void> {
+        await this.printTarget('InventoryItem', itemId, method);
+    }
+
+    async printPackage(packageId: string, method: LabelOutputMethod = 'browser'): Promise<void> {
+        await this.printTarget('OrderPackage', packageId, method);
+    }
+
+    async printPackages(packageIds: string[]): Promise<void> {
+        if (!packageIds.length) return;
+        const templates = await firstValueFrom(this.api.getLabelTemplates());
+        const template = templates.find(current => current.kind === 'OrderPackage' && current.isDefault && !!current.publishedVersionId && !current.isArchived);
+        if (!template) throw new Error('Primero publica una etiqueta de bolsa en el Centro de impresión.');
+
+        const [assets, contexts] = await Promise.all([
+            firstValueFrom(this.api.getLabelAssets()),
+            Promise.all(packageIds.map(packageId => firstValueFrom(this.api.getPackageLabelPrintContext(template.id, packageId))))
+        ]);
+        const assetUrls = new Map(assets.map(asset => [asset.id, asset.url]));
+        const printerProfile = contexts[0].template.printerProfile;
+        const viaBluetooth = this.canPrintViaBluetooth(printerProfile);
+        // La impresión BLE manda el bitmap dot-por-dot al cabezal (203 dpi real);
+        // el escalado 1.5x es solo para nitidez en pantalla/impresión del SO, que
+        // sí reescala la imagen al tamaño físico declarado. Si se reusa ese mismo
+        // canvas para BLE, la etiqueta sale ~1.5x más grande de lo debido.
+        const canvases = await Promise.all(contexts.map(async context => {
+            const design = this.designService.parseDesign(context.template.designJson);
+            return this.renderer.render(design, context.template.printerProfile, {
+                data: context.data,
+                assetUrls,
+                scale: viaBluetooth ? 1 : 1.5,
+                monochrome: true
+            });
+        }));
+
+        await Promise.all(contexts.map(context => {
+            const event: CreateLabelPrintEventDto = {
+                labelTemplateVersionId: context.template.versionId,
+                targetKind: 2,
+                targetId: context.targetId,
+                printerProfile: context.template.printerProfile === 'NiimbotB1_50x50' ? 0 : 1,
+                method: viaBluetooth ? 2 : 0, // 2 = LabelPrintMethod.NativeBluetooth (ver backend)
+                copies: 1
+            };
+            return firstValueFrom(this.api.createLabelPrintEvent(event));
+        }));
+
+        if (viaBluetooth) {
+            const profileSpec = this.renderer.getProfile(printerProfile);
+            for (const canvas of canvases) {
+                await this.bluetoothPrinter.printCanvas(canvas, profileSpec);
+            }
+            return;
+        }
+        await this.renderer.printManyInBrowser(canvases, printerProfile, 'Etiquetas de bolsas · Regi Bazar');
+    }
+
+    async renderDraft(
+        designJson: string,
+        kind: LabelTemplateKind,
+        profile: 'NiimbotB1_50x50' | 'AiyinE40_4x6'
+    ): Promise<HTMLCanvasElement> {
+        const design = this.designService.parseDesign(designJson);
+        const assets = await firstValueFrom(this.api.getLabelAssets());
+        return this.renderer.render(design, profile, {
+            data: this.designService.getSampleData(kind),
+            assetUrls: new Map(assets.map(asset => [asset.id, asset.url])),
+            scale: 1.5,
+            monochrome: true
+        });
+    }
+
+    private async printTarget(kind: LabelTemplateKind, targetId: string, method: LabelOutputMethod): Promise<void> {
+        const templates = await firstValueFrom(this.api.getLabelTemplates());
+        const template = templates.find(current => current.kind === kind && current.isDefault && !!current.publishedVersionId && !current.isArchived);
+        if (!template) {
+            throw new Error(`Primero publica una etiqueta de ${this.kindLabel(kind)} en el Centro de impresión.`);
+        }
+
+        const context = await this.loadContext(kind, template.id, targetId);
+        const assets = await firstValueFrom(this.api.getLabelAssets());
+        const design = this.designService.parseDesign(context.template.designJson);
+        const viaBluetooth = method === 'browser' && this.canPrintViaBluetooth(context.template.printerProfile);
+        // Ver comentario equivalente en printPackages: el canvas para BLE debe
+        // quedar a la resolución nativa del cabezal, sin el supersampleo 1.5x
+        // que solo sirve para nitidez en pantalla/impresión del SO.
+        const canvas = await this.renderer.render(design, context.template.printerProfile, {
+            data: context.data,
+            assetUrls: new Map(assets.map(asset => [asset.id, asset.url])),
+            scale: viaBluetooth ? 1 : 1.5,
+            monochrome: true
+        });
+        const event: CreateLabelPrintEventDto = {
+            labelTemplateVersionId: context.template.versionId,
+            targetKind: this.kindValue(kind),
+            targetId,
+            printerProfile: context.template.printerProfile === 'NiimbotB1_50x50' ? 0 : 1,
+            method: viaBluetooth ? 2 : this.methodValue(method), // 2 = LabelPrintMethod.NativeBluetooth (ver backend)
+            copies: 1
+        };
+        await firstValueFrom(this.api.createLabelPrintEvent(event));
+
+        const title = `${this.kindLabel(kind)} · Regi Bazar`;
+        if (method === 'download') {
+            this.renderer.downloadPng(canvas, title);
+            return;
+        }
+        if (viaBluetooth) {
+            await this.bluetoothPrinter.printCanvas(canvas, this.renderer.getProfile(context.template.printerProfile));
+            return;
+        }
+        if (method === 'share') {
+            const shared = await this.renderer.sharePng(canvas, title);
+            if (!shared) {
+                this.renderer.downloadPng(canvas, title);
+            }
+            return;
+        }
+        await this.renderer.printInBrowser(canvas, context.template.printerProfile, title);
+    }
+
+    private loadContext(kind: LabelTemplateKind, templateId: string, targetId: string): Promise<LabelPrintContextDto> {
+        switch (kind) {
+            case 'InventoryBox':
+                return firstValueFrom(this.api.getBoxLabelPrintContext(templateId, targetId));
+            case 'InventoryItem':
+                return firstValueFrom(this.api.getItemLabelPrintContext(templateId, targetId));
+            case 'OrderPackage':
+                return firstValueFrom(this.api.getPackageLabelPrintContext(templateId, targetId));
+        }
+    }
+
+    private kindValue(kind: LabelTemplateKind): 0 | 1 | 2 {
+        return ({ InventoryBox: 0, InventoryItem: 1, OrderPackage: 2 } as Record<LabelTemplateKind, 0 | 1 | 2>)[kind];
+    }
+
+    private methodValue(method: LabelOutputMethod): 0 | 3 | 4 {
+        return method === 'browser' ? 0 : method === 'share' ? 3 : 4;
+    }
+
+    private kindLabel(kind: LabelTemplateKind): string {
+        return ({ InventoryBox: 'Etiqueta de caja', InventoryItem: 'Etiqueta de artículo', OrderPackage: 'Etiqueta de bolsa' } as Record<LabelTemplateKind, string>)[kind];
+    }
+}

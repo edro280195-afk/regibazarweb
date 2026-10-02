@@ -83,14 +83,22 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     deliveryNotes: Record<number, string> = {};
     paymentMethods: Record<number, string> = {};
     photos: Record<number, { file: File; preview: string }[]> = {};
+
+    // ── Signature pad ──
+    signatures: Record<number, { svg: string; name?: string }> = {};
+    signatureModalId = signal(0);
+    signatureName = '';
+    private sigCtx: CanvasRenderingContext2D | null = null;
+    private sigDrawing = false;
+    private sigHasInk = false;
+    @ViewChild('signatureCanvas') signatureCanvasRef?: ElementRef<HTMLCanvasElement>;
     expenseForm = { type: 'Gasolina', amount: null as number | null, notes: '', photo: null as File | null };
 
     private token = '';
     mapInitialized = false;
     map: any;
-    directionsService: any;
-    directionsRenderer: any;
-    fullRouteRenderer: any;
+    routePolyline: any;
+    fullRoutePolyline: any;
     markers: any[] = [];
 
     // Navigation Overlay Signals
@@ -287,21 +295,31 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         return R * c;
     }
 
-    // Calls DirectionsService to draw the route line to the next pending stop.
-    // Kept separate from plotRoute so GPS updates don't redraw markers or change viewport.
+    private formatMeters(meters: number): string {
+        return meters < 1000
+            ? `${Math.round(meters)} m aprox.`
+            : `${(meters / 1000).toFixed(1)} km aprox.`;
+    }
+
+    private formatApproxEta(meters: number): string {
+        const minutes = Math.max(1, Math.round((meters / 1000) / 25 * 60));
+        return `${minutes} min aprox.`;
+    }
+
+    // Dibuja una ruta aproximada sin pedir rutas reales en cada movimiento.
     private updateRouteDirection(forceCalc = false): void {
         const r = this.route();
         const pos = this.gps.lastPosition();
-        if (!pos || !this.map || !r || !this.directionsService) return;
+        if (!pos || !this.map || !r) return;
         const pending = r.deliveries.filter((d: any) => d.status !== 'Delivered' && d.status !== 'NotDelivered' && d.latitude);
         if (!pending.length) {
-            if (this.directionsRenderer) this.directionsRenderer.setDirections({ routes: [] });
-            if (this.fullRouteRenderer) this.fullRouteRenderer.setDirections({ routes: [] });
+            this.routePolyline?.setMap(null);
+            this.fullRoutePolyline?.setMap(null);
             return;
         }
 
-        const origin = new google.maps.LatLng(pos.lat, pos.lng);
-        const dest = new google.maps.LatLng(pending[0].latitude, pending[0].longitude);
+        const origin = { lat: pos.lat, lng: pos.lng };
+        const dest = { lat: pending[0].latitude, lng: pending[0].longitude };
 
         // Update Overlay UI
         this.navNextAddress.set(pending[0].alternativeAddress || pending[0].address || pending[0].clientAddress || 'Sin dirección');
@@ -311,7 +329,6 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         // We removed the aggressive fitBounds to ensure the driver stays centered in the view, 
         // as watchPosition already calls map.panTo(driverLocation) every second.
 
-        // Throttle API usage
         const distMoved = this.getDistance(pos.lat, pos.lng, this.lastRouteCalcLat, this.lastRouteCalcLng);
         if (!forceCalc && pending[0].id === this.lastRouteCalcDestId && distMoved < 50) return;
 
@@ -319,47 +336,33 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         this.lastRouteCalcLng = pos.lng;
         this.lastRouteCalcDestId = pending[0].id;
 
-        // 1. NEON ROUTE (Next Leg)
-        this.directionsService.route(
-            { origin, destination: dest, travelMode: google.maps.TravelMode.DRIVING },
-            (result: any, status: string) => {
-                if (status === 'OK') {
-                    this.directionsRenderer.setOptions({
-                        polylineOptions: { strokeColor: '#f472b6', strokeWeight: 6, strokeOpacity: 0.9 }
-                    });
-                    this.directionsRenderer.setDirections(result);
-                    const leg = result.routes[0].legs[0];
-                    if (leg && leg.duration && leg.distance) {
-                        this.navEta.set(leg.duration.text);
-                        this.navDistance.set(leg.distance.text);
-                    }
-                } else {
-                    console.warn('[RouteView] DirectionsService status:', status);
-                    this.navEta.set('');
-                    this.navDistance.set('');
-                }
-            }
-        );
+        const metersToNext = this.getDistance(origin.lat, origin.lng, dest.lat, dest.lng);
+        this.navDistance.set(this.formatMeters(metersToNext));
+        this.navEta.set(this.formatApproxEta(metersToNext));
+        this.routePolyline?.setMap(null);
+        this.routePolyline = new google.maps.Polyline({
+            path: [origin, dest],
+            map: this.map,
+            strokeColor: '#f472b6',
+            strokeWeight: 6,
+            strokeOpacity: 0.9
+        });
 
-        // 2. PREDICTIVE MULTI-ROUTING (Faded full day route for context)
         if (pending.length > 1) {
-            const waypoints = pending.slice(0, Math.min(pending.length - 1, 20)).map((d: any) => ({
-                location: new google.maps.LatLng(d.latitude, d.longitude),
-                stopover: true
-            }));
-            const finalDest = pending[Math.min(pending.length - 1, 20)];
-            const fullDest = new google.maps.LatLng(finalDest.latitude, finalDest.longitude);
-
-            this.directionsService.route(
-                { origin, destination: fullDest, waypoints, travelMode: google.maps.TravelMode.DRIVING },
-                (result: any, status: string) => {
-                    if (status === 'OK') {
-                        this.fullRouteRenderer.setDirections(result);
-                    }
-                }
-            );
+            const fullPath = [
+                origin,
+                ...pending.slice(0, 21).map((d: any) => ({ lat: d.latitude, lng: d.longitude }))
+            ];
+            this.fullRoutePolyline?.setMap(null);
+            this.fullRoutePolyline = new google.maps.Polyline({
+                path: fullPath,
+                map: this.map,
+                strokeColor: '#a1a1aa',
+                strokeWeight: 3,
+                strokeOpacity: 0.4
+            });
         } else {
-            if (this.fullRouteRenderer) this.fullRouteRenderer.setDirections({ routes: [] });
+            this.fullRoutePolyline?.setMap(null);
         }
     }
 
@@ -371,18 +374,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             this.map = new google.maps.Map(this.mapEl.nativeElement, {
                 center: { lat: 27.48, lng: -99.50 }, zoom: 13, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy'
             });
-            this.directionsService = new google.maps.DirectionsService();
-            this.directionsRenderer = new google.maps.DirectionsRenderer({
-                map: this.map, suppressMarkers: true,
-                polylineOptions: { strokeColor: '#db2777', strokeWeight: 4, strokeOpacity: 0.8 }
-            });
-            this.fullRouteRenderer = new google.maps.DirectionsRenderer({
-                map: this.map, suppressMarkers: true,
-                polylineOptions: { strokeColor: '#a1a1aa', strokeWeight: 3, strokeOpacity: 0.4 }
-            });
         }
-        // Geocode any deliveries that lack coordinates (they are not persisted by the backend)
-        await this.geocodeDeliveries(route);
         this.plotRoute(route);
         this.updateRouteDirection(true);
     }
@@ -459,15 +451,107 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         const delivery = this.route()?.deliveries?.find((d: any) => d.id === id);
         const due = delivery?.balanceDue ?? delivery?.total ?? 0;
         const payments = method && due > 0 ? [{ amount: due, method }] : undefined;
-        this.api.markDelivered(this.token, id, notes, photoFiles, payments).subscribe({
+        const sig = this.signatures[id];
+        const signature = sig ? { svg: sig.svg, signedByName: sig.name } : undefined;
+        this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature).subscribe({
             next: () => {
                 this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
                 this.photos[id] = []; this.deliveryNotes[id] = '';
+                delete this.signatures[id];
                 this.isDelivering.set(false);
                 this.loadRoute();
             },
             error: () => { this.isDelivering.set(false); }
         });
+    }
+
+    // ── Signature pad methods ──
+    openSignaturePad(deliveryId: number): void {
+        this.signatureModalId.set(deliveryId);
+        this.signatureName = '';
+        this.sigHasInk = false;
+        setTimeout(() => this.initSignaturePad(), 50);
+    }
+
+    closeSignaturePad(): void {
+        this.signatureModalId.set(0);
+        this.sigCtx = null;
+    }
+
+    private initSignaturePad(): void {
+        const canvas = this.signatureCanvasRef?.nativeElement;
+        if (!canvas) return;
+        // Ajustar al tamaño real del display (mejora definición en retina)
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.scale(dpr, dpr);
+        ctx.strokeStyle = '#831843';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        this.sigCtx = ctx;
+    }
+
+    onSignatureStart(ev: PointerEvent): void {
+        if (!this.sigCtx) return;
+        ev.preventDefault();
+        const canvas = this.signatureCanvasRef!.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.sigCtx.beginPath();
+        this.sigCtx.moveTo(ev.clientX - rect.left, ev.clientY - rect.top);
+        this.sigDrawing = true;
+        try { canvas.setPointerCapture(ev.pointerId); } catch {}
+    }
+
+    onSignatureMove(ev: PointerEvent): void {
+        if (!this.sigCtx || !this.sigDrawing) return;
+        ev.preventDefault();
+        const canvas = this.signatureCanvasRef!.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.sigCtx.lineTo(ev.clientX - rect.left, ev.clientY - rect.top);
+        this.sigCtx.stroke();
+        this.sigHasInk = true;
+    }
+
+    onSignatureEnd(): void {
+        this.sigDrawing = false;
+    }
+
+    clearSignaturePad(): void {
+        const canvas = this.signatureCanvasRef?.nativeElement;
+        if (canvas && this.sigCtx) this.sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+        this.sigHasInk = false;
+    }
+
+    signatureHasInk(): boolean { return this.sigHasInk; }
+
+    saveSignaturePad(): void {
+        const id = this.signatureModalId();
+        if (!id || !this.signatureCanvasRef?.nativeElement) return;
+        const svg = this.canvasToSvg(this.signatureCanvasRef.nativeElement);
+        this.signatures[id] = { svg, name: this.signatureName.trim() || undefined };
+        this.closeSignaturePad();
+        this.showToast('✍️ Firma guardada');
+    }
+
+    skipSignaturePad(): void {
+        // No se guarda nada; el botón "Entregar" seguirá funcionando sin firma.
+        this.closeSignaturePad();
+    }
+
+    private canvasToSvg(canvas: HTMLCanvasElement): string {
+        const rect = canvas.getBoundingClientRect();
+        const w = rect.width;
+        const h = rect.height;
+        // Para una entrega real se podría vectorizar; aquí usamos la imagen del
+        // canvas dentro de un <foreignObject> para fidelidad total con un SVG
+        // pequeño (~2-5 KB).
+        const dataUrl = canvas.toDataURL('image/png');
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><img xmlns="http://www.w3.org/1999/xhtml" src="${dataUrl}" style="width:100%;height:100%"/></foreignObject></svg>`;
     }
 
     // ═══ FAIL ═══

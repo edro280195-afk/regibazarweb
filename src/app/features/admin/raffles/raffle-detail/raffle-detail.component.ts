@@ -94,7 +94,7 @@ import { gsap } from 'gsap';
                                                       placeholder="Cuéntales qué ganarán..."></textarea>
                                         </div>
 
-                                        <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                             <div class="group">
                                                 <label class="label-coquette text-pink-800 font-black mb-2 block tracking-wide">Nº Ganadoras</label>
                                                 <input class="input-coquette py-3" type="number" min="1" max="50" [(ngModel)]="form.winnerCount" name="winnerCount" />
@@ -160,7 +160,7 @@ import { gsap } from 'gsap';
                                             <label class="label-coquette text-pink-800 font-black mb-4 block tracking-wide flex items-center gap-2">
                                                 <span>📅</span> Rango de fechas de compra
                                             </label>
-                                            <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                                 <div>
                                                     <label class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-1 block">Desde</label>
                                                     <input class="input-coquette py-2 text-sm" type="datetime-local" [(ngModel)]="form.dateRangeStart" name="dateRangeStart" (change)="evalParticipantsPreview()" />
@@ -172,7 +172,7 @@ import { gsap } from 'gsap';
                                             </div>
                                         </div>
 
-                                        <div class="grid grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                             <div class="group">
                                                 <label class="label-coquette text-pink-800 font-black mb-2 block tracking-wide">Monto Mínimo ($)</label>
                                                 <input class="input-coquette py-3" type="number" min="0" step="0.01" [(ngModel)]="form.minOrderTotal" name="minOrderTotal" (change)="evalParticipantsPreview()" />
@@ -901,7 +901,9 @@ export class RaffleDetailComponent implements OnInit, AfterViewInit {
         if (isTanda) {
             this.raffleService.shuffleTandaTurns(this.raffleId, { selectionMethod: 'tandaShuffle' }).subscribe({
                 next: (res) => {
-                    const winnerNames = res.turnAssignments.map((t: any) => t.clientName);
+                    const winnerNames = [...res.turnAssignments]
+                        .sort((a, b) => a.newTurn - b.newTurn)
+                        .map(t => t.clientName);
                     this.animationWinnerNames.set(winnerNames.length > 0 ? winnerNames : ['Tanda']);
                     this.raffleAnim?.setWinnerAndStart(this.animationWinnerNames());
                     this.loadRaffle();

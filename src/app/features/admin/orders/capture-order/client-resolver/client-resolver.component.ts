@@ -32,8 +32,8 @@ export interface ClientResolveResult {
       </div>
 
       <ng-container *ngIf="!loading() && response()">
-        <!-- "use": top candidate clarísimo -->
-        <div *ngIf="response()!.suggestedAction === 'use' && top()" class="resolver-card use">
+        <!-- Una sola sugerencia visible: la dueña confirma o marca que es nueva. -->
+        <div *ngIf="(response()!.suggestedAction === 'use' || response()!.suggestedAction === 'choose') && top()" class="resolver-card use">
           <div class="card-row">
             <div class="avatar">{{ initials(top()!.name) }}</div>
             <div class="card-body">
@@ -51,29 +51,7 @@ export interface ClientResolveResult {
           </div>
           <div class="card-actions">
             <button type="button" class="btn-primary" (click)="confirmTop()">Sí, es ella</button>
-            <button type="button" class="btn-link" (click)="showChoose.set(true)">Otra</button>
             <button type="button" class="btn-link" (click)="markNew()">Es nueva</button>
-          </div>
-        </div>
-
-        <!-- "choose" o expansión manual -->
-        <div *ngIf="(response()!.suggestedAction === 'choose' || showChoose()) && candidates().length" class="resolver-card choose">
-          <div class="card-title small">Posibles clientas</div>
-          <ul class="candidate-list">
-            <li *ngFor="let c of candidates()" class="candidate" (click)="confirmCandidate(c)">
-              <div class="avatar small">{{ initials(c.name) }}</div>
-              <div class="candidate-body">
-                <div class="candidate-name">{{ c.name }}</div>
-                <div class="candidate-meta">
-                  <span class="badge tiny">{{ c.matchedBy }}</span>
-                  <span class="muted">{{ percent(c.score) }}%</span>
-                  <span class="muted">· {{ c.ordersCount }} ped.</span>
-                </div>
-              </div>
-            </li>
-          </ul>
-          <div class="card-actions">
-            <button type="button" class="btn-link" (click)="markNew()">Ninguna · es nueva</button>
           </div>
         </div>
 
@@ -199,7 +177,6 @@ export class ClientResolverComponent implements OnInit, OnDestroy {
 
     response = signal<ResolveClientResponse | null>(null);
     loading = signal(false);
-    showChoose = signal(false);
 
     visible() {
         return this._name.length > 0 || !!this._phone || !!this._address;
@@ -221,7 +198,6 @@ export class ClientResolverComponent implements OnInit, OnDestroy {
                 distinctUntilChanged(() => false), // ya cambió por definición
                 switchMap(() => {
                     this.loading.set(true);
-                    this.showChoose.set(false);
                     return this.api.resolveClient({
                         name: this._name,
                         phone: this._phone,
@@ -254,10 +230,6 @@ export class ClientResolverComponent implements OnInit, OnDestroy {
         this.resolved.emit({ clientId: c.clientId, action: 'use', matchedCandidate: c });
     }
 
-    confirmCandidate(c: ResolveCandidateDto) {
-        this.resolved.emit({ clientId: c.clientId, action: 'choose', matchedCandidate: c });
-    }
-
     markNew() {
         this.resolved.emit({ clientId: null, action: 'create' });
     }
@@ -269,7 +241,4 @@ export class ClientResolverComponent implements OnInit, OnDestroy {
         return (parts[0][0] + parts[1][0]).toUpperCase();
     }
 
-    percent(score: number): number {
-        return Math.round(score * 100);
-    }
 }

@@ -135,7 +135,8 @@ type StepId = 'Queued' | 'Downloading' | 'Transcribing' | 'Parsing' | 'Ready';
       padding: 10px 14px;
       border-radius: 12px;
       font-weight: 800;
-      white-space: nowrap;
+       white-space: normal;
+       overflow-wrap: anywhere;
     }
     .import-grid {
       display: grid;
@@ -341,9 +342,9 @@ export class LiveImportComponent implements OnDestroy {
         { id: 'Ready', label: 'Listo para revisar', help: 'Ya puedes confirmar pedidos.' },
     ];
 
-    canImport = computed(() => {
+    canImport(): boolean {
         return this.facebookUrl.trim().length > 12 && !this.importing() && !this.polling();
-    });
+    }
 
     progressPercent = computed(() => {
         if (!this.session()) return 0;

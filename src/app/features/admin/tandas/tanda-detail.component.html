@@ -1,0 +1,1095 @@
+<div class="tanda-detail-page space-y-6 animate-fade-in">
+  <!-- Top Navigation & Breadcrumbs -->
+  <div class="flex items-center justify-between gap-3 px-1">
+    <nav class="flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-400">
+      <a routerLink="/admin/tandas" class="transition-colors hover:text-pink-600">Tandas</a>
+      <span class="opacity-40">/</span>
+      <span class="flex min-w-0 items-center gap-2 truncate font-black text-pink-950">
+        <span class="truncate">{{ tanda()?.name || 'Cargando...' }}</span>
+        @if (tanda() && !loading()) {
+          <button type="button" (click)="openEditModal()" class="shrink-0 text-pink-400 transition-colors hover:text-pink-600" title="Editar tanda" aria-label="Editar tanda">✎</button>
+        }
+      </span>
+    </nav>
+    <a [routerLink]="['/admin/tandas']" class="btn-3d btn-3d-secondary !min-h-10 !rounded-xl !px-3.5 !text-xs">
+      <span>←</span> Volver
+    </a>
+  </div>
+
+  @if (loading()) {
+    <div class="panel-coquette p-14 text-center">
+      <div class="flex flex-col items-center gap-3">
+        <div class="h-10 w-10 animate-spin rounded-full border-4 border-pink-100 border-t-pink-500"></div>
+        <p class="font-bold text-pink-500 animate-pulse">Cargando detalles de la tanda... ✨</p>
+      </div>
+    </div>
+  } @else if (tanda(); as t) {
+    <!-- Financial & Progress Summary Hero -->
+    <section class="panel-coquette p-5 sm:p-6" aria-label="Resumen financiero de la tanda">
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-black text-pink-800">{{ statusLabel(t.status) }}</span>
+              <span class="text-xs font-bold text-pink-500">Semana {{ t.currentWeek || 0 }} de {{ t.totalWeeks }}</span>
+              @if (t.currency === 'USD') {
+                <span class="rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-black text-purple-700">USD</span>
+              }
+            </div>
+            <button type="button" (click)="openEditModal()" class="btn-3d btn-3d-secondary !min-h-9 !rounded-xl !px-3 !text-xs">
+              <span>✎</span> Editar Tanda
+            </button>
+          </div>
+          <h1 class="mt-2.5 truncate font-display text-2xl font-black text-pink-950 sm:text-3xl">{{ t.name }}</h1>
+          <p class="mt-0.5 text-xs font-bold text-pink-600 sm:text-sm">🛍️ {{ t.product?.name || 'Producto sin definir' }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:gap-3">
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-3 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Lugares</p>
+            <p class="mt-1 text-xl font-black text-pink-950">{{ t.participantCount }}/{{ t.totalWeeks }}</p>
+          </div>
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-3 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Cobrado</p>
+            <p class="mt-1 text-xl font-black text-pink-950">{{ t.collectedAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+          </div>
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-3 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Pendiente</p>
+            <p class="mt-1 text-xl font-black text-rose-700">{{ t.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+          </div>
+          <div class="rounded-2xl border border-white/80 bg-white/80 p-3 shadow-sm">
+            <p class="text-[9px] font-black uppercase tracking-wider text-pink-400">Avance</p>
+            <p class="mt-1 text-xl font-black text-pink-950">{{ t.progressPercentage | number:'1.0-0' }}%</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-pink-100/80 shadow-inner" aria-label="Progreso general de la tanda">
+        <div class="h-full rounded-full bg-gradient-to-r from-pink-400 via-rose-400 to-purple-400 transition-[width] duration-300" [style.width.%]="t.progressPercentage"></div>
+      </div>
+    </section>
+
+    <!-- Comprobantes Pendientes de Revisión -->
+    @if (paymentProofs().length > 0) {
+      <section class="panel-coquette border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-pink-50/40 p-4 sm:p-5" aria-label="Comprobantes pendientes de revisión">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-600">Revisión necesaria</p>
+            <h2 class="text-base font-black text-pink-950 sm:text-lg">Comprobantes de pago 📸</h2>
+            <p class="text-xs font-semibold text-pink-600">Aprueba para registrar automáticamente el abono en esta tanda.</p>
+          </div>
+          <span class="rounded-full bg-amber-200/80 px-3 py-1 text-[11px] font-black text-amber-900 shadow-sm">{{ paymentProofs().length }} pendiente{{ paymentProofs().length === 1 ? '' : 's' }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          @for (proof of paymentProofs(); track proof.id) {
+            <article class="overflow-hidden rounded-2xl border border-amber-200/90 bg-white/95 p-3 shadow-sm">
+              <a [href]="proof.fileUrl" target="_blank" rel="noopener noreferrer" class="block h-40 overflow-hidden rounded-xl bg-pink-50/50">
+                <img [src]="proof.fileUrl" [alt]="'Comprobante de ' + proof.participantName" class="h-full w-full object-contain transition-transform hover:scale-105" loading="lazy">
+              </a>
+              <div class="mt-3 space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <h3 class="truncate text-xs font-black text-pink-950">{{ proof.participantName }}</h3>
+                    <p class="text-[11px] font-bold text-pink-500">Semana {{ proof.weekNumber }} · {{ proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                  </div>
+                  <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase text-amber-800">En revisión</span>
+                </div>
+                @if (proof.ocrAmount || proof.depositDate) {
+                  <p class="rounded-xl bg-purple-50 px-2.5 py-1.5 text-[10px] font-bold text-purple-700">
+                    OCR: {{ proof.ocrAmount || proof.amountClaimed | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                    @if (proof.depositDate) { · Depósito: {{ proof.depositDate | date:'dd/MM/yyyy HH:mm' }} }
+                  </p>
+                }
+                <div class="flex gap-2 pt-1">
+                  <button type="button" (click)="reviewPaymentProof(proof, true)" [disabled]="reviewingProofId() === proof.id" class="btn-3d btn-3d-primary flex-1 !min-h-10 !text-xs">
+                    {{ reviewingProofId() === proof.id ? 'Guardando...' : '✓ Aprobar' }}
+                  </button>
+                  <button type="button" (click)="rejectPaymentProof(proof)" [disabled]="reviewingProofId() === proof.id" class="btn-3d btn-3d-rose flex-1 !min-h-10 !text-xs">
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Main Workspace (2 columns on Desktop) -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <!-- Main Column: Delivery Hero & Weekly Table/Visual View -->
+      <div class="space-y-6 lg:col-span-2">
+        <!-- Delivery Hero Card -->
+        <section class="panel-coquette overflow-hidden p-5 sm:p-6" aria-label="Entrega de la semana">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-4 min-w-0">
+              <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 text-3xl text-white shadow-md">
+                📦
+              </div>
+              <div class="min-w-0">
+                <p class="text-[10px] font-black uppercase tracking-wider text-pink-500">Entrega de Tanda</p>
+                @if (sundayParticipant(); as sp) {
+                  @if (sp.isDelivered) {
+                    <h2 class="mt-0.5 truncate text-lg font-black text-emerald-600 sm:text-xl">✅ ¡Producto entregado! ✨</h2>
+                    <p class="text-xs font-bold text-pink-500">{{ sp.customerName }} recibió su producto.</p>
+                  } @else {
+                    <h2 class="mt-0.5 truncate text-lg font-black text-pink-950 sm:text-xl">💖 {{ sp.customerName }}</h2>
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span class="rounded-lg bg-pink-100 px-2 py-0.5 text-[10px] font-black uppercase text-pink-700">Turno #{{ sp.assignedTurn }}</span>
+                      <span class="rounded-lg bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700">Próx. Domingo</span>
+                    </div>
+                  }
+                } @else {
+                  <p class="mt-0.5 text-sm font-semibold italic text-pink-400">Sin entrega programada para este domingo...</p>
+                }
+              </div>
+            </div>
+
+            @if (sundayParticipant(); as sp) {
+              @if (!sp.isDelivered) {
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <button type="button" (click)="addToSundayRoute(sp)" [disabled]="addingToRoute()" class="btn-3d btn-3d-secondary !text-xs">
+                    {{ addingToRoute() ? 'Agregando...' : '📍 Agregar a ruta' }}
+                  </button>
+                  <button type="button" (click)="onConfirmSundayDelivery(sp)" class="btn-3d btn-3d-primary !text-xs">
+                    Confirmar Entrega ✨
+                  </button>
+                </div>
+              } @else {
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-xs font-black text-emerald-700">
+                  Entrega Completada
+                </div>
+              }
+            }
+          </div>
+        </section>
+
+        <!-- Weekly Payments & Logistics Panel -->
+        <section class="panel-coquette p-4 sm:p-6" aria-label="Gestión de abonos">
+          <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-pink-600 sm:text-sm">
+                <span>💎</span> Panel de Gestión de Tanda
+              </h2>
+              <p class="text-[10px] font-bold text-pink-400 sm:text-xs">Control de abonos y logística de entregas</p>
+            </div>
+
+            <!-- View Switcher -->
+            <div class="flex self-start rounded-2xl border border-pink-100 bg-pink-50/70 p-1 shadow-inner sm:self-auto">
+              <button type="button" (click)="viewMode.set('table')"
+                      [class]="viewMode() === 'table' ? 'bg-white text-pink-700 shadow-md font-black' : 'text-pink-400 hover:text-pink-600 font-bold'"
+                      class="flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs transition-all">
+                <span>📋</span> Abonos
+              </button>
+              <button type="button" (click)="viewMode.set('visual')"
+                      [class]="viewMode() === 'visual' ? 'bg-white text-pink-700 shadow-md font-black' : 'text-pink-400 hover:text-pink-600 font-bold'"
+                      class="flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs transition-all">
+                <span>🌟</span> Ruta Pro
+              </button>
+            </div>
+          </div>
+
+          @if (viewMode() === 'table') {
+            <!-- MOBILE VIEW (< 1024px) -->
+            <div class="block space-y-4 lg:hidden">
+              <!-- Week Navigator -->
+              <div class="rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50/80 via-white to-rose-50/80 p-3 shadow-sm">
+                <div class="flex items-center justify-between gap-2">
+                  <button type="button" (click)="prevSelectedWeek()" [disabled]="selectedWeekMobile() <= 1"
+                          class="flex h-11 w-11 items-center justify-center rounded-xl border border-pink-100 bg-white font-black text-pink-700 shadow-sm active:scale-95 disabled:opacity-30"
+                          aria-label="Semana anterior">
+                    ←
+                  </button>
+                  <div class="text-center">
+                    <div class="flex items-center justify-center gap-1.5">
+                      <span class="text-base font-black text-pink-950">Semana {{ selectedWeekMobile() }}</span>
+                      @if (selectedWeekMobile() === currentWeek()) {
+                        <span class="rounded-full bg-pink-500 px-2 py-0.5 text-[9px] font-black uppercase text-white shadow-sm">Actual</span>
+                      }
+                    </div>
+                    <p class="text-[10px] font-bold text-pink-500">
+                      Cobrado: {{ mobileWeekStats().collected | currency:'MXN':'symbol-narrow':'1.0-0' }} · {{ mobileWeekStats().paidCount }}/{{ participants().length }} pagadas
+                    </p>
+                  </div>
+                  <button type="button" (click)="nextSelectedWeek()" [disabled]="selectedWeekMobile() >= (tanda()?.totalWeeks ?? 52)"
+                          class="flex h-11 w-11 items-center justify-center rounded-xl border border-pink-100 bg-white font-black text-pink-700 shadow-sm active:scale-95 disabled:opacity-30"
+                          aria-label="Semana siguiente">
+                    →
+                  </button>
+                </div>
+
+                <!-- Horizontal Ribbon of Week Pills -->
+                <div class="week-ribbon mt-2.5" role="tablist" aria-label="Semanas disponibles">
+                  @for (w of weeksArray(); track w) {
+                    <button type="button" (click)="selectedWeekMobile.set(w)"
+                            [class.is-active]="selectedWeekMobile() === w"
+                            [class.is-current]="w === currentWeek()"
+                            class="week-pill"
+                            [attr.aria-selected]="selectedWeekMobile() === w">
+                      Sem {{ w }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Participant Cards for Active Week -->
+              <div class="space-y-2.5">
+                @for (p of participants(); track p.id) {
+                  <div class="flex items-center justify-between gap-3 rounded-2xl border border-pink-100 bg-white/90 p-3.5 shadow-sm transition-all hover:border-pink-200">
+                    <div class="flex min-w-0 flex-1 items-center gap-3">
+                      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-pink-800 text-xs font-black text-white shadow-sm">
+                        {{ p.assignedTurn }}
+                      </span>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <p class="truncate text-sm font-black text-pink-950">{{ p.customerName }}</p>
+                          @if (p.isDelivered) {
+                            <span class="text-xs" title="Producto entregado">📦</span>
+                          }
+                        </div>
+                        <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-pink-500">
+                          <span>Cuota: {{ getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                          @if (p.variant) {
+                            <span>· {{ p.variant }}</span>
+                          }
+                        </div>
+                        @if (p.items.length > 0) {
+                          <p class="mt-0.5 truncate text-[10px] font-bold text-purple-600">🛍️ {{ itemSummary(p) }}</p>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-2">
+                      @if (hasPaid(p, selectedWeekMobile())) {
+                        <button type="button" (click)="openPaymentModal(p, selectedWeekMobile())"
+                                class="flex min-h-10 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 shadow-sm active:scale-95">
+                          <span>✓</span> {{ getWeekPaidAmount(p, selectedWeekMobile()) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                        </button>
+                      } @else {
+                        <button type="button" (click)="openPaymentModal(p, selectedWeekMobile())"
+                                class="btn-3d btn-3d-primary !min-h-10 !px-3 !py-1.5 !text-xs">
+                          {{ getWeekPaidAmount(p, selectedWeekMobile()) > 0 ? 'Abonar ' + (getWeekPaidAmount(p, selectedWeekMobile()) | currency:'MXN':'symbol-narrow':'1.0-0') : 'Abonar ' + (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
+                        </button>
+                      }
+
+                      <button type="button" (click)="selectedParticipantActions.set(p)"
+                              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-xs text-pink-600 transition-colors hover:bg-pink-100 active:scale-95"
+                              aria-label="Acciones de la participante">
+                        ⚙️
+                      </button>
+                    </div>
+                  </div>
+                } @empty {
+                  <div class="rounded-2xl border border-dashed border-pink-200 bg-pink-50/40 py-10 text-center text-xs font-bold text-pink-400">
+                    <p class="text-2xl mb-1">🌸</p>
+                    No hay participantes inscritas en esta tanda
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- DESKTOP VIEW (>= 1024px) -->
+            <div class="hidden overflow-x-auto rounded-2xl border border-pink-100 bg-white/70 shadow-sm lg:block">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-pink-100 bg-pink-50/70 text-[10px] font-black uppercase tracking-wider text-pink-600">
+                    <th class="table-sticky-cell min-w-[200px] p-3">Clienta</th>
+                    @for (w of weeksArray(); track w) {
+                      <th class="min-w-[76px] p-2 text-center">Sem {{ w }}</th>
+                    }
+                    <th class="min-w-[95px] p-3 text-center">Entrega</th>
+                    <th class="p-3 text-center">📦</th>
+                    <th class="p-3 text-center">⚙️</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-pink-50 font-bold">
+                  @for (p of participants(); track p.id) {
+                    <tr class="group hover:bg-pink-50/40 transition-colors">
+                      <td class="table-sticky-cell p-3">
+                        <div class="flex items-center gap-2">
+                          @if (editingTurnId() === p.id) {
+                            <input type="number" [value]="p.assignedTurn"
+                                   (blur)="editingTurnId.set(null)"
+                                   (keyup.enter)="onUpdateTurn(p, $event)"
+                                   class="h-8 w-11 rounded-lg border border-pink-300 bg-pink-50 p-1 text-center font-black text-pink-700"
+                                   #turnInput (focus)="turnInput.select()">
+                          } @else {
+                            <span (click)="editingTurnId.set(p.id)"
+                                  class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-pink-800 text-[11px] font-black text-white hover:bg-pink-600"
+                                  title="Clic para cambiar turno">
+                              {{ p.assignedTurn }}
+                            </span>
+                          }
+                          <span class="flex-1 truncate font-black text-pink-950" [title]="p.customerName">{{ p.customerName }}</span>
+                          <button type="button" (click)="selectedParticipantActions.set(p)" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-xs text-pink-400 hover:bg-pink-100 hover:text-pink-600">
+                            ⚙️
+                          </button>
+                        </div>
+                        @if (p.items.length > 0) {
+                          <p class="mt-1 pl-9 truncate text-[10px] font-bold text-purple-600">🛍️ {{ itemSummary(p) }}</p>
+                        }
+                      </td>
+
+                      @for (w of weeksArray(); track w) {
+                        <td class="p-2 text-center">
+                          @if (hasPaid(p, w)) {
+                            <button type="button" (click)="openPaymentModal(p, w)"
+                                    class="w-full rounded-lg bg-emerald-50 px-1 py-1.5 text-[10px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors">
+                              ✓ {{ getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                            </button>
+                          } @else {
+                            <button type="button" (click)="openPaymentModal(p, w)"
+                                    class="w-full rounded-lg border border-pink-100 bg-white/70 py-1.5 text-[11px] font-black text-pink-400 hover:border-pink-300 hover:text-pink-700 hover:bg-white transition-all">
+                              {{ getWeekPaidAmount(p, w) > 0 ? (getWeekPaidAmount(p, w) | currency:'MXN':'symbol-narrow':'1.0-0') : (getParticipantWeeklyAmount(p) | currency:'MXN':'symbol-narrow':'1.0-0') }}
+                            </button>
+                          }
+                        </td>
+                      }
+
+                      <td class="p-3 text-center">
+                        <span class="text-[10px] font-black uppercase text-pink-500">
+                          {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
+                        </span>
+                      </td>
+
+                      <td class="p-3 text-center">
+                        <input type="checkbox" [checked]="p.isDelivered"
+                               (click)="$event.preventDefault(); openParticipantEditor(p)"
+                               class="h-4 w-4 cursor-pointer rounded border-pink-300 text-pink-600 focus:ring-pink-300"
+                               [attr.aria-label]="'Editar entrega de ' + p.customerName">
+                      </td>
+
+                      <td class="p-3 text-center">
+                        <button type="button" (click)="selectedParticipantActions.set(p)" class="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-50 text-xs text-pink-400 hover:bg-pink-100 hover:text-pink-600">
+                          ⚙️
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td [attr.colspan]="weeksArray().length + 4" class="py-14 text-center font-bold text-pink-400">
+                        <p class="text-3xl mb-1">🌸</p>
+                        Comienza inscribiendo participantes a la tanda
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <!-- VISUAL VIEW ("Ruta Pro") -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              @for (p of participants(); track p.id) {
+                <div class="panel-coquette flex flex-col justify-between p-5 transition-all hover:scale-[1.01]"
+                     [class.border-pink-300]="p.assignedTurn === currentWeek()"
+                     [class.shadow-lg]="p.assignedTurn === currentWeek()">
+                  <div>
+                    <div class="flex items-start justify-between gap-2">
+                      <div>
+                        <span class="text-[9px] font-black uppercase tracking-wider text-pink-400">Semana {{ p.assignedTurn }}</span>
+                        <h3 class="font-display text-base font-black text-pink-950">
+                          {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'EEEE dd' : '' : 'es-MX' | uppercase }}
+                        </h3>
+                        <p class="text-[10px] font-bold text-pink-400">{{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'MMMM yyyy' : '' : 'es-MX' | uppercase }}</p>
+                      </div>
+                      @if (p.assignedTurn === currentWeek()) {
+                        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-pink-600 text-base text-white shadow-md">📍</span>
+                      }
+                      @if (p.isDelivered) {
+                        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-base text-emerald-700">✅</span>
+                      }
+                    </div>
+
+                    <div class="my-4 flex items-center gap-3">
+                      <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-rose-400 text-lg font-black text-white shadow-sm">
+                        {{ p.customerName?.charAt(0) }}
+                      </div>
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-black text-pink-950">{{ p.customerName }}</p>
+                        <span class="mt-0.5 inline-block rounded-full bg-pink-100 px-2 py-0.5 text-[9px] font-black text-pink-700">
+                          💎 {{ p.variant || 'Sin Variante' }}
+                        </span>
+                        @if (p.items.length > 0) {
+                          <p class="mt-1 truncate text-[10px] font-bold text-purple-600">🛍️ {{ itemSummary(p) }}</p>
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="pt-3 border-t border-pink-100">
+                    @if (!p.isDelivered) {
+                      <button type="button" (click)="onConfirmSundayDelivery(p)" class="btn-3d btn-3d-secondary w-full !min-h-10 !text-xs">
+                        🎁 Confirmar Entrega
+                      </button>
+                    } @else {
+                      <div class="text-center text-xs font-black uppercase tracking-wider text-emerald-600">
+                        ✨ Entrega completada ✨
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      </div>
+
+      <!-- Right Column: Sidebar -->
+      <aside class="space-y-6" aria-label="Información y acciones de la tanda">
+        <!-- Tanda Summary Card -->
+        <div class="panel-coquette p-5 sm:p-6">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-pink-500">Información General</h3>
+            <button type="button" (click)="openEditModal()" class="text-xs font-bold text-pink-600 hover:text-pink-800">
+              ✎ Editar
+            </button>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-pink-500">Producto:</span>
+              <span class="font-black text-pink-950">{{ t.product?.name || 'Informativo' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-pink-500">Fecha de inicio:</span>
+              <span class="font-black text-pink-950">{{ t.startDate | date:'dd MMM yyyy' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-pink-500">Abono semanal:</span>
+              <span class="text-sm font-black text-pink-700">{{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            @if (t.itemCost) {
+              <div class="flex justify-between items-center pt-2 border-t border-pink-100">
+                <span class="font-bold text-pink-500">Valor artículo:</span>
+                <span class="font-black text-purple-700">
+                  {{ t.itemCost | currency:(t.currency || 'MXN'):'symbol-narrow':'1.0-0' }}
+                  <span class="text-[9px] uppercase text-pink-400">({{ t.currency || 'MXN' }})</span>
+                </span>
+              </div>
+            }
+            @if (t.currency === 'USD' && t.exchangeRate) {
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-pink-500">Tipo de cambio:</span>
+                <span class="font-black text-pink-700">{{ t.exchangeRate | currency:'MXN':'symbol-narrow':'1.2-2' }} MXN</span>
+              </div>
+            }
+          </div>
+
+          @if (t.accessToken) {
+            <button type="button" (click)="onCopyLink(t.accessToken)" class="btn-3d btn-3d-secondary mt-5 w-full !min-h-11 !text-xs">
+              🔗 Copiar enlace para clientas
+            </button>
+          }
+        </div>
+
+        <!-- Enrollment Card -->
+        <div class="panel-coquette p-5 sm:p-6">
+          <h3 class="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-pink-600">
+            <span>➕</span> Inscribir en Tanda
+          </h3>
+
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <label class="form-label-coquette !mb-0" for="client-enroll-search">Clienta</label>
+            <button type="button" (click)="showOnlyFrequent.set(!showOnlyFrequent())"
+                    class="rounded-full border px-2.5 py-0.5 text-[9px] font-black transition-all"
+                    [class]="showOnlyFrequent() ? 'border-pink-300 bg-pink-100 text-pink-700' : 'border-pink-100 bg-white text-pink-400'">
+              {{ showOnlyFrequent() ? '✨ Frecuentes' : '👥 Todas' }}
+            </button>
+          </div>
+
+          <div class="relative">
+            <input id="client-enroll-search" class="form-input-coquette"
+                   [ngModel]="clientSearch()"
+                   (ngModelChange)="onClientSearch($event)"
+                   (focus)="showSuggestions.set(true)"
+                   (blur)="hideSuggestionsWithDelay()"
+                   (keydown)="onClientKeydown($event)"
+                   placeholder="Buscar clienta por nombre..."
+                   autocomplete="off" />
+
+            @if (showSuggestions() && filteredClientsSearch().length > 0) {
+              <div class="autocomplete-dropdown p-1.5">
+                @for (c of filteredClientsSearch(); track c.id; let i = $index) {
+                  <div (click)="selectClientToEnroll(c)"
+                       [class.bg-pink-50]="i === selectedSuggestionIdx()"
+                       class="flex cursor-pointer items-center justify-between gap-2 rounded-xl p-2 transition-colors hover:bg-pink-50">
+                    <div class="min-w-0">
+                      <p class="truncate text-xs font-black text-pink-950">{{ c.name }}</p>
+                      <span class="text-[9px] font-bold text-pink-400">{{ c.tag || 'Clienta' }}</span>
+                    </div>
+                    <span class="text-xs font-bold text-pink-500">＋</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          @if (selectedClient(); as sc) {
+            <div class="mt-4 rounded-2xl border border-pink-200/80 bg-white/95 p-3.5 shadow-sm">
+              <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-100 text-xs font-black text-pink-700">
+                  {{ sc.name.charAt(0) }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-xs font-black text-pink-950">{{ sc.name }}</p>
+                  <p class="text-[9px] font-bold text-pink-400 uppercase">{{ sc.tag || 'Clienta' }}</p>
+                </div>
+              </div>
+
+              <div class="mt-3 space-y-2.5">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="form-label-coquette !text-[8px]">Variante</label>
+                    <input type="text" [(ngModel)]="enrollVariant" class="form-input-coquette !min-h-9 !py-1 !text-xs font-bold" placeholder="Rosa..." />
+                  </div>
+                  <div>
+                    <label class="form-label-coquette !text-[8px]">Turno #</label>
+                    <input type="number" [(ngModel)]="enrollTurn" class="form-input-coquette !min-h-9 !py-1 !text-xs font-black text-center" min="1" [max]="t.totalWeeks" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="form-label-coquette !text-[8px]">Abono (MXN)</label>
+                    <input type="number" [(ngModel)]="enrollWeeklyAmount" class="form-input-coquette !min-h-9 !py-1 !text-xs font-bold" [placeholder]="t.weeklyAmount.toString()" />
+                  </div>
+                  <div>
+                    <label class="form-label-coquette !text-[8px]">Valor Propio</label>
+                    <input type="number" [(ngModel)]="enrollItemCost" class="form-input-coquette !min-h-9 !py-1 !text-xs font-bold" placeholder="Opcional" />
+                  </div>
+                </div>
+                <button type="button" (click)="onAddParticipant()" [disabled]="isEnrolling()" class="btn-3d btn-3d-primary w-full !min-h-11 !text-xs">
+                  @if (isEnrolling()) { <span class="animate-spin">⌛</span> } @else { 🎀 Inscribir en Tanda }
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Quick Tanda Actions Card -->
+        <div class="panel-coquette space-y-2.5 p-5 sm:p-6">
+          <h3 class="text-[10px] font-black uppercase tracking-widest text-pink-500">Herramientas</h3>
+          <button type="button" class="btn-3d btn-3d-primary w-full !min-h-11 !text-xs" (click)="onShuffle()">
+            🎡 Mostrar ruleta de lugares
+          </button>
+          <button type="button" class="btn-3d btn-3d-purple w-full !min-h-11 !text-xs" (click)="openReorderModal()">
+            🔄 Reordenar Lista
+          </button>
+          <button type="button" class="btn-3d btn-3d-secondary w-full !min-h-11 !text-xs" (click)="onProcessPenalties()">
+            ⚠️ Procesar Retrasos
+          </button>
+          <button type="button" (click)="setTandaStatus(t.status === 'Cancelled' ? 'Active' : 'Cancelled')"
+                  class="btn-3d btn-3d-ghost w-full !min-h-10 !text-xs">
+            {{ t.status === 'Cancelled' ? 'Reactivar tanda' : 'Cancelar tanda' }}
+          </button>
+        </div>
+      </aside>
+    </div>
+  }
+
+  <!-- PAYMENT MODAL -->
+  @if (showPaymentModal()) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+      <div class="modal-sheet max-w-xl p-5 sm:p-7">
+        <div class="mb-5 flex items-start justify-between gap-4 border-b border-pink-100 pb-3">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-wider text-pink-500">Semana {{ activePayment()?.week }}</p>
+            <h3 id="payment-title" class="font-display text-xl font-black text-pink-950">{{ activePayment()?.participant?.customerName }}</h3>
+            <p class="text-xs font-semibold text-pink-600">
+              Cuota {{ getParticipantWeeklyAmount(activePayment()!.participant) | currency:'MXN':'symbol-narrow':'1.0-0' }} ·
+              Pagado {{ getWeekPaidAmount(activePayment()!.participant, activePayment()!.week) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+            </p>
+          </div>
+          <button type="button" (click)="showPaymentModal.set(false)" class="flex h-9 w-9 items-center justify-center rounded-full bg-pink-100 text-lg font-black text-pink-700" aria-label="Cerrar modal">×</button>
+        </div>
+
+        @if (paymentsForActiveWeek().length > 0) {
+          <div class="mb-5 rounded-2xl border border-pink-100 bg-pink-50/70 p-3">
+            <p class="mb-2 text-[10px] font-black uppercase tracking-wider text-pink-500">Movimientos registrados</p>
+            <div class="space-y-2">
+              @for (payment of paymentsForActiveWeek(); track payment.id) {
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white p-2.5 text-xs shadow-sm">
+                  <div>
+                    <p class="font-black text-pink-950">{{ payment.amountPaid | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
+                    <p class="text-[10px] font-bold text-pink-500">{{ payment.paymentDate | date:'dd MMM yyyy, HH:mm' }}{{ payment.notes ? ' · ' + payment.notes : '' }}</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" (click)="editPayment(payment)" class="rounded-lg px-2.5 py-1 text-xs font-black text-pink-700 hover:bg-pink-50">Editar</button>
+                    <button type="button" (click)="requestDeletePayment(payment.id)" class="rounded-lg px-2.5 py-1 text-xs font-black text-rose-700 hover:bg-rose-50">
+                      {{ pendingDeletePaymentId() === payment.id ? 'Confirmar' : 'Eliminar' }}
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <div>
+            <label class="form-label-coquette" for="payment-amount">Monto abonado</label>
+            <input id="payment-amount" type="number" min="0.01" step="0.01" [(ngModel)]="paymentForm().amountPaid" class="form-input-coquette" />
+          </div>
+          <div>
+            <label class="form-label-coquette" for="payment-penalty">Penalización pagada</label>
+            <input id="payment-penalty" type="number" min="0" step="0.01" [(ngModel)]="paymentForm().penaltyPaid" class="form-input-coquette" />
+          </div>
+          <div>
+            <label class="form-label-coquette" for="payment-date">Fecha y hora</label>
+            <input id="payment-date" type="datetime-local" [(ngModel)]="paymentForm().paymentDate" class="form-input-coquette" />
+          </div>
+          <div class="flex items-center">
+            <label class="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50/70 px-4 text-xs font-black text-pink-800">
+              <input type="checkbox" [(ngModel)]="paymentForm().isVerified" class="h-4 w-4 rounded accent-pink-600" />
+              Pago verificado
+            </label>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="form-label-coquette" for="payment-notes">Notas / Referencia</label>
+            <textarea id="payment-notes" rows="2" [(ngModel)]="paymentForm().notes" class="form-input-coquette !min-h-[70px]" placeholder="Transferencia, efectivo, referencia..."></textarea>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          @if (editingPaymentId()) {
+            <button type="button" (click)="cancelPaymentEdit()" class="btn-3d btn-3d-secondary !text-xs">Nuevo abono</button>
+          }
+          <button type="button" (click)="showPaymentModal.set(false)" class="btn-3d btn-3d-secondary !text-xs">Cerrar</button>
+          <button type="button" (click)="confirmPayment()" [disabled]="isSavingPay()" class="btn-3d btn-3d-primary !text-xs">
+            {{ isSavingPay() ? 'Guardando...' : (editingPaymentId() ? 'Guardar cambios' : 'Registrar abono ✨') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- EDIT TANDA MODAL -->
+  @if (showEditModal()) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-tanda-title">
+      <div class="modal-sheet max-w-lg p-5 sm:p-7">
+        <div class="mb-4 flex items-start justify-between gap-4 border-b border-pink-100 pb-3">
+          <div>
+            <h3 id="edit-tanda-title" class="font-display text-xl font-black text-pink-950">📝 Editar Detalles de Tanda</h3>
+            <p class="text-xs font-semibold text-pink-500">Modifica nombre, producto, fechas, valores y monedas</p>
+          </div>
+          <button type="button" (click)="showEditModal.set(false)" class="flex h-9 w-9 items-center justify-center rounded-full bg-pink-100 text-lg font-black text-pink-700" aria-label="Cerrar modal">×</button>
+        </div>
+
+        <div class="space-y-3.5">
+          <div>
+            <label class="form-label-coquette" for="edit-tanda-name">Nombre de la Tanda</label>
+            <input id="edit-tanda-name" type="text" [(ngModel)]="editForm().name" class="form-input-coquette" />
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="edit-product">Producto del Catálogo</label>
+            <select id="edit-product" [(ngModel)]="editForm().productId" class="form-input-coquette">
+              @for (product of tandaProducts(); track product.id) {
+                <option [value]="product.id">{{ product.name }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Currency & Value Section -->
+          <div class="rounded-2xl border border-pink-100 bg-pink-50/70 p-3.5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-pink-900">💵 Moneda y Valor</span>
+              <div class="flex rounded-xl border border-pink-200 bg-white p-0.5 shadow-sm">
+                <button type="button" (click)="setEditCurrency('MXN')"
+                        [class.bg-pink-500]="editForm().currency === 'MXN'"
+                        [class.text-white]="editForm().currency === 'MXN'"
+                        [class.text-pink-700]="editForm().currency !== 'MXN'"
+                        class="rounded-lg px-2.5 py-1 text-xs font-black transition-all">MXN ($)</button>
+                <button type="button" (click)="setEditCurrency('USD')"
+                        [class.bg-pink-500]="editForm().currency === 'USD'"
+                        [class.text-white]="editForm().currency === 'USD'"
+                        [class.text-pink-700]="editForm().currency !== 'USD'"
+                        class="rounded-lg px-2.5 py-1 text-xs font-black transition-all">USD ($)</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div>
+                <label class="form-label-coquette !text-[9px]">Valor Artículo ({{ editForm().currency || 'MXN' }})</label>
+                <input class="form-input-coquette !min-h-9 !py-1 !text-xs" type="number" step="0.01" min="0"
+                       [(ngModel)]="editForm().itemCost" (ngModelChange)="onEditItemCostOrRateChange()" placeholder="Ej. 1200" />
+              </div>
+              @if (editForm().currency === 'USD') {
+                <div>
+                  <label class="form-label-coquette !text-[9px]">Tipo de Cambio (MXN/USD)</label>
+                  <input class="form-input-coquette !min-h-9 !py-1 !text-xs" type="number" step="0.01" min="0"
+                         [(ngModel)]="editForm().exchangeRate" (ngModelChange)="onEditItemCostOrRateChange()" placeholder="Ej. 19.50" />
+                </div>
+              }
+            </div>
+
+            @if (editForm().currency === 'USD' && editForm().itemCost && editForm().exchangeRate) {
+              <div class="flex justify-between rounded-xl border border-purple-100 bg-purple-50/80 px-2.5 py-1.5 text-[11px] font-bold text-purple-700">
+                <span>Equivalente en pesos:</span>
+                <span class="font-black">{{ (editForm().itemCost! * editForm().exchangeRate!) | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="form-label-coquette">Semanas Totales</label>
+              <input type="number" min="1" max="52" [(ngModel)]="editForm().totalWeeks" (ngModelChange)="onEditItemCostOrRateChange()" class="form-input-coquette" />
+            </div>
+            <div>
+              <label class="form-label-coquette">Abono Semanal (MXN)</label>
+              <input type="number" min="0.01" step="0.01" [(ngModel)]="editForm().weeklyAmount" class="form-input-coquette" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="form-label-coquette">Fecha de Inicio</label>
+              <input type="date" [(ngModel)]="editForm().startDate" class="form-input-coquette" />
+            </div>
+            <div>
+              <label class="form-label-coquette">Penalización</label>
+              <input type="number" min="0" step="0.01" [(ngModel)]="editForm().penaltyAmount" class="form-input-coquette" />
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="edit-status">Estado</label>
+            <select id="edit-status" [(ngModel)]="editForm().status" class="form-input-coquette">
+              <option value="Draft">Borrador</option>
+              <option value="Active">Activa</option>
+              <option value="Completed">Completada</option>
+              <option value="Cancelled">Cancelada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button type="button" (click)="showEditModal.set(false)" class="btn-3d btn-3d-secondary !text-xs">Cancelar</button>
+          <button type="button" (click)="onUpdateTanda()" [disabled]="isUpdatingTanda()" class="btn-3d btn-3d-primary !text-xs">
+            @if (isUpdatingTanda()) { <span class="animate-spin">⌛</span> } @else { Guardar Cambios ✨ }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- PARTICIPANT ACTION SHEET -->
+  @if (selectedParticipantActions(); as p) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="participant-actions-title">
+      <div class="modal-sheet max-w-sm p-6 text-center">
+        <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-400 to-rose-400 text-xl font-black text-white shadow-md">
+          {{ p.customerName?.charAt(0) }}
+        </div>
+        <h3 id="participant-actions-title" class="font-display text-lg font-black text-pink-950">{{ p.customerName }}</h3>
+        <p class="text-xs font-bold uppercase tracking-wider text-pink-500">Turno #{{ p.assignedTurn }}</p>
+
+        <div class="mt-5 space-y-2.5 text-xs font-black">
+          <button type="button" (click)="openParticipantEditor(p)"
+                  class="btn-3d btn-3d-secondary w-full !justify-start !min-h-12 !px-4">
+            <span class="text-base">✎</span> Editar participante
+          </button>
+          <button type="button" (click)="openItemsModal(p)"
+                  class="btn-3d btn-3d-purple w-full !justify-start !min-h-12 !px-4">
+            <span class="text-base">🛍️</span> Editar artículos y cobro
+          </button>
+          <button type="button" (click)="copyParticipantMessage(p)"
+                  class="btn-3d btn-3d-secondary w-full !justify-start !min-h-12 !px-4">
+            <span class="text-base">💌</span> Copiar instrucciones WhatsApp
+          </button>
+          <button type="button" (click)="showRemoveConfirm.set(p); selectedParticipantActions.set(null)"
+                  class="btn-3d btn-3d-rose w-full !justify-start !min-h-12 !px-4">
+            <span class="text-base">🗑️</span> Quitar de esta Tanda
+          </button>
+          <button type="button" (click)="selectedParticipantActions.set(null)"
+                  class="btn-3d btn-3d-ghost w-full !min-h-11">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- PARTICIPANT CUSTOM ITEMS MODAL -->
+  @if (editingItemsParticipant(); as participant) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="participant-items-title">
+      <div class="modal-sheet max-w-xl p-5 sm:p-7">
+        <div class="mb-4 flex items-start justify-between gap-4 border-b border-purple-100 pb-3">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-wider text-purple-600">Cobro personalizado</p>
+            <h3 id="participant-items-title" class="font-display text-xl font-black text-pink-950">Artículos de {{ participant.customerName }}</h3>
+            <p class="text-xs font-semibold text-pink-600">Agrega artículos mixtos; el abono semanal se calcula por cantidad.</p>
+          </div>
+          <button type="button" (click)="editingItemsParticipant.set(null)" class="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-lg font-black text-purple-700" aria-label="Cerrar modal">×</button>
+        </div>
+
+        <div class="space-y-3">
+          @for (item of itemDrafts; track $index) {
+            <div class="rounded-2xl border border-purple-100 bg-purple-50/50 p-3.5 space-y-2.5">
+              <div>
+                <label class="form-label-coquette !text-[9px]">Artículo</label>
+                <input [(ngModel)]="item.productName" class="form-input-coquette !min-h-9 !py-1 !text-xs font-bold" placeholder="Ej. Set de cosmetiqueras" />
+              </div>
+              <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div>
+                  <label class="form-label-coquette !text-[9px]">Cantidad</label>
+                  <input [(ngModel)]="item.quantity" type="number" min="1" class="form-input-coquette !min-h-9 !py-1 !text-xs" />
+                </div>
+                <div>
+                  <label class="form-label-coquette !text-[9px]">Variante</label>
+                  <input [(ngModel)]="item.variant" class="form-input-coquette !min-h-9 !py-1 !text-xs" placeholder="Color..." />
+                </div>
+                <div>
+                  <label class="form-label-coquette !text-[9px]">Precio Unitario</label>
+                  <input [(ngModel)]="item.unitPrice" type="number" min="0" step="0.01" class="form-input-coquette !min-h-9 !py-1 !text-xs" />
+                </div>
+                <div>
+                  <label class="form-label-coquette !text-[9px]">Cobro semanal</label>
+                  <input [(ngModel)]="item.weeklyAmount" type="number" min="0" step="0.01" class="form-input-coquette !min-h-9 !py-1 !text-xs" />
+                </div>
+              </div>
+              <button type="button" (click)="removeItemDraft($index)" [disabled]="itemDrafts.length === 1" class="text-xs font-black text-rose-600 disabled:opacity-30">
+                ✕ Quitar artículo
+              </button>
+            </div>
+          }
+        </div>
+
+        <button type="button" (click)="addItemDraft()" class="mt-3.5 w-full rounded-2xl border border-dashed border-purple-300 py-2.5 text-xs font-black text-purple-700 hover:bg-purple-50 transition-colors">
+          ＋ Agregar otro artículo
+        </button>
+
+        <div class="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button type="button" (click)="editingItemsParticipant.set(null)" class="btn-3d btn-3d-secondary !text-xs">Cancelar</button>
+          <button type="button" (click)="saveParticipantItems()" [disabled]="isSavingItems()" class="btn-3d btn-3d-purple !text-xs">
+            {{ isSavingItems() ? 'Guardando...' : 'Guardar artículos y cobro ✨' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- EDIT PARTICIPANT MODAL -->
+  @if (editingParticipant(); as participant) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="participant-editor-title">
+      <div class="modal-sheet max-w-xl p-5 sm:p-7">
+        <div class="mb-5 flex items-start justify-between gap-4 border-b border-pink-100 pb-3">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-wider text-pink-500">Lugar {{ participant.assignedTurn }}</p>
+            <h3 id="participant-editor-title" class="font-display text-xl font-black text-pink-950">Editar participante</h3>
+            <p class="text-xs font-semibold text-pink-600">Todos los datos y lugares pueden modificarse.</p>
+          </div>
+          <button type="button" (click)="editingParticipant.set(null)" class="flex h-9 w-9 items-center justify-center rounded-full bg-pink-100 text-lg font-black text-pink-700" aria-label="Cerrar modal">×</button>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <div class="relative sm:col-span-2">
+            <label class="form-label-coquette" for="edit-participant-search">Clienta</label>
+            <div class="relative">
+              <input id="edit-participant-search" type="text"
+                     class="form-input-coquette pl-9"
+                     [ngModel]="editParticipantClientSearch()"
+                     (ngModelChange)="onEditParticipantSearch($event)"
+                     (focus)="showEditParticipantSuggestions.set(true)"
+                     (blur)="hideEditParticipantSuggestionsWithDelay()"
+                     placeholder="Buscar clienta por nombre..." />
+              <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-pink-400">🔍</span>
+            </div>
+
+            @if (showEditParticipantSuggestions() && filteredEditParticipantClients().length > 0) {
+              <div class="autocomplete-dropdown p-1.5">
+                @for (cl of filteredEditParticipantClients(); track cl.id) {
+                  <div (mousedown)="$event.preventDefault()" (click)="selectClientForEditParticipant(cl)"
+                       class="flex cursor-pointer items-center justify-between gap-2 rounded-xl p-2.5 transition-colors hover:bg-pink-50"
+                       [class.bg-pink-50]="participantForm().customerId === cl.id">
+                    <div class="min-w-0">
+                      <p class="truncate text-xs font-black text-pink-950">{{ cl.name }}</p>
+                      <p class="text-[10px] font-bold text-pink-400">{{ cl.tag || 'Clienta' }} {{ cl.phone ? '· ' + cl.phone : '' }}</p>
+                    </div>
+                    <span class="text-xs font-black text-pink-600">
+                      {{ participantForm().customerId === cl.id ? '✓' : 'Elegir' }}
+                    </span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="participant-turn">Lugar / Turno</label>
+            <input id="participant-turn" type="number" min="1" [max]="tanda()?.totalWeeks ?? 52"
+                   [(ngModel)]="participantForm().assignedTurn" class="form-input-coquette" />
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="participant-amount">Abono Semanal (MXN)</label>
+            <input id="participant-amount" type="number" min="0.01" step="0.01"
+                   [(ngModel)]="participantForm().weeklyAmount" class="form-input-coquette"
+                   [placeholder]="tanda()?.weeklyAmount?.toString() || 'General'" />
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="participant-cost">Valor del Artículo</label>
+            <input id="participant-cost" type="number" min="0" step="0.01"
+                   [(ngModel)]="participantForm().itemCost" class="form-input-coquette" placeholder="Ej. 1200" />
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="participant-status">Estado</label>
+            <select id="participant-status" [(ngModel)]="participantForm().status" class="form-input-coquette">
+              <option value="Active">Al corriente</option>
+              <option value="Delinquent">Con retraso</option>
+              <option value="Completed">Completada</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label-coquette" for="participant-variant">Variante</label>
+            <input id="participant-variant" type="text" [(ngModel)]="participantForm().variant" class="form-input-coquette" placeholder="Color, talla o modelo" />
+          </div>
+
+          <div class="flex items-center">
+            <label class="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-2xl border border-pink-100 bg-pink-50/70 px-4 text-xs font-black text-pink-800">
+              <input type="checkbox" [(ngModel)]="participantForm().isDelivered" class="h-4 w-4 rounded accent-pink-600" />
+              Producto entregado
+            </label>
+          </div>
+
+          @if (participantForm().isDelivered) {
+            <div class="sm:col-span-2">
+              <label class="form-label-coquette" for="participant-delivery-date">Fecha de entrega</label>
+              <input id="participant-delivery-date" type="date" [(ngModel)]="participantForm().deliveryDate" class="form-input-coquette" />
+            </div>
+          }
+        </div>
+
+        <div class="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button type="button" (click)="editingParticipant.set(null)" class="btn-3d btn-3d-secondary !text-xs">Cancelar</button>
+          <button type="button" (click)="saveParticipant()" [disabled]="isUpdatingParticipant()" class="btn-3d btn-3d-primary !text-xs">
+            {{ isUpdatingParticipant() ? 'Guardando...' : 'Guardar participante ✨' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- EDIT VARIANT MODAL -->
+  @if (editingVariantId(); as id) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="variant-modal-title">
+      <div class="modal-sheet max-w-sm p-6 text-center">
+        <h3 id="variant-modal-title" class="font-display text-lg font-black text-pink-950 mb-4">🎨 Variante del Producto</h3>
+        <label class="form-label-coquette text-left" for="variant-input">Color / Modelo / Variante</label>
+        <input id="variant-input" type="text" [(ngModel)]="editVariantValue" class="form-input-coquette" placeholder="Escribe la variante aquí..." #vInput (keyup.enter)="onUpdateVariant(id)" />
+        <div class="mt-5 flex gap-2.5">
+          <button type="button" (click)="editingVariantId.set(null)" class="btn-3d btn-3d-secondary flex-1 !text-xs">Cancelar</button>
+          <button type="button" (click)="onUpdateVariant(id)" [disabled]="isUpdatingVariant()" class="btn-3d btn-3d-primary flex-1 !text-xs">
+            @if (isUpdatingVariant()) { <span class="animate-spin">⌛</span> } @else { Guardar ✨ }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- REMOVE CONFIRMATION MODAL -->
+  @if (showRemoveConfirm(); as p) {
+    <div class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="remove-confirm-title">
+      <div class="modal-sheet max-w-sm border-rose-200 p-6 text-center">
+        <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-3xl">
+          ⚠️
+        </div>
+        <h3 id="remove-confirm-title" class="font-display text-lg font-black text-rose-950">¿Estás segura?</h3>
+        <p class="mt-2 text-xs font-semibold leading-relaxed text-rose-600">
+          Vas a quitar a <span class="font-black text-rose-800">{{ p.customerName }}</span> de la tanda. Sus pagos también se borrarán de forma permanente. 🎀
+        </p>
+        <div class="mt-6 flex gap-2.5">
+          <button type="button" (click)="showRemoveConfirm.set(null)" class="btn-3d btn-3d-secondary flex-1 !text-xs">No, esperar</button>
+          <button type="button" (click)="confirmRemoveParticipant(p)" class="btn-3d btn-3d-rose flex-1 !text-xs">
+            Sí, quitar ✨
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- CONFIRM DELIVERY MODAL -->
+  @if (confirmingDelivery(); as p) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-delivery-title">
+      <div class="modal-sheet max-w-sm p-6 text-center">
+        <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-pink-100 text-3xl">
+          🎁
+        </div>
+        <h3 id="confirm-delivery-title" class="font-display text-lg font-black text-pink-950">¿Confirmar Entrega?</h3>
+        <p class="mt-2 text-xs font-semibold leading-relaxed text-pink-600">
+          ¿Confirmas que <span class="font-black text-pink-800">{{ p.customerName }}</span> recibió su producto hoy? ✨
+        </p>
+        <div class="mt-6 flex gap-2.5">
+          <button type="button" (click)="confirmingDelivery.set(null)" class="btn-3d btn-3d-secondary flex-1 !text-xs">Cancelar</button>
+          <button type="button" (click)="confirmDelivery(p)" class="btn-3d btn-3d-primary flex-1 !text-xs">
+            Sí, confirmar ✨
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ROULETTE / RAFFLE ANIMATION -->
+  @if (showRoulette()) {
+    <app-raffle-animation
+      [customTitle]="tanda()?.name"
+      [participants]="rouletteParticipants()"
+      [winnerNames]="rouletteWinnerNames()"
+      [turnNumbers]="rouletteTurnNumbers()"
+      animationType="roulette"
+      (close)="showRoulette.set(false)"
+      (startRequested)="handleRouletteStart()">
+    </app-raffle-animation>
+  }
+
+  <!-- DRAG & DROP REORDER MODAL -->
+  @if (showReorderModal()) {
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reorder-title">
+      <div class="modal-sheet flex max-h-[88svh] max-w-lg flex-col overflow-hidden">
+        <div class="flex items-center justify-between border-b border-pink-100 bg-gradient-to-r from-purple-50 to-pink-50 p-5">
+          <div>
+            <h3 id="reorder-title" class="font-display text-lg font-black text-pink-950">Mover lugares</h3>
+            <p class="text-xs font-semibold text-pink-600">Arrastra participantes o espacios vacíos. Todo el orden es editable.</p>
+          </div>
+          <button type="button" (click)="showReorderModal.set(false)" class="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xl font-bold text-pink-700 shadow-sm" aria-label="Cerrar modal">×</button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 sm:p-5 bg-pink-50/30">
+          <div cdkDropList (cdkDropListDropped)="drop($event)" class="space-y-2.5">
+            @for (p of reorderSlots(); track $index) {
+              <div cdkDrag class="flex cursor-move items-center gap-3 rounded-2xl border border-pink-100 bg-white p-3.5 shadow-sm transition-colors hover:border-pink-300">
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-xs font-black text-pink-600">
+                  {{ $index + 1 }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  @if (p; as participant) {
+                    <p class="truncate text-xs font-black text-pink-950">{{ participant.customerName }}</p>
+                    <p class="text-[10px] font-bold text-pink-400">
+                      {{ participant.variant || 'Sin variante' }}
+                      @if (participant.isDelivered) { · Entregado }
+                    </p>
+                  } @else {
+                    <p class="text-xs font-bold text-pink-400">Lugar disponible</p>
+                    <p class="text-[10px] text-pink-300">Puedes mover este espacio entre participantes</p>
+                  }
+                </div>
+                <span class="text-pink-300">⠿</span>
+                <div *cdkDragPlaceholder class="h-14 rounded-2xl border-2 border-dashed border-pink-300 bg-pink-50"></div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="flex gap-2.5 border-t border-pink-100 bg-white p-4">
+          <button type="button" (click)="showReorderModal.set(false)" class="btn-3d btn-3d-secondary flex-1 !text-xs">Cancelar</button>
+          <button type="button" (click)="onSaveReorder()" [disabled]="isSavingReorder()" class="btn-3d btn-3d-purple flex-1 !text-xs">
+            @if (isSavingReorder()) { <span>Guardando...</span> } @else { <span>Guardar Nuevo Orden ✨</span> }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

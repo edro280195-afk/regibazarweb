@@ -1,676 +1,115 @@
-import { Component, inject, signal, OnInit, computed, ViewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { TandaDto, TandaParticipantDto, ClientDto, CLIENT_TAG_LABELS, CamiChatResponse } from '../../../core/models';
+import {
+  CamiChatResponse,
+  ClientDto,
+  TandaDto,
+  TandaParticipantDto,
+  TandaParticipantStatus,
+  TandaPaymentDto,
+  TandaPaymentProofAdminDto,
+  TandaProductDto,
+  TandaStatus,
+  CreateTandaParticipantItemDto,
+  UpdateTandaParticipantDto,
+  UpdateTandaPaymentDto
+} from '../../../core/models';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { RaffleAnimationComponent } from '../raffles/raffle-animation/raffle-animation.component';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  buildPlaceAssignments,
+  buildTandaSlots,
+  getVerifiedWeekPaidAmount
+} from './tanda-admin.util';
+
+interface PaymentForm {
+  amountPaid: number;
+  penaltyPaid: number;
+  paymentDate: string;
+  isVerified: boolean;
+  notes: string;
+}
+
+interface ParticipantForm {
+  customerId: number;
+  assignedTurn: number;
+  variant: string;
+  weeklyAmount?: number;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
+  status: TandaParticipantStatus;
+  isDelivered: boolean;
+  deliveryDate: string;
+}
+
+interface TandaEditForm {
+  productId: string;
+  name: string;
+  totalWeeks: number;
+  weeklyAmount: number;
+  penaltyAmount: number;
+  startDate: string;
+  currency?: string;
+  itemCost?: number;
+  exchangeRate?: number;
+  status: TandaStatus;
+}
 
 @Component({
   selector: 'app-tanda-detail',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterLink, FormsModule, DragDropModule, RaffleAnimationComponent],
-  template: `
-    <div class="space-y-6 max-w-7xl mx-auto animate-fade-in pb-20">
-      <!-- Breadcrumbs & Navigation -->
-      <div class="flex items-center justify-between mb-2">
-        <nav class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-pink-400">
-          <a routerLink="/admin/tandas" class="hover:text-pink-600 transition-colors">Tandas</a>
-          <span class="opacity-50">/</span>
-          <span class="text-pink-900 font-black flex items-center gap-2">
-            {{ tanda()?.name || 'Cargando...' }}
-            @if (tanda() && !loading()) {
-              <button (click)="openEditModal()" class="text-pink-300 hover:text-pink-500 transition-colors text-sm">✎</button>
-            }
-          </span>
-        </nav>
-        <button [routerLink]="['/admin/tandas']" class="btn-coquette btn-ghost text-xs">← Volver</button>
-      </div>
-
-      @if (loading()) {
-        <div class="card-coquette p-20 text-center">
-            <div class="flex flex-col items-center gap-4">
-              <div class="w-12 h-12 border-4 border-pink-100 border-t-pink-500 rounded-full animate-spin"></div>
-              <p class="text-pink-400 font-bold animate-pulse">Cargando detalles de la tanda... ✨</p>
-            </div>
-        </div>
-      } @else if (tanda(); as t) {
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          <!-- Main Content: Weekly Management -->
-          <div class="lg:col-span-2 space-y-6">
-            
-            <!-- Delivery Hero (SHIMMER) -->
-            <div class="card-coquette overflow-hidden relative border-pink-200">
-              <div class="absolute inset-0 bg-gradient-to-r from-pink-50 via-white to-rose-50 -z-10"></div>
-              
-              <div class="p-8 relative flex flex-wrap items-center justify-between gap-6 overflow-hidden">
-                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent skew-x-12 animate-shimmer pointer-events-none"></div>
-
-                <div class="flex items-center gap-6">
-                  <div class="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-pink-400 to-rose-500 shadow-lg shadow-pink-200 flex items-center justify-center text-3xl text-white transform hover:rotate-6 transition-transform">
-                    📦
-                  </div>
-                  <div>
-                    <h3 class="text-2xl font-black text-pink-900 font-display">Entrega de Tanda</h3>
-                    @if (sundayParticipant(); as sp) {
-                      @if (sp.isDelivered) {
-                        <p class="text-emerald-500 font-bold flex items-center gap-2 mt-1 animate-fade-in">
-                          <span class="text-xl">✅</span> ¡PRODUCTO ENTREGADO! ✨
-                        </p>
-                      } @else {
-                        <p class="text-pink-500 font-bold flex items-center gap-2 mt-1">
-                          <span class="animate-pulse">💖</span> {{ sp.customerName }} recibe hoy
-                        </p>
-                      }
-                      <div class="flex gap-2 mt-3">
-                        <span class="px-3 py-1 bg-pink-100 text-pink-700 text-[10px] font-black rounded-lg uppercase tracking-wider">Turno #{{ sp.assignedTurn }}</span>
-                        <span class="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-lg uppercase tracking-wider">Entrega: Próx. Domingo</span>
-                      </div>
-                    } @else {
-                      <p class="text-pink-400 italic mt-1 font-medium italic">Pendiente por asignar turno de entrega...</p>
-                    }
-                  </div>
-                </div>
-                
-                @if (sundayParticipant(); as sp) {
-                  @if (!sp.isDelivered) {
-                    <div class="flex flex-col sm:flex-row gap-2 items-stretch">
-                      <button (click)="addToSundayRoute(sp)"
-                              [disabled]="addingToRoute()"
-                              class="btn-coquette btn-pink px-6 py-4 shadow-xl disabled:opacity-60 disabled:cursor-not-allowed">
-                        {{ addingToRoute() ? 'Agregando...' : '📍 Agregar a ruta del domingo' }}
-                      </button>
-                      <button (click)="onConfirmSundayDelivery(sp)" class="btn-coquette btn-rose px-8 py-4 shadow-xl">Confirmar Entrega ✨</button>
-                    </div>
-                  } @else {
-                    <div class="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs border border-emerald-100 uppercase tracking-widest">
-                       Entrega Completada
-                    </div>
-                  }
-                }
-              </div>
-            </div>
-
-            <!-- Weekly Payments Table -->
-            <div class="card-coquette p-6 border-pink-100/50">
-              <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                <div>
-                   <h4 class="text-xs font-black text-pink-600 uppercase tracking-widest flex items-center gap-2">
-                     <span>💎</span> Panel de Gestión de Tanda
-                   </h4>
-                   <p class="text-[9px] text-pink-400 font-bold mt-1">Control de abonos y logística de entregas</p>
-                </div>
-                
-                <!-- Premium View Switcher -->
-                <div class="bg-pink-50 p-1 rounded-2xl flex gap-1 border border-pink-100/50 shadow-inner">
-                   <button (click)="viewMode.set('table')" 
-                           [class]="viewMode() === 'table' ? 'bg-white text-pink-600 shadow-md scale-105' : 'text-pink-300 hover:text-pink-500'"
-                           class="px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2">
-                     <span>📋</span> Abonos
-                   </button>
-                   <button (click)="viewMode.set('visual')" 
-                           [class]="viewMode() === 'visual' ? 'bg-white text-pink-600 shadow-md scale-105' : 'text-pink-300 hover:text-pink-500'"
-                           class="px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2">
-                     <span>🌟</span> Ruta Pro
-                   </button>
-                </div>
-              </div>
-
-              @if (viewMode() === 'table') {
-                <div class="overflow-x-auto rounded-2xl border border-pink-50 shadow-inner scrollbar-hide animate-fade-in">
-                  <table class="table-coquette w-full">
-                    <thead>
-                      <tr>
-                        <th class="sticky left-0 z-20 bg-pink-50 shadow-[4px_0_8px_rgba(131,24,67,0.03)] min-w-[180px]">Clienta</th>
-                        @for (w of weeksArray(); track w) {
-                          <th class="text-center min-w-[75px]">Sem {{ w }}</th>
-                        }
-                        <th class="text-center min-w-[100px]">📅 Entrega</th>
-                        <th class="text-center">📦</th>
-                        <th class="text-center">⚙️</th>
-                      </tr>
-                    </thead>
-                  <tbody>
-                    @for (p of participants(); track p.id) {
-                      <tr class="group">
-                        <td class="sticky left-0 z-20 bg-white group-hover:bg-pink-50/30 transition-colors shadow-[4px_0_8px_rgba(131,24,67,0.03)]">
-                          <div class="flex items-center gap-3">
-                            <!-- Turno Editable -->
-                            @if (editingTurnId() === p.id) {
-                              <input type="number" 
-                                     [value]="p.assignedTurn" 
-                                     (blur)="editingTurnId.set(null)"
-                                     (keyup.enter)="onUpdateTurn(p, $event)"
-                                     class="w-10 h-8 rounded border-pink-200 text-center font-black text-pink-600 bg-pink-50 p-1"
-                                     #turnInput
-                                     (focus)="turnInput.select()">
-                            } @else {
-                              <span (click)="editingTurnId.set(p.id)" 
-                                    class="w-6 h-6 rounded bg-pink-800 text-white text-[10px] font-black flex items-center justify-center shrink-0 cursor-pointer hover:bg-pink-600 transition-colors"
-                                    title="Clic para cambiar turno">{{ p.assignedTurn }}</span>
-                            }
-                            <span class="text-sm font-black text-pink-900 truncate flex-1" [title]="p.customerName">{{ p.customerName }}</span>
-                            <!-- Botón de ajustes móvil -->
-                            <button (click)="selectedParticipantActions.set(p)" 
-                                    class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all shrink-0">
-                                ⚙️
-                            </button>
-                          </div>
-                        </td>
-                        @for (w of weeksArray(); track w) {
-                          <td class="text-center p-2">
-                            @if (hasPaid(p, w)) {
-                              <button (click)="onRemovePayment(p, w)" class="text-lg drop-shadow-sm animate-bounce-in inline-block hover:scale-125 transition-transform" title="Quitar pago">💖</button>
-                            } @else {
-                              <button (click)="openPaymentModal(p, w)" 
-                                      class="w-full py-1.5 rounded-lg border border-pink-50 text-[11px] font-black text-pink-300 hover:border-pink-300 hover:text-pink-600 hover:bg-white transition-all">
-                                {{ t.weeklyAmount }}
-                              </button>
-                            }
-                          </td>
-                        }
-                        @if (tanda(); as t) {
-                          <td class="text-center">
-                            <span class="text-[9px] font-black text-pink-400 uppercase tracking-tight">
-                              {{ getDeliveryDate(t.startDate, p.assignedTurn) | date:'dd MMM' : '' : 'es-MX' | uppercase }}
-                            </span>
-                          </td>
-                        }
-                        <td class="text-center">
-                          <input type="checkbox" [checked]="p.isDelivered" (click)="onConfirmSundayDelivery(p)" class="w-4 h-4 rounded border-pink-200 text-pink-500 focus:ring-pink-300 cursor-pointer">
-                        </td>
-                        <td class="text-center">
-                          <button (click)="selectedParticipantActions.set(p)" class="w-8 h-8 rounded-full bg-pink-50 text-pink-400 flex items-center justify-center text-xs hover:bg-pink-100 hover:text-pink-600 transition-all">
-                             ⚙️
-                          </button>
-                        </td>
-                      </tr>
-                    } @empty {
-                      <tr>
-                        <td [attr.colspan]="weeksArray().length + 3" class="text-center py-20 text-pink-300 font-medium">
-                          <div class="text-4xl mb-2">🌸</div>
-                          Comienza inscribiendo a las participantes
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            } @else {
-                <!-- RUTA DE ENTREGAS CON ESTEROIDES (Visual View) -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-in">
-                  @for (p of participants(); track p.id) {
-                    <div class="relative group">
-                       <!-- Milestone Card -->
-                       <div class="bg-gradient-to-br from-white to-pink-50/20 rounded-[2.5rem] p-6 border-2 transition-all duration-500 min-h-[220px] flex flex-col justify-between"
-                            [ngClass]="{
-                              'border-pink-200 shadow-xl shadow-pink-100/50 scale-[1.02]': p.assignedTurn === currentWeek(),
-                              'border-pink-50 opacity-80 hover:opacity-100 hover:border-pink-100': p.assignedTurn !== currentWeek(),
-                              'grayscale-[0.5]': p.isDelivered
-                            }">
-                          
-                          <!-- Card Header: Turn & Date -->
-                          <div class="flex justify-between items-start">
-                             <div class="flex flex-col">
-                                <span class="text-[9px] font-black text-pink-400 tracking-[0.2em] uppercase">Semana {{ p.assignedTurn }}</span>
-                                <h5 class="text-lg font-black text-pink-900 leading-tight">
-                                   {{ getDeliveryDate(tanda()!.startDate, p.assignedTurn) | date:'EEEE dd' : '' : 'es-MX' | uppercase }}
-                                </h5>
-                                <p class="text-[10px] text-pink-400 font-bold opacity-60">{{ getDeliveryDate(tanda()!.startDate, p.assignedTurn) | date:'MMMM yyyy' : '' : 'es-MX' | uppercase }}</p>
-                             </div>
-                             @if (p.assignedTurn === currentWeek()) {
-                               <span class="w-10 h-10 rounded-2xl bg-pink-600 text-white flex items-center justify-center text-xl shadow-lg shadow-pink-200 animate-bounce-subtle">📍</span>
-                             }
-                             @if (p.isDelivered) {
-                               <span class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">✅</span>
-                             }
-                          </div>
-
-                          <!-- Card Body: Client -->
-                          <div class="my-4">
-                             <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-400 flex items-center justify-center text-white text-xl font-black shadow-md">
-                                   {{ p.customerName?.charAt(0) }}
-                                </div>
-                                <div>
-                                   <p class="text-base font-black text-pink-900 truncate max-w-[150px]">{{ p.customerName }}</p>
-                                   <!-- VARIANTE CON ESTILO DE ETIQUETA -->
-                                   <div class="mt-1 flex items-center gap-1">
-                                      <span class="text-[8px] bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full font-black uppercase tracking-wider border border-pink-200">💎 {{ p.variant || 'Sin Variante' }}</span>
-                                   </div>
-                                </div>
-                             </div>
-                          </div>
-
-                          <!-- Card Actions -->
-                          <div class="pt-2 border-t border-pink-50/50">
-                             @if (!p.isDelivered) {
-                               <button (click)="onConfirmSundayDelivery(p)" 
-                                       class="w-full py-2.5 bg-white hover:bg-pink-600 hover:text-white text-pink-600 text-[10px] font-black rounded-xl uppercase tracking-widest transition-all border border-pink-100 shadow-sm flex items-center justify-center gap-2 group-hover:scale-[1.02]">
-                                 🎁 Confirmar Entrega
-                               </button>
-                             } @else {
-                               <div class="text-center py-2 text-emerald-500 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                                  ✨ PRODUCTO ENTREGADO ✨
-                               </div>
-                             }
-                          </div>
-                       </div>
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- Sidebar: Actions & Info -->
-          <div class="space-y-6">
-            <!-- Tanda Summary Card -->
-            <div class="card-coquette p-6 bg-gradient-to-br from-white to-pink-50/30">
-              <h4 class="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em] mb-4">Información General</h4>
-              <div class="space-y-4">
-                <div class="flex justify-between items-center text-sm">
-                  <span class="text-pink-600 font-bold italic">Producto:</span>
-                  <span class="text-pink-900 font-black">{{ t.product?.name || 'Informativo' }}</span>
-                </div>
-                <div class="flex justify-between items-center text-sm">
-                  <span class="text-pink-600 font-bold italic">Inicio:</span>
-                  <span class="text-pink-900 font-black">{{ t.startDate | date:'dd MMM yyyy' }}</span>
-                </div>
-                <div class="flex justify-between items-center text-sm">
-                  <span class="text-pink-600 font-bold italic">Paga Semanal:</span>
-                  <span class="text-base font-black text-pink-600">{{ t.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
-                </div>
-              </div>
-
-              <!-- Enlace de Clienta -->
-              @if (t.accessToken) {
-                <button (click)="onCopyLink(t.accessToken)" class="mt-6 w-full py-3 bg-pink-100 hover:bg-pink-200 text-pink-600 text-[10px] font-black rounded-2xl uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm border border-pink-200">
-                  🔗 Copiar Enlace Clientas
-                </button>
-              }
-            </div>
-
-            <!-- Enrollment Panel -->
-            <div class="card-coquette p-6 border-pink-200/60 bg-white/50 relative">
-              <div class="absolute -top-4 -right-4 text-4xl opacity-10">🎀</div>
-              <h4 class="text-sm font-black text-pink-600 mb-4 flex items-center gap-2">
-                <span>➕</span> Inscribir en Tanda
-              </h4>
-              
-                  <div class="flex items-center justify-between gap-2 mb-2">
-                    <label class="text-[9px] font-black text-pink-400 uppercase tracking-widest">Clienta</label>
-                    <button (click)="showOnlyFrequent.set(!showOnlyFrequent())" 
-                            class="text-[9px] font-black px-2 py-0.5 rounded-full border transition-all"
-                            [class]="showOnlyFrequent() ? 'bg-pink-100 text-pink-600 border-pink-200' : 'bg-gray-100 text-gray-500 border-gray-200'">
-                      {{ showOnlyFrequent() ? '✨ Frecuentes' : '👥 Todas' }}
-                    </button>
-                  </div>
-                  <div class="relative">
-                    <input class="input-coquette py-2 text-xs" 
-                           [ngModel]="clientSearch()" 
-                           (ngModelChange)="onClientSearch($event)"
-                           (focus)="showSuggestions.set(true)"
-                           (blur)="hideSuggestionsWithDelay()"
-                           (keydown)="onClientKeydown($event)"
-                           placeholder="Buscar por nombre..." />
-                    
-                    @if (showSuggestions() && filteredClientsSearch().length > 0) {
-                      <div class="absolute top-full left-0 right-0 z-50 mt-1 glass-strong rounded-xl p-1 border border-pink-100 shadow-lg max-h-60 overflow-y-auto scrollbar-hide animate-slide-down">
-                        @for (c of filteredClientsSearch(); track c.id; let i = $index) {
-                          <div (click)="selectClientToEnroll(c)" 
-                               [class.bg-pink-50]="i === selectedSuggestionIdx()"
-                               class="p-2.5 hover:bg-pink-50 rounded-lg cursor-pointer transition-colors group flex items-center justify-between gap-3">
-                             <div class="min-w-0">
-                                <p class="text-xs font-bold text-pink-900 group-hover:text-pink-600 truncate">{{ c.name }}</p>
-                                <div class="flex items-center gap-1.5 mt-0.5">
-                                  <span class="text-[8px] font-black uppercase tracking-tighter text-pink-400">{{ c.tag }}</span>
-                                  @if (c.ordersCount > 0) {
-                                    <span class="text-[8px] bg-purple-50 text-purple-600 px-1 rounded border border-purple-100 font-bold">FRECUENTE</span>
-                                  }
-                                </div>
-                             </div>
-                             <span class="w-6 h-6 rounded-full bg-pink-100 flex items-center justify-center text-[10px] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">➕</span>
-                          </div>
-                        }
-                      </div>
-                    } @else if (showSuggestions() && clientSearch().length >= 2) {
-                      <div class="absolute top-full left-0 right-0 z-50 mt-1 glass-strong rounded-xl p-4 text-center border border-pink-100 shadow-lg animate-slide-down">
-                        <p class="text-[10px] text-pink-400 font-medium italic">No se encontraron coincidencias 🔍</p>
-                      </div>
-                    }
-                  </div>
-
-                @if (selectedClient(); as sc) {
-                  <div class="p-4 bg-gradient-to-br from-pink-50 to-white rounded-2xl border border-pink-200 animate-scale-in">
-                    <div class="flex items-center gap-3 mb-4">
-                       <div class="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 font-black text-sm">
-                          {{ sc.name.charAt(0) }}
-                       </div>
-                       <div class="flex-1">
-                          <p class="text-sm font-black text-pink-900 leading-tight">{{ sc.name }}</p>
-                          <p class="text-[10px] text-pink-400 font-bold uppercase">{{ sc.tag || 'Clienta' }}</p>
-                       </div>
-                    </div>
-                    
-                    <div class="space-y-4">
-                      <div class="flex gap-4">
-                        <div class="flex-1">
-                          <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Variante (Color/Modelo)</label>
-                          <input type="text" [(ngModel)]="enrollVariant" class="input-coquette py-1.5 text-xs font-bold" placeholder="Ej. Rosa Pastel" />
-                        </div>
-                        <div class="w-20">
-                          <label class="text-[9px] font-black text-pink-400 uppercase mb-1 block">Turno #</label>
-                          <input type="number" [(ngModel)]="enrollTurn" class="input-coquette py-1.5 text-xs text-center font-black" min="1" [max]="t.totalWeeks" />
-                        </div>
-                      </div>
-                      <button (click)="onAddParticipant()" [disabled]="isEnrolling()" class="btn-coquette btn-pink w-full py-3 text-[10px] font-black shadow-md">
-                        @if (isEnrolling()) { <span class="animate-spin italic">⌛</span> } @else { Inscribir en Tanda 🎀 }
-                      </button>
-                    </div>
-                  </div>
-                }
-              </div>
-
-              <!-- Tanda Actions -->
-            <div class="space-y-3">
-              <button class="btn-coquette btn-pink w-full justify-center text-[10px] py-3 font-black shadow-lg" (click)="onShuffle()">
-                🎲 Sorteo Aleatorio
-              </button>
-              <button class="btn-coquette btn-purple w-full justify-center text-[10px] py-3 font-black shadow-lg mt-3" (click)="openReorderModal()">
-                🔄 Reordenar Lista
-              </button>
-              <button class="btn-coquette btn-outline-pink w-full justify-center text-[10px] py-3 font-black shadow-sm" (click)="onProcessPenalties()">
-                ⚠️ Procesar Retrasos
-              </button>
-              <button class="bg-rose-50 border border-rose-100 text-rose-300 hover:text-rose-600 hover:bg-rose-100/50 rounded-3xl w-full py-3 text-[10px] font-black transition-all">
-                🚫 Cancelar Tanda
-              </button>
-            </div>
-          </div>
-        </div>
-      }
-      
-      <!-- PAYMENT MODAL -->
-      @if (showPaymentModal()) {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="showPaymentModal.set(false)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-sm relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl animate-heartbeat">💖</span> Registrar Abono
-             </h3>
-             
-             <div class="bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl p-6 border border-pink-100 text-center mb-8">
-                <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest mb-1"> Participante </p>
-                <p class="text-lg font-black text-pink-900 mb-4">{{ activePayment()?.participant?.customerName }}</p>
-                
-                <div class="flex items-end justify-center gap-1">
-                  <p class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-rose-500 font-display">
-                    {{ tanda()?.weeklyAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}
-                  </p>
-                  <span class="text-pink-400 text-[10px] font-medium uppercase mb-2">/ Sem {{ activePayment()?.week }}</span>
-                </div>
-             </div>
-
-             <div class="flex gap-4">
-                <button (click)="showPaymentModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Regresar</button>
-                <button (click)="confirmPayment()" [disabled]="isSavingPay()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isSavingPay()) { <span class="animate-spin italic">⌛</span> } @else { Confirmar 💖 }
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-
-      <!-- EDIT TANDA MODAL -->
-      @if (showEditModal()) {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="showEditModal.set(false)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-lg relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl">📝</span> Editar Detalles de Tanda
-             </h3>
-             
-             <div class="grid grid-cols-2 gap-4 mb-8">
-               <div class="col-span-2">
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Nombre de la Tanda</label>
-                 <input type="text" [(ngModel)]="editForm().name" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Semanas Totales</label>
-                 <input type="number" [(ngModel)]="editForm().totalWeeks" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Fecha de Inicio</label>
-                 <input type="date" [(ngModel)]="editForm().startDate" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Monto Semanal</label>
-                 <input type="number" [(ngModel)]="editForm().weeklyAmount" class="input-coquette py-2" />
-               </div>
-               
-               <div>
-                 <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Penalización</label>
-                 <input type="number" [(ngModel)]="editForm().penaltyAmount" class="input-coquette py-2" />
-               </div>
-             </div>
-
-             <div class="flex gap-4">
-                <button (click)="showEditModal.set(false)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
-                <button (click)="onUpdateTanda()" [disabled]="isUpdatingTanda()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isUpdatingTanda()) { <span class="animate-spin italic">⌛</span> } @else { Guardar Cambios ✨ }
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-
-      <!-- ACTION SHEET: Participant Management -->
-      @if (selectedParticipantActions(); as p) {
-        <!-- PARTICIPANT ACTIONS (Mobile Optimized Modal) -->
-        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-sm" (click)="selectedParticipantActions.set(null)"></div>
-          <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative z-10 animate-scale-in shadow-2xl border border-pink-100">
-             <div class="w-12 h-1.5 bg-pink-100 rounded-full mx-auto mb-6 sm:hidden"></div>
-             
-             <div class="text-center mb-8">
-               <div class="w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-400 rounded-3xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg mb-4">
-                  {{ p.customerName?.charAt(0) }}
-               </div>
-               <h3 class="text-xl font-black text-pink-900">{{ p.customerName }}</h3>
-               <p class="text-xs font-bold text-pink-400 uppercase tracking-widest mt-1">Turno #{{ p.assignedTurn }}</p>
-             </div>
-
-             <div class="space-y-3">
-                <button (click)="editingTurnId.set(p.id); selectedParticipantActions.set(null)" 
-                        class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
-                  <span class="text-lg">🔢</span> Cambiar Turno
-                </button>
-                <button (click)="editingVariantId.set(p.id); editVariantValue = p.variant || ''; selectedParticipantActions.set(null)" 
-                        class="w-full py-4 bg-pink-50 hover:bg-pink-100 text-pink-600 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-pink-100">
-                  <span class="text-lg">🎨</span> Editar Variante
-                </button>
-                <button (click)="showRemoveConfirm.set(p); selectedParticipantActions.set(null)" 
-                        class="w-full py-4 bg-rose-50 hover:bg-rose-100 text-rose-500 font-black rounded-2xl flex items-center justify-center gap-3 transition-all border border-rose-100">
-                  <span class="text-lg">🗑️</span> Quitar de esta Tanda
-                </button>
-                <button (click)="selectedParticipantActions.set(null)" 
-                        class="w-full py-4 text-pink-300 font-bold rounded-2xl flex items-center justify-center gap-3 transition-all">
-                  Cancelar
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-
-      <!-- EDIT VARIANT MODAL -->
-      @if (editingVariantId(); as id) {
-        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/30 backdrop-blur-md" (click)="editingVariantId.set(null)"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-sm relative z-10 animate-scale-in">
-             <h3 class="text-xl font-black text-pink-900 mb-6 flex items-center gap-2">
-                <span class="text-2xl">🎨</span> Variante del Producto
-             </h3>
-             
-             <div class="mb-8">
-               <label class="text-[10px] font-black text-pink-400 uppercase mb-1 block">Color / Modelo / Variante</label>
-               <input type="text" [(ngModel)]="editVariantValue" class="input-coquette py-3 font-bold" placeholder="Escribe la variante aquí..." #vInput (keyup.enter)="onUpdateVariant(id)" />
-             </div>
-
-             <div class="flex gap-4">
-                <button (click)="editingVariantId.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
-                <button (click)="onUpdateVariant(id)" [disabled]="isUpdatingVariant()" class="btn-coquette btn-pink flex-1 justify-center shadow-lg">
-                   @if (isUpdatingVariant()) { <span class="animate-spin italic">⌛</span> } @else { Guardar ✨ }
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-
-      <!-- CUSTOM CONFIRMATION MODAL -->
-      @if (showRemoveConfirm(); as p) {
-        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-rose-900/40 backdrop-blur-md"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-sm relative z-10 animate-scale-in border-rose-100">
-             <div class="w-20 h-20 bg-rose-100 rounded-full mx-auto flex items-center justify-center text-rose-500 text-4xl mb-6 animate-bounce-slow">
-                ⚠️
-             </div>
-             <h3 class="text-xl font-black text-rose-900 text-center mb-2">¿Estás segura?</h3>
-             <p class="text-sm text-rose-400 text-center font-medium leading-relaxed mb-8">
-               Vas a quitar a <span class="font-black text-rose-600">{{ p.customerName }}</span> de la tanda. Sus pagos también se borrarán de forma permanente. 🎀
-             </p>
-
-             <div class="flex gap-4">
-                <button (click)="showRemoveConfirm.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">No, esperar</button>
-                <button (click)="confirmRemoveParticipant(p)" class="btn-coquette btn-rose flex-1 justify-center shadow-lg shadow-rose-200">
-                   Sí, quitar ✨
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-
-      <!-- CUSTOM DELIVERY CONFIRMATION MODAL -->
-      @if (confirmingDelivery(); as p) {
-        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
-          <div class="absolute inset-0 bg-pink-900/40 backdrop-blur-md"></div>
-          <div class="card-coquette bg-white p-8 w-full max-w-sm relative z-10 animate-scale-in">
-             <div class="w-20 h-20 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-pink-500 text-4xl mb-6 animate-bounce-subtle">
-                🎁
-             </div>
-             <h3 class="text-xl font-black text-pink-900 text-center mb-2">¿Confirmar Entrega?</h3>
-             <p class="text-sm text-pink-400 text-center font-medium leading-relaxed mb-8">
-               ¿Confirmas que <span class="font-black text-pink-600">{{ p.customerName }}</span> recibió su producto hoy? ✨
-             </p>
-
-             <div class="flex gap-4">
-                <button (click)="confirmingDelivery.set(null)" class="btn-coquette btn-ghost flex-1 justify-center">Cancelar</button>
-                <button (click)="confirmDelivery(p)" class="btn-coquette btn-pink flex-1 justify-center shadow-lg shadow-pink-200">
-                   Sí, confirmar ✨
-                </button>
-             </div>
-          </div>
-        </div>
-      }
-    </div>
-
-    <!-- Ruleta de Sorteo -->
-    @if (showRoulette()) {
-      <app-raffle-animation
-        [customTitle]="tanda()?.name"
-        [participants]="rouletteParticipants()"
-        [winnerNames]="rouletteWinnerNames()"
-        animationType="roulette"
-        (close)="showRoulette.set(false)"
-        (startRequested)="handleRouletteStart()"
-      ></app-raffle-animation>
-    }
-
-
-    <!-- Modal de Reordenamiento Drag & Drop -->
-    @if (showReorderModal()) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-        <div class="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-          <!-- Header -->
-          <div class="p-6 border-b flex justify-between items-center bg-gradient-to-r from-purple-50 to-pink-50">
-            <div>
-              <h3 class="text-xl font-bold text-gray-800">Reordenar Participantes</h3>
-              <p class="text-xs text-gray-500">Arrastra para cambiar el orden de los turnos</p>
-            </div>
-            <button (click)="showReorderModal.set(false)" class="p-2 hover:bg-white rounded-full transition-colors">
-              <span class="text-2xl text-gray-400">×</span>
-            </button>
-          </div>
-
-          <!-- Draggable List -->
-          <div class="flex-1 overflow-y-auto p-6 bg-gray-50/30">
-            <div cdkDropList 
-                 (cdkDropListDropped)="drop($event)"
-                 class="space-y-3">
-              @for (p of reorderList(); track p.id) {
-                <div cdkDrag 
-                     class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 cursor-move hover:border-purple-300 transition-colors group">
-                  <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors">
-                    {{ $index + 1 }}
-                  </div>
-                  <div class="flex-1">
-                    <p class="font-semibold text-gray-800">{{ p.customerName }}</p>
-                    <p class="text-xs text-gray-400">{{ p.variant || 'Sin variante' }}</p>
-                  </div>
-                  <div class="text-gray-300 group-hover:text-purple-400">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-                    </svg>
-                  </div>
-
-                  <!-- Placeholder while dragging -->
-                  <div *cdkDragPlaceholder class="bg-purple-50 border-2 border-dashed border-purple-200 h-16 rounded-2xl"></div>
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <div class="p-6 bg-white border-t flex gap-3">
-            <button (click)="showReorderModal.set(false)" 
-                    class="flex-1 px-6 py-3 border border-gray-200 text-gray-600 rounded-2xl hover:bg-gray-50 font-semibold transition-all">
-              Cancelar
-            </button>
-            <button (click)="onSaveReorder()" 
-                    [disabled]="isSavingReorder()"
-                    class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl hover:shadow-lg hover:scale-[1.02] active:scale-95 font-semibold transition-all disabled:opacity-50 disabled:scale-100">
-              @if (isSavingReorder()) {
-                <span>Guardando...</span>
-              } @else {
-                <span>Guardar Nuevo Orden</span>
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-  `,
-  styles: []
+  templateUrl: './tanda-detail.component.html',
+  styleUrl: './tanda-detail.component.css'
 })
 export class TandaDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private tandaService = inject(TandaService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
+  private destroyRef = inject(DestroyRef);
 
   tanda = signal<TandaDto | null>(null);
   participants = signal<TandaParticipantDto[]>([]);
+  paymentProofs = signal<TandaPaymentProofAdminDto[]>([]);
+  reviewingProofId = signal<string | null>(null);
   weeksArray = signal<number[]>([]);
   sundayParticipant = signal<TandaParticipantDto | null>(null);
   loading = signal(true);
   viewMode = signal<'table' | 'visual'>('table');
+  selectedWeekMobile = signal<number>(1);
+
+  mobileWeekStats = computed(() => {
+    const w = this.selectedWeekMobile();
+    const parts = this.participants();
+    let collected = 0;
+    let paidCount = 0;
+    for (const p of parts) {
+      const paid = this.getWeekPaidAmount(p, w);
+      collected += paid;
+      if (paid >= this.getParticipantWeeklyAmount(p)) {
+        paidCount++;
+      }
+    }
+    return { collected, paidCount };
+  });
 
   currentWeek = computed(() => {
     const t = this.tanda();
@@ -716,6 +155,7 @@ export class TandaDetailComponent implements OnInit {
 
   // Inscripción
   allClients = signal<ClientDto[]>([]);
+  tandaProducts = signal<TandaProductDto[]>([]);
   clientSearch = signal('');
   showOnlyFrequent = signal(true);
   confirmingDelivery = signal<TandaParticipantDto | null>(null);
@@ -725,16 +165,21 @@ export class TandaDetailComponent implements OnInit {
   selectedClient = signal<ClientDto | null>(null);
   enrollTurn = 1;
   enrollVariant = '';
+  enrollWeeklyAmount?: number;
+  enrollCurrency = 'MXN';
+  enrollItemCost?: number;
+  enrollExchangeRate?: number;
   isEnrolling = signal(false);
 
   // Reordenamiento y Sorteo
   showReorderModal = signal(false);
-  reorderList = signal<TandaParticipantDto[]>([]);
+  reorderSlots = signal<Array<TandaParticipantDto | null>>([]);
   isSavingReorder = signal(false);
 
   showRoulette = signal(false);
   rouletteParticipants = signal<{ id: string, name: string }[]>([]);
   rouletteWinnerNames = signal<string[]>([]);
+  rouletteTurnNumbers = signal<number[]>([]);
 
   @ViewChild(RaffleAnimationComponent) raffleComponent?: RaffleAnimationComponent;
 
@@ -742,16 +187,29 @@ export class TandaDetailComponent implements OnInit {
   showPaymentModal = signal(false);
   isSavingPay = signal(false);
   activePayment = signal<{ participant: TandaParticipantDto, week: number } | null>(null);
+  editingPaymentId = signal<string | null>(null);
+  pendingDeletePaymentId = signal<string | null>(null);
+  paymentForm = signal<PaymentForm>(this.createEmptyPaymentForm());
+
+  paymentsForActiveWeek = computed(() => {
+    const active = this.activePayment();
+    if (!active) return [];
+    return (active.participant.payments ?? [])
+      .filter(payment => payment.weekNumber === active.week)
+      .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+  });
 
   // Edición
   showEditModal = signal(false);
   isUpdatingTanda = signal(false);
-  editForm = signal({
+  editForm = signal<TandaEditForm>({
+    productId: '',
     name: '',
     totalWeeks: 10,
     weeklyAmount: 0,
     penaltyAmount: 0,
-    startDate: ''
+    startDate: '',
+    status: 'Active'
   });
 
   // Reordenamiento y Eliminación
@@ -761,6 +219,33 @@ export class TandaDetailComponent implements OnInit {
   isUpdatingVariant = signal(false);
   selectedParticipantActions = signal<TandaParticipantDto | null>(null);
   showRemoveConfirm = signal<TandaParticipantDto | null>(null);
+  editingParticipant = signal<TandaParticipantDto | null>(null);
+  editingItemsParticipant = signal<TandaParticipantDto | null>(null);
+  itemDrafts: CreateTandaParticipantItemDto[] = [];
+  isSavingItems = signal(false);
+  isUpdatingParticipant = signal(false);
+  editParticipantClientSearch = signal('');
+  showEditParticipantSuggestions = signal(false);
+  participantForm = signal<ParticipantForm>({
+    customerId: 0,
+    assignedTurn: 1,
+    variant: '',
+    weeklyAmount: undefined,
+    status: 'Active',
+    isDelivered: false,
+    deliveryDate: ''
+  });
+
+  filteredEditParticipantClients = computed(() => {
+    const s = this.editParticipantClientSearch().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const clients = this.allClients();
+    if (!s) return clients.slice(0, 10);
+    return clients.filter(cl => {
+      const name = (cl.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const phone = cl.phone || '';
+      return name.includes(s) || phone.includes(s);
+    }).slice(0, 12);
+  });
 
   filteredClientsSearch = computed(() => {
     const s = this.clientSearch().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -777,10 +262,11 @@ export class TandaDetailComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.route.params.subscribe(params => {
-      this.loadTanda(params['id']);
-    });
+    this.route.params
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => this.loadTanda(params['id']));
     this.loadAllClients();
+    this.loadTandaProducts();
   }
 
   loadAllClients() {
@@ -799,7 +285,12 @@ export class TandaDetailComponent implements OnInit {
           this.participants.set([...data.participants].sort((a, b) => a.assignedTurn - b.assignedTurn));
         }
         this.weeksArray.set(Array.from({ length: data.totalWeeks }, (_, i) => i + 1));
+        const cw = this.currentWeek();
+        if (cw > 0 && cw <= data.totalWeeks) {
+          this.selectedWeekMobile.set(cw);
+        }
         this.loading.set(false);
+        this.loadPaymentProofs(id);
 
         this.tandaService.getSundayDelivery(id).subscribe({
           next: (p) => this.sundayParticipant.set(p),
@@ -813,8 +304,56 @@ export class TandaDetailComponent implements OnInit {
     });
   }
 
+  loadPaymentProofs(tandaId: string) {
+    this.tandaService.getPaymentProofs(tandaId).subscribe({
+      next: proofs => this.paymentProofs.set(proofs),
+      error: () => this.paymentProofs.set([])
+    });
+  }
+
+  reviewPaymentProof(proof: TandaPaymentProofAdminDto, approve: boolean, rejectionReason?: string) {
+    if (this.reviewingProofId()) return;
+    this.reviewingProofId.set(proof.id);
+    this.tandaService.reviewPaymentProof(proof.id, approve, rejectionReason).subscribe({
+      next: () => {
+        this.reviewingProofId.set(null);
+        this.toastService.success(approve ? 'Comprobante aprobado y pago registrado ✨' : 'Comprobante rechazado');
+        this.loadPaymentProofs(proof.tandaId);
+        this.loadTanda(proof.tandaId);
+      },
+      error: error => {
+        this.reviewingProofId.set(null);
+        this.toastService.error(error.error?.message || 'No se pudo revisar el comprobante');
+      }
+    });
+  }
+
+  rejectPaymentProof(proof: TandaPaymentProofAdminDto) {
+    const reason = window.prompt('Indica brevemente por qué se rechaza el comprobante:')?.trim();
+    if (reason) this.reviewPaymentProof(proof, false, reason);
+  }
+
+  prevSelectedWeek() {
+    this.selectedWeekMobile.update(w => Math.max(1, w - 1));
+  }
+
+  nextSelectedWeek() {
+    const total = this.tanda()?.totalWeeks ?? 52;
+    this.selectedWeekMobile.update(w => Math.min(total, w + 1));
+  }
+
   hasPaid(participant: TandaParticipantDto, week: number): boolean {
-    return participant.payments?.some(p => p.weekNumber === week) || false;
+    return this.getWeekPaidAmount(participant, week) >= this.getParticipantWeeklyAmount(participant);
+  }
+
+  getWeekPaidAmount(participant: TandaParticipantDto, week: number): number {
+    return getVerifiedWeekPaidAmount(participant.payments, week);
+  }
+
+  getParticipantWeeklyAmount(p: TandaParticipantDto): number {
+    if (p.weeklyAmount != null) return p.weeklyAmount;
+    const itemAmount = (p.items ?? []).reduce((sum, item) => sum + (item.weeklyAmount ?? 0) * Math.max(1, item.quantity), 0);
+    return itemAmount > 0 ? itemAmount : this.tanda()?.weeklyAmount ?? 0;
   }
 
   onClientSearch(term: string) {
@@ -848,67 +387,54 @@ export class TandaDetailComponent implements OnInit {
   }
 
   onShuffle() {
-    const participants = this.participants();
-    if (participants.length < 2) {
-      this.toastService.error('Necesitas al menos 2 participantes para sortear 🎀');
+    const participants = [...this.participants()]
+      .sort((a, b) => a.assignedTurn - b.assignedTurn);
+
+    if (participants.length === 0) {
+      this.toastService.error('La tanda no tiene lugares asignados');
       return;
     }
 
-    // Preparamos participantes para la ruleta
     this.rouletteParticipants.set(participants.map(p => ({ id: p.id, name: p.customerName || 'Participante' })));
-    this.rouletteWinnerNames.set([]); // Limpiamos ganador previo
-    
+    this.rouletteWinnerNames.set(participants.map(p => p.customerName || 'Participante'));
+    this.rouletteTurnNumbers.set(participants.map(p => p.assignedTurn));
     this.showRoulette.set(true);
   }
 
-  handleRouletteStart() {
-    const t = this.tanda();
-    const participants = this.participants();
-    if (t && participants.length > 0) {
-      // 1. Generamos el orden "literalmente aleatorio" de todos los participantes
-      const shuffled = [...participants].sort(() => Math.random() - 0.5);
-      const shuffledNames = shuffled.map(p => p.customerName || 'Alguien');
-      
-      this.rouletteWinnerNames.set(shuffledNames);
-      
-      // 2. Iniciamos la animación con toda la secuencia.
-      // El componente de ruleta girará, sacará a la #1, permitirá continuar,
-      // la eliminará de la ruleta y girará por la #2, y así sucesivamente.
-      if (this.raffleComponent) {
-        this.raffleComponent.setWinnerAndStart(shuffledNames);
-      }
+  loadTandaProducts() {
+    this.tandaService.getTandaProducts().subscribe({
+      next: products => this.tandaProducts.set(products),
+      error: () => this.toastService.error('No se pudo cargar el catálogo de productos')
+    });
+  }
 
-      // 3. Guardamos silenciosamente este nuevo orden en el backend usando el endpoint de reordenamiento.
-      // Así, si el usuario cierra la ruleta a la mitad o termina de verla, el orden 1 al N ya está guardado.
-      const idsInOrder = shuffled.map(p => p.id);
-      this.tandaService.reorderParticipants(t.id, idsInOrder).subscribe({
-        next: () => {
-          this.loadTanda(t.id);
-        },
-        error: (err) => {
-          this.toastService.error(err.error?.message || 'Error al guardar el sorteo en el servidor');
-        }
-      });
+  handleRouletteStart() {
+    const winnerNames = this.rouletteWinnerNames();
+    if (winnerNames.length > 0) {
+      this.raffleComponent?.setWinnerAndStart(winnerNames);
     }
   }
 
   openReorderModal() {
-    this.reorderList.set([...this.participants()].sort((a, b) => a.assignedTurn - b.assignedTurn));
+    this.reorderSlots.set(buildTandaSlots(
+      this.participants(),
+      this.tanda()?.totalWeeks ?? 0
+    ));
     this.showReorderModal.set(true);
   }
 
-  drop(event: CdkDragDrop<TandaParticipantDto[]>) {
-    const list = [...this.reorderList()];
+  drop(event: CdkDragDrop<Array<TandaParticipantDto | null>>) {
+    const list = [...this.reorderSlots()];
     moveItemInArray(list, event.previousIndex, event.currentIndex);
-    this.reorderList.set(list);
+    this.reorderSlots.set(list);
   }
 
   onSaveReorder() {
     const t = this.tanda();
     if (t && !this.isSavingReorder()) {
       this.isSavingReorder.set(true);
-      const ids = this.reorderList().map(p => p.id);
-      this.tandaService.reorderParticipants(t.id, ids).subscribe({
+      const assignments = buildPlaceAssignments(this.reorderSlots());
+      this.tandaService.updatePlaces(t.id, assignments).subscribe({
         next: () => {
           this.toastService.success('Orden actualizado con éxito ✨');
           this.showReorderModal.set(false);
@@ -928,8 +454,9 @@ export class TandaDetailComponent implements OnInit {
     this.clientSearch.set('');
     this.showSuggestions.set(false);
     this.selectedSuggestionIdx.set(-1);
-    this.enrollTurn = this.participants().length + 1;
+    this.enrollTurn = this.findFirstAvailableTurn();
     this.enrollVariant = '';
+    this.enrollWeeklyAmount = undefined;
   }
 
   onAddParticipant() {
@@ -939,15 +466,22 @@ export class TandaDetailComponent implements OnInit {
       this.isEnrolling.set(true);
       this.tandaService.addParticipant({
         tandaId: t.id,
-        customerId: sc.id.toString(),
+        customerId: sc.id,
         assignedTurn: this.enrollTurn,
-        variant: this.enrollVariant
+        variant: this.enrollVariant,
+        weeklyAmount: this.enrollWeeklyAmount || undefined,
+        currency: this.enrollCurrency || undefined,
+        itemCost: this.enrollItemCost || undefined,
+        exchangeRate: this.enrollExchangeRate || undefined
       }).subscribe({
         next: () => {
           this.toastService.success(`${sc.name} inscrita con éxito ✨`);
           this.loadTanda(t.id);
           this.selectedClient.set(null);
           this.enrollVariant = '';
+          this.enrollWeeklyAmount = undefined;
+          this.enrollItemCost = undefined;
+          this.enrollExchangeRate = undefined;
           this.isEnrolling.set(false);
         },
         error: (err) => {
@@ -979,24 +513,155 @@ export class TandaDetailComponent implements OnInit {
     });
   }
 
+  copyParticipantMessage(participant: TandaParticipantDto) {
+    const tanda = this.tanda();
+    if (!tanda || !participant.publicAccessToken) {
+      this.toastService.error('Esta participante aún no tiene enlace personal');
+      return;
+    }
+    const link = `${window.location.origin}/tanda-view/${participant.publicAccessToken}`;
+    const weekly = this.getParticipantWeeklyAmount(participant).toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
+    const message = `Hola ${participant.customerName || 'hermosa'} 💕\n\nTu abono semanal de la tanda es de ${weekly}. Cuando realices tu transferencia, entra a tu enlace personal para consultar tu avance y subir la foto del comprobante:\n\n${link}\n\nToca “Enviar comprobante” y nosotros revisaremos tu pago. ✨`;
+    navigator.clipboard.writeText(message).then(() => {
+      this.selectedParticipantActions.set(null);
+      this.toastService.success('Instrucciones copiadas para enviar por Messenger 💌');
+    });
+  }
+
+  itemSummary(participant: TandaParticipantDto): string {
+    return (participant.items ?? [])
+      .map(item => `${item.quantity}× ${item.productName}${item.variant ? ` (${item.variant})` : ''}`)
+      .join(' · ');
+  }
+
+  openItemsModal(participant: TandaParticipantDto) {
+    const tanda = this.tanda();
+    const existingItems = participant.items ?? [];
+    this.itemDrafts = existingItems.length > 0
+      ? existingItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          weeklyAmount: item.weeklyAmount,
+          variant: item.variant
+        }))
+      : [{
+          productId: tanda?.productId,
+          productName: tanda?.product?.name || 'Artículo de tanda',
+          quantity: 1,
+          unitPrice: participant.itemCost ?? tanda?.itemCost ?? 0,
+          weeklyAmount: this.getParticipantWeeklyAmount(participant),
+          variant: participant.variant
+        }];
+    this.editingItemsParticipant.set(participant);
+    this.selectedParticipantActions.set(null);
+  }
+
+  addItemDraft() {
+    this.itemDrafts = [...this.itemDrafts, { productName: '', quantity: 1, unitPrice: 0, weeklyAmount: 0 }];
+  }
+
+  removeItemDraft(index: number) {
+    if (this.itemDrafts.length > 1) this.itemDrafts = this.itemDrafts.filter((_, itemIndex) => itemIndex !== index);
+  }
+
+  saveParticipantItems() {
+    const participant = this.editingItemsParticipant();
+    const tanda = this.tanda();
+    if (!participant || !tanda || this.isSavingItems()) return;
+    if (this.itemDrafts.some(item => !item.productName.trim() || item.quantity < 1 || item.unitPrice < 0 || (item.weeklyAmount ?? 0) < 0)) {
+      this.toastService.error('Completa correctamente los artículos y cobros.');
+      return;
+    }
+
+    this.isSavingItems.set(true);
+    this.tandaService.replaceParticipantItems(participant.id, { items: this.itemDrafts }).subscribe({
+      next: () => {
+        this.isSavingItems.set(false);
+        this.editingItemsParticipant.set(null);
+        this.toastService.success('Artículos y cobro actualizados ✨');
+        this.loadTanda(tanda.id);
+      },
+      error: error => {
+        this.isSavingItems.set(false);
+        this.toastService.error(error.error?.message || 'No se pudieron actualizar los artículos.');
+      }
+    });
+  }
+
   openPaymentModal(participant: TandaParticipantDto, week: number) {
     this.activePayment.set({ participant, week });
+    const remaining = Math.max(
+      0,
+      this.getParticipantWeeklyAmount(participant) - this.getWeekPaidAmount(participant, week)
+    );
+    this.paymentForm.set({
+      ...this.createEmptyPaymentForm(),
+      amountPaid: remaining || this.getParticipantWeeklyAmount(participant)
+    });
+    this.editingPaymentId.set(null);
+    this.pendingDeletePaymentId.set(null);
     this.showPaymentModal.set(true);
     this.isSavingPay.set(false);
+  }
+
+  editPayment(payment: TandaPaymentDto) {
+    this.editingPaymentId.set(payment.id);
+    this.pendingDeletePaymentId.set(null);
+    this.paymentForm.set({
+      amountPaid: payment.amountPaid,
+      penaltyPaid: payment.penaltyPaid,
+      paymentDate: this.toDateTimeLocal(payment.paymentDate),
+      isVerified: payment.isVerified,
+      notes: payment.notes ?? ''
+    });
+  }
+
+  cancelPaymentEdit() {
+    const active = this.activePayment();
+    this.editingPaymentId.set(null);
+    this.pendingDeletePaymentId.set(null);
+    this.paymentForm.set({
+      ...this.createEmptyPaymentForm(),
+      amountPaid: active ? this.getParticipantWeeklyAmount(active.participant) : 0
+    });
   }
 
   confirmPayment() {
     const pay = this.activePayment();
     const t = this.tanda();
     if (pay && t && !this.isSavingPay()) {
+      const form = this.paymentForm();
+      if (form.amountPaid <= 0) {
+        this.toastService.error('Captura un monto mayor a cero');
+        return;
+      }
+
       this.isSavingPay.set(true);
-      this.tandaService.registerPayment({
+      const editingId = this.editingPaymentId();
+      const request = editingId
+        ? this.tandaService.updatePayment(editingId, {
+            weekNumber: pay.week,
+            amountPaid: form.amountPaid,
+            penaltyPaid: form.penaltyPaid,
+            paymentDate: new Date(form.paymentDate).toISOString(),
+            isVerified: form.isVerified,
+            notes: form.notes.trim() || undefined
+          })
+        : this.tandaService.registerPayment({
         participantId: pay.participant.id,
         weekNumber: pay.week,
-        amountPaid: t.weeklyAmount
-      }).subscribe({
+            amountPaid: form.amountPaid,
+            penaltyPaid: form.penaltyPaid,
+            paymentDate: new Date(form.paymentDate).toISOString(),
+            isVerified: form.isVerified,
+            notes: form.notes.trim() || undefined
+          });
+
+      request.subscribe({
         next: () => {
-          this.toastService.success('Abono registrado correctamente 💅');
+          this.toastService.success(editingId ? 'Abono actualizado' : 'Abono registrado correctamente');
           this.showPaymentModal.set(false);
           this.loadTanda(t.id);
           this.isSavingPay.set(false);
@@ -1009,15 +674,42 @@ export class TandaDetailComponent implements OnInit {
     }
   }
 
+  setEditCurrency(curr: string) {
+    this.editForm.update(f => {
+      const exchangeRate = curr === 'USD' && !f.exchangeRate ? 19.50 : f.exchangeRate;
+      return { ...f, currency: curr, exchangeRate };
+    });
+    this.onEditItemCostOrRateChange();
+  }
+
+  onEditItemCostOrRateChange() {
+    const f = this.editForm();
+    if (f.itemCost && f.itemCost > 0 && f.totalWeeks > 0) {
+      let totalMxn = f.itemCost;
+      if (f.currency === 'USD' && f.exchangeRate) {
+        totalMxn = f.itemCost * f.exchangeRate;
+      }
+      this.editForm.update(form => ({
+        ...form,
+        weeklyAmount: Math.ceil(totalMxn / form.totalWeeks)
+      }));
+    }
+  }
+
   openEditModal() {
     const t = this.tanda();
     if (t) {
       this.editForm.set({
+        productId: t.productId,
         name: t.name,
         totalWeeks: t.totalWeeks,
         weeklyAmount: t.weeklyAmount,
         penaltyAmount: t.penaltyAmount || 0,
-        startDate: new Date(t.startDate).toISOString().split('T')[0]
+        startDate: t.startDate.split('T')[0],
+        currency: t.currency || 'MXN',
+        itemCost: t.itemCost,
+        exchangeRate: t.exchangeRate,
+        status: t.status
       });
       this.showEditModal.set(true);
     }
@@ -1042,8 +734,9 @@ export class TandaDetailComponent implements OnInit {
     }
   }
 
-  onUpdateTurn(p: TandaParticipantDto, event: any) {
-    const newTurn = parseInt(event.target.value);
+  onUpdateTurn(p: TandaParticipantDto, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const newTurn = Number.parseInt(input.value, 10);
     if (isNaN(newTurn) || newTurn === p.assignedTurn) {
       this.editingTurnId.set(null);
       return;
@@ -1171,18 +864,156 @@ export class TandaDetailComponent implements OnInit {
   }
 
   onRemovePayment(participant: TandaParticipantDto, week: number) {
-    const payment = participant.payments?.find(pay => pay.weekNumber === week);
-    if (!payment) return;
+    this.openPaymentModal(participant, week);
+  }
 
-    if (confirm(`¿Quieres quitar el pago de la semana ${week} para ${participant.customerName}? Se borrará del historial.`)) {
-      this.tandaService.deletePayment(payment.id).subscribe({
-        next: () => {
-          this.toastService.success('Pago eliminado ✨');
-          const t = this.tanda();
-          if (t) this.loadTanda(t.id);
-        },
-        error: (err) => this.toastService.error(err.error?.message || 'Error al eliminar pago')
-      });
+  requestDeletePayment(paymentId: string) {
+    if (this.pendingDeletePaymentId() !== paymentId) {
+      this.pendingDeletePaymentId.set(paymentId);
+      return;
     }
+
+    this.tandaService.deletePayment(paymentId).subscribe({
+      next: () => {
+        this.toastService.success('Pago eliminado');
+        this.showPaymentModal.set(false);
+        const tanda = this.tanda();
+        if (tanda) this.loadTanda(tanda.id);
+      },
+      error: err => this.toastService.error(err.error?.message || 'Error al eliminar pago')
+    });
+  }
+
+  onEditParticipantSearch(term: string) {
+    this.editParticipantClientSearch.set(term);
+    this.showEditParticipantSuggestions.set(true);
+  }
+
+  selectClientForEditParticipant(client: ClientDto) {
+    this.participantForm.update(form => ({ ...form, customerId: client.id }));
+    this.editParticipantClientSearch.set(client.name);
+    this.showEditParticipantSuggestions.set(false);
+  }
+
+  hideEditParticipantSuggestionsWithDelay() {
+    setTimeout(() => this.showEditParticipantSuggestions.set(false), 250);
+  }
+
+  openParticipantEditor(participant: TandaParticipantDto) {
+    this.editingParticipant.set(participant);
+    this.editParticipantClientSearch.set(participant.customerName || '');
+    this.showEditParticipantSuggestions.set(false);
+    this.participantForm.set({
+      customerId: participant.customerId,
+      assignedTurn: participant.assignedTurn,
+      variant: participant.variant ?? '',
+      weeklyAmount: participant.weeklyAmount,
+      currency: participant.currency ?? '',
+      itemCost: participant.itemCost,
+      exchangeRate: participant.exchangeRate,
+      status: participant.status,
+      isDelivered: participant.isDelivered,
+      deliveryDate: participant.deliveryDate?.split('T')[0] ?? ''
+    });
+    this.selectedParticipantActions.set(null);
+  }
+
+  saveParticipant() {
+    const participant = this.editingParticipant();
+    const tanda = this.tanda();
+    if (!participant || !tanda || this.isUpdatingParticipant()) return;
+
+    const form = this.participantForm();
+    const dto: UpdateTandaParticipantDto = {
+      customerId: form.customerId,
+      assignedTurn: form.assignedTurn,
+      variant: form.variant.trim() || undefined,
+      weeklyAmount: form.weeklyAmount || undefined,
+      currency: form.currency?.trim() || undefined,
+      itemCost: form.itemCost || undefined,
+      exchangeRate: form.exchangeRate || undefined,
+      status: form.status,
+      isDelivered: form.isDelivered,
+      deliveryDate: form.isDelivered && form.deliveryDate
+        ? new Date(`${form.deliveryDate}T12:00:00`).toISOString()
+        : undefined
+    };
+
+    this.isUpdatingParticipant.set(true);
+    this.tandaService.updateParticipant(participant.id, dto).subscribe({
+      next: () => {
+        this.toastService.success('Participante actualizada');
+        this.editingParticipant.set(null);
+        this.isUpdatingParticipant.set(false);
+        this.loadTanda(tanda.id);
+      },
+      error: err => {
+        this.isUpdatingParticipant.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo actualizar la participante');
+      }
+    });
+  }
+
+  setTandaStatus(status: TandaStatus) {
+    const tanda = this.tanda();
+    if (!tanda || this.isUpdatingTanda()) return;
+    this.isUpdatingTanda.set(true);
+    this.tandaService.updateTanda(tanda.id, {
+      productId: tanda.productId,
+      name: tanda.name,
+      totalWeeks: tanda.totalWeeks,
+      weeklyAmount: tanda.weeklyAmount,
+      penaltyAmount: tanda.penaltyAmount,
+      startDate: tanda.startDate,
+      currency: tanda.currency,
+      itemCost: tanda.itemCost,
+      exchangeRate: tanda.exchangeRate,
+      status
+    }).subscribe({
+      next: () => {
+        this.isUpdatingTanda.set(false);
+        this.toastService.success('Estado de la tanda actualizado');
+        this.loadTanda(tanda.id);
+      },
+      error: err => {
+        this.isUpdatingTanda.set(false);
+        this.toastService.error(err.error?.message || 'No se pudo cambiar el estado');
+      }
+    });
+  }
+
+  private findFirstAvailableTurn(): number {
+    const occupied = new Set(this.participants().map(participant => participant.assignedTurn));
+    const totalWeeks = this.tanda()?.totalWeeks ?? 1;
+    return Array.from({ length: totalWeeks }, (_, index) => index + 1)
+      .find(turn => !occupied.has(turn)) ?? totalWeeks;
+  }
+
+  private createEmptyPaymentForm(): PaymentForm {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return {
+      amountPaid: 0,
+      penaltyPaid: 0,
+      paymentDate: now.toISOString().slice(0, 16),
+      isVerified: true,
+      notes: ''
+    };
+  }
+
+  private toDateTimeLocal(value: string): string {
+    const date = new Date(value);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 16);
+  }
+
+  statusLabel(status: TandaStatus): string {
+    const labels: Record<TandaStatus, string> = {
+      Draft: 'Borrador',
+      Active: 'Activa',
+      Completed: 'Completada',
+      Cancelled: 'Cancelada'
+    };
+    return labels[status];
   }
 }
