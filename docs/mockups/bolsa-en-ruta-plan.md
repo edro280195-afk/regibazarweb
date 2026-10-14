@@ -1,36 +1,45 @@
-# Plan: agregar una bolsa consolidada a una ruta
+# Plan: insertar entregas en una ruta sin cambiar el orden acordado
 
 ## Objetivo
 
-Permitir que la dueña elija una bolsa completa desde el constructor de rutas y que la ruta use el domicilio principal, manteniendo los artículos, saldos y pagos de cada pedido fuente por separado.
+Al agregar uno o más pedidos, bolsas o tandas a una ruta existente, la persona operadora elige en qué punto van. El API inserta la selección después de una parada existente (o al principio si la ruta aún no tiene paradas) y conserva el orden relativo de todas las entregas que ya estaban en la ruta.
 
-## Flujo propuesto
+## Flujo
 
-1. El constructor muestra la bolsa como una sola candidata, con sus clientas, pedidos, domicilio principal, total y saldo agregado.
-2. Seleccionar la bolsa la agrega completa; no se permite enviar solo el pedido de una de las clientas.
-3. El optimizador calcula una sola ubicación para la bolsa.
-4. El API crea una entrega estándar por pedido fuente, con sorteo consecutivo en esa ubicación. Cada entrega conserva artículos, clienta y saldo originales.
-5. La vista web del chofer muestra cada pedido fuente como entrega normal, identifica la bolsa y repite el domicilio principal.
-6. La app Android sin cambios recibe las mismas entregas estándar de siempre. Verá una tarjeta por pedido fuente en el mismo domicilio, sin un nuevo tipo de parada que pudiera romper su lectura actual.
-7. Al agregar una bolsa a una ruta activa se incluyen todos sus pedidos o ninguno. La optimización mantiene juntos los pedidos de la bolsa.
+1. Desde una ruta existente, abrir **Agregar a la ruta** y seleccionar pedidos, bolsas consolidadas o tandas como hoy.
+2. Continuar a **Elegir ubicación**. No se envía nada todavía.
+3. Revisar el mapa de las paradas actuales y sus direcciones. Cada parada elegible también aparece en una lista accesible; seleccionar el pin o su tarjeta destaca el mismo punto.
+4. Elegir **Primera parada** o **Después de [nombre/parada]**. La vista previa refleja dónde quedará la nueva entrega respecto a la ruta actual.
+5. Confirmar. Si se eligieron varias entregas, se insertan juntas en el orden de selección.
 
-## Reglas y protecciones
+## Reglas
 
-- La ruta no acepta una parte de una bolsa consolidada.
-- Si algún pedido fuente ya está en otra ruta, cancelado, entregado, es pickup, no tiene sus bolsas confirmadas o tiene bolsas cargadas en otra ruta, no se agrega la bolsa.
-- El domicilio y las coordenadas de la parada salen del snapshot de la clienta principal.
-- Las entregas, pagos, historial, RegiPuntos y saldos siguen asociados a cada pedido fuente.
-- El API conserva el contrato de entregas `Order` existente. No se crea un tipo `Consolidation` ni se modifica Android.
+- Agregar a una ruta existente nunca llama al optimizador ni reordena las entregas existentes.
+- El punto de inserción se identifica por una entrega de esa misma ruta. `0` representa explícitamente el inicio; una solicitud antigua sin punto conserva su compatibilidad como agregado al final.
+- Al insertar después de una entrega de bolsa consolidada, el API usa el final de esa bolsa física. Nunca intercala otro pedido entre sus integrantes.
+- Los pedidos de una bolsa seleccionada se insertan como bloque, uno por cada pedido fuente, con sus dueñas, artículos, pagos e historial originales.
+- Las tandas y las bolsas mantienen la continuidad de sus paradas físicas. Las selecciones múltiples se encadenan después de la entrega insertada anterior para respetar el orden que eligió el operador.
+- El API verifica que la parada de referencia pertenezca a la ruta solicitada y que la entrega que se agrega siga disponible.
+- El flujo de creación de rutas nuevas y la acción manual **Optimizar ruta** conservan su comportamiento actual.
+
+## Experiencia visual
+
+- Mobile-first real: en móvil el mapa aparece arriba de la lista de direcciones, con botones grandes y scroll vertical; en escritorio el mapa y la lista pueden verse al mismo tiempo.
+- Lenguaje visual del login: Cute Tactile 3D + Soft Neumorphism, rosas, lavanda, marfil, jerarquía cálida y estados seleccionados claros.
+- La tarjeta seleccionada indica “Insertar después de…” y la nueva parada se distingue en el mapa y en la vista previa.
+- Mostrar destino y clienta/grupo en cada parada para elegir rápido sin confundir direcciones.
+- En bolsas, mantener visible el total por dueña y su saldo individual, además del agregado de la bolsa.
+- El mockup es ilustrativo: el mapa de producción usará las coordenadas reales disponibles.
 
 ## Alcance técnico
 
-- Web: constructor de rutas, vista previa de ruta y detalle de ruta.
-- API: validación y expansión atómica del grupo, optimización por una sola ubicación, prioridad agrupada al reordenar y dirección principal al mapear entregas.
-- Base de datos: reutilizar `OrderConsolidation`, `OrderConsolidationId` y el snapshot de domicilio existentes; no requiere migración.
-- Android: sin cambios de código o paquete. La pantalla de Android seguirá mostrando cada pedido fuente como una tarjeta normal en el mismo domicilio.
+- Web: agregar un segundo paso al modal actual de agregar pedidos/tandas; exponer mapa y lista de paradas existentes; enviar el identificador de la referencia junto con cada alta.
+- API: insertar pedidos/bloques en el lugar solicitado, desplazar `SortOrder` de forma segura y no ejecutar `OptimizeRouteInternal` en altas a rutas existentes.
+- Mantener la acción de optimización explícita, el flujo de nueva ruta, el contrato de Android y los datos fuente de cada pedido. No integrar cambios en Android.
+- No se anticipa una migración: se reutiliza `Delivery.SortOrder`.
 
-## Revisión de la propuesta
+## Validación de entrega
 
-- Confirmar visualmente una sola candidata y un pin, con los totales por clienta visibles.
-- Revisar el estado con datos de 320–430 px y escritorio.
-- Confirmar los builds de Angular y API. No se requiere migración de base de datos.
+- Revisar mockup en tamaños de teléfono y escritorio antes de integrar.
+- Compilar Angular y API después de la integración.
+- Confirmar en el diff que altas a rutas existentes no invocan el optimizador y que Android no cambió.

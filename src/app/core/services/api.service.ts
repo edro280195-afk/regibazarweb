@@ -665,22 +665,20 @@ export class ApiService {
     }
 
     // ── Route Mutation ──
-    addOrderToRoute(routeId: number, orderId: number, lat?: number, lng?: number): Observable<any> {
+    addOrderToRoute(routeId: number, orderId: number, afterDeliveryId?: number): Observable<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }> {
         let params = new HttpParams();
-        if (lat !== undefined) params = params.set('lat', lat.toString());
-        if (lng !== undefined) params = params.set('lng', lng.toString());
-        return this.http.post(`${this.base}/routes/${routeId}/add-order`, orderId, { params });
+        if (afterDeliveryId !== undefined) params = params.set('afterDeliveryId', afterDeliveryId.toString());
+        return this.http.post<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }>(`${this.base}/routes/${routeId}/add-order`, orderId, { params });
     }
 
     removeOrderFromRoute(routeId: number, orderId: number): Observable<any> {
         return this.http.delete(`${this.base}/routes/${routeId}/remove-order/${orderId}`);
     }
 
-    addTandaToRoute(routeId: number, tandaParticipantId: string, lat?: number, lng?: number): Observable<any> {
+    addTandaToRoute(routeId: number, tandaParticipantId: string, afterDeliveryId?: number): Observable<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }> {
         let params = new HttpParams();
-        if (lat !== undefined) params = params.set('lat', lat.toString());
-        if (lng !== undefined) params = params.set('lng', lng.toString());
-        return this.http.post(`${this.base}/routes/${routeId}/add-tanda`, JSON.stringify(tandaParticipantId), {
+        if (afterDeliveryId !== undefined) params = params.set('afterDeliveryId', afterDeliveryId.toString());
+        return this.http.post<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }>(`${this.base}/routes/${routeId}/add-tanda`, JSON.stringify(tandaParticipantId), {
             params,
             headers: { 'Content-Type': 'application/json' }
         });

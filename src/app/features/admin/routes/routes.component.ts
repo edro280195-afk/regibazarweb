@@ -33,6 +33,35 @@ interface GeocodedOrder extends OrderSummaryDto {
   _geocoded: boolean;
 }
 
+interface RouteInsertionStop {
+  key: string;
+  afterDeliveryId: number;
+  stopNumber: number;
+  clientName: string;
+  address: string;
+  latitude?: number;
+  longitude?: number;
+  deliveryCount: number;
+}
+
+interface RouteInsertionTarget {
+  label: string;
+  detail: string;
+  buttonLabel: string;
+}
+
+interface RouteAddSelection {
+  kind: 'order' | 'tanda';
+  id: number | string;
+}
+
+interface RouteAddOwnerTotal {
+  ownerClientId: number;
+  ownerName: string;
+  total: number;
+  balanceDue: number;
+}
+
 @Component({
   selector: 'app-routes',
   standalone: true,
@@ -346,7 +375,7 @@ interface GeocodedOrder extends OrderSummaryDto {
                           (click)="openMap(route)">
                     🗺️ Mapa
                   </button>
-                  @if (route.status !== 'Completed') {
+                  @if (route.status !== 'Completed' && route.status !== 'Canceled') {
                     <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white text-xs font-bold shadow-lg shadow-pink-200 hover:shadow-xl active:scale-95 transition-all"
                             (click)="openAddSheet(route)">
                       ➕ Agregar
@@ -578,7 +607,7 @@ interface GeocodedOrder extends OrderSummaryDto {
            ═══════════════════════════════════════════════════ -->
       @if (addSheetRoute(); as asr) {
         <div class="fixed inset-0 z-[3200] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" (click)="closeAddSheet()">
-          <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[88vh] flex flex-col overflow-hidden animate-scale-in shadow-2xl" (click)="$event.stopPropagation()">
+          <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[94svh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-scale-in shadow-2xl transition-[max-width]" [class.max-w-4xl]="routeInsertionStep() === 'position'" (click)="$event.stopPropagation()">
             <div class="pt-3 sm:hidden"><div class="w-10 h-1.5 bg-pink-100 rounded-full mx-auto"></div></div>
 
             <div class="px-5 pt-4 pb-3 border-b border-pink-50">
@@ -586,9 +615,16 @@ interface GeocodedOrder extends OrderSummaryDto {
                 <h2 class="text-lg font-black text-pink-900">➕ Agregar a la Ruta #{{ asr.id }}</h2>
                 <button class="w-9 h-9 rounded-full bg-pink-50 flex items-center justify-center text-pink-400 hover:bg-pink-100 text-lg" (click)="closeAddSheet()">×</button>
               </div>
-              <p class="text-[11px] text-pink-400 font-semibold mt-0.5">Selecciona varios y confirma una sola vez 💕</p>
+              <p class="text-[11px] text-pink-400 font-semibold mt-0.5">
+                @if (routeInsertionStep() === 'select') {
+                  Paso 1 de 2 · selecciona pedidos, bolsas o tandas 💕
+                } @else {
+                  Paso 2 de 2 · elige después de qué parada insertar 🚚
+                }
+              </p>
             </div>
 
+            @if (routeInsertionStep() === 'select') {
             <div class="px-5 pt-3">
               <input type="text" placeholder="🔍 Buscar por nombre o dirección…"
                      class="w-full px-4 py-3 rounded-2xl bg-pink-50/60 border border-pink-100 text-sm font-semibold text-pink-900 placeholder:text-pink-300 focus:outline-none focus:border-pink-300 transition-colors"
@@ -659,19 +695,120 @@ interface GeocodedOrder extends OrderSummaryDto {
               }
             </div>
 
-            <div class="p-4 border-t border-pink-50 bg-white">
-              <button class="w-full h-12 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-pink-200 active:scale-[0.98] transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2"
-                      [disabled]="addSelectionCount() === 0 || addingToRoute()"
-                      (click)="confirmAddToRoute()">
-                @if (addingToRoute()) {
-                  <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span> Agregando…
-                } @else if (addSelectionCount() === 0) {
-                  Selecciona pedidos o tandas
+            } @else {
+              <div class="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-black text-pink-900">¿Después de quién?</p>
+                    <p class="text-[10px] text-pink-400 font-semibold">La ruta conserva el orden de sus paradas actuales.</p>
+                    <p class="mt-1 text-[10px] font-bold text-violet-600 truncate">Vas a agregar: {{ routeAddSelectionSummary() }}</p>
+                    @if (routeAddSelectedOwners().length > 0) {
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        @for (owner of routeAddSelectedOwners(); track owner.ownerClientId) {
+                          <span class="rounded-lg bg-violet-50 px-2 py-1 text-[9px] font-bold text-violet-700">{{ owner.ownerName }} · {{ owner.total | currency:'MXN':'symbol-narrow':'1.0-0' }} / debe {{ owner.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <span class="shrink-0 px-3 py-1.5 rounded-full bg-pink-50 border border-pink-100 text-[10px] font-black text-pink-600">
+                    {{ addSelectionCount() }} seleccionadas@if (addSelectionTotal() > 0) { · {{ addSelectionTotal() | currency:'MXN':'symbol-narrow':'1.0-0' }} }
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,.85fr)] gap-4 lg:gap-5">
+                  <section class="min-w-0">
+                    <div class="flex items-center justify-between mb-2 px-1">
+                      <h3 class="text-xs font-black text-pink-900">🗺️ Mapa de la ruta</h3>
+                      <span class="text-[9px] text-gray-400">Toca un pin o elige una dirección</span>
+                    </div>
+                    <div class="h-56 sm:h-72 lg:h-[min(54vh,480px)] min-h-[220px] overflow-hidden rounded-2xl border border-pink-100 bg-pink-50/30 shadow-inner">
+                      <google-map height="100%" width="100%" [center]="routeInsertionMapCenter()" [zoom]="routeInsertionMapZoom()" [options]="mapOptions">
+                        @for (stop of routeInsertionMapStops(); track stop.key) {
+                          <map-marker [position]="{ lat: stop.latitude, lng: stop.longitude }"
+                                      [options]="getRouteInsertionMarkerOptions(stop)"
+                                      (mapClick)="selectRouteInsertionStop(stop)"></map-marker>
+                        }
+                      </google-map>
+                    </div>
+                    @if (routeInsertionStops().length > routeInsertionMapStops().length) {
+                      <p class="mt-2 px-1 text-[9px] text-amber-600">Algunas paradas no tienen coordenadas; siguen disponibles en la lista.</p>
+                    }
+                  </section>
+
+                  <section class="min-w-0 lg:max-h-[min(64vh,590px)] lg:overflow-y-auto lg:pr-1">
+                    <h3 class="text-xs font-black text-pink-900 mb-2 px-1">📍 Direcciones actuales · {{ routeInsertionStops().length }} paradas</h3>
+                    <div class="space-y-2">
+                      <button class="w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all active:scale-[0.99]"
+                              [class]="selectedAfterDeliveryId() === 0 ? 'border-violet-300 bg-violet-50 shadow-sm' : 'border-violet-100 bg-white hover:border-violet-200'"
+                              (click)="selectRouteInsertionStart()">
+                        <span class="w-7 h-7 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-black shrink-0">♡</span>
+                        <span class="flex-1 min-w-0"><span class="block text-xs font-black text-violet-800">Al inicio de la ruta</span><span class="block text-[10px] text-gray-400">Esta entrega será la primera parada</span></span>
+                        <span class="w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-black"
+                              [class]="selectedAfterDeliveryId() === 0 ? 'border-violet-500 bg-violet-500 text-white' : 'border-violet-200 text-transparent'">✓</span>
+                      </button>
+
+                      @for (stop of routeInsertionStops(); track stop.key) {
+                        <button class="w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all active:scale-[0.99]"
+                                [class]="selectedAfterDeliveryId() === stop.afterDeliveryId ? 'border-pink-400 bg-pink-50 shadow-sm' : 'border-pink-50 bg-white hover:border-pink-200'"
+                                (click)="selectRouteInsertionStop(stop)">
+                          <span class="w-7 h-7 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center text-[11px] font-black shrink-0">{{ stop.stopNumber }}</span>
+                          <span class="flex-1 min-w-0">
+                            <span class="block text-xs font-black text-gray-800 truncate">Después de {{ stop.clientName }}</span>
+                            <span class="block text-[10px] text-gray-400 truncate">📍 {{ stop.address }}</span>
+                            @if (stop.deliveryCount > 1) {
+                              <span class="inline-block mt-1 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-600 text-[9px] font-black">{{ stop.deliveryCount }} pedidos · parada agrupada</span>
+                            }
+                          </span>
+                          <span class="w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-black shrink-0"
+                                [class]="selectedAfterDeliveryId() === stop.afterDeliveryId ? 'border-pink-500 bg-pink-500 text-white' : 'border-pink-200 text-transparent'">✓</span>
+                        </button>
+                      } @empty {
+                        <p class="rounded-2xl border border-dashed border-pink-200 bg-pink-50/40 p-4 text-center text-xs font-semibold text-pink-400">La ruta está vacía. Puedes iniciar con la primera parada ♡</p>
+                      }
+                    </div>
+                  </section>
+                </div>
+
+                @if (selectedInsertionTarget(); as target) {
+                  <div class="mt-4 rounded-2xl border border-pink-100 bg-gradient-to-r from-pink-50 to-violet-50 px-4 py-3">
+                    <p class="text-xs font-black text-pink-800">✨ {{ target.label }}</p>
+                    <p class="mt-0.5 text-[10px] text-gray-500">{{ target.detail }} La ruta seguirá en su orden actual.</p>
+                  </div>
                 } @else {
-                  Agregar {{ addSelectionCount() }} {{ addSelectionCount() === 1 ? 'entrega' : 'entregas' }}
-                  @if (addSelectionTotal() > 0) { · {{ addSelectionTotal() | currency:'MXN':'symbol-narrow':'1.0-0' }} }
+                  <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-[10px] font-bold text-amber-700">Elige una parada o el inicio para continuar.</div>
                 }
-              </button>
+              </div>
+            }
+
+            <div class="p-4 border-t border-pink-50 bg-white">
+              @if (routeInsertionStep() === 'select') {
+                <button class="w-full h-12 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-pink-200 active:scale-[0.98] transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2"
+                        [disabled]="addSelectionCount() === 0"
+                        (click)="continueToRoutePosition()">
+                  @if (addSelectionCount() === 0) {
+                    Selecciona pedidos o tandas
+                  } @else {
+                    Elegir dónde insertar · {{ addSelectionCount() }} {{ addSelectionCount() === 1 ? 'entrega' : 'entregas' }}
+                    @if (addSelectionTotal() > 0) { · {{ addSelectionTotal() | currency:'MXN':'symbol-narrow':'1.0-0' }} }
+                  }
+                </button>
+              } @else {
+                <div class="flex gap-2 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-0">
+                  <button class="px-4 h-12 rounded-2xl bg-pink-50 text-pink-600 font-bold text-xs border border-pink-100 active:scale-95 transition-all disabled:opacity-40"
+                          [disabled]="addingToRoute()" (click)="backToRouteSelection()">← Cambiar pedidos</button>
+                  <button class="flex-1 h-12 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-pink-200 active:scale-[0.98] transition-all disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2"
+                          [disabled]="selectedAfterDeliveryId() === null || addingToRoute()"
+                          (click)="confirmAddToRoute()">
+                    @if (addingToRoute()) {
+                      <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span> Insertando…
+                    } @else if (selectedInsertionTarget(); as target) {
+                      ♡ {{ target.buttonLabel }}
+                    } @else {
+                      Elige dónde insertar
+                    }
+                  </button>
+                </div>
+              }
             </div>
           </div>
         </div>
@@ -1407,11 +1544,97 @@ export class RoutesComponent implements OnInit, OnDestroy {
 
   addSheetRoute = signal<RouteDto | null>(null);
   addSheetTab = signal<'orders' | 'tandas'>('orders');
+  routeInsertionStep = signal<'select' | 'position'>('select');
   addSearchQuery = signal('');
   addSelectedOrderIds = signal<Set<number>>(new Set());
   addSelectedTandaIds = signal<Set<string>>(new Set());
+  addSelectionOrder = signal<RouteAddSelection[]>([]);
+  selectedAfterDeliveryId = signal<number | null>(null);
   availableTandas = signal<AvailableTandaDto[]>([]);
   addingToRoute = signal(false);
+
+  routeInsertionStops = computed<RouteInsertionStop[]>(() => {
+    const route = this.addSheetRoute();
+    if (!route) return [];
+
+    const grouped = new Map<string, RouteDeliveryDto[]>();
+    const ordered = [...route.deliveries].sort((first, second) =>
+      first.sortOrder - second.sortOrder || first.deliveryId - second.deliveryId);
+
+    for (const delivery of ordered) {
+      const key = delivery.kind === 'Tanda'
+        ? `tanda:${delivery.tandaParticipantId ?? delivery.deliveryId}`
+        : delivery.consolidationId != null
+          ? `bag:${delivery.consolidationId}`
+          : `order:${delivery.orderId ?? delivery.deliveryId}`;
+      const group = grouped.get(key) ?? [];
+      group.push(delivery);
+      grouped.set(key, group);
+    }
+
+    return [...grouped.entries()].map(([key, deliveries], index) => {
+      const first = deliveries[0];
+      const last = deliveries[deliveries.length - 1];
+      const ownerNames = [...new Set(deliveries
+        .map(delivery => delivery.consolidationOwnerName || delivery.clientName)
+        .filter(name => name.trim().length > 0))];
+      const clientName = first.consolidationId != null
+        ? `Bolsa #${first.consolidationId} · ${ownerNames.join(' + ')}`
+        : first.kind === 'Tanda'
+          ? `${first.tandaName || 'Tanda'} · ${first.clientName}`
+          : first.clientName;
+      const address = (first.alternativeAddress || first.clientAddress || '').trim();
+      const coordinates = deliveries.find(delivery => delivery.latitude != null && delivery.longitude != null);
+
+      return {
+        key,
+        afterDeliveryId: last.deliveryId,
+        stopNumber: index + 1,
+        clientName,
+        address: address || 'Dirección no registrada',
+        latitude: coordinates?.latitude,
+        longitude: coordinates?.longitude,
+        deliveryCount: deliveries.length
+      };
+    });
+  });
+
+  routeInsertionMapStops = computed(() => this.routeInsertionStops().filter(
+    (stop): stop is RouteInsertionStop & { latitude: number; longitude: number } =>
+      typeof stop.latitude === 'number' && typeof stop.longitude === 'number'
+  ));
+
+  routeInsertionMapCenter = computed<google.maps.LatLngLiteral>(() => {
+    const stops = this.routeInsertionMapStops();
+    if (stops.length === 0) return { lat: GEO_CONFIG.defaultLat, lng: GEO_CONFIG.defaultLng };
+    const lat = stops.reduce((sum, stop) => sum + stop.latitude, 0) / stops.length;
+    const lng = stops.reduce((sum, stop) => sum + stop.longitude, 0) / stops.length;
+    return { lat, lng };
+  });
+
+  routeInsertionMapZoom = computed(() => this.routeInsertionMapStops().length > 1 ? 12 : 14);
+
+  selectedInsertionTarget = computed<RouteInsertionTarget | null>(() => {
+    const selectedId = this.selectedAfterDeliveryId();
+    if (selectedId === null) return null;
+    if (selectedId === 0) {
+      return {
+        label: 'Insertar al inicio de la ruta',
+        detail: 'La nueva selección será la primera parada.',
+        buttonLabel: 'Insertar al inicio'
+      };
+    }
+
+    const stops = this.routeInsertionStops();
+    const stopIndex = stops.findIndex(stop => stop.afterDeliveryId === selectedId);
+    const stop = stops[stopIndex];
+    if (!stop) return null;
+    const nextStop = stops[stopIndex + 1];
+    const detail = nextStop
+      ? `Quedará después de ${stop.clientName} y antes de ${nextStop.clientName}.`
+      : `Quedará al final, después de ${stop.clientName}.`;
+    return { label: `Insertar después de ${stop.clientName}`, detail, buttonLabel: 'Insertar aquí' };
+  });
 
   filteredAddableOrders = computed(() => {
     const q = this.addSearchQuery().toLowerCase().trim();
@@ -1435,6 +1658,38 @@ export class RoutesComponent implements OnInit, OnDestroy {
   });
 
   addSelectionCount = computed(() => this.addSelectedOrderIds().size + this.addSelectedTandaIds().size);
+  routeAddSelectionSummary = computed(() => this.addSelectionOrder().map(selection => {
+    if (selection.kind === 'order') {
+      const order = this.pendingOrders().find(candidate => candidate.id === Number(selection.id));
+      if (!order) return `Pedido #${selection.id}`;
+      return order.orderConsolidationId != null
+        ? `Bolsa #${order.orderConsolidationId} · ${order.clientName}`
+        : `${order.clientName} · #${order.id}`;
+    }
+
+    const tanda = this.availableTandas().find(candidate => candidate.tandaParticipantId === selection.id);
+    return tanda ? `${tanda.clientName} · ${tanda.tandaName}` : 'Tanda seleccionada';
+  }).join(' · '));
+
+  routeAddSelectedOwners = computed<RouteAddOwnerTotal[]>(() => {
+    const selectedIds = this.addSelectedOrderIds();
+    const totals = new Map<number, RouteAddOwnerTotal>();
+    for (const order of this.pendingOrders().filter(candidate => selectedIds.has(candidate.id))) {
+      for (const owner of order.consolidationOwners ?? []) {
+        const total = totals.get(owner.ownerClientId) ?? {
+          ownerClientId: owner.ownerClientId,
+          ownerName: owner.ownerName,
+          total: 0,
+          balanceDue: 0
+        };
+        total.total += owner.total;
+        total.balanceDue += owner.balanceDue;
+        totals.set(owner.ownerClientId, total);
+      }
+    }
+    return [...totals.values()];
+  });
+
   addSelectionTotal = computed(() => {
     const ids = this.addSelectedOrderIds();
     return this.pendingOrders().filter(o => ids.has(o.id)).reduce((sum, o) => sum + o.total, 0);
@@ -2283,9 +2538,12 @@ export class RoutesComponent implements OnInit, OnDestroy {
   openAddSheet(route: RouteDto): void {
     this.addSheetRoute.set(route);
     this.addSheetTab.set('orders');
+    this.routeInsertionStep.set('select');
     this.addSearchQuery.set('');
     this.addSelectedOrderIds.set(new Set());
     this.addSelectedTandaIds.set(new Set());
+    this.addSelectionOrder.set([]);
+    this.selectedAfterDeliveryId.set(null);
     this.loadPendingOrders();
     this.api.getAvailableTandas().subscribe({
       next: (tandas) => this.availableTandas.set(tandas),
@@ -2296,48 +2554,93 @@ export class RoutesComponent implements OnInit, OnDestroy {
   closeAddSheet(): void {
     if (this.addingToRoute()) return;
     this.addSheetRoute.set(null);
+    this.routeInsertionStep.set('select');
   }
 
   toggleAddOrder(id: number): void {
+    const wasSelected = this.addSelectedOrderIds().has(id);
     this.addSelectedOrderIds.update(s => {
       const next = new Set(s);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+    this.addSelectionOrder.update(items => wasSelected
+      ? items.filter(item => item.kind !== 'order' || item.id !== id)
+      : [...items, { kind: 'order', id }]);
   }
 
   toggleAddTanda(id: string): void {
+    const wasSelected = this.addSelectedTandaIds().has(id);
     this.addSelectedTandaIds.update(s => {
       const next = new Set(s);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+    this.addSelectionOrder.update(items => wasSelected
+      ? items.filter(item => item.kind !== 'tanda' || item.id !== id)
+      : [...items, { kind: 'tanda', id }]);
+  }
+
+  continueToRoutePosition(): void {
+    if (this.addSelectionCount() === 0) return;
+    this.routeInsertionStep.set('position');
+    this.selectedAfterDeliveryId.set(this.routeInsertionStops().length === 0 ? 0 : null);
+  }
+
+  backToRouteSelection(): void {
+    if (this.addingToRoute()) return;
+    this.routeInsertionStep.set('select');
+  }
+
+  selectRouteInsertionStart(): void {
+    this.selectedAfterDeliveryId.set(0);
+  }
+
+  selectRouteInsertionStop(stop: RouteInsertionStop): void {
+    this.selectedAfterDeliveryId.set(stop.afterDeliveryId);
+  }
+
+  getRouteInsertionMarkerOptions(stop: RouteInsertionStop): google.maps.MarkerOptions {
+    const selected = this.selectedAfterDeliveryId() === stop.afterDeliveryId;
+    return {
+      label: { text: stop.stopNumber.toString(), color: '#ffffff', fontWeight: 'bold', fontSize: '12px' },
+      title: `Después de ${stop.clientName}\n${stop.address}`,
+      clickable: true,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: selected ? '#c43f7a' : '#e989ad',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: selected ? 4 : 2,
+        scale: selected ? 15 : 12
+      }
+    };
   }
 
   async confirmAddToRoute(): Promise<void> {
     const route = this.addSheetRoute();
-    if (!route || this.addSelectionCount() === 0) return;
+    const initialAnchorId = this.selectedAfterDeliveryId();
+    if (!route || this.addSelectionCount() === 0 || initialAnchorId === null) return;
 
     this.addingToRoute.set(true);
-    const pos = await this.getCurrentLocation();
     let ok = 0, failed = 0;
+    let afterDeliveryId = initialAnchorId;
 
-    // Secuencial a propósito: cada alta re-optimiza la ruta en el backend
-    for (const orderId of this.addSelectedOrderIds()) {
+    // Se insertan secuencialmente para mantener juntas las selecciones y respetar su orden.
+    for (const selection of this.addSelectionOrder()) {
       try {
-        await firstValueFrom(this.api.addOrderToRoute(route.id, orderId, pos?.lat, pos?.lng));
-        ok++;
-      } catch { failed++; }
-    }
-    for (const tandaId of this.addSelectedTandaIds()) {
-      try {
-        await firstValueFrom(this.api.addTandaToRoute(route.id, tandaId, pos?.lat, pos?.lng));
+        const result = selection.kind === 'order'
+          ? await firstValueFrom(this.api.addOrderToRoute(route.id, Number(selection.id), afterDeliveryId))
+          : await firstValueFrom(this.api.addTandaToRoute(route.id, String(selection.id), afterDeliveryId));
+        afterDeliveryId = result.lastDeliveryId;
         ok++;
       } catch { failed++; }
     }
 
     this.addingToRoute.set(false);
     this.addSheetRoute.set(null);
+    this.routeInsertionStep.set('select');
+    this.selectedAfterDeliveryId.set(null);
     if (ok > 0) this.toast.success(`${ok} ${ok === 1 ? 'entrega agregada' : 'entregas agregadas'} a la ruta 🚀`);
     if (failed > 0) this.toast.error(`${failed} no se ${failed === 1 ? 'pudo' : 'pudieron'} agregar`);
     this.loadRoutes();
