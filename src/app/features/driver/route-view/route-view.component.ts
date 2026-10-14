@@ -10,7 +10,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { GpsService } from '../../../core/services/gps.service';
-import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage } from '../../../core/models';
+import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage, RouteDeliveryDto } from '../../../core/models';
 import { effect } from '@angular/core';
 
 declare const google: any;
@@ -263,6 +263,28 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             },
             error: () => this.loading.set(false)
         });
+    }
+
+    physicalStopNumber(target: RouteDeliveryDto): number {
+        const orderedDeliveries = [...(this.route()?.deliveries ?? [])] as RouteDeliveryDto[];
+        orderedDeliveries.sort((first, second) => first.sortOrder - second.sortOrder);
+        const seenStops = new Set<string>();
+        let stopNumber = 0;
+        for (const delivery of orderedDeliveries) {
+            const key = delivery.kind === 'Tanda'
+                ? `tanda:${delivery.tandaParticipantId ?? delivery.deliveryId}`
+                : delivery.consolidationId != null
+                    ? `bag:${delivery.consolidationId}`
+                    : `order:${delivery.orderId ?? delivery.deliveryId}`;
+            if (seenStops.has(key)) {
+                if (delivery.deliveryId === target.deliveryId) return stopNumber;
+                continue;
+            }
+            seenStops.add(key);
+            stopNumber++;
+            if (delivery.deliveryId === target.deliveryId) return stopNumber;
+        }
+        return target.sortOrder;
     }
 
     // ═══ GPS ═══

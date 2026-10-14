@@ -91,7 +91,16 @@
 
                             <!-- Info -->
                             <div class="flex-1 min-w-0">
-                                <p class="text-[11px] md:text-sm font-bold text-gray-800 truncate">{{ order.clientName }}</p>
+                                <p class="text-[11px] md:text-sm font-bold text-gray-800 truncate">
+                                    {{ order.clientName }}
+                                    @if (order.orderConsolidationId) {
+                                        <span class="text-[9px] px-1 py-0.5 bg-violet-100 text-violet-700 rounded">🛍️ Bolsa #{{ order.orderConsolidationId }}</span>
+                                    }
+                                </p>
+                                @if (order.orderConsolidationId) {
+                                    <p class="text-[9px] md:text-[10px] font-bold text-violet-700 truncate">{{ ownerTotals(order.consolidationOwners) }}</p>
+                                    <p class="text-[9px] md:text-[10px] font-black text-rose-500">Total {{ order.total | currency:'MXN':'symbol-narrow':'1.2-2' }} · Deben {{ order.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
+                                }
 
                                 @if (order._isGoogleResolved) {
                                 <p class="text-[9px] md:text-[10px] text-gray-400 truncate mt-0.5">📍 {{ order.alternativeAddress || order.clientAddress }}</p>

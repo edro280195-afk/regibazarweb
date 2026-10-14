@@ -6,7 +6,7 @@ import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { OrderSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto, RoutePackagesRequiredDto } from '../../../../core/models';
+import { OrderSummaryDto, OrderConsolidationDto, ConsolidationOwnerSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto, RoutePackagesRequiredDto } from '../../../../core/models';
 import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
 import { AddressEditorV2Component } from '../../clients/address-editor-v2/address-editor-v2.component';
 import { Subject, forkJoin } from 'rxjs';
@@ -29,6 +29,11 @@ interface CandidateRow {
     hasCoords: boolean;
     packagesConfirmed?: boolean;
     totalPackages?: number | null;
+    consolidationId?: number;
+    memberOrderIds?: number[];
+    aggregateTotal?: number;
+    aggregateBalanceDue?: number;
+    owners?: ConsolidationOwnerSummaryDto[];
     isTandaPending: boolean;
     tandaName?: string;
     tandaWeek?: number;
@@ -231,6 +236,9 @@ declare const google: any;
                                     @if (row.kind === 'Tanda') {
                                         <span class="px-1 py-0.5 bg-fuchsia-100 text-fuchsia-700 text-[9px] font-black rounded uppercase">Tanda</span>
                                     }
+                                    @if (row.consolidationId) {
+                                        <span class="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[9px] font-black rounded-full uppercase">🛍️ Bolsa #{{ row.consolidationId }} · {{ row.memberOrderIds?.length }} pedidos</span>
+                                    }
                                     @if (row.kind === 'Order' && !row.packagesConfirmed) {
                                         <span class="px-1 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-black rounded uppercase">Bolsas pendientes</span>
                                     }
@@ -241,8 +249,14 @@ declare const google: any;
                                 @if (row.address) {
                                     <p class="text-[10px] text-pink-400 truncate">📍 {{ row.address }}</p>
                                 }
+                                @if (row.consolidationId) {
+                                    @for (owner of row.owners ?? []; track owner.ownerClientId) {
+                                        <p class="text-[10px] font-bold text-violet-700 truncate">{{ owner.ownerName }} · {{ owner.total | currency:'MXN':'symbol-narrow':'1.2-2' }} (debe {{ owner.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }})</p>
+                                    }
+                                    <p class="text-[10px] font-black text-rose-500">Total {{ row.aggregateTotal | currency:'MXN':'symbol-narrow':'1.2-2' }} · Deben {{ row.aggregateBalanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
+                                }
                             </div>
-                            @if (row.clientId) {
+                            @if (row.clientId && !row.consolidationId) {
                                 <button (click)="openAddressPicker(row, $event)"
                                         class="w-7 h-7 rounded-xl bg-pink-50 text-pink-400 hover:bg-pink-100 hover:text-pink-600 flex items-center justify-center text-sm transition-all shrink-0"
                                         title="Editar ubicación e indicaciones">
@@ -310,7 +324,7 @@ declare const google: any;
                         }
 
                         <!-- Preview stops (numbered pins) -->
-                        @for (stop of preview()?.stops ?? []; track stop.kind + (stop.orderId ?? stop.tandaParticipantId)) {
+                        @for (stop of preview()?.stops ?? []; track stop.consolidationId ?? (stop.kind + (stop.orderId ?? stop.tandaParticipantId))) {
                             @if (stop.latitude != null && stop.longitude != null) {
                                 <map-marker
                                     [position]="{ lat: stop.latitude, lng: stop.longitude }"
@@ -399,7 +413,7 @@ declare const google: any;
                             La ruta aparecerá aquí en vivo. ✨
                         </p>
                     }
-                    @for (stop of preview()?.stops ?? []; track stop.kind + (stop.orderId ?? stop.tandaParticipantId)) {
+                    @for (stop of preview()?.stops ?? []; track stop.consolidationId ?? (stop.kind + (stop.orderId ?? stop.tandaParticipantId))) {
                         <div class="flex items-center gap-2 p-2 rounded-2xl mb-1 hover:bg-pink-50/40 transition-all cursor-pointer"
                              [class.bg-pink-50]="hoveredKey() === keyOf(stop)"
                              (mouseenter)="hoveredKey.set(keyOf(stop))"
@@ -416,6 +430,9 @@ declare const google: any;
                                     @if (stop.kind === 'Tanda') {
                                         <span class="px-1 py-0.5 bg-fuchsia-100 text-fuchsia-700 text-[9px] font-black rounded uppercase">Tanda</span>
                                     }
+                                    @if (stop.consolidationId) {
+                                        <span class="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[9px] font-black rounded-full uppercase">🛍️ {{ stop.memberOrderIds?.length }} pedidos · una parada</span>
+                                    }
                                     @if (!stop.hasCoords) {
                                         <span class="px-1 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded uppercase">Sin coords</span>
                                     }
@@ -423,9 +440,17 @@ declare const google: any;
                                 @if (stop.clientAddress) {
                                     <p class="text-[10px] text-pink-400 truncate">📍 {{ stop.clientAddress }}</p>
                                 }
+                                @if (stop.consolidationId) {
+                                    @for (owner of stop.owners ?? []; track owner.ownerClientId) {
+                                        <p class="text-[10px] font-bold text-violet-700 truncate">{{ owner.ownerName }} · {{ owner.total | currency:'MXN':'symbol-narrow':'1.2-2' }} (debe {{ owner.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }})</p>
+                                    }
+                                    <p class="text-[10px] font-black text-rose-500">Debe {{ stop.aggregateBalanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
+                                }
                             </div>
-                            @if (stop.kind !== 'Tanda' && stop.total > 0) {
-                                <span class="text-[10px] font-black text-emerald-500 shrink-0">{{ stop.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                            @if (stop.kind !== 'Tanda' && stop.total > 0 && !stop.consolidationId) {
+                                <span class="text-[10px] font-black text-pink-500 shrink-0">{{ stop.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                            } @else if (stop.consolidationId) {
+                                <span class="text-[10px] font-black text-pink-500 shrink-0">{{ stop.aggregateTotal | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                             }
                         </div>
                     }
@@ -532,6 +557,7 @@ export class RouteBuilderComponent implements OnInit {
     loadingRoute = signal(false);
 
     pendingOrders = signal<OrderSummaryDto[]>([]);
+    consolidations = signal<OrderConsolidationDto[]>([]);
     availableTandas = signal<AvailableTandaDto[]>([]);
     loading = signal(true);
 
@@ -660,6 +686,45 @@ export class RouteBuilderComponent implements OnInit {
                 totalPackages: o.totalPackages,
                 isTandaPending: false
             }));
+        const routeId = this.editRouteId();
+        const consolidationRows: CandidateRow[] = this.consolidations()
+            .filter(consolidation => {
+                const members = consolidation.orders.map(member => member.order);
+                return members.length > 0 && members.every(order =>
+                    order.status !== 'Canceled'
+                    && order.status !== 'Delivered'
+                    && order.orderType !== 'PickUp'
+                    && (order.deliveryRouteId == null || order.deliveryRouteId === routeId)
+                    && !lockedOrderIds.has(order.id)
+                );
+            })
+            .map(consolidation => {
+                const owners = this.summarizeOwners(consolidation);
+                const members = consolidation.orders.map(member => member.order);
+                const primaryMember = consolidation.orders.find(member => member.orderId === consolidation.primaryOrderId);
+                return {
+                    key: `bag:${consolidation.id}`,
+                    kind: 'Order' as const,
+                    rawId: consolidation.primaryOrderId,
+                    clientId: consolidation.primaryClientId,
+                    clientName: `Bolsa #${consolidation.id} · ${consolidation.primaryClientName}`,
+                    address: consolidation.primaryAddress,
+                    clientAddress: consolidation.primaryAddress,
+                    latitude: consolidation.primaryLatitude ?? primaryMember?.order.clientLatitude ?? null,
+                    longitude: consolidation.primaryLongitude ?? primaryMember?.order.clientLongitude ?? null,
+                    deliveryInstructions: consolidation.deliveryInstructions ?? undefined,
+                    hasCoords: (consolidation.primaryLatitude ?? primaryMember?.order.clientLatitude) != null
+                        && (consolidation.primaryLongitude ?? primaryMember?.order.clientLongitude) != null,
+                    packagesConfirmed: members.every(order => order.packagesConfirmed === true),
+                    totalPackages: members.reduce((sum, order) => sum + (order.totalPackages ?? 0), 0),
+                    consolidationId: consolidation.id,
+                    memberOrderIds: members.map(order => order.id),
+                    aggregateTotal: consolidation.total,
+                    aggregateBalanceDue: consolidation.balanceDue,
+                    owners,
+                    isTandaPending: false
+                };
+            });
         const tandaRows: CandidateRow[] = this.availableTandas().map(t => ({
             key: `tanda:${t.tandaParticipantId}`,
             kind: 'Tanda' as const,
@@ -676,7 +741,7 @@ export class RouteBuilderComponent implements OnInit {
             tandaName: t.tandaName,
             tandaWeek: t.week
         }));
-        return [...orderRows, ...tandaRows];
+        return [...orderRows, ...consolidationRows, ...tandaRows];
     });
 
     visibleCandidates = computed(() => {
@@ -685,7 +750,9 @@ export class RouteBuilderComponent implements OnInit {
         return this.candidates().filter(c => {
             if (mode === 'no-coords' && c.hasCoords) return false;
             if (mode === 'tandas' && c.kind !== 'Tanda') return false;
-            if (term && !(c.clientName.toLowerCase().includes(term) || (c.address ?? '').toLowerCase().includes(term))) return false;
+            if (term && !(c.clientName.toLowerCase().includes(term)
+                || (c.address ?? '').toLowerCase().includes(term)
+                || (c.owners ?? []).some(owner => owner.ownerName.toLowerCase().includes(term)))) return false;
             return true;
         });
     });
@@ -801,6 +868,8 @@ export class RouteBuilderComponent implements OnInit {
                     if (d.status === 'Delivered' || d.status === 'NotDelivered') continue;
                     if (d.kind === 'Tanda' && d.tandaParticipantId) {
                         preSelected.add(`tanda:${d.tandaParticipantId}`);
+                    } else if (d.consolidationId != null) {
+                        preSelected.add(`bag:${d.consolidationId}`);
                     } else if (d.orderId != null) {
                         preSelected.add(`order:${d.orderId}`);
                     }
@@ -849,6 +918,7 @@ export class RouteBuilderComponent implements OnInit {
     }
 
     keyOf(stop: PreviewStopDto): string {
+        if (stop.consolidationId != null) return `bag:${stop.consolidationId}`;
         return stop.kind === 'Tanda' ? `tanda:${stop.tandaParticipantId}` : `order:${stop.orderId}`;
     }
 
@@ -907,8 +977,13 @@ export class RouteBuilderComponent implements OnInit {
 
     loadCandidates(): void {
         this.loading.set(true);
-        let ordersLoaded = false, tandasLoaded = false;
-        const done = () => { if (ordersLoaded && tandasLoaded) this.loading.set(false); };
+        let ordersLoaded = false, tandasLoaded = false, consolidationsLoaded = false;
+        const done = () => {
+            if (ordersLoaded && tandasLoaded && consolidationsLoaded) {
+                this.loading.set(false);
+                if (this.selected().size > 0) this.refreshPreview();
+            }
+        };
         const editId = this.route.snapshot.paramMap.get('id');
         const currentRouteId = editId ? parseInt(editId, 10) : null;
 
@@ -938,10 +1013,44 @@ export class RouteBuilderComponent implements OnInit {
             },
             error: () => { tandasLoaded = true; done(); }
         });
+
+        this.api.getOrderConsolidations().subscribe({
+            next: (items) => {
+                this.consolidations.set(items ?? []);
+                consolidationsLoaded = true;
+                done();
+            },
+            error: () => {
+                this.consolidations.set([]);
+                consolidationsLoaded = true;
+                done();
+            }
+        });
     }
 
     orderHasCoords(o: OrderSummaryDto): boolean {
         return o.clientLatitude != null && o.clientLongitude != null;
+    }
+
+    private summarizeOwners(consolidation: OrderConsolidationDto): ConsolidationOwnerSummaryDto[] {
+        const grouped = new Map<number, ConsolidationOwnerSummaryDto>();
+        for (const member of consolidation.orders) {
+            const current = grouped.get(member.ownerClientId);
+            if (current) {
+                current.orderIds.push(member.orderId);
+                current.total += member.order.total;
+                current.balanceDue += member.order.balanceDue;
+            } else {
+                grouped.set(member.ownerClientId, {
+                    ownerClientId: member.ownerClientId,
+                    ownerName: member.ownerNameSnapshot,
+                    orderIds: [member.orderId],
+                    total: member.order.total,
+                    balanceDue: member.order.balanceDue
+                });
+            }
+        }
+        return [...grouped.values()].sort((first, second) => first.ownerName.localeCompare(second.ownerName));
     }
 
     toggle(key: StopKey): void {
@@ -1181,6 +1290,11 @@ export class RouteBuilderComponent implements OnInit {
         const tandaIds: string[] = [];
         for (const key of this.selected()) {
             if (key.startsWith('order:')) orderIds.push(Number(key.substring(6)));
+            else if (key.startsWith('bag:')) {
+                const consolidationId = Number(key.substring(4));
+                const bag = this.consolidations().find(item => item.id === consolidationId);
+                if (bag) orderIds.push(...bag.orders.map(member => member.orderId));
+            }
             else if (key.startsWith('tanda:')) tandaIds.push(key.substring(6));
         }
 
@@ -1233,7 +1347,8 @@ export class RouteBuilderComponent implements OnInit {
         const orderIds: number[] = [];
         const tandaIds: string[] = [];
         for (const s of stops) {
-            if (s.kind === 'Order' && s.orderId != null) orderIds.push(s.orderId);
+            if (s.kind === 'Order' && s.memberOrderIds?.length) orderIds.push(...s.memberOrderIds);
+            else if (s.kind === 'Order' && s.orderId != null) orderIds.push(s.orderId);
             else if (s.kind === 'Tanda' && s.tandaParticipantId) tandaIds.push(s.tandaParticipantId);
         }
 

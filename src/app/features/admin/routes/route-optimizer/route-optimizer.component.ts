@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output, OnInit, ViewChild, signal, comp
 import { CommonModule } from '@angular/common';
 import { GoogleMapsModule, GoogleMap } from '@angular/google-maps';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { OrderSummaryDto } from '../../../../core/models';
+import { ConsolidationOwnerSummaryDto, OrderSummaryDto } from '../../../../core/models';
 import { environment } from '../../../../../environments/environment';
 
 // ─── CONFIG ────────────────────────────────────────────────────
@@ -260,6 +260,13 @@ export class RouteOptimizerComponent implements OnInit {
             title: `${index + 1}. ${order.clientName}`,
             zIndex: isHovered ? 100 : index
         };
+    }
+
+    ownerTotals(owners?: ConsolidationOwnerSummaryDto[]): string {
+        const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
+        return (owners ?? []).map(owner =>
+            `${owner.ownerName}: ${currency.format(owner.total)} (debe ${currency.format(owner.balanceDue)})`
+        ).join(' · ');
     }
 
     // --- User Interactions ---

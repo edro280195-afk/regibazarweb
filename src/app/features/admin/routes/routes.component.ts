@@ -9,7 +9,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { RouteDto, RouteDeliveryDto, OrderSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse, AvailableTandaDto } from '../../../core/models';
+import { RouteDto, RouteDeliveryDto, OrderSummaryDto, OrderConsolidationDto, ConsolidationOwnerSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse, AvailableTandaDto } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
 import { AddressEditorV2Component } from '../clients/address-editor-v2/address-editor-v2.component';
@@ -427,15 +427,21 @@ interface GeocodedOrder extends OrderSummaryDto {
                         }
                         <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 border-2 border-white shadow-sm"
                              [class]="d.status === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : d.status === 'NotDelivered' ? 'bg-red-100 text-red-600' : d.status === 'InTransit' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-700'">
-                          {{ d.sortOrder }}
+                          {{ getPhysicalStopNumber(route, d) }}
                         </div>
                         <div class="flex-1 min-w-0">
                           <p class="text-sm font-bold text-gray-800 truncate flex items-center gap-2">
                             {{ d.clientName }}
+                            @if (d.consolidationId) {
+                              <span class="text-[9px] px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-md font-black uppercase tracking-wider">🛍️ Bolsa #{{ d.consolidationId }} · pedido de {{ d.consolidationOwnerName }}</span>
+                            }
                             @if (d.kind === 'Tanda') {
                               <span class="text-[9px] px-1.5 py-0.5 bg-fuchsia-100 text-fuchsia-700 rounded-md font-black uppercase tracking-wider">✨ Tanda</span>
                             }
                           </p>
+                          @if (d.consolidationId) {
+                            <p class="text-[10px] text-violet-600 truncate">Destino de la bolsa: {{ d.consolidationPrimaryClientName }}</p>
+                          }
                           @if (d.kind === 'Tanda') {
                             <p class="text-[10px] text-fuchsia-500 truncate">
                               {{ d.tandaName }}@if (d.tandaWeek != null) { · Semana {{ d.tandaWeek }}@if (d.tandaTotalWeeks) {/{{ d.tandaTotalWeeks }}} }@if (d.tandaVariant) { · {{ d.tandaVariant }} }
@@ -610,7 +616,15 @@ interface GeocodedOrder extends OrderSummaryDto {
                     <span class="w-6 h-6 rounded-lg border-2 flex items-center justify-center text-[11px] font-black shrink-0 transition-colors"
                           [class]="addSelectedOrderIds().has(o.id) ? 'bg-pink-500 border-pink-500 text-white' : 'border-pink-200 text-transparent'">✓</span>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm font-bold text-gray-800 truncate">{{ o.clientName }} <span class="text-pink-300 font-semibold">#{{ o.id }}</span></p>
+                      @if (o.orderConsolidationId) {
+                        <p class="text-sm font-bold text-gray-800 truncate">🛍️ Bolsa #{{ o.orderConsolidationId }} · entrega a {{ o.clientName }}</p>
+                        @for (owner of o.consolidationOwners ?? []; track owner.ownerClientId) {
+                          <p class="text-[10px] font-bold text-violet-700 truncate">{{ owner.ownerName }} · {{ owner.total | currency:'MXN':'symbol-narrow':'1.2-2' }} (debe {{ owner.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }})</p>
+                        }
+                        <p class="text-[10px] font-black text-rose-500">Total {{ o.total | currency:'MXN':'symbol-narrow':'1.2-2' }} · Deben {{ o.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
+                      } @else {
+                        <p class="text-sm font-bold text-gray-800 truncate">{{ o.clientName }} <span class="text-pink-300 font-semibold">#{{ o.id }}</span></p>
+                      }
                       @if (o.alternativeAddress || o.clientAddress) {
                         <p class="text-[11px] text-gray-400 truncate">📍 {{ o.alternativeAddress || o.clientAddress }}</p>
                       } @else {
@@ -725,6 +739,10 @@ interface GeocodedOrder extends OrderSummaryDto {
             <h3 class="text-base font-black text-pink-900 mb-1.5">¿Quitar a {{ rc.delivery.clientName }} de la ruta?</h3>
             @if (rc.delivery.kind === 'Tanda') {
               <p class="text-xs text-gray-400 mb-5">La tanda <strong>{{ rc.delivery.tandaName }}</strong> volverá a estar disponible para otra ruta. Las demás entregas se renumeran solas.</p>
+            } @else if (rc.delivery.consolidationId) {
+              <p class="text-xs text-gray-400 mb-5">Se quitará la <strong>bolsa #{{ rc.delivery.consolidationId }}</strong> completa de la ruta. Los pedidos, las dueñas y los saldos volverán a Pendientes.</p>
+            } @else if (rc.delivery.consolidationId) {
+              <p class="text-xs text-gray-400 mb-5">Se quitará la <strong>bolsa #{{ rc.delivery.consolidationId }}</strong> completa de la ruta. Los pedidos, las dueñas y los saldos volverán a Pendientes.</p>
             } @else {
               <p class="text-xs text-gray-400 mb-5">El pedido <strong>#{{ rc.delivery.orderId }} · {{ rc.delivery.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong> vuelve a Pendientes; podrás agregarlo a otra ruta cuando quieras.</p>
             }
@@ -842,7 +860,14 @@ interface GeocodedOrder extends OrderSummaryDto {
                         
                         <div class="flex-1 min-w-0">
                           <div class="flex items-center gap-1.5 flex-wrap">
-                            <p class="text-sm font-bold text-pink-900 truncate">#{{ order.id }} · {{ order.clientName }}</p>
+                            @if (order.orderConsolidationId) {
+                              <p class="text-sm font-bold text-pink-900 truncate">🛍️ Bolsa #{{ order.orderConsolidationId }} · entrega a {{ order.clientName }}</p>
+                              @for (owner of order.consolidationOwners ?? []; track owner.ownerClientId) {
+                                <p class="text-[10px] font-bold text-violet-700 truncate">{{ owner.ownerName }} · {{ owner.total | currency:'MXN':'symbol-narrow':'1.2-2' }} (debe {{ owner.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }})</p>
+                              }
+                            } @else {
+                              <p class="text-sm font-bold text-pink-900 truncate">#{{ order.id }} · {{ order.clientName }}</p>
+                            }
                             @if (!order.clientAddress) {
                               <span class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-700 uppercase animate-pulse">⚠️ Sin dir.</span>
                             }
@@ -861,6 +886,9 @@ interface GeocodedOrder extends OrderSummaryDto {
                                 <button (click)="openMagicPicker(order)" class="text-[10px] bg-gradient-to-r from-amber-400 to-orange-400 px-3 py-1.5 rounded-xl text-white font-black hover:shadow-lg transition-all active:scale-95">📍 Ubicar con Magia</button>
                               </div>
                             }
+                          @if (order.orderConsolidationId) {
+                            <p class="text-[10px] font-black text-rose-500 mt-1">Total bolsa {{ order.total | currency:'MXN':'symbol-narrow':'1.2-2' }} · Deben {{ order.balanceDue | currency:'MXN':'symbol-narrow':'1.2-2' }}</p>
+                          }
                         </div>
                         <span class="text-sm font-black text-pink-700 shrink-0">{{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
                       </div>
@@ -1305,7 +1333,8 @@ export class RoutesComponent implements OnInit, OnDestroy {
     return this.pendingOrders().filter(o =>
       o.clientName.toLowerCase().includes(query) ||
       (o.id.toString() === query) ||
-      (o.clientPhone && o.clientPhone.includes(query))
+      (o.clientPhone && o.clientPhone.includes(query)) ||
+      (o.consolidationOwners ?? []).some(owner => owner.ownerName.toLowerCase().includes(query))
     );
   });
 
@@ -1391,7 +1420,8 @@ export class RoutesComponent implements OnInit, OnDestroy {
     return list.filter(o =>
       o.clientName.toLowerCase().includes(q) ||
       (o.alternativeAddress || o.clientAddress || '').toLowerCase().includes(q) ||
-      String(o.id).includes(q));
+      String(o.id).includes(q) ||
+      (o.consolidationOwners ?? []).some(owner => owner.ownerName.toLowerCase().includes(q)));
   });
 
   filteredAddableTandas = computed(() => {
@@ -2060,6 +2090,27 @@ export class RoutesComponent implements OnInit, OnDestroy {
     return r.deliveries.filter(d => d.kind !== 'Tanda').length;
   }
 
+  getPhysicalStopNumber(route: RouteDto, target: RouteDeliveryDto): number {
+    const orderedDeliveries = [...route.deliveries].sort((first, second) => first.sortOrder - second.sortOrder);
+    const seenStops = new Set<string>();
+    let stopNumber = 0;
+    for (const delivery of orderedDeliveries) {
+      const key = delivery.kind === 'Tanda'
+        ? `tanda:${delivery.tandaParticipantId ?? delivery.deliveryId}`
+        : delivery.consolidationId != null
+          ? `bag:${delivery.consolidationId}`
+          : `order:${delivery.orderId ?? delivery.deliveryId}`;
+      if (seenStops.has(key)) {
+        if (delivery.deliveryId === target.deliveryId) return stopNumber;
+        continue;
+      }
+      seenStops.add(key);
+      stopNumber++;
+      if (delivery.deliveryId === target.deliveryId) return stopNumber;
+    }
+    return target.sortOrder;
+  }
+
   getTandaCount(r: RouteDto): number {
     return r.deliveries.filter(d => d.kind === 'Tanda').length;
   }
@@ -2110,12 +2161,81 @@ export class RoutesComponent implements OnInit, OnDestroy {
   loadPendingOrders(): void {
     this.api.getOrders().subscribe({
       next: (orders) => {
-        this.pendingOrders.set(
-          orders.filter(o => o.status !== 'Canceled' && o.status !== 'Delivered' && o.orderType !== 'PickUp' && !o.deliveryRouteId)
-            .sort((a, b) => (a.clientAddress ? 0 : 1) - (b.clientAddress ? 0 : 1))
-        );
+        this.api.getOrderConsolidations().subscribe({
+          next: consolidations => this.pendingOrders.set(this.buildPendingRouteRows(orders, consolidations)),
+          error: () => this.pendingOrders.set(orders
+            .filter(order => order.status !== 'Canceled' && order.status !== 'Delivered'
+              && order.orderType !== 'PickUp' && !order.deliveryRouteId)
+            .sort((first, second) => (first.clientAddress ? 0 : 1) - (second.clientAddress ? 0 : 1)))
+        });
       }
     });
+  }
+
+  private buildPendingRouteRows(
+    orders: OrderSummaryDto[],
+    consolidations: OrderConsolidationDto[]
+  ): OrderSummaryDto[] {
+    const eligible = (order: OrderSummaryDto): boolean => order.status !== 'Canceled'
+      && order.status !== 'Delivered'
+      && order.orderType !== 'PickUp'
+      && !order.deliveryRouteId;
+    const groupedOrderIds = new Set<number>();
+    const bagRows: OrderSummaryDto[] = [];
+
+    for (const consolidation of consolidations) {
+      const members = consolidation.orders.map(member => member.order);
+      if (members.length !== consolidation.orders.length || members.some(order => !eligible(order))) continue;
+
+      const primary = members.find(order => order.id === consolidation.primaryOrderId);
+      if (!primary) continue;
+      const owners = this.summarizeConsolidationOwners(consolidation);
+      for (const member of members) groupedOrderIds.add(member.id);
+      bagRows.push({
+        ...primary,
+        clientName: consolidation.primaryClientName,
+        clientAddress: consolidation.primaryAddress,
+        alternativeAddress: undefined,
+        clientLatitude: consolidation.primaryLatitude ?? primary.clientLatitude ?? null,
+        clientLongitude: consolidation.primaryLongitude ?? primary.clientLongitude ?? null,
+        deliveryInstructions: consolidation.deliveryInstructions ?? primary.deliveryInstructions,
+        total: consolidation.total,
+        amountPaid: consolidation.amountPaid,
+        balanceDue: consolidation.balanceDue,
+        orderConsolidationId: consolidation.id,
+        consolidationMemberOrderIds: members.map(order => order.id),
+        consolidationOwners: owners
+      });
+    }
+
+    const individualRows = orders.filter(order => eligible(order)
+      && order.orderConsolidationId == null
+      && !groupedOrderIds.has(order.id));
+    return [...individualRows, ...bagRows]
+      .sort((first, second) => (first.clientAddress ? 0 : 1) - (second.clientAddress ? 0 : 1));
+  }
+
+  private summarizeConsolidationOwners(
+    consolidation: OrderConsolidationDto
+  ): ConsolidationOwnerSummaryDto[] {
+    const grouped = new Map<number, ConsolidationOwnerSummaryDto>();
+    for (const member of consolidation.orders) {
+      const current = grouped.get(member.ownerClientId);
+      if (current) {
+        current.orderIds.push(member.orderId);
+        current.total += member.order.total;
+        current.balanceDue += member.order.balanceDue;
+      } else {
+        grouped.set(member.ownerClientId, {
+          ownerClientId: member.ownerClientId,
+          ownerName: member.ownerNameSnapshot,
+          orderIds: [member.orderId],
+          total: member.order.total,
+          balanceDue: member.order.balanceDue
+        });
+      }
+    }
+    return [...grouped.values()].sort((first, second) => first.ownerName.localeCompare(second.ownerName));
   }
 
   // ─── ROUTE MUTATION ───
@@ -2151,7 +2271,9 @@ export class RoutesComponent implements OnInit, OnDestroy {
       });
     } else if (rc.delivery.orderId != null) {
       this.api.removeOrderFromRoute(rc.route.id, rc.delivery.orderId).subscribe({
-        next: () => done('Pedido removido, volvió a Pendientes ✨'),
+        next: () => done(rc.delivery.consolidationId != null
+          ? `Bolsa #${rc.delivery.consolidationId} removida y devuelta a Pendientes ✨`
+          : 'Pedido removido, volvió a Pendientes ✨'),
         error: () => fail('Error al remover pedido')
       });
     }
@@ -2441,7 +2563,10 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.routes.update(rs => [...rs]);
     const newOrderIds = route.deliveries.map(d => d.deliveryId);
     this.api.reorderRouteDeliveries(route.id, newOrderIds).subscribe({
-      next: () => this.toast.success('Ruta reordenada ✨'),
+      next: () => {
+        this.toast.success('Ruta reordenada ✨');
+        this.loadRoutes();
+      },
       error: () => { this.toast.error('Error al guardar'); this.loadRoutes(); }
     });
   }

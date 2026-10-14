@@ -230,6 +230,9 @@ export interface OrderSummaryDto {
     consolidationOwnerClientId?: number | null;
     consolidationOwnerNameSnapshot?: string | null;
     deliveryTime?: string | null;
+    /** Pedidos que integran una bolsa física y resumen por dueña para armar rutas. */
+    consolidationMemberOrderIds?: number[];
+    consolidationOwners?: ConsolidationOwnerSummaryDto[];
 }
 
 export interface OrderConsolidationMemberDto {
@@ -252,6 +255,14 @@ export interface OrderConsolidationDto {
     orders: OrderConsolidationMemberDto[];
     total: number;
     amountPaid: number;
+    balanceDue: number;
+}
+
+export interface ConsolidationOwnerSummaryDto {
+    ownerClientId: number;
+    ownerName: string;
+    orderIds: number[];
+    total: number;
     balanceDue: number;
 }
 
@@ -645,6 +656,10 @@ export interface RouteDeliveryDto {
     tandaVariant?: string;
     scheduledDeliveryDate?: string;
     deliveryTime?: string;
+    consolidationId?: number;
+    consolidationOwnerName?: string;
+    consolidationPrimaryClientName?: string;
+    isConsolidationPrimaryOrder?: boolean;
 }
 
 export interface AvailableTandaDto {
@@ -701,6 +716,11 @@ export interface PreviewStopDto {
     hasCoords: boolean;
     tandaName?: string;
     tandaWeek?: number;
+    consolidationId?: number;
+    memberOrderIds?: number[];
+    owners?: ConsolidationOwnerSummaryDto[];
+    aggregateTotal?: number;
+    aggregateBalanceDue?: number;
 }
 
 export interface PreviewRouteResponse {
