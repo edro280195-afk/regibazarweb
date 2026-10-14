@@ -9,7 +9,7 @@ import {
   signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TandaService } from '../../../core/services/tanda.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -81,6 +81,7 @@ interface TandaEditForm {
 })
 export class TandaDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private tandaService = inject(TandaService);
   private apiService = inject(ApiService);
   private toastService = inject(ToastService);
@@ -786,21 +787,24 @@ export class TandaDetailComponent implements OnInit {
     if (this.addingToRoute()) return;
     this.addingToRoute.set(true);
 
-    // Busca una ruta Pending existente. Si hay, agregamos ahí.
-    // Si no hay, creamos una ruta nueva con solo esta tanda.
+    // Si ya hay ruta, abre su selector para elegir la posición antes de agregar.
+    // Si no hay, crea una ruta nueva con solo esta tanda.
     this.apiService.getRoutes().subscribe({
       next: (routes) => {
         const pendingRoute = routes.find(r => r.status === 'Pending');
         if (pendingRoute) {
-          this.apiService.addTandaToRoute(pendingRoute.id, p.id).subscribe({
-            next: () => {
-              this.addingToRoute.set(false);
-              this.toastService.success(`✨ ${p.customerName} agregada a la ruta del domingo`);
-            },
-            error: (err) => {
-              this.addingToRoute.set(false);
-              this.toastService.error(err.error?.message || 'No se pudo agregar a la ruta');
+          this.router.navigate(['/admin/routes'], {
+            queryParams: { routeId: pendingRoute.id, addTandaId: p.id }
+          }).then(navigated => {
+            this.addingToRoute.set(false);
+            if (navigated) {
+              this.toastService.info(`Elige en el mapa dónde agregar a ${p.customerName} 📍`);
+            } else {
+              this.toastService.error('No se pudo abrir el selector de posición de la ruta.');
             }
+          }).catch(() => {
+            this.addingToRoute.set(false);
+            this.toastService.error('No se pudo abrir el selector de posición de la ruta.');
           });
         } else {
           this.apiService.createRoute([], false, [p.id]).subscribe({

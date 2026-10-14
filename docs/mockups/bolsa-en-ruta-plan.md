@@ -15,7 +15,7 @@ Al agregar uno o más pedidos, bolsas o tandas a una ruta existente, la persona 
 ## Reglas
 
 - Agregar a una ruta existente nunca llama al optimizador ni reordena las entregas existentes.
-- El punto de inserción se identifica por una entrega de esa misma ruta. `0` representa explícitamente el inicio; una solicitud antigua sin punto conserva su compatibilidad como agregado al final.
+- El punto de inserción se identifica por una entrega de esa misma ruta. `0` representa explícitamente el inicio; las altas a rutas existentes deben enviar una posición elegida.
 - Al insertar después de una entrega de bolsa consolidada, el API usa el final de esa bolsa física. Nunca intercala otro pedido entre sus integrantes.
 - Los pedidos de una bolsa seleccionada se insertan como bloque, uno por cada pedido fuente, con sus dueñas, artículos, pagos e historial originales.
 - Las tandas y las bolsas mantienen la continuidad de sus paradas físicas. Las selecciones múltiples se encadenan después de la entrega insertada anterior para respetar el orden que eligió el operador.
@@ -33,7 +33,7 @@ Al agregar uno o más pedidos, bolsas o tandas a una ruta existente, la persona 
 
 ## Alcance técnico
 
-- Web: agregar un segundo paso al modal actual de agregar pedidos/tandas; exponer mapa y lista de paradas existentes; enviar el identificador de la referencia junto con cada alta.
+- Web: agregar un segundo paso al modal actual de agregar pedidos/tandas; exponer mapa y lista de paradas existentes; enviar el identificador de la referencia junto con cada alta. El atajo desde el detalle de tandas abre este mismo selector con la tanda ya elegida.
 - API: insertar pedidos/bloques en el lugar solicitado, desplazar `SortOrder` de forma segura y no ejecutar `OptimizeRouteInternal` en altas a rutas existentes.
 - Mantener la acción de optimización explícita, el flujo de nueva ruta, el contrato de Android y los datos fuente de cada pedido. No integrar cambios en Android.
 - No se anticipa una migración: se reutiliza `Delivery.SortOrder`.

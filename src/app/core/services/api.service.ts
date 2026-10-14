@@ -665,9 +665,8 @@ export class ApiService {
     }
 
     // ── Route Mutation ──
-    addOrderToRoute(routeId: number, orderId: number, afterDeliveryId?: number): Observable<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }> {
-        let params = new HttpParams();
-        if (afterDeliveryId !== undefined) params = params.set('afterDeliveryId', afterDeliveryId.toString());
+    addOrderToRoute(routeId: number, orderId: number, afterDeliveryId: number): Observable<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }> {
+        const params = new HttpParams().set('afterDeliveryId', afterDeliveryId.toString());
         return this.http.post<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }>(`${this.base}/routes/${routeId}/add-order`, orderId, { params });
     }
 
@@ -675,9 +674,8 @@ export class ApiService {
         return this.http.delete(`${this.base}/routes/${routeId}/remove-order/${orderId}`);
     }
 
-    addTandaToRoute(routeId: number, tandaParticipantId: string, afterDeliveryId?: number): Observable<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }> {
-        let params = new HttpParams();
-        if (afterDeliveryId !== undefined) params = params.set('afterDeliveryId', afterDeliveryId.toString());
+    addTandaToRoute(routeId: number, tandaParticipantId: string, afterDeliveryId: number): Observable<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }> {
+        const params = new HttpParams().set('afterDeliveryId', afterDeliveryId.toString());
         return this.http.post<{ message: string; insertedDeliveryIds: number[]; lastDeliveryId: number }>(`${this.base}/routes/${routeId}/add-tanda`, JSON.stringify(tandaParticipantId), {
             params,
             headers: { 'Content-Type': 'application/json' }

@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, signal, computed, HostListener, CUSTOM_EL
 import { CommonModule, CurrencyPipe, DatePipe, KeyValuePipe } from '@angular/common';
 import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, Router } from '@angular/router';
+import { ActivatedRoute, RouterLink, Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
@@ -1389,7 +1389,9 @@ export class RoutesComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private signalr = inject(SignalRService);
   private push = inject(PushNotificationService);
+  private activatedRoute = inject(ActivatedRoute);
   router = inject(Router);
+  private pendingTandaRouteSelection: { routeId: number; tandaId: string } | null = null;
 
   routes = signal<RouteDto[]>([]);
   loading = signal(true);
@@ -1714,6 +1716,17 @@ export class RoutesComponent implements OnInit, OnDestroy {
   onDocumentClick() { if (this.moreMenuRouteId() !== null) this.moreMenuRouteId.set(null); }
 
   ngOnInit(): void {
+    const routeId = Number(this.activatedRoute.snapshot.queryParamMap.get('routeId'));
+    const tandaId = this.activatedRoute.snapshot.queryParamMap.get('addTandaId');
+    if (Number.isInteger(routeId) && routeId > 0 && tandaId) {
+      this.pendingTandaRouteSelection = { routeId, tandaId };
+      void this.router.navigate([], {
+        relativeTo: this.activatedRoute,
+        queryParams: { routeId: null, addTandaId: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
     this.loadRoutes();
     this.initSignalR();
     this.initPush();
@@ -2403,6 +2416,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
         this.loading.set(false);
         this.lastRefreshedAt.set(new Date());
         this.refreshAgo.set('ahora');
+        this.openPendingTandaRouteSelection(r);
         // Phase 38: Initialize God Mode Map after DOM is rendered
         if (r.length > 0) {
           setTimeout(() => this.initGodModeMap(), 300);
@@ -2535,7 +2549,21 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   // ── Agregar pedidos/tandas (bottom-sheet con buscador) ──
-  openAddSheet(route: RouteDto): void {
+  private openPendingTandaRouteSelection(routes: RouteDto[]): void {
+    const requested = this.pendingTandaRouteSelection;
+    if (!requested) return;
+    this.pendingTandaRouteSelection = null;
+
+    const route = routes.find(candidate => candidate.id === requested.routeId);
+    if (!route || route.status === 'Completed' || route.status === 'Canceled') {
+      this.toast.error('La ruta solicitada ya no está disponible para agregar la tanda.');
+      return;
+    }
+
+    this.openAddSheet(route, requested.tandaId);
+  }
+
+  openAddSheet(route: RouteDto, preselectedTandaId?: string): void {
     this.addSheetRoute.set(route);
     this.addSheetTab.set('orders');
     this.routeInsertionStep.set('select');
@@ -2546,7 +2574,18 @@ export class RoutesComponent implements OnInit, OnDestroy {
     this.selectedAfterDeliveryId.set(null);
     this.loadPendingOrders();
     this.api.getAvailableTandas().subscribe({
-      next: (tandas) => this.availableTandas.set(tandas),
+      next: (tandas) => {
+        this.availableTandas.set(tandas);
+        if (preselectedTandaId) {
+          if (tandas.some(tanda => tanda.tandaParticipantId === preselectedTandaId)) {
+            this.addSheetTab.set('tandas');
+            this.toggleAddTanda(preselectedTandaId);
+            this.toast.info('Tanda seleccionada. Elige en el mapa dónde insertarla 📍');
+          } else {
+            this.toast.error('La tanda ya no está disponible para agregar a esa ruta.');
+          }
+        }
+      },
       error: () => this.availableTandas.set([])
     });
   }
