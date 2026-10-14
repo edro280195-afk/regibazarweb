@@ -368,9 +368,9 @@ interface RouteAddOwnerTotal {
                 </div>
               </div>
 
-              <!-- Action Bar: 3 acciones grandes + menú "Más" -->
+              <!-- Acciones rápidas de la ruta + menú "Más" -->
               <div class="px-4 sm:px-5 pb-3 relative">
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-pink-50 text-pink-600 text-xs font-bold border border-pink-100 hover:bg-pink-100 active:scale-95 transition-all"
                           (click)="openMap(route)">
                     🗺️ Mapa
@@ -386,6 +386,11 @@ interface RouteAddOwnerTotal {
                       📱 WhatsApp
                     </button>
                   }
+                  <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-violet-50 text-violet-600 text-xs font-bold border border-violet-100 hover:bg-violet-100 active:scale-95 transition-all"
+                          [attr.aria-label]="'Copiar enlace del chofer de la ruta ' + route.id"
+                          (click)="copyDriverLink(route)">
+                    🔗 Copiar enlace
+                  </button>
                   <button class="flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-white text-gray-500 text-xs font-bold border border-pink-100 hover:bg-pink-50 active:scale-95 transition-all"
                           (click)="$event.stopPropagation(); toggleMoreMenu(route.id)">
                     ⋯ Más
@@ -395,10 +400,6 @@ interface RouteAddOwnerTotal {
                 @if (moreMenuRouteId() === route.id) {
                   <div class="absolute right-4 sm:right-5 bottom-full mb-1 z-[901] w-60 bg-white rounded-2xl border border-pink-100 shadow-xl shadow-pink-100/60 overflow-hidden animate-scale-in"
                        (click)="$event.stopPropagation()">
-                    <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
-                            (click)="copyDriverLink(route); moreMenuRouteId.set(null)">
-                      📋 Copiar link del chofer
-                    </button>
                     <button class="w-full flex items-center gap-2.5 px-4 py-3 text-left text-xs font-bold text-gray-600 hover:bg-pink-50 transition-colors"
                             (click)="shareWhatsApp(route); moreMenuRouteId.set(null)">
                       📱 Compartir por WhatsApp
@@ -2985,7 +2986,15 @@ export class RoutesComponent implements OnInit, OnDestroy {
   // ═══ DRIVER LINK ═══
   copyDriverLink(route: RouteDto): void {
     const link = route.driverLink || `${window.location.origin}/repartidor/${route.driverToken}`;
-    navigator.clipboard.writeText(link).then(() => this.toast.success('¡Link copiado! 📋✅'));
+    if (!navigator.clipboard?.writeText) {
+      this.toast.error('Este navegador no permite copiar el enlace. Compártelo por WhatsApp.');
+      return;
+    }
+
+    navigator.clipboard.writeText(link).then(
+      () => this.toast.success('¡Enlace del chofer copiado! 📋✅'),
+      () => this.toast.error('No se pudo copiar el enlace. Compártelo por WhatsApp.')
+    );
   }
 
   shareWhatsApp(route: RouteDto): void {
