@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed, effect, ViewChild, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect, ViewChild, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -6,10 +6,11 @@ import { GoogleMap, MapMarker, MapPolyline } from '@angular/google-maps';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../../../../core/services/api.service';
 import { ToastService } from '../../../../core/services/toast.service';
+import { RouteOptimizerPreferenceService } from '../../../../core/services/route-optimizer-preference.service';
 import { OrderSummaryDto, OrderConsolidationDto, ConsolidationOwnerSummaryDto, AvailableTandaDto, PreviewRouteResponse, PreviewStopDto, RouteDto, RouteDeliveryDto, RoutePackagesRequiredDto } from '../../../../core/models';
 import { getEffectiveDeliveryAddress } from '../../../../core/utils/address.util';
 import { AddressEditorV2Component } from '../../clients/address-editor-v2/address-editor-v2.component';
-import { Subject, forkJoin } from 'rxjs';
+import { Subject, Subscription, forkJoin } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
 type StopKey = string; // "order:42" | "tanda:guid"
@@ -62,7 +63,7 @@ declare const google: any;
                     <p class="text-pink-400 text-xs sm:text-sm">
                         {{ isEditMode()
                             ? 'Modifica las paradas pendientes. Las ya entregadas quedan fijas.'
-                            : 'Selecciona y la ruta se calcula sola sin costo.' }}
+                            : 'Compara el recorrido por calles con el motor local de respaldo.' }}
                     </p>
                 </div>
                 <button (click)="save()"
@@ -84,12 +85,12 @@ declare const google: any;
                     </p>
                 </div>
                 <div class="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-pink-100/60">
-                    <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest">Distancia</p>
-                    <p class="text-xl sm:text-2xl font-black text-pink-900">{{ formatDistance(preview()?.totalDistanceMeters ?? 0) }}</p>
-                </div>
-                <div class="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-pink-100/60">
                     <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest">Duración</p>
                     <p class="text-xl sm:text-2xl font-black text-pink-900">{{ formatDuration(preview()?.totalDurationSeconds ?? 0) }}</p>
+                </div>
+                <div class="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-pink-100/60">
+                    <p class="text-[10px] font-black text-pink-400 uppercase tracking-widest">Distancia</p>
+                    <p class="text-xl sm:text-2xl font-black text-pink-900">{{ formatDistance(preview()?.totalDistanceMeters ?? 0) }}</p>
                 </div>
                 <div class="rounded-2xl p-3 sm:p-4 shadow-sm border"
                      [class.bg-white]="!isApproxOptimizer()" [class.border-pink-100/60]="!isApproxOptimizer()"
@@ -105,6 +106,55 @@ declare const google: any;
             </div>
         </div>
 
+        <!-- SELECTOR DE MOTOR: ORS para calles reales y modo local para volver al comportamiento anterior. -->
+        <section class="max-w-[1600px] mx-auto mb-4" aria-labelledby="routeEngineTitle">
+            <div class="rounded-3xl border border-pink-100/70 bg-white/90 p-4 shadow-sm sm:p-5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-pink-100 to-violet-100 text-xl shadow-inner" aria-hidden="true">🛣️</span>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 id="routeEngineTitle" class="text-sm font-black text-pink-900 sm:text-base">Motor para ordenar la ruta</h2>
+                                <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide"
+                                      [class.bg-violet-100]="useRoadOptimizer()"
+                                      [class.text-violet-700]="useRoadOptimizer()"
+                                      [class.bg-pink-100]="!useRoadOptimizer()"
+                                      [class.text-pink-700]="!useRoadOptimizer()">
+                                    {{ useRoadOptimizer() ? 'Por calles · ORS' : 'Motor local · respaldo' }}
+                                </span>
+                            </div>
+                            <p class="mt-1 text-xs leading-relaxed text-pink-500 sm:text-sm">
+                                {{ useRoadOptimizer()
+                                    ? 'Calcula con calles reales. Si ORS no está disponible, conserva todas las paradas y cambia al modo local.'
+                                    : 'Usa el cálculo local de antes; no hace llamadas a ORS.' }}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" role="switch"
+                            [attr.aria-checked]="useRoadOptimizer()"
+                            [attr.aria-label]="useRoadOptimizer() ? 'Desactivar optimización por calles y usar motor local' : 'Activar optimización por calles con OpenRouteService'"
+                            [disabled]="saving()"
+                            (click)="toggleRoadOptimizer()"
+                            class="inline-flex min-h-12 shrink-0 items-center gap-3 self-end rounded-2xl border border-pink-100 bg-pink-50/60 px-3 py-2 text-left shadow-inner transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto">
+                        <span class="text-[11px] font-black" [class.text-violet-700]="useRoadOptimizer()" [class.text-pink-600]="!useRoadOptimizer()">
+                            {{ useRoadOptimizer() ? 'ACTIVADO' : 'APAGADO' }}
+                        </span>
+                        <span class="relative h-7 w-12 rounded-full transition-colors"
+                              [class.bg-violet-400]="useRoadOptimizer()"
+                              [class.bg-pink-200]="!useRoadOptimizer()">
+                            <span class="absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                                  [class.translate-x-6]="useRoadOptimizer()"
+                                  [class.translate-x-1]="!useRoadOptimizer()"></span>
+                        </span>
+                    </button>
+                </div>
+                <p class="mt-3 border-t border-pink-50 pt-3 text-[11px] leading-relaxed text-pink-400 sm:text-xs">
+                    Google Maps seguirá mostrando el mapa y la geocodificación existente no cambia. El switch solo cambia cómo se ordenan las paradas.
+                    Al activar ORS, el API envía únicamente las coordenadas de las paradas seleccionadas; no manda nombres, teléfonos ni saldos.
+                </p>
+            </div>
+        </section>
+
         <!-- ALERT: optimización aproximada (sin distancias reales de calle) -->
         @if (isApproxOptimizer()) {
             <div class="max-w-[1600px] mx-auto mb-4">
@@ -114,10 +164,12 @@ declare const google: any;
                         <div class="flex-1 min-w-0">
                             <h3 class="font-black text-amber-900 mb-1 text-sm sm:text-base">Ruta calculada en modo aproximado</h3>
                             <p class="text-xs sm:text-sm text-amber-700">
-                                El orden se calculó con distancias en <strong>línea recta</strong>, no por calles reales,
-                                por lo que puede no ser el más eficiente (en una ciudad con sentidos y puentes el orden se ve raro).
-                                Revisa el orden antes de guardar. Si ya activaste las distancias reales de Google y sigues viendo
-                                esto, hay que revisar la configuración del servidor.
+                                @if (preview()?.optimizerMessage) {
+                                    {{ preview()?.optimizerMessage }}
+                                } @else {
+                                    El motor local estima distancias en línea recta, no por calles reales.
+                                }
+                                Revisa el orden antes de guardar. Puedes apagar ORS con el switch de arriba para volver al modo local.
                             </p>
                         </div>
                     </div>
@@ -361,6 +413,12 @@ declare const google: any;
                 }
             </div>
 
+            @if (preview()?.optimizerSource === 'ors-vroom') {
+                <p class="border-t border-pink-50 bg-white px-3 py-2 text-center text-[9px] leading-relaxed text-pink-400 sm:text-[10px]">
+                    © openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors
+                </p>
+            }
+
             <!-- RIGHT: RUTA OPTIMIZADA EN VIVO -->
             <div class="lg:col-span-3 bg-white rounded-3xl shadow-sm border border-pink-100/60 overflow-hidden flex flex-col"
                  [class.hidden]="mobileView() !== 'route'" [class.lg:flex]="true">
@@ -542,11 +600,12 @@ declare const google: any;
     .lasso-hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); max-width:calc(100% - 1rem); background:rgba(236,72,153,0.92); color:#fff; font-size:11px; font-weight:800; letter-spacing:.02em; padding:6px 12px; border-radius:999px; pointer-events:none; box-shadow:0 4px 12px rgba(236,72,153,.35); white-space:normal; overflow-wrap:anywhere; text-align:center; }
     `]
 })
-export class RouteBuilderComponent implements OnInit {
+export class RouteBuilderComponent implements OnInit, OnDestroy {
     private api = inject(ApiService);
     private toast = inject(ToastService);
     private router = inject(Router);
     private route = inject(ActivatedRoute);
+    private optimizerPreference = inject(RouteOptimizerPreferenceService);
 
     @ViewChild(GoogleMap) googleMap?: GoogleMap;
 
@@ -571,6 +630,7 @@ export class RouteBuilderComponent implements OnInit {
     preview = signal<PreviewRouteResponse | null>(null);
     loadingPreview = signal(false);
     saving = signal(false);
+    useRoadOptimizer = this.optimizerPreference.useRoadOptimizer;
     geocodingNow = signal(false);
     pickingAddressFor = signal<CandidateRow | null>(null);
 
@@ -658,6 +718,8 @@ export class RouteBuilderComponent implements OnInit {
     }
 
     private previewTrigger$ = new Subject<void>();
+    private previewRequestSubscription?: Subscription;
+    private previewTriggerSubscription?: Subscription;
     private mapsPollTimer?: any;
 
     candidates = computed<CandidateRow[]>(() => {
@@ -785,10 +847,11 @@ export class RouteBuilderComponent implements OnInit {
     optimizerLabel = computed(() => {
         const src = this.preview()?.optimizerSource;
         if (!src) return '—';
-        if (src === 'distance-matrix+2opt') return 'Aprox. sin costo';
-        if (src === 'haversine+2opt') return 'Aprox. sin costo';
-        if (src === 'google-routes-v2') return 'Ruta por calles';
-        if (src === 'haversine-fallback') return 'Aprox. sin costo';
+        if (src === 'distance-matrix+2opt') return 'Local · línea recta';
+        if (src === 'haversine+2opt') return 'Local · línea recta';
+        if (src === 'google-routes-v2') return 'Google · calles reales';
+        if (src === 'ors-vroom') return 'ORS · calles reales';
+        if (src === 'haversine-fallback') return 'Respaldo local';
         if (src === 'no-coords') return '⚠️ Sin coords';
         return src;
     });
@@ -799,13 +862,21 @@ export class RouteBuilderComponent implements OnInit {
         return src === 'haversine+2opt' || src === 'haversine-fallback';
     });
 
+    toggleRoadOptimizer(): void {
+        const enabled = !this.useRoadOptimizer();
+        this.optimizerPreference.setUseRoadOptimizer(enabled);
+        if (this.selected().size > 0) this.refreshPreview();
+    }
+
     constructor() {
         effect(() => {
             const _ = this.selected().size;
             this.previewTrigger$.next();
         }, { allowSignalWrites: true });
 
-        this.previewTrigger$.pipe(debounceTime(500)).subscribe(() => this.refreshPreview());
+        this.previewTriggerSubscription = this.previewTrigger$
+            .pipe(debounceTime(500))
+            .subscribe(() => this.refreshPreview());
 
         effect(() => {
             const p = this.preview();
@@ -821,6 +892,12 @@ export class RouteBuilderComponent implements OnInit {
             }
             this.fitMapBounds();
         }, { allowSignalWrites: true });
+    }
+
+    ngOnDestroy(): void {
+        this.previewTriggerSubscription?.unsubscribe();
+        this.previewRequestSubscription?.unsubscribe();
+        if (this.mapsPollTimer != null) clearInterval(this.mapsPollTimer);
     }
 
     ngOnInit(): void {
@@ -1286,6 +1363,8 @@ export class RouteBuilderComponent implements OnInit {
     }
 
     refreshPreview(): void {
+        this.previewRequestSubscription?.unsubscribe();
+        this.previewRequestSubscription = undefined;
         const orderIds: number[] = [];
         const tandaIds: string[] = [];
         for (const key of this.selected()) {
@@ -1300,12 +1379,15 @@ export class RouteBuilderComponent implements OnInit {
 
         if (orderIds.length === 0 && tandaIds.length === 0) {
             this.preview.set(null);
+            this.loadingPreview.set(false);
             return;
         }
 
         this.loadingPreview.set(true);
         const depot = this.depotPosition() ?? { lat: 27.4861, lng: -99.5069 };
-        this.api.previewRoute(orderIds, tandaIds, depot.lat, depot.lng).subscribe({
+        this.previewRequestSubscription = this.api.previewRoute(
+            orderIds, tandaIds, depot.lat, depot.lng, this.useRoadOptimizer()
+        ).subscribe({
             next: (res) => {
                 this.preview.set(res);
                 this.loadingPreview.set(false);
@@ -1346,7 +1428,16 @@ export class RouteBuilderComponent implements OnInit {
         const stops = this.preview()?.stops ?? [];
         const orderIds: number[] = [];
         const tandaIds: string[] = [];
+        const orderedStopIds: string[] = [];
         for (const s of stops) {
+            if (s.kind === 'Tanda' && s.tandaParticipantId) {
+                orderedStopIds.push(`tanda:${s.tandaParticipantId}`);
+            } else if (s.consolidationId != null) {
+                orderedStopIds.push(`bag:${s.consolidationId}`);
+            } else if (s.orderId != null) {
+                orderedStopIds.push(`order:${s.orderId}`);
+            }
+
             if (s.kind === 'Order' && s.memberOrderIds?.length) orderIds.push(...s.memberOrderIds);
             else if (s.kind === 'Order' && s.orderId != null) orderIds.push(s.orderId);
             else if (s.kind === 'Tanda' && s.tandaParticipantId) tandaIds.push(s.tandaParticipantId);
@@ -1357,7 +1448,9 @@ export class RouteBuilderComponent implements OnInit {
 
         if (routeId != null) {
             // Edit mode: recompose existing route
-            this.api.recomposeRoute(routeId, orderIds, tandaIds).subscribe({
+            this.api.recomposeRoute(
+                routeId, orderIds, tandaIds, orderedStopIds, this.useRoadOptimizer()
+            ).subscribe({
                 next: (res) => {
                     this.saving.set(false);
                     if (res.skipped && res.skipped.length > 0) {

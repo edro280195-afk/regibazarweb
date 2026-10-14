@@ -733,11 +733,14 @@ export interface PreviewRouteResponse {
     polylineEncoded?: string;
     depotLatitude?: number;
     depotLongitude?: number;
+    optimizerMessage?: string;
 }
 
 export interface RecomposeRouteRequest {
     orderIds: number[];
     tandaParticipantIds?: string[];
+    orderedStopIds?: string[];
+    useRoadOptimizer?: boolean;
 }
 
 export interface RecomposeRouteResponse {

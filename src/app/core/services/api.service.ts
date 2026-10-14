@@ -386,9 +386,15 @@ export class ApiService {
         return this.http.post<CreateRouteResponse>(`${this.base}/routes`, { orderIds, force, tandaParticipantIds, preOptimized });
     }
 
-    previewRoute(orderIds: number[], tandaParticipantIds: string[], startLat?: number, startLng?: number): Observable<PreviewRouteResponse> {
+    previewRoute(
+        orderIds: number[],
+        tandaParticipantIds: string[],
+        startLat?: number,
+        startLng?: number,
+        useRoadOptimizer: boolean = true
+    ): Observable<PreviewRouteResponse> {
         return this.http.post<PreviewRouteResponse>(`${this.base}/routes/preview`, {
-            orderIds, tandaParticipantIds, startLat, startLng
+            orderIds, tandaParticipantIds, startLat, startLng, useRoadOptimizer
         });
     }
 
@@ -690,10 +696,18 @@ export class ApiService {
         return this.http.patch(`${this.base}/routes/${routeId}/deliveries/${deliveryId}/notes`, { notes });
     }
 
-    recomposeRoute(routeId: number, orderIds: number[], tandaParticipantIds?: string[]): Observable<RecomposeRouteResponse> {
+    recomposeRoute(
+        routeId: number,
+        orderIds: number[],
+        tandaParticipantIds?: string[],
+        orderedStopIds?: string[],
+        useRoadOptimizer: boolean = false
+    ): Observable<RecomposeRouteResponse> {
         return this.http.put<RecomposeRouteResponse>(`${this.base}/routes/${routeId}/recompose`, {
             orderIds,
-            tandaParticipantIds: tandaParticipantIds ?? []
+            tandaParticipantIds: tandaParticipantIds ?? [],
+            orderedStopIds,
+            useRoadOptimizer
         });
     }
 
@@ -702,10 +716,11 @@ export class ApiService {
         return this.http.put<any>(`${this.base}/routes/${routeId}/reorder`, deliveryIds);
     }
 
-    optimizeRoute(routeId: number, lat?: number, lng?: number): Observable<any> {
+    optimizeRoute(routeId: number, lat?: number, lng?: number, useRoadOptimizer: boolean = false): Observable<{ message: string; optimizerSource?: string }> {
         let params = new HttpParams();
         if (lat !== undefined) params = params.set('lat', lat.toString());
         if (lng !== undefined) params = params.set('lng', lng.toString());
-        return this.http.post(`${this.base}/routes/${routeId}/optimize`, {}, { params });
+        params = params.set('useRoadOptimizer', String(useRoadOptimizer));
+        return this.http.post<{ message: string; optimizerSource?: string }>(`${this.base}/routes/${routeId}/optimize`, {}, { params });
     }
 }

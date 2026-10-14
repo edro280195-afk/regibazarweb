@@ -9,6 +9,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { RouteOptimizerPreferenceService } from '../../../core/services/route-optimizer-preference.service';
 import { RouteDto, RouteDeliveryDto, OrderSummaryDto, OrderConsolidationDto, ConsolidationOwnerSummaryDto, DriverExpenseDto, OrderPaymentDto, AiRouteSelectionResponse, AvailableTandaDto } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import { RouteOptimizerComponent } from './route-optimizer/route-optimizer.component';
@@ -237,6 +238,43 @@ interface RouteAddOwnerTotal {
           <p class="text-2xl font-black text-emerald-600">{{ routesByStatus('Completed') }}</p>
         </div>
       </div>
+
+      <section class="relative z-10 mb-5 rounded-3xl border border-pink-100/70 bg-white/85 p-4 shadow-[0_5px_0_#f8d2e2,0_9px_20px_rgba(217,54,125,.1)] sm:flex sm:items-center sm:justify-between sm:gap-5"
+               aria-labelledby="routesEngineTitle">
+        <div class="flex min-w-0 items-start gap-3">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-pink-100 to-violet-100 text-xl shadow-inner" aria-hidden="true">🛣️</span>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 id="routesEngineTitle" class="text-sm font-black text-pink-900">Motor para ordenar rutas</h2>
+              <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide"
+                    [class.bg-violet-100]="useRoadOptimizer()" [class.text-violet-700]="useRoadOptimizer()"
+                    [class.bg-pink-100]="!useRoadOptimizer()" [class.text-pink-700]="!useRoadOptimizer()">
+                {{ useRoadOptimizer() ? 'ORS por calles' : 'Respaldo local' }}
+              </span>
+            </div>
+            <p class="mt-1 text-[11px] leading-relaxed text-pink-500 sm:text-xs">
+              {{ useRoadOptimizer()
+                ? 'Las próximas rutas y reoptimizaciones probarán el recorrido por calles; si ORS falla, se usa el modo local.'
+                : 'Las próximas rutas usarán el algoritmo local de antes, sin llamadas a ORS.' }}
+              Google Maps sigue mostrando el mapa y las direcciones.
+            </p>
+          </div>
+        </div>
+        <button type="button" role="switch"
+                [attr.aria-checked]="useRoadOptimizer()"
+                [attr.aria-label]="useRoadOptimizer() ? 'Desactivar ORS y volver al motor local' : 'Activar optimización por calles con ORS'"
+                (click)="toggleRoadOptimizerPreference()"
+                class="mt-3 inline-flex min-h-12 items-center gap-3 self-end rounded-2xl border border-pink-100 bg-pink-50/60 px-3 py-2 text-left shadow-inner transition active:scale-[.98] sm:mt-0 sm:self-auto">
+          <span class="text-[11px] font-black" [class.text-violet-700]="useRoadOptimizer()" [class.text-pink-600]="!useRoadOptimizer()">
+            {{ useRoadOptimizer() ? 'ACTIVADO' : 'APAGADO' }}
+          </span>
+          <span class="relative h-7 w-12 rounded-full transition-colors"
+                [class.bg-violet-400]="useRoadOptimizer()" [class.bg-pink-200]="!useRoadOptimizer()">
+            <span class="absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                  [class.translate-x-6]="useRoadOptimizer()" [class.translate-x-1]="!useRoadOptimizer()"></span>
+          </span>
+        </button>
+      </section>
 
       <!-- ═══ FILTRO DE RUTAS + AUTO-REFRESH ═══ -->
       <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 animate-slide-up" style="animation-delay:200ms">
@@ -1388,6 +1426,7 @@ interface RouteAddOwnerTotal {
 export class RoutesComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
   private toast = inject(ToastService);
+  private optimizerPreference = inject(RouteOptimizerPreferenceService);
   private signalr = inject(SignalRService);
   private push = inject(PushNotificationService);
   private activatedRoute = inject(ActivatedRoute);
@@ -1395,6 +1434,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   private pendingTandaRouteSelection: { routeId: number; tandaId: string } | null = null;
 
   routes = signal<RouteDto[]>([]);
+  useRoadOptimizer = this.optimizerPreference.useRoadOptimizer;
   loading = signal(true);
   scrollY = signal(0);
   latestEvent = signal<string>('');
@@ -2327,16 +2367,30 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   async optimizeRoute(routeId: number): Promise<void> {
-    this.toast.info('Optimizando ruta... 🧩');
+    this.toast.info(this.useRoadOptimizer()
+      ? 'Optimizando por calles... 🧩'
+      : 'Optimizando con el motor local... 🧩');
     const pos = await this.getCurrentLocation();
     
-    this.api.optimizeRoute(routeId, pos?.lat, pos?.lng).subscribe({
-      next: () => {
-        this.toast.success('Ruta optimizada con éxito 🚀');
+    this.api.optimizeRoute(routeId, pos?.lat, pos?.lng, this.useRoadOptimizer()).subscribe({
+      next: (result) => {
+        if (result.optimizerSource === 'haversine-fallback') {
+          this.toast.info(result.message || 'ORS no respondió; se usó el motor local.');
+        } else {
+          this.toast.success('Ruta optimizada con éxito 🚀');
+        }
         this.loadRoutes();
       },
       error: () => this.toast.error('Error al optimizar')
     });
+  }
+
+  toggleRoadOptimizerPreference(): void {
+    const enabled = !this.useRoadOptimizer();
+    this.optimizerPreference.setUseRoadOptimizer(enabled);
+    this.toast.info(enabled
+      ? 'Las próximas rutas intentarán optimizarse por calles.'
+      : 'Las próximas rutas usarán el motor local de respaldo.');
   }
 
   // ═══ COMPUTED HELPERS ═══
