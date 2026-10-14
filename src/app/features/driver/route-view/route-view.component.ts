@@ -17,6 +17,7 @@ declare const google: any;
 
 /** GPS key for localStorage persistence */
 const GPS_KEY = 'regi_gps_granted';
+type DriverPaymentMethod = 'Efectivo' | 'Transferencia' | 'Deposito' | 'SinCobro';
 
 @Component({
     selector: 'app-route-view',
@@ -81,7 +82,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     failReasons = ['No estaba 🏠', 'Dirección incorrecta 📍', 'No contestó 📱', 'Rechazó pedido ❌'];
 
     deliveryNotes: Record<number, string> = {};
-    paymentMethods: Record<number, string> = {};
+    paymentMethods: Record<number, DriverPaymentMethod> = {};
+    cashReceived: Record<number, number | null> = {};
     photos: Record<number, { file: File; preview: string }[]> = {};
 
     // ── Signature pad ──
@@ -444,13 +446,29 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
     markDelivered(id: number): void {
         if (this.isDelivering()) return;
-        this.isDelivering.set(true);
         const notes = this.deliveryNotes[id] || '';
         const photoFiles = (this.photos[id] || []).map(p => p.file);
         const method = this.paymentMethods[id];
         const delivery = this.route()?.deliveries?.find((d: any) => d.id === id);
-        const due = delivery?.balanceDue ?? delivery?.total ?? 0;
-        const payments = method && due > 0 ? [{ amount: due, method }] : undefined;
+        const due = this.roundMoney(Math.max(0, delivery?.balanceDue ?? delivery?.total ?? 0));
+        if (!this.canMarkDelivered(id, due, delivery?.kind)) return;
+
+        this.isDelivering.set(true);
+        let payments: { amount: number; method: string; notes?: string }[] | undefined;
+        if (due > 0 && method === 'Efectivo') {
+            const received = this.roundMoney(Math.max(0, this.cashReceived[id] ?? 0));
+            const applied = this.roundMoney(Math.min(received, due));
+            const change = this.roundMoney(Math.max(0, received - due));
+            const remaining = this.roundMoney(Math.max(0, due - applied));
+            const paymentNotes = change > 0
+                ? `Recibió $${received.toFixed(2)} en efectivo; entregó $${change.toFixed(2)} de cambio.`
+                : remaining > 0
+                    ? `Recibió $${received.toFixed(2)} en efectivo; quedaron $${remaining.toFixed(2)} pendientes.`
+                    : `Recibió $${received.toFixed(2)} en efectivo.`;
+            payments = [{ amount: applied, method, notes: paymentNotes }];
+        } else if (due > 0 && method && method !== 'SinCobro') {
+            payments = [{ amount: due, method }];
+        }
         const sig = this.signatures[id];
         const signature = sig ? { svg: sig.svg, signedByName: sig.name } : undefined;
         this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature).subscribe({
@@ -463,6 +481,34 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             },
             error: () => { this.isDelivering.set(false); }
         });
+    }
+
+    selectPaymentMethod(deliveryId: number, method: DriverPaymentMethod): void {
+        this.paymentMethods[deliveryId] = method;
+        if (method === 'Efectivo' && this.cashReceived[deliveryId] == null) {
+            this.cashReceived[deliveryId] = null;
+        }
+    }
+
+    canMarkDelivered(deliveryId: number, balanceDue: number, kind?: string): boolean {
+        if (kind === 'Tanda' || balanceDue <= 0) return true;
+        const method = this.paymentMethods[deliveryId];
+        if (!method) return false;
+        return method !== 'Efectivo' || (this.cashReceived[deliveryId] ?? 0) > 0;
+    }
+
+    cashChange(deliveryId: number, balanceDue: number): number {
+        const received = this.roundMoney(Math.max(0, this.cashReceived[deliveryId] ?? 0));
+        return this.roundMoney(Math.max(0, received - balanceDue));
+    }
+
+    balanceAfterCash(deliveryId: number, balanceDue: number): number {
+        const received = this.roundMoney(Math.max(0, this.cashReceived[deliveryId] ?? 0));
+        return this.roundMoney(Math.max(0, balanceDue - Math.min(received, balanceDue)));
+    }
+
+    private roundMoney(value: number): number {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
     }
 
     // ── Signature pad methods ──
