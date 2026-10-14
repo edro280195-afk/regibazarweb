@@ -198,7 +198,13 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                   @if (order.scheduledDeliveryDate) {
                     <p class="text-[10px] text-pink-600 mt-1 flex items-center gap-1 font-black">
                       🚚 Entrega: {{ order.scheduledDeliveryDate | date:'dd MMM yyyy' }}
+                      @if (hasScheduledTime(order.scheduledDeliveryDate)) {
+                        · {{ order.scheduledDeliveryDate | date:'h:mm a' }}
+                      }
                     </p>
+                  }
+                  @if (order.deliveryTime) {
+                    <p class="text-[10px] text-purple-600 mt-1 font-bold">🕒 {{ order.deliveryTime }}</p>
                   }
 
                   <!-- 🛍️ Bolsas reales: creación rápida con QR -->
@@ -455,18 +461,37 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
               
             </div>
 
-            <!-- Scheduled Delivery Date -->
+            <!-- Fecha y horario acordado para esta entrega -->
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
-                <h4 class="text-xs font-black text-pink-600 mb-2 uppercase tracking-widest flex items-center gap-2">📅 Fecha de Entrega Programada</h4>
-                <div class="flex items-center gap-2">
-                    <input type="date" class="input-coquette text-xs py-2 grow" 
-                           [ngModel]="selectedOrder()!.scheduledDeliveryDate?.substring(0, 10)" 
-                           (change)="updateScheduledDate($event)">
-                    @if (selectedOrder()!.scheduledDeliveryDate) {
-                        <button class="text-pink-300 hover:text-rose-500 p-1" (click)="clearScheduledDate()" title="Quitar fecha programada">✕</button>
-                    }
+                <h4 class="text-xs font-black text-pink-600 mb-1 uppercase tracking-widest flex items-center gap-2">📅 Horario acordado</h4>
+                <p class="text-[10px] text-pink-400 mb-3">La fecha y la ventana aparecerán en la ruta web y en el enlace de la clienta.</p>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[10px] font-bold text-pink-800 mb-1" for="schedule-date">Fecha</label>
+                    <input id="schedule-date" name="schedule-date" type="date" class="input-coquette text-base py-2 w-full"
+                           [(ngModel)]="scheduleDateDraft" />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-pink-800 mb-1" for="schedule-time">Hora exacta</label>
+                    <input id="schedule-time" name="schedule-time" type="time" class="input-coquette text-base py-2 w-full"
+                           [(ngModel)]="scheduleTimeDraft" />
+                  </div>
                 </div>
-                <p class="text-[9px] text-pink-400 mt-1">Si se asigna, el enlace vencerá 2 días después de esta fecha.</p>
+                <label class="block text-[10px] font-bold text-pink-800 mt-3 mb-1" for="schedule-window">Ventana u horario flexible <span class="font-medium text-pink-400">(opcional)</span></label>
+                <input id="schedule-window" name="schedule-window" type="text" maxlength="120" class="input-coquette text-base py-2 w-full"
+                       [(ngModel)]="deliveryTimeDraft" placeholder="Ej. entre 5:30 y 6:30 pm; llamar al llegar" />
+                <div class="mt-3 bg-purple-50/80 rounded-xl px-3 py-2 border border-purple-100 text-[10px] text-purple-700">
+                  Este acuerdo es solo para la entrega. Las instrucciones generales del domicilio se conservan aparte.
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                  <button type="button" class="btn-coquette btn-pink min-h-11 justify-center text-xs" [disabled]="savingDeliverySchedule()" (click)="saveDeliverySchedule()">
+                    {{ savingDeliverySchedule() ? 'Guardando…' : 'Guardar horario' }}
+                  </button>
+                  <button type="button" class="btn-coquette btn-outline-pink min-h-11 justify-center text-xs" [disabled]="savingDeliverySchedule()" (click)="resetDeliverySchedule()">
+                    Restablecer fecha automática
+                  </button>
+                </div>
+                <p class="text-[9px] text-pink-400 mt-2">El enlace conserva su regla actual de vencimiento, dos días después de la fecha programada.</p>
             </div>
 
             <!-- Delivery Instructions & Alternative Address -->
@@ -797,6 +822,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
   orderTypeFilter = '';
   typeFilter = '';
   selectedOrder = signal<OrderSummaryDto | null>(null);
+  scheduleDateDraft = '';
+  scheduleTimeDraft = '';
+  deliveryTimeDraft = '';
+  savingDeliverySchedule = signal(false);
 
   // 🛍️ Quick-set de bolsas desde la tarjeta del Kanban (id del pedido en edición inline)
   bagsEditFor = signal<number | null>(null);
@@ -1038,6 +1067,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   selectOrder(order: OrderSummaryDto): void {
     this.selectedOrder.set(order);
+    this.setDeliveryScheduleDraft(order);
     this.reloadSelectedOrder();
     this.loadPackages(order.id);
     this.paymentAmount = 0;
@@ -1307,6 +1337,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
         const refreshed = res.items.find(o => o.id === order.id);
         if (refreshed) {
           this.selectedOrder.set(refreshed);
+          this.setDeliveryScheduleDraft(refreshed);
         }
       }
     });
@@ -1814,38 +1845,67 @@ export class OrdersComponent implements OnInit, OnDestroy {
     });
   }
 
-  updateScheduledDate(event: any): void {
+  saveDeliverySchedule(): void {
     const order = this.selectedOrder();
-    const date = event.target.value;
-    if (!order) return;
+    if (!order || this.savingDeliverySchedule()) return;
+    if (this.scheduleTimeDraft && !this.scheduleDateDraft) {
+      this.toast.error('Elige una fecha para guardar la hora.');
+      return;
+    }
 
+    const scheduledDeliveryDate = this.getScheduledDateUtc();
+    const deliveryTime = this.deliveryTimeDraft.trim();
+    this.savingDeliverySchedule.set(true);
     this.api.updateOrderDetails(order.id, {
-      scheduledDeliveryDate: date || undefined,
+      scheduledDeliveryDate,
+      deliveryTime,
+      applyDeliverySchedule: true,
       clientName: order.clientName
     }).subscribe({
       next: () => {
-        this.toast.success('Fecha de entrega actualizada 📅');
+        this.savingDeliverySchedule.set(false);
+        this.toast.success('Horario de entrega actualizado 📅');
         this.reloadSelectedOrder();
         this.loadOrders();
       },
-      error: () => this.toast.error('Error al actualizar fecha')
+      error: () => {
+        this.savingDeliverySchedule.set(false);
+        this.toast.error('Error al actualizar el horario');
+      }
     });
   }
 
-  clearScheduledDate(): void {
-    const order = this.selectedOrder();
-    if (!order) return;
+  resetDeliverySchedule(): void {
+    this.scheduleDateDraft = '';
+    this.scheduleTimeDraft = '';
+    this.deliveryTimeDraft = '';
+    this.saveDeliverySchedule();
+  }
 
-    this.api.updateOrderDetails(order.id, {
-      scheduledDeliveryDate: undefined,
-      clientName: order.clientName
-    }).subscribe({
-      next: () => {
-        this.toast.success('Fecha programada eliminada 🗑️');
-        this.reloadSelectedOrder();
-        this.loadOrders();
-      },
-      error: () => this.toast.error('Error al eliminar fecha')
-    });
+  hasScheduledTime(value?: string | null): boolean {
+    if (!value) return false;
+    const date = new Date(value);
+    return !Number.isNaN(date.getTime()) && (date.getHours() !== 0 || date.getMinutes() !== 0);
+  }
+
+  private setDeliveryScheduleDraft(order: OrderSummaryDto): void {
+    const date = order.scheduledDeliveryDate ? new Date(order.scheduledDeliveryDate) : null;
+    if (!date || Number.isNaN(date.getTime())) {
+      this.scheduleDateDraft = '';
+      this.scheduleTimeDraft = '';
+    } else {
+      this.scheduleDateDraft = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      this.scheduleTimeDraft = this.hasScheduledTime(order.scheduledDeliveryDate)
+        ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+        : '';
+    }
+    this.deliveryTimeDraft = order.deliveryTime ?? '';
+  }
+
+  private getScheduledDateUtc(): string | undefined {
+    if (!this.scheduleDateDraft) return undefined;
+    const localTime = this.scheduleTimeDraft || '00:00';
+    const date = new Date(`${this.scheduleDateDraft}T${localTime}`);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   }
 }

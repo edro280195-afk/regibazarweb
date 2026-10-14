@@ -149,6 +149,18 @@
                     }
                 </div>
 
+                @if (d.scheduledDeliveryDate || d.deliveryTime) {
+                    <div class="scheduled-appointment mb-3">
+                        <span class="scheduled-appointment-label">♡ Horario acordado</span>
+                        @if (d.scheduledDeliveryDate) {
+                            <strong>{{ d.scheduledDeliveryDate | date:'EEE d MMM' }}@if (hasScheduledTime(d.scheduledDeliveryDate)) { · {{ d.scheduledDeliveryDate | date:'h:mm a' }} }</strong>
+                        }
+                        @if (d.deliveryTime) {
+                            <p>{{ d.deliveryTime }}</p>
+                        }
+                    </div>
+                }
+
                 @if (d.kind === 'Tanda') {
                     <div class="bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-xl p-3 mb-3 text-sm">
                         <span class="block text-[10px] uppercase tracking-widest text-fuchsia-300 font-bold mb-1">✨ Entrega de Tanda</span>

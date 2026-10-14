@@ -155,6 +155,7 @@ export interface ClientOrderViewDto {
     deliveryInstructions?: string | null;
     expiresAt?: string | null;
     scheduledDeliveryDate?: string | null;
+    deliveryTime?: string | null;
     evidenceUrls?: string[] | null;
     signatureSvg?: string | null;
     signedByName?: string | null;
@@ -228,6 +229,7 @@ export interface OrderSummaryDto {
     /** Clienta dueña del pedido dentro de la bolsa (foto al consolidar). */
     consolidationOwnerClientId?: number | null;
     consolidationOwnerNameSnapshot?: string | null;
+    deliveryTime?: string | null;
 }
 
 export interface OrderConsolidationMemberDto {
@@ -641,6 +643,8 @@ export interface RouteDeliveryDto {
     tandaWeek?: number;
     tandaTotalWeeks?: number;
     tandaVariant?: string;
+    scheduledDeliveryDate?: string;
+    deliveryTime?: string;
 }
 
 export interface AvailableTandaDto {
@@ -1174,6 +1178,7 @@ export interface UpdateOrderDetailsRequest {
     deliveryInstructions?: string;
     alternativeAddress?: string;
     scheduledDeliveryDate?: string;
+    applyDeliverySchedule?: boolean;
     clientFacebookProfileUrl?: string;
     /** Número de bolsas. Si viene, marca packagesConfirmed = true en el backend y crea las bolsas con QR que falten. */
     totalPackages?: number | null;

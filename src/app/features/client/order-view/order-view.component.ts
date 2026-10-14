@@ -157,7 +157,10 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             @if (o.scheduledDeliveryDate) {
               <div class="mt-3 bg-white/85 backdrop-blur-md border-2 border-white rounded-2xl px-4 py-2.5 inline-block shadow-sm">
                 <p class="text-[9px] font-black text-[#cf5038] uppercase tracking-[0.2em] mb-0.5">📅 Entrega Programada</p>
-                <p class="text-sm font-black text-[#52232b]">{{ o.scheduledDeliveryDate | date:"EEEE d 'de' MMMM" }}</p>
+                <p class="text-sm font-black text-[#52232b]">{{ o.scheduledDeliveryDate | date:"EEEE d 'de' MMMM" }}@if (hasScheduledTime(o.scheduledDeliveryDate)) { · {{ o.scheduledDeliveryDate | date:'h:mm a' }} }</p>
+                @if (o.deliveryTime) {
+                  <p class="text-[11px] font-bold text-[#8d5270] mt-1">🕒 {{ o.deliveryTime }}</p>
+                }
               </div>
             }
             
@@ -1162,6 +1165,8 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
       this.showToast('¡Tu pedido tiene una actualización! ✨');
     });
 
+    this.signalr.orderDataChanged$.subscribe(() => this.loadOrder());
+
     this.signalr.locationUpdate$.subscribe((loc: any) => {
       this.driverLocation.set(loc);
       const o = this.order();
@@ -1197,6 +1202,12 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     if (hr < 12) return '¡Buenos días';
     if (hr < 19) return '¡Buenas tardes';
     return '¡Buenas noches';
+  }
+
+  hasScheduledTime(value?: string | null): boolean {
+    if (!value) return false;
+    const date = new Date(value);
+    return !Number.isNaN(date.getTime()) && (date.getHours() !== 0 || date.getMinutes() !== 0);
   }
 
   getStatusDetailMessage(status: string, deliveriesAhead: number): string {

@@ -111,6 +111,26 @@
 
 .no-charge-panel strong { color: #fbcfe8; }
 
+.scheduled-appointment {
+  padding: 10px 12px;
+  border: 1px solid rgba(221, 214, 254, 0.2);
+  border-radius: 16px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(196, 181, 253, 0.13);
+}
+
+.scheduled-appointment-label {
+  display: block;
+  color: #fbcfe8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scheduled-appointment strong { display: block; margin-top: 2px; font-size: 13px; }
+.scheduled-appointment p { margin: 2px 0 0; color: rgba(255, 255, 255, 0.7); font-size: 12px; }
+
 @media (max-width: 359px) {
   .cash-result-grid { grid-template-columns: 1fr; }
   .payment-method { min-height: 60px; }

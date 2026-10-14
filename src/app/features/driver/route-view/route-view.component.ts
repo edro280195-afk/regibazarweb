@@ -145,6 +145,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             this.loadRoute();
         });
 
+        this.signalr.orderDataChanged$.subscribe(() => this.loadRoute());
+
         this.initPush();
     }
 
@@ -505,6 +507,12 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     balanceAfterCash(deliveryId: number, balanceDue: number): number {
         const received = this.roundMoney(Math.max(0, this.cashReceived[deliveryId] ?? 0));
         return this.roundMoney(Math.max(0, balanceDue - Math.min(received, balanceDue)));
+    }
+
+    hasScheduledTime(value?: string | null): boolean {
+        if (!value) return false;
+        const date = new Date(value);
+        return !Number.isNaN(date.getTime()) && (date.getHours() !== 0 || date.getMinutes() !== 0);
     }
 
     private roundMoney(value: number): number {
