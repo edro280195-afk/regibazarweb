@@ -25,7 +25,7 @@ import {
     LabelTemplateSummaryDto, LabelTemplateDetailDto, CreateLabelTemplateDto,
     UpdateLabelTemplateDto, SaveLabelTemplateDraftDto, SaveLabelTemplateDraftResultDto,
     PublishLabelTemplateResultDto, LabelAssetDto, LabelPrintContextDto,
-    CreateLabelPrintEventDto
+    CreateLabelPrintEventDto, OrderConsolidationDto, CreateOrderConsolidationRequest
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -183,6 +183,22 @@ export class ApiService {
         if (endDate) params = params.set('dateTo', endDate);
         if (salesPeriodId != null) params = params.set('salesPeriodId', salesPeriodId.toString());
         return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/paged`, { params });
+    }
+
+    getOrderConsolidationCandidates(page: number, pageSize: number, search = ''): Observable<PagedResult<OrderSummaryDto>> {
+        let params = new HttpParams()
+            .set('page', String(page))
+            .set('pageSize', String(pageSize));
+        if (search.trim()) params = params.set('search', search.trim());
+        return this.http.get<PagedResult<OrderSummaryDto>>(`${this.base}/orders/consolidations/candidates`, { params });
+    }
+
+    getOrderConsolidations(): Observable<OrderConsolidationDto[]> {
+        return this.http.get<OrderConsolidationDto[]>(`${this.base}/orders/consolidations`);
+    }
+
+    createOrderConsolidation(request: CreateOrderConsolidationRequest): Observable<OrderConsolidationDto> {
+        return this.http.post<OrderConsolidationDto>(`${this.base}/orders/consolidations`, request);
     }
 
     markOrderNotified(id: number, notified: boolean): Observable<OrderSummaryDto> {

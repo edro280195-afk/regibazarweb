@@ -36,7 +36,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <p>Hola, {{ auth.userName() || 'Hermosa' }} 💕</p>
           <h1 class="text-2xl font-bold text-pink-900">Pedidos <span aria-hidden="true">📦</span></h1>
         </div>
-        <div class="rb-orders-header-actions grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+        <div class="rb-orders-header-actions grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <label class="btn-coquette btn-outline-pink min-w-0 cursor-pointer justify-center px-2 py-2 text-[10px] sm:px-4 sm:text-sm" aria-label="Importar pedidos desde Excel">
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
@@ -44,6 +44,10 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Enviar enlaces">
             <span class="sm:hidden">💌 Enlaces</span>
             <span class="hidden sm:inline">💌 Enviar Enlaces</span>
+          </a>
+          <a routerLink="/admin/order-consolidations" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Preparar o consultar bolsas consolidadas">
+            <span class="sm:hidden">🛍️ Bolsas</span>
+            <span class="hidden sm:inline">🛍️ Unir pedidos</span>
           </a>
           <a routerLink="/admin/capture" class="btn-coquette btn-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Crear nuevo pedido">
             <span class="sm:hidden">✨ Nuevo</span>

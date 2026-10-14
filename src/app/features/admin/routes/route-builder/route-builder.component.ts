@@ -917,6 +917,7 @@ export class RouteBuilderComponent implements OnInit {
                 const eligible = (items ?? []).filter(o =>
                     o.status !== 'Canceled' && o.status !== 'Delivered'
                     && o.orderType !== 'PickUp'
+                    && o.orderConsolidationId == null
                     // In edit mode, allow orders that belong to this route (they have deliveryRouteId = currentRouteId)
                     && (currentRouteId != null
                         ? (!o.deliveryRouteId || o.deliveryRouteId === currentRouteId)

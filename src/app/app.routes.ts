@@ -24,6 +24,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/orders/orders.component').then(m => m.OrdersComponent)
             },
             {
+                path: 'order-consolidations',
+                loadComponent: () => import('./features/admin/orders/order-consolidations/order-consolidations.component').then(m => m.OrderConsolidationsComponent)
+            },
+            {
                 path: 'inventory',
                 loadComponent: () => import('./features/admin/inventory/inventory.component').then(m => m.InventoryComponent)
             },

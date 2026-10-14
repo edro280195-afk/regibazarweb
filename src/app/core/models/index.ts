@@ -223,6 +223,39 @@ export interface OrderSummaryDto {
     deliveredAt?: string;
     /** Evidencia de no-entrega (fotos del intento fallido). */
     nonDeliveryEvidenceUrls?: string[];
+    /** Bolsa que reúne este pedido sin alterar sus artículos o pagos. */
+    orderConsolidationId?: number | null;
+    /** Clienta dueña del pedido dentro de la bolsa (foto al consolidar). */
+    consolidationOwnerClientId?: number | null;
+    consolidationOwnerNameSnapshot?: string | null;
+}
+
+export interface OrderConsolidationMemberDto {
+    orderId: number;
+    ownerClientId: number;
+    ownerNameSnapshot: string;
+    order: OrderSummaryDto;
+}
+
+export interface OrderConsolidationDto {
+    id: number;
+    primaryOrderId: number;
+    primaryClientId: number;
+    primaryClientName: string;
+    primaryAddress: string;
+    primaryLatitude: number | null;
+    primaryLongitude: number | null;
+    deliveryInstructions: string | null;
+    createdAtUtc: string;
+    orders: OrderConsolidationMemberDto[];
+    total: number;
+    amountPaid: number;
+    balanceDue: number;
+}
+
+export interface CreateOrderConsolidationRequest {
+    orderIds: number[];
+    primaryOrderId: number;
 }
 
 export interface PagedResult<T> {
