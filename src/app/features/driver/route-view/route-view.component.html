@@ -219,72 +219,103 @@
 
                 <!-- ACTIONS AREA -->
                 <div class="grid grid-cols-2 gap-3 mb-6">
-                    <!-- COBRO SELECTORS (Omitted for brevity in collapse mode but keep in full) -->
+                    <!-- DECISIÓN DE COBRO -->
                     @if ((d.balanceDue ?? d.total) > 0) {
-                        <div class="col-span-2 grid grid-cols-2 gap-2">
-                            <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
-                                    [class.is-selected]="paymentMethods[d.id] === 'Efectivo'"
-                                    [attr.aria-pressed]="paymentMethods[d.id] === 'Efectivo'"
-                                    (click)="selectPaymentMethod(d.id, 'Efectivo')">
-                                <span class="text-lg">💵</span>
-                                <span class="text-[11px] font-bold uppercase mt-1">Efectivo</span>
-                            </button>
-                            <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
-                                    [class.is-selected]="paymentMethods[d.id] === 'Transferencia'"
-                                    [attr.aria-pressed]="paymentMethods[d.id] === 'Transferencia'"
-                                    (click)="selectPaymentMethod(d.id, 'Transferencia')">
-                                <span class="text-lg">💳</span>
-                                <span class="text-[11px] font-bold uppercase mt-1">Transferencia</span>
-                            </button>
-                            <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
-                                    [class.is-selected]="paymentMethods[d.id] === 'Deposito'"
-                                    [attr.aria-pressed]="paymentMethods[d.id] === 'Deposito'"
-                                    (click)="selectPaymentMethod(d.id, 'Deposito')">
-                                <span class="text-lg">🏦</span>
-                                <span class="text-[11px] font-bold uppercase mt-1">Depósito</span>
-                            </button>
-                            <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
-                                    [class.is-selected]="paymentMethods[d.id] === 'SinCobro'"
-                                    [attr.aria-pressed]="paymentMethods[d.id] === 'SinCobro'"
-                                    (click)="selectPaymentMethod(d.id, 'SinCobro')">
-                                <span class="text-lg">♡</span>
-                                <span class="text-[11px] font-bold uppercase mt-1">Sin cobrar</span>
-                            </button>
-                        </div>
-                    }
-
-                    @if ((d.balanceDue ?? d.total) > 0 && paymentMethods[d.id] === 'Efectivo') {
-                        <div class="col-span-2 cash-payment-card">
-                            <label class="cash-payment-label" for="driver-cash-{{d.id}}">¿Cuánto efectivo recibió?</label>
-                            <div class="cash-payment-input">
-                                <span aria-hidden="true">$</span>
-                                <input id="driver-cash-{{d.id}}" name="cash-received-{{d.id}}" type="number" inputmode="decimal" min="0" step="0.01"
-                                       [(ngModel)]="cashReceived[d.id]" aria-describedby="cash-result-{{d.id}}" />
-                            </div>
-                            <div class="cash-result-grid" id="cash-result-{{d.id}}" aria-live="polite">
-                                <div class="cash-result change-result">
-                                    <span>Cambio para la clienta</span>
-                                    <strong>${{ cashChange(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }}</strong>
+                        <section class="col-span-2 delivery-payment-flow" aria-label="Confirmación del cobro">
+                            <div class="delivery-payment-heading">
+                                <div>
+                                    <span class="delivery-payment-eyebrow">COBRO DE LA ENTREGA</span>
+                                    <h3>¿Recibiste algún pago?</h3>
+                                    <p>Elige cómo cerrar esta parada.</p>
                                 </div>
-                                <div class="cash-result">
-                                    <span>Saldo después del pago</span>
-                                    <strong>${{ balanceAfterCash(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }}</strong>
-                                </div>
+                                <span class="delivery-balance-chip">${{ d.balanceDue ?? d.total | number:'1.2-2' }}</span>
                             </div>
-                            <p class="cash-payment-hint">El registro de pago no superará el saldo pendiente.</p>
-                        </div>
-                    }
 
-                    @if ((d.balanceDue ?? d.total) > 0 && paymentMethods[d.id] === 'SinCobro') {
-                        <div class="col-span-2 no-charge-panel" role="status">
-                            La entrega quedará como <strong>entregada</strong>. Los ${{ d.balanceDue ?? d.total | number:'1.2-2' }} seguirán pendientes de cobro.
-                        </div>
-                    }
+                            <button type="button" class="payment-mode-choice"
+                                    [class.is-selected]="paymentModes[d.id] === 'collect'"
+                                    [attr.aria-pressed]="paymentModes[d.id] === 'collect'"
+                                    (click)="selectPaymentMode(d.id, 'collect')">
+                                <span class="payment-mode-icon" aria-hidden="true">💵</span>
+                                <span class="payment-mode-copy"><strong>Registrar un pago</strong><small>Captura el método y cuánto recibiste</small></span>
+                                <span class="payment-mode-check" aria-hidden="true">{{ paymentModes[d.id] === 'collect' ? '✓' : '' }}</span>
+                            </button>
 
-                    @if ((d.balanceDue ?? d.total) > 0 && (paymentMethods[d.id] === 'Transferencia' || paymentMethods[d.id] === 'Deposito')) {
-                        <div class="col-span-2 non-cash-panel" role="status">
-                            Se registrarán ${{ d.balanceDue ?? d.total | number:'1.2-2' }} por {{ paymentMethods[d.id] === 'Transferencia' ? 'transferencia' : 'depósito' }}.
-                        </div>
+                            @if (paymentModes[d.id] === 'collect') {
+                                <div class="payment-detail-panel">
+                                    <p class="payment-detail-title">¿Cómo pagó?</p>
+                                    <div class="payment-method-grid">
+                                        <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
+                                                [class.is-selected]="paymentMethods[d.id] === 'Efectivo'"
+                                                [attr.aria-pressed]="paymentMethods[d.id] === 'Efectivo'"
+                                                (click)="selectPaymentMethod(d.id, 'Efectivo')">
+                                            <span class="text-lg">💵</span>
+                                            <span class="text-[11px] font-bold uppercase mt-1">Efectivo</span>
+                                        </button>
+                                        <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
+                                                [class.is-selected]="paymentMethods[d.id] === 'Transferencia'"
+                                                [attr.aria-pressed]="paymentMethods[d.id] === 'Transferencia'"
+                                                (click)="selectPaymentMethod(d.id, 'Transferencia')">
+                                            <span class="text-lg">💳</span>
+                                            <span class="text-[11px] font-bold uppercase mt-1">Transferencia</span>
+                                        </button>
+                                        <button type="button" class="payment-method flex flex-col items-center justify-center py-3 rounded-2xl border transition-all"
+                                                [class.is-selected]="paymentMethods[d.id] === 'Deposito'"
+                                                [attr.aria-pressed]="paymentMethods[d.id] === 'Deposito'"
+                                                (click)="selectPaymentMethod(d.id, 'Deposito')">
+                                            <span class="text-lg">🏦</span>
+                                            <span class="text-[11px] font-bold uppercase mt-1">Depósito</span>
+                                        </button>
+                                    </div>
+
+                                    @if (!paymentMethods[d.id]) {
+                                        <p class="payment-selection-hint">Selecciona el método que recibiste.</p>
+                                    }
+
+                                    @if (paymentMethods[d.id] === 'Efectivo') {
+                                        <div class="cash-payment-card">
+                                            <label class="cash-payment-label" for="driver-cash-{{d.id}}">¿Cuánto efectivo recibió?</label>
+                                            <div class="cash-payment-input">
+                                                <span aria-hidden="true">$</span>
+                                                <input id="driver-cash-{{d.id}}" name="cash-received-{{d.id}}" type="number" inputmode="decimal" min="0" step="0.01"
+                                                       [(ngModel)]="cashReceived[d.id]" aria-describedby="cash-result-{{d.id}}" />
+                                            </div>
+                                            <div class="cash-result-grid" id="cash-result-{{d.id}}" aria-live="polite">
+                                                <div class="cash-result change-result">
+                                                    <span>Cambio para la clienta</span>
+                                                    <strong>${{ cashChange(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }}</strong>
+                                                </div>
+                                                <div class="cash-result">
+                                                    <span>Saldo después del pago</span>
+                                                    <strong>${{ balanceAfterCash(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }}</strong>
+                                                </div>
+                                            </div>
+                                            <p class="cash-payment-hint">El registro no superará el saldo pendiente.</p>
+                                        </div>
+                                    }
+
+                                    @if (paymentMethods[d.id] === 'Transferencia' || paymentMethods[d.id] === 'Deposito') {
+                                        <div class="non-cash-panel" role="status">
+                                            Se registrarán ${{ d.balanceDue ?? d.total | number:'1.2-2' }} por {{ paymentMethods[d.id] === 'Transferencia' ? 'transferencia' : 'depósito' }}.
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <button type="button" class="payment-mode-choice pending-mode-choice"
+                                    [class.is-selected]="paymentModes[d.id] === 'leaveBalance'"
+                                    [attr.aria-pressed]="paymentModes[d.id] === 'leaveBalance'"
+                                    (click)="selectPaymentMode(d.id, 'leaveBalance')">
+                                <span class="payment-mode-icon pending-icon" aria-hidden="true">♡</span>
+                                <span class="payment-mode-copy"><strong>Entregar con saldo pendiente</strong><small>No pagó hoy · conservar la deuda</small></span>
+                                <span class="payment-mode-check" aria-hidden="true">{{ paymentModes[d.id] === 'leaveBalance' ? '✓' : '' }}</span>
+                            </button>
+
+                            @if (paymentModes[d.id] === 'leaveBalance') {
+                                <div class="no-charge-panel" role="status">
+                                    Se marcará como <strong>entregada</strong>. No se registrará ningún pago y <strong>${{ d.balanceDue ?? d.total | number:'1.2-2' }}</strong> seguirán pendientes.
+                                </div>
+                            }
+                        </section>
                     }
 
                     <button (click)="showFailModalFn(d.id)" 
@@ -309,12 +340,25 @@
                 <!-- DELIVER BUTTON -->
                 <button type="button" (click)="markDelivered(d.id)"
                         [disabled]="!canMarkDelivered(d.id, d.balanceDue ?? d.total, d.kind) || isDelivering()"
-                        class="w-full h-20 rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:grayscale disabled:opacity-40 disabled:cursor-not-allowed"
+                        class="w-full h-20 rounded-[2rem] font-black text-base sm:text-xl tracking-normal shadow-lg active:scale-[0.98] transition-all disabled:grayscale disabled:opacity-40 disabled:cursor-not-allowed"
                         [class.bg-pink-600]="d.kind !== 'Tanda'"
                         [class.shadow-pink-600/20]="d.kind !== 'Tanda'"
                         [class.bg-fuchsia-600]="d.kind === 'Tanda'"
                         [class.shadow-fuchsia-600/20]="d.kind === 'Tanda'">
-                    {{ isDelivering() ? 'Entregando...' : (d.kind === 'Tanda' ? '✨ Confirmar Tanda' : (paymentMethods[d.id] === 'SinCobro' ? '♡ Entregar sin cobrar' : '✓ Entregar')) }}
+                    @if (isDelivering()) {
+                        Entregando...
+                    } @else if (d.kind === 'Tanda') {
+                        ✨ Confirmar Tanda
+                    } @else if (paymentModes[d.id] === 'leaveBalance') {
+                        <span class="delivery-submit-pending">
+                            <strong>♡ Entregar</strong>
+                            <small>Quedan ${{ d.balanceDue ?? d.total | number:'1.2-2' }} pendientes</small>
+                        </span>
+                    } @else if (paymentModes[d.id] === 'collect') {
+                        ✓ Entregar y registrar pago
+                    } @else {
+                        ✓ Entregar
+                    }
                 </button>
             </div>
         } @else {

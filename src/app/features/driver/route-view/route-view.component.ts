@@ -17,7 +17,8 @@ declare const google: any;
 
 /** GPS key for localStorage persistence */
 const GPS_KEY = 'regi_gps_granted';
-type DriverPaymentMethod = 'Efectivo' | 'Transferencia' | 'Deposito' | 'SinCobro';
+type DriverPaymentMethod = 'Efectivo' | 'Transferencia' | 'Deposito';
+type DeliveryPaymentMode = 'collect' | 'leaveBalance';
 
 @Component({
     selector: 'app-route-view',
@@ -51,7 +52,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     totalCobrado = computed(() => {
         const r = this.route();
         if (!r) return 0;
-        return r.deliveries?.filter((d: any) => d.status === 'Delivered').reduce((s: number, d: any) => s + (d.total || 0), 0) || 0;
+        return r.deliveries?.filter((d: any) => d.status === 'Delivered').reduce((sum: number, d: any) => sum + (d.amountPaid || 0), 0) || 0;
     });
     totalGastos = computed(() => this.route()?.expenses?.reduce((s: number, e: any) => s + e.amount, 0) || 0);
 
@@ -82,6 +83,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     failReasons = ['No estaba 🏠', 'Dirección incorrecta 📍', 'No contestó 📱', 'Rechazó pedido ❌'];
 
     deliveryNotes: Record<number, string> = {};
+    paymentModes: Record<number, DeliveryPaymentMode> = {};
     paymentMethods: Record<number, DriverPaymentMethod> = {};
     cashReceived: Record<number, number | null> = {};
     photos: Record<number, { file: File; preview: string }[]> = {};
@@ -472,6 +474,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         if (this.isDelivering()) return;
         const notes = this.deliveryNotes[id] || '';
         const photoFiles = (this.photos[id] || []).map(p => p.file);
+        const paymentMode = this.paymentModes[id];
         const method = this.paymentMethods[id];
         const delivery = this.route()?.deliveries?.find((d: any) => d.id === id);
         const due = this.roundMoney(Math.max(0, delivery?.balanceDue ?? delivery?.total ?? 0));
@@ -479,7 +482,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
 
         this.isDelivering.set(true);
         let payments: { amount: number; method: string; notes?: string }[] | undefined;
-        if (due > 0 && method === 'Efectivo') {
+        if (due > 0 && paymentMode === 'collect' && method === 'Efectivo') {
             const received = this.roundMoney(Math.max(0, this.cashReceived[id] ?? 0));
             const applied = this.roundMoney(Math.min(received, due));
             const change = this.roundMoney(Math.max(0, received - due));
@@ -490,14 +493,17 @@ export class RouteViewComponent implements OnInit, OnDestroy {
                     ? `Recibió $${received.toFixed(2)} en efectivo; quedaron $${remaining.toFixed(2)} pendientes.`
                     : `Recibió $${received.toFixed(2)} en efectivo.`;
             payments = [{ amount: applied, method, notes: paymentNotes }];
-        } else if (due > 0 && method && method !== 'SinCobro') {
+        } else if (due > 0 && paymentMode === 'collect' && method) {
             payments = [{ amount: due, method }];
         }
         const sig = this.signatures[id];
         const signature = sig ? { svg: sig.svg, signedByName: sig.name } : undefined;
         this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature).subscribe({
             next: () => {
-                this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
+                const toast = paymentMode === 'leaveBalance'
+                    ? `¡Entregada! · $${due.toFixed(2)} quedan pendientes`
+                    : `¡${ORDER_STATUS_LABELS[2]}! ✨`;
+                this.showToast(toast);
                 this.photos[id] = []; this.deliveryNotes[id] = '';
                 delete this.signatures[id];
                 this.isDelivering.set(false);
@@ -508,14 +514,25 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
 
     selectPaymentMethod(deliveryId: number, method: DriverPaymentMethod): void {
+        this.paymentModes[deliveryId] = 'collect';
         this.paymentMethods[deliveryId] = method;
         if (method === 'Efectivo' && this.cashReceived[deliveryId] == null) {
             this.cashReceived[deliveryId] = null;
         }
     }
 
+    selectPaymentMode(deliveryId: number, mode: DeliveryPaymentMode): void {
+        this.paymentModes[deliveryId] = mode;
+        if (mode === 'leaveBalance') {
+            delete this.paymentMethods[deliveryId];
+            delete this.cashReceived[deliveryId];
+        }
+    }
+
     canMarkDelivered(deliveryId: number, balanceDue: number, kind?: string): boolean {
         if (kind === 'Tanda' || balanceDue <= 0) return true;
+        if (this.paymentModes[deliveryId] === 'leaveBalance') return true;
+        if (this.paymentModes[deliveryId] !== 'collect') return false;
         const method = this.paymentMethods[deliveryId];
         if (!method) return false;
         return method !== 'Efectivo' || (this.cashReceived[deliveryId] ?? 0) > 0;
