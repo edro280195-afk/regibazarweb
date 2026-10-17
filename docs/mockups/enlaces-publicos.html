@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mockups · Enlace público Regi Bazar</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Alice&family=Great+Vibes&family=Quicksand:wght@300..700&display=swap');
+
+    :root {
+      --ink: #831843;
+      --muted: #b2769a;
+      --line: #f8d7e7;
+      --surface: #fffafd;
+      --pink: #ec4899;
+      --pink-dark: #be185d;
+      --pink-soft: #fce7f3;
+      --lavender: #f1eaff;
+      --blue: #4f75d8;
+      --blue-soft: #eaf0ff;
+      --green: #278565;
+      --green-soft: #e7f7ef;
+      --amber: #ae6a28;
+      --amber-soft: #fff2df;
+      --red: #b84b58;
+      --red-soft: #ffeaec;
+      --shadow: 0 24px 70px rgba(255, 133, 162, .25);
+      font-family: 'Quicksand', sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: radial-gradient(circle at 8% 4%, #ffdce9 0, transparent 25%), linear-gradient(135deg, #fff5f7, #f8efff 52%, #fffafd);
+      min-width: 320px;
+    }
+    button { font: inherit; cursor: pointer; }
+    .shell { max-width: 1240px; margin: 0 auto; padding: 28px 20px 48px; }
+    .intro { display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-bottom: 24px; }
+    .eyebrow { color: var(--pink); font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { margin: 6px 0 8px; font-size: clamp(25px, 4vw, 40px); line-height: 1.05; letter-spacing: -.04em; }
+    .intro p { max-width: 680px; margin: 0; color: var(--muted); line-height: 1.55; }
+    .badge { border: 1px solid var(--line); background: #fff8fb; color: var(--pink-dark); padding: 10px 13px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px; background: rgba(255,255,255,.72); border: 1px solid var(--line); border-radius: 18px; margin-bottom: 16px; }
+    .state-button { border: 0; background: transparent; color: var(--muted); padding: 9px 12px; border-radius: 11px; font-size: 12px; font-weight: 750; }
+    .state-button:hover, .state-button.active { color: var(--pink-dark); background: var(--pink-soft); }
+    .state-button .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: currentColor; vertical-align: 1px; }
+    .hint { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+    .stage { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; align-items: start; }
+    .preview-wrap { background: radial-gradient(circle at 15% 18%, rgba(255,255,255,.85) 0 5%, transparent 6%), linear-gradient(145deg, #ffddea, #e7ddfa); border: 1px solid #e4cfdf; border-radius: 28px; padding: 38px; min-height: 760px; display: grid; place-items: center; }
+    .phone { width: min(100%, 410px); min-height: 710px; overflow: hidden; background: var(--surface); border: 7px solid #fff; border-radius: 38px; box-shadow: 0 25px 70px rgba(190, 24, 93, .22); }
+    .phone-bar { height: 26px; background: linear-gradient(90deg, #f472b6, #c084fc); display: flex; justify-content: center; align-items: center; }
+    .phone-bar span { width: 72px; height: 5px; border-radius: 9px; background: #8a7185; }
+    .page { position: relative; padding: 18px 17px 26px; overflow: hidden; background: radial-gradient(circle at 100% 0, #fff0f7 0, transparent 28%), radial-gradient(circle at 0 50%, #f5efff 0, transparent 24%), var(--surface); min-height: 680px; }
+    .page:before, .page:after { position: absolute; z-index: 0; opacity: .35; pointer-events: none; }
+    .page:before { content: '✨'; top: 55px; right: 13px; font-size: 24px; }
+    .page:after { content: '🌸'; bottom: 18px; left: 10px; font-size: 27px; }
+    .page > * { position: relative; z-index: 1; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+    .brand { color: var(--pink-dark); font-size: 12px; font-weight: 850; letter-spacing: .08em; }
+    .secure { color: var(--green); font-size: 10px; font-weight: 800; }
+    .hero { margin-bottom: 13px; text-align: center; }
+    .hero-ribbon { margin: 0 auto 4px; font-size: 38px; filter: drop-shadow(0 0 13px rgba(244,114,182,.45)); animation: wiggle 3s ease-in-out infinite; }
+    .hero h2 { margin: 3px 0 7px; font-family: 'Alice', serif; color: #db2777; font-size: 25px; line-height: 1.08; letter-spacing: -.045em; text-shadow: 0 2px 3px rgba(219,39,119,.08); }
+    .hero p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .state-pill { display: inline-flex; gap: 7px; align-items: center; padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; background: var(--pink-soft); color: var(--pink-dark); }
+    .state-pill.blue { background: var(--blue-soft); color: var(--blue); }
+    .state-pill.green { background: var(--green-soft); color: var(--green); }
+    .state-pill.amber { background: var(--amber-soft); color: var(--amber); }
+    .state-pill.red { background: var(--red-soft); color: var(--red); }
+    .girly-badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 7px 11px; border: 1px solid #f3cadd; border-radius: 999px; color: #a43c6d; background: linear-gradient(100deg, #f6eaff, #ffeaf3); font-size: 10px; font-weight: 850; letter-spacing: .06em; }
+    .scheduled { display: inline-block; margin-top: 9px; padding: 9px 14px; border: 1px solid #f3cadd; border-radius: 16px; background: rgba(255,255,255,.65); box-shadow: 0 7px 20px rgba(255,133,162,.11); }
+    .scheduled small { display: block; margin-bottom: 2px; color: var(--pink); font-size: 8px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+    .scheduled strong { font-family: 'Alice', serif; color: var(--ink); font-size: 14px; }
+    .balance-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -4px 13px; padding: 10px 12px; border: 1px solid #f6d6e5; border-radius: 18px; background: rgba(255,255,255,.94); box-shadow: 0 7px 18px rgba(190,24,93,.1); }
+    .balance-bar small { display: block; color: var(--pink); font-size: 8px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; }
+    .balance-bar strong { display: block; margin-top: 2px; color: var(--ink); font-family: 'Alice', serif; font-size: 19px; }
+    .balance-bar button { border: 0; border-radius: 12px; padding: 9px 12px; color: #fff; background: var(--pink); font-size: 10px; font-weight: 900; box-shadow: 0 7px 14px rgba(236,72,153,.2); }
+    .balance-bar.urgent { border: 2px solid #f59abf; background: linear-gradient(100deg, #fff0f6, #fffafd); box-shadow: 0 9px 22px rgba(236,72,153,.2); }
+    .balance-bar.urgent small { color: var(--pink-dark); }
+    .balance-bar.urgent strong { color: #a6195c; font-size: 21px; }
+    .balance-bar.urgent button { padding: 10px 13px; background: linear-gradient(135deg, #ec4899, #be185d); box-shadow: 0 8px 17px rgba(190,24,93,.28); }
+    .nav-tabs { display: flex; gap: 4px; padding: 5px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,.85); border-radius: 20px; background: rgba(255,255,255,.6); }
+    .nav-tabs span { flex: 1; padding: 8px 3px; border-radius: 14px; color: #f1a6c8; text-align: center; font-size: 9px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+    .nav-tabs span.active { color: var(--pink); background: rgba(255,255,255,.95); box-shadow: 0 3px 10px rgba(219,39,119,.08); }
+    .ticket { position: relative; overflow: hidden; padding: 18px 16px; border: 1px solid rgba(255,255,255,.95); border-radius: 27px; background: rgba(255,255,255,.9); box-shadow: 0 9px 25px rgba(190,24,93,.07); }
+    .ticket:before { content: ''; position: absolute; top: -35px; right: -35px; width: 125px; height: 125px; border-radius: 50%; background: #fce7f3; filter: blur(18px); opacity: .6; }
+    .ticket h3 { position: relative; margin: 0 0 15px; color: var(--ink); font-family: 'Alice', serif; font-size: 18px; text-align: center; }
+    .ticket-item { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #fff0f6; font-size: 11px; }
+    .ticket-item span { color: var(--ink); font-weight: 700; }
+    .ticket-item small { display: block; margin-top: 2px; color: #ed84b2; font-size: 9px; font-weight: 900; }
+    .ticket-item strong { color: var(--pink); font-size: 11px; }
+    .dashed-line { margin: 13px 0; border-top: 2px dashed #fbcfe8; }
+    .ticket-total { display: flex; justify-content: space-between; color: var(--ink); font-family: 'Alice', serif; font-size: 17px; }
+    .payment-alert { margin-bottom: 12px; padding: 12px 13px; border: 2px solid #f49bc0; border-radius: 18px; background: linear-gradient(135deg, #ffe6f0, #fff5fa); color: #9f1d5a; box-shadow: 0 8px 19px rgba(236,72,153,.16); }
+    .payment-alert strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .payment-alert span { display: block; font-size: 10px; line-height: 1.4; }
+    .delivery-proof { display: grid; gap: 9px; margin-top: 13px; }
+    .proof-photo { position: relative; min-height: 108px; overflow: hidden; display: flex; align-items: end; padding: 10px; border: 3px solid #fff; border-radius: 18px; background: linear-gradient(145deg, #f7c7d9 0 35%, #d7b9e8 35% 64%, #b5d7da 64%); box-shadow: 0 7px 17px rgba(190,24,93,.13); }
+    .proof-photo:before { content: '📸'; position: absolute; top: 12px; right: 13px; font-size: 25px; filter: drop-shadow(0 3px 5px rgba(131,24,67,.2)); }
+    .proof-photo:after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 48%; background: linear-gradient(transparent, rgba(75,30,66,.25)); }
+    .proof-photo span { position: relative; z-index: 1; color: #fff; font-size: 10px; font-weight: 900; text-shadow: 0 1px 4px rgba(75,30,66,.6); }
+    .signature-proof { padding: 11px 12px 9px; border: 1px solid #efd8e7; border-radius: 16px; background: #fff; }
+    .signature-proof small { display: block; color: var(--pink); font-size: 8px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .signature-mark { display: block; padding: 3px 0 1px; color: #6e4d87; font-family: 'Great Vibes', cursive; font-size: 27px; line-height: 1; transform: rotate(-3deg); }
+    .signature-proof span { color: var(--muted); font-size: 9px; }
+    .gift-panel { display: grid; place-items: center; min-height: 370px; padding: 25px; text-align: center; background: rgba(252,231,243,.72); border-radius: 32px; }
+    .gift-panel .gift { font-size: 100px; filter: drop-shadow(0 18px 22px rgba(236,72,153,.28)); animation: gift-float 2.4s ease-in-out infinite; }
+    .gift-panel h2 { margin: 11px 0 7px; color: var(--pink); font-family: 'Alice', serif; font-size: 25px; }
+    .gift-panel p { margin: 0; padding: 8px 12px; border: 1px solid #f7c9dd; border-radius: 999px; color: var(--pink-dark); background: rgba(255,255,255,.65); font-size: 11px; font-weight: 700; }
+    .opening-balance { display: inline-block; margin-top: 12px; padding: 7px 10px; border: 1px solid #f2b5cf; border-radius: 999px; color: #a6195c; background: rgba(255,255,255,.7); font-size: 10px; font-weight: 850; }
+    @keyframes wiggle { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    @keyframes gift-float { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-12px) rotate(2deg); } }
+
+    .priority { border: 1px solid var(--line); border-radius: 22px; padding: 16px; background: #fff; margin-bottom: 12px; }
+    .priority.tracking { padding: 0; overflow: hidden; border-color: #d8e2ff; }
+    .priority h3 { margin: 0 0 5px; font-size: 15px; }
+    .priority p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .map { height: 205px; position: relative; overflow: hidden; background: #e6edff; }
+    .map:before, .map:after { content: ""; position: absolute; background: #fff; opacity: .78; transform: rotate(-18deg); }
+    .map:before { width: 130%; height: 24px; top: 85px; left: -15%; box-shadow: 0 -55px 0 #fff, 0 60px 0 #fff; }
+    .map:after { width: 18px; height: 120%; top: -10%; left: 48%; transform: rotate(34deg); box-shadow: 80px 0 0 rgba(255,255,255,.75), -95px 0 0 rgba(255,255,255,.65); }
+    .map-label { position: absolute; z-index: 2; top: 13px; left: 13px; padding: 8px 10px; border-radius: 10px; color: var(--blue); background: rgba(255,255,255,.9); font-size: 10px; font-weight: 850; box-shadow: 0 5px 18px rgba(63,88,158,.13); }
+    .pin { position: absolute; z-index: 3; width: 15px; height: 15px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 3px 10px rgba(45,66,143,.3); }
+    .pin.car { left: 28%; top: 64%; background: var(--blue); }
+    .pin.home { right: 19%; top: 27%; background: var(--pink); }
+    .route { position: absolute; z-index: 2; left: 31%; top: 55%; width: 48%; height: 2px; background: var(--pink); transform: rotate(-27deg); transform-origin: left; }
+    .tracking-summary { display: flex; justify-content: space-between; gap: 12px; padding: 13px 15px; background: #fff; }
+    .tracking-summary strong { display: block; color: var(--blue); font-size: 17px; }
+    .tracking-summary span { color: var(--muted); font-size: 10px; }
+    .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .metric { padding: 12px 9px; border-radius: 16px; background: #fff; border: 1px solid var(--line); text-align: center; }
+    .metric strong { display: block; font-size: 17px; }
+    .metric span { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.25; }
+    .detail-list { display: grid; gap: 9px; margin: 0; }
+    .detail { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+    .detail span:first-child { color: var(--muted); }
+    .detail strong { text-align: right; }
+    .balance { padding: 14px; background: #fff4f8; border: 1px solid #f7cfe0; border-radius: 17px; margin: 12px 0; }
+    .balance-line { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+    .balance-line + .balance-line { margin-top: 7px; }
+    .balance-line.total { padding-top: 9px; margin-top: 9px; border-top: 1px solid #f1cadc; font-size: 14px; font-weight: 850; }
+    .balance-line.due { color: var(--pink-dark); font-weight: 850; }
+    .button { width: 100%; border: 0; border-radius: 14px; padding: 12px 14px; color: #fff; background: var(--pink); font-size: 12px; font-weight: 850; box-shadow: 0 8px 18px rgba(219,77,139,.2); }
+    .button.secondary { background: #fff; color: var(--pink-dark); border: 1px solid #f1cadd; box-shadow: none; }
+    .button.blue { background: var(--blue); box-shadow: 0 8px 18px rgba(90,121,216,.2); }
+    .button.green { background: var(--green); box-shadow: 0 8px 18px rgba(39,133,101,.18); }
+    .button + .button { margin-top: 8px; }
+    .notice { display: flex; gap: 9px; align-items: flex-start; padding: 12px; border-radius: 15px; background: var(--amber-soft); color: var(--amber); font-size: 11px; line-height: 1.4; }
+    .notice.blue { background: var(--blue-soft); color: #3f5cae; }
+    .notice.green { background: var(--green-soft); color: var(--green); }
+    .notice.red { background: var(--red-soft); color: var(--red); }
+    .section-title { margin: 17px 0 9px; color: var(--pink); font-size: 10px; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; }
+    .items { display: grid; gap: 8px; }
+    .item { display: flex; justify-content: space-between; gap: 10px; padding: 10px 11px; background: #fff; border: 1px solid var(--line); border-radius: 13px; font-size: 11px; }
+    .item span { color: var(--muted); }
+    .address { padding: 12px; border-radius: 15px; background: #fbf7ff; border: 1px solid #e8e0fa; font-size: 11px; line-height: 1.45; }
+    .timeline { display: grid; gap: 12px; }
+    .step { display: grid; grid-template-columns: 22px 1fr; gap: 9px; align-items: start; font-size: 11px; }
+    .step i { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--pink); color: #fff; font-size: 10px; font-style: normal; }
+    .step.off i { background: #eadfe7; color: #9e8796; }
+    .step strong { display: block; font-size: 11px; }
+    .step span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .chat { display: flex; gap: 9px; align-items: center; padding: 12px 13px; border: 1px solid var(--line); border-radius: 15px; background: #fff; font-size: 11px; }
+    .chat b { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: var(--pink-soft); }
+    .footer-note { margin-top: 15px; color: var(--muted); font-size: 10px; text-align: center; }
+
+    .notes { background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 20px; }
+    .notes h2 { margin: 0 0 15px; font-size: 17px; }
+    .notes h3 { margin: 18px 0 7px; color: var(--pink-dark); font-size: 12px; }
+    .notes p, .notes li { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .notes ul { padding-left: 17px; margin: 7px 0 0; }
+    .decision { display: grid; gap: 8px; padding: 13px; border-radius: 15px; background: #fff8fb; border: 1px solid #f5d8e5; }
+    .decision strong { font-size: 12px; }
+    .decision span { color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .legend { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+    .legend span { padding: 6px 8px; border-radius: 8px; color: var(--muted); background: #faf6f9; font-size: 10px; }
+
+    @media (max-width: 900px) {
+      .stage { grid-template-columns: 1fr; }
+      .notes { order: -1; }
+      .preview-wrap { min-height: auto; padding: 22px 12px; }
+      .hint { width: 100%; margin-left: 0; }
+    }
+    @media (max-width: 540px) {
+      .shell { padding: 18px 10px 30px; }
+      .intro { display: block; }
+      .badge { display: inline-block; margin-top: 14px; }
+      .toolbar { border-radius: 15px; }
+      .state-button { padding: 8px 9px; font-size: 11px; }
+      .preview-wrap { border-radius: 20px; padding: 10px 0; background: transparent; border: 0; }
+      .phone { border-width: 5px; border-radius: 29px; }
+      .page { padding-left: 14px; padding-right: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="intro">
+      <div>
+        <div class="eyebrow">Prototipo para validar</div>
+        <h1>El mismo enlace, la información correcta</h1>
+        <p>Mockup visual del enlace público de Regi Bazar. Cambia de prioridad según el estado del pedido: primero pago y claridad, después mapa y ETA, y finalmente comprobante.</p>
+      </div>
+      <div class="badge">Sin conexión a datos reales</div>
+    </section>
+
+    <nav class="toolbar" aria-label="Estados del mockup" id="states"></nav>
+
+    <section class="stage">
+      <div class="preview-wrap">
+        <div class="phone">
+          <div class="phone-bar"><span></span></div>
+          <div class="page" id="preview"></div>
+        </div>
+      </div>
+
+      <aside class="notes" id="notes"></aside>
+    </section>
+  </main>
+
+  <script>
+    const states = {
+      opening: {
+        label: 'Abrir regalito', tone: '', title: 'Tienes un envío de Regi Bazar', subtitle: 'La primera visita conserva la sorpresa del pedido.',
+        priority: `<div class="gift-panel"><div><div class="gift">🎁</div><h2>¡Tu pedido está aquí!</h2><p>Toca el regalito para abrir 🎀</p><div class="opening-balance">💗 Saldo pendiente: $980.00</div></div></div>`,
+        extra: `<div class="footer-note">La apertura confirma el pedido solo si estaba pendiente.</div>`,
+        note: 'Esta pantalla conserva el momento distintivo de la vista actual. No hay asistente ni resumen hablado, solo la apertura visual del regalito.'
+      },
+      pending: {
+        label: 'Pendiente', tone: '', title: 'Tu pedido está listo', subtitle: 'Revisa tu resumen y dinos cómo te gustaría pagar.',
+        priority: `<div class="balance"><div class="balance-line"><span>Total del pedido</span><strong>$1,280.00</strong></div><div class="balance-line"><span>Abonado</span><strong>$300.00</strong></div><div class="balance-line due"><span>Saldo pendiente</span><strong>$980.00</strong></div></div><button class="button">Ver formas de pago</button><button class="button secondary">Confirmar pedido</button>`,
+        extra: `<div class="notice">💳 El enlace seguirá disponible mientras exista saldo pendiente o el pedido esté en proceso.</div><div class="section-title">Entrega</div><div class="detail-list"><div class="detail"><span>Programada</span><strong>Domingo 31 de agosto</strong></div><div class="detail"><span>Dirección</span><strong>Col. Juárez, Nuevo Laredo</strong></div></div>`,
+        note: 'La prioridad es financiera. El CTA principal lleva al pago y el segundo confirma el pedido. No mostramos mapa todavía.'
+      },
+      confirmed: {
+        label: 'Confirmado', tone: '', title: '¡Pedido confirmado!', subtitle: 'Ya recibimos tu confirmación. Estamos preparando todo con cariño.',
+        priority: `<div class="notice green">✓ Tu pedido quedó confirmado y conserva su fecha de entrega.</div><div class="balance"><div class="balance-line"><span>Total</span><strong>$1,280.00</strong></div><div class="balance-line due"><span>Saldo pendiente</span><strong>$980.00</strong></div></div><button class="button">Pagar saldo</button>`,
+        extra: `<div class="section-title">Siguiente paso</div><div class="timeline"><div class="step"><i>✓</i><div><strong>Pedido confirmado</strong><span>Hoy, 10:42 a. m.</span></div></div><div class="step off"><i>2</i><div><strong>Preparando tu pedido</strong><span>En proceso</span></div></div><div class="step off"><i>3</i><div><strong>En ruta</strong><span>Te avisaremos</span></div></div></div>`,
+        note: 'Conserva el saldo visible, pero la narrativa cambia a preparación. El pago sigue accesible sin dominar toda la pantalla.'
+      },
+      packed: {
+        label: 'Empacado', tone: 'amber', title: 'Tu pedido ya está empacado', subtitle: 'Está listo para salir en la próxima ruta de entregas.',
+        priority: `<div class="notice">📦 Tu paquetito está armado y listo para salir.</div><div class="detail-list" style="margin-top:12px"><div class="detail"><span>Entrega</span><strong>Domingo 31 de agosto</strong></div><div class="detail"><span>Saldo pendiente</span><strong style="color:var(--pink-dark)">$980.00</strong></div></div><button class="button">Pagar saldo</button>`,
+        extra: `<div class="section-title">Resumen</div><div class="items"><div class="item"><span>3 productos</span><strong>$1,220.00</strong></div><div class="item"><span>Envío</span><strong>$60.00</strong></div></div><div class="chat" style="margin-top:12px"><b>💬</b><span>¿Necesitas cambiar una instrucción de entrega?</span></div>`,
+        note: 'El pedido está operativo, pero aún no hay seguimiento. Permitimos actualizar instrucciones mientras el enlace siga vigente.'
+      },
+      route: {
+        label: 'En ruta', tone: 'blue', title: 'Tu pedido va en camino', subtitle: 'El repartidor ya salió. Puedes consultar su avance en vivo.',
+        priority: `<div class="priority tracking"><div class="map"><div class="map-label">Actualización en vivo</div><div class="route"></div><div class="pin car"></div><div class="pin home"></div></div><div class="tracking-summary"><div><strong>25–35 min</strong><span>ETA aproximado</span></div><div style="text-align:right"><strong>3</strong><span>paradas antes</span></div></div></div><button class="button blue">Abrir mapa en pantalla completa</button>`,
+        extra: `<div class="metric-row"><div class="metric"><strong>#4</strong><span>Tu lugar en la lista</span></div><div class="metric"><strong>7</strong><span>Paradas totales</span></div><div class="metric"><strong>$980</strong><span>Saldo pendiente</span></div></div><div class="address"><strong>Entrega en</strong><br>Col. Juárez, Nuevo Laredo<br><span style="color:var(--muted)">Casa rosa, portón blanco</span></div>`,
+        note: 'Aquí el mapa y ETA ocupan el primer lugar. El saldo permanece visible como dato secundario, no desaparece.'
+      },
+      next: {
+        label: 'Tu turno', tone: 'blue', title: 'Eres la siguiente parada', subtitle: 'Ten tu teléfono cerca. El repartidor está llegando a tu zona.',
+        priority: `<div class="priority tracking"><div class="map"><div class="map-label">¡Tu turno!</div><div class="route"></div><div class="pin car" style="left:60%;top:48%"></div><div class="pin home"></div></div><div class="tracking-summary"><div><strong>8–12 min</strong><span>ETA aproximado</span></div><div style="text-align:right"><strong>0</strong><span>paradas antes</span></div></div></div><button class="button blue">Ver indicaciones de entrega</button>`,
+        extra: `<div class="notice blue">📍 El repartidor está a menos de 300 m de tu destino. Revisa tus instrucciones de entrega.</div><div class="detail-list" style="margin-top:12px"><div class="detail"><span>Saldo a cobrar</span><strong style="color:var(--pink-dark)">$980.00</strong></div><div class="detail"><span>Firma o evidencia</span><strong>Al recibir</strong></div></div>`,
+        note: 'Este es el estado de máxima urgencia. Se conserva el mapa, se destaca el ETA y se reduce el contenido que distrae de recibir el pedido.'
+      },
+      deliveredDue: {
+        label: 'Entregado · saldo', tone: 'amber', title: '¡Tu pedido fue entregado!', subtitle: 'Gracias por tu compra. Aún tienes un saldo pendiente por cubrir.',
+        priority: `<div class="notice green">✓ Entregado hoy a las 4:18 p. m.</div><div class="payment-alert"><strong>💗 Aún falta liquidar tu pedido</strong><span>Tu comprobante está listo, pero todavía tienes un saldo pendiente de <b>$980.00</b>.</span></div><div class="balance"><div class="balance-line"><span>Total</span><strong>$1,280.00</strong></div><div class="balance-line"><span>Abonado</span><strong>$300.00</strong></div><div class="balance-line due"><span>Saldo pendiente</span><strong>$980.00</strong></div></div><button class="button">Pagar saldo pendiente</button>`,
+        extra: `<div class="section-title">Comprobante de entrega</div><div class="delivery-proof"><div class="proof-photo"><span>Entrega registrada · 4:18 p. m.</span></div><div class="signature-proof"><small>Firma de recibido</small><span class="signature-mark">María López</span><span>Recibió: María López · Hoy, 4:18 p. m.</span></div></div><button class="button secondary" style="margin-top:10px">Ver comprobante completo</button>`,
+        note: 'Este es el estado prioritario para cobranza: primero confirmamos la entrega y enseguida hacemos muy visible el saldo pendiente. La foto y la firma aparecen en la misma pantalla.'
+      },
+      deliveredPaid: {
+        label: 'Entregado · liquidado', tone: 'green', title: '¡Compra completada!', subtitle: 'Tu pedido fue entregado y quedó totalmente liquidado.',
+        priority: `<div class="notice green">✓ Pedido entregado y pagado por completo.</div><div class="detail-list" style="margin-top:12px"><div class="detail"><span>Entregado</span><strong>Hoy, 4:18 p. m.</strong></div><div class="detail"><span>Total pagado</span><strong>$1,280.00</strong></div></div><button class="button green">Ver comprobante de entrega</button>`,
+        extra: `<div class="section-title">Comprobante de entrega</div><div class="delivery-proof"><div class="proof-photo"><span>Entrega registrada · 4:18 p. m.</span></div><div class="signature-proof"><small>Firma de recibido</small><span class="signature-mark">María López</span><span>Recibió: María López · Hoy, 4:18 p. m.</span></div></div><div class="section-title">Tu pedido</div><div class="items"><div class="item"><span>3 productos</span><strong>$1,220.00</strong></div><div class="item"><span>Envío</span><strong>$60.00</strong></div></div><div class="footer-note">Este enlace permanecerá disponible por un periodo de consulta.</div>`,
+        note: 'Es un estado de cierre. La pantalla muestra evidencia y firma como respaldo, sin CTAs de pago ni seguimiento activo.'
+      },
+      failed: {
+        label: 'No entregado', tone: 'red', title: 'No logramos entregarlo', subtitle: 'Conservamos tu pedido y te mostraremos el siguiente paso.',
+        priority: `<div class="notice red">⚠️ Motivo registrado: no había alguien para recibirlo.</div><div class="detail-list" style="margin-top:12px"><div class="detail"><span>Último intento</span><strong>Domingo 31 de agosto</strong></div><div class="detail"><span>Saldo pendiente</span><strong style="color:var(--pink-dark)">$980.00</strong></div></div><button class="button">Contactar a Regi Bazar</button>`,
+        extra: `<div class="section-title">Qué sigue</div><div class="timeline"><div class="step"><i>!</i><div><strong>Intento no entregado</strong><span>Evidencia disponible</span></div></div><div class="step off"><i>2</i><div><strong>Reprogramación</strong><span>Te confirmaremos la nueva fecha</span></div></div></div><div class="chat" style="margin-top:12px"><b>💬</b><span>Escríbenos para acordar la entrega.</span></div>`,
+        note: 'No se debe mandar a una pantalla de expirado. El enlace sigue vivo porque el pedido necesita resolución.'
+      },
+      postponed: {
+        label: 'Pospuesto', tone: 'amber', title: 'Tu entrega fue pospuesta', subtitle: 'Tu pedido sigue guardado. Te avisaremos cuando tengamos la nueva fecha.',
+        priority: `<div class="notice">📅 Nueva fecha pendiente de confirmar.</div><div class="balance"><div class="balance-line"><span>Saldo pendiente</span><strong>$980.00</strong></div><div class="balance-line"><span>Pedido</span><strong>3 productos</strong></div></div><button class="button">Pagar saldo</button>`,
+        extra: `<div class="section-title">Nota de Regi Bazar</div><div class="address">“Se reprogramó por disponibilidad de ruta. Conservaremos tu pedido y te avisaremos por Messenger.”</div><div class="chat" style="margin-top:12px"><b>💬</b><span>¿Tienes una duda? Escríbenos.</span></div>`,
+        note: 'El estado informa sin prometer una fecha falsa. Pago e instrucciones siguen disponibles.'
+      },
+      canceled: {
+        label: 'Cancelado', tone: 'red', title: 'Este pedido fue cancelado', subtitle: 'Ya no se realizarán acciones de entrega para este pedido.',
+        priority: `<div class="notice red">Pedido cancelado por Regi Bazar el 31 de agosto.</div><div class="detail-list" style="margin-top:12px"><div class="detail"><span>Total del pedido</span><strong>$1,280.00</strong></div><div class="detail"><span>Abonado</span><strong>$300.00</strong></div><div class="detail"><span>Reembolso</span><strong>Consulta con Regi Bazar</strong></div></div>`,
+        extra: `<div class="section-title">¿Necesitas ayuda?</div><button class="button secondary">Contactar a Regi Bazar</button><div class="footer-note">No se mostrarán acciones de confirmar, pagar o seguir ruta.</div>`,
+        note: 'La pantalla es informativa y segura. El enlace puede mostrar el historial breve, pero no debe permitir operaciones contradictorias.'
+      },
+      expired: {
+        label: 'Expirado', tone: 'red', title: 'Este enlace ya no está disponible', subtitle: 'El pedido cerró su ventana de consulta. Si necesitas ayuda, contáctanos.',
+        priority: `<div class="notice red">🔒 Por seguridad, este enlace dejó de estar activo.</div><button class="button">Contactar a Regi Bazar</button>`,
+        extra: `<div class="section-title">¿Por qué?</div><p style="margin:0;color:var(--muted);font-size:12px;line-height:1.5">Los enlaces de pedidos cerrados se conservan solo durante una ventana limitada. El equipo puede ayudarte a recuperar la información necesaria.</p>`,
+        note: 'Este debe ser el último estado. Nunca debe aparecer mientras haya saldo pendiente, una reprogramación abierta o una ruta activa.'
+      }
+    };
+
+    const stateOrder = Object.keys(states);
+    const stateNav = document.getElementById('states');
+    const preview = document.getElementById('preview');
+    const notes = document.getElementById('notes');
+
+    function render(name) {
+      const s = states[name];
+      stateNav.innerHTML = stateOrder.map(key => `<button class="state-button ${key === name ? 'active' : ''}" data-state="${key}"><span class="dot"></span>${states[key].label}</button>`).join('');
+      if (name === 'opening') {
+        preview.innerHTML = `<div class="gift-panel" style="min-height:630px;border-radius:0;background:linear-gradient(145deg,#fce7f3,#f4edff)"><div><div class="brand" style="margin-bottom:25px">🎀 REGI BAZAR</div>${s.priority}<div class="footer-note">Tu pedido está listo para descubrirse ✨</div></div></div>`;
+      } else {
+        const showBalance = !['canceled', 'expired'].includes(name);
+        preview.innerHTML = `
+          <div class="topline"><div class="brand">🎀 REGI BAZAR</div><div class="secure">🔒 Enlace privado</div></div>
+          <div class="hero"><div class="hero-ribbon">🎀</div><span class="state-pill ${s.tone}">${s.label}</span><h2>${s.title}</h2><p>${s.subtitle}</p><div class="scheduled"><small>📅 Entrega programada</small><strong>Domingo 31 de agosto</strong></div><div class="girly-badge">💎 120 RegiPuntos</div></div>
+          ${showBalance ? `<div class="balance-bar ${name === 'deliveredDue' ? 'urgent' : ''}"><div><small>${name === 'deliveredDue' ? '⚠️ Pago pendiente después de entregar' : 'Saldo pendiente'}</small><strong>$980.00</strong></div><button>Pagar ✨</button></div>` : ''}
+          <div class="nav-tabs"><span class="active">🛍️ Pedido</span><span>💸 Pago</span><span>🏠 Estado</span></div>
+          <div class="state-content">${s.priority}${s.extra}</div>
+          <div class="footer-note">Pedido #RB-2048 · Hecho con 🎀 para ti</div>`;
+      }
+      notes.innerHTML = `
+        <h2>Decisión de este estado</h2>
+        <div class="decision"><strong>${s.label}</strong><span>${s.note}</span></div>
+        <h3>Orden de información</h3>
+        <ul><li>Estado y mensaje principal</li><li>Acción o información prioritaria</li><li>Saldo y datos operativos</li><li>Detalle, chat y comprobantes</li></ul>
+        <h3>Regla de vigencia</h3>
+        <p>${name === 'expired' ? 'Solo después de que el pedido esté cerrado y sin acciones pendientes.' : 'El enlace permanece disponible mientras este estado todavía requiera una acción o consulta de la clienta.'}</p>
+        <div class="legend"><span>Mobile first</span><span>Sin tablas</span><span>Una acción primaria</span><span>Texto corto</span></div>`;
+      stateNav.querySelectorAll('[data-state]').forEach(button => button.addEventListener('click', () => render(button.dataset.state)));
+    }
+
+    render('opening');
+  </script>
+</body>
+</html>

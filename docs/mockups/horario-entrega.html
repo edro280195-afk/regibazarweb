@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff4f8">
+  <meta name="description" content="Mockup para cambiar la fecha y el horario acordado de una entrega de Regi Bazar.">
+  <title>Horario de entrega · Regi Bazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alice&family=Quicksand:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: oklch(35% .075 350);
+      --ink-soft: oklch(48% .07 350);
+      --muted: oklch(61% .055 350);
+      --canvas: oklch(97.5% .022 350);
+      --surface: oklch(99.5% .007 350);
+      --surface-soft: oklch(96% .025 350);
+      --rose: oklch(64% .21 4);
+      --rose-dark: oklch(51% .19 5);
+      --rose-pale: oklch(92% .055 4);
+      --lavender: oklch(93% .035 300);
+      --line: oklch(89% .045 350);
+      --shadow: 0 12px 28px oklch(60% .09 350 / .16);
+      --font: 'Quicksand', 'Segoe UI', sans-serif;
+      --heading: 'Alice', Georgia, serif;
+    }
+    * { box-sizing: border-box; }
+    html { min-width: 320px; overflow-x: clip; background: var(--canvas); }
+    body { min-width: 320px; min-height: 100vh; min-height: 100svh; margin: 0; color: var(--ink); background: radial-gradient(circle at 14% 18%, oklch(100% .01 350 / .85) 0 2px, transparent 3px), var(--canvas); background-size: 72px 72px, auto; font: 500 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid var(--rose); outline-offset: 3px; }
+    .note { width: min(1080px, calc(100% - 32px)); margin: 24px auto 15px; color: var(--muted); text-align: center; font-size: 13px; }
+    .note strong { color: var(--rose-dark); }
+    .frame { width: min(100% - 24px, 450px); margin: 0 auto 32px; padding: 14px; border: 1px solid oklch(100% .01 350 / .9); border-radius: 30px; background: color-mix(in oklch, var(--surface) 94%, var(--lavender)); box-shadow: 9px 9px 23px oklch(69% .07 350 / .17), -8px -8px 22px oklch(100% .01 350 / .92); }
+    .brand { display: flex; align-items: center; gap: 8px; padding: 3px 4px 13px; color: var(--rose-dark); font: 20px var(--heading); }
+    .brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 12px; background: var(--rose-pale); box-shadow: inset 2px 2px 5px oklch(75% .06 350 / .22), 2px 3px 6px oklch(70% .08 350 / .13); }
+    .person { padding: 12px 7px 16px; }
+    .eyebrow { color: var(--rose-dark); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    h1 { margin: 4px 0 1px; font: 30px/1.1 var(--heading); }
+    .person p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .schedule-card { padding: 16px 14px; border: 1px solid var(--line); border-radius: 21px; background: var(--surface); }
+    h2 { margin: 0; font-size: 16px; font-weight: 800; }
+    .helper { margin: 3px 0 14px; color: var(--muted); font-size: 12px; }
+    label { display: block; margin: 12px 0 6px; color: var(--ink-soft); font-size: 12px; font-weight: 800; }
+    input, textarea { width: 100%; min-height: 52px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 15px; color: var(--ink); background: var(--surface-soft); font-size: 16px; }
+    textarea { min-height: 84px; resize: vertical; }
+    .label-with-hint { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .label-with-hint small { color: var(--muted); font-size: 10px; font-weight: 600; }
+    .save { width: 100%; min-height: 55px; margin-top: 15px; border: 0; border-radius: 18px; color: oklch(99% .012 350); background: var(--rose); box-shadow: 0 6px 0 var(--rose-dark), 0 12px 18px oklch(64% .16 5 / .2); font-weight: 800; cursor: pointer; transition: transform .16s ease-out, box-shadow .16s ease-out; }
+    .save:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--rose-dark), 0 6px 10px oklch(64% .16 5 / .16); }
+    .reset { display: block; min-height: 44px; margin: 7px auto 0; padding: 8px 12px; border: 0; color: var(--muted); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .hint-card { display: flex; gap: 9px; margin-top: 13px; padding: 11px 12px; border: 1px solid oklch(88% .05 300); border-radius: 16px; color: var(--ink-soft); background: var(--lavender); font-size: 11px; }
+    .hint-card strong { display: block; color: var(--ink); }
+    .driver-preview { margin-top: 19px; padding-top: 14px; border-top: 1px dashed var(--line); }
+    .driver-preview h3 { margin: 0 0 9px; color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .driver-stop { padding: 11px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-soft); }
+    .driver-stop strong { display: block; font-size: 13px; }
+    .driver-stop span { display: block; margin-top: 4px; color: var(--rose-dark); font-size: 12px; font-weight: 800; }
+    .driver-stop small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .desktop { display: none; }
+    @media (min-width: 900px) {
+      .frame { display: none; }
+      .desktop { display: grid; grid-template-columns: 208px 1fr; width: min(1180px, calc(100% - 48px)); min-height: 660px; margin: 0 auto 42px; overflow: hidden; border: 1px solid var(--line); border-radius: 28px; background: var(--surface); box-shadow: var(--shadow); }
+      .rail { padding: 24px 16px; background: oklch(96% .026 350); }
+      .rail .brand { margin: 0 0 34px 3px; }
+      .rail-label { display: block; margin: 12px 0 7px 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .rail-item { display: flex; gap: 11px; align-items: center; min-height: 44px; padding: 0 11px; border-radius: 13px; color: var(--ink-soft); font-size: 13px; font-weight: 700; }
+      .rail-item.active { color: var(--rose-dark); background: var(--rose-pale); }
+      .workspace { padding: 26px 32px 34px; }
+      .workspace-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+      .workspace-head p { margin: 0; color: var(--muted); font-size: 12px; }
+      .workspace-head strong { font-size: 14px; }
+      .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(325px, .74fr); gap: 25px; align-items: start; }
+      .order-summary { min-height: 490px; padding: 25px; border: 1px solid var(--line); border-radius: 23px; background: var(--surface); }
+      .order-summary h1 { font-size: 37px; }
+      .order-facts { display: grid; gap: 9px; margin-top: 30px; }
+      .fact { display: flex; justify-content: space-between; gap: 15px; padding: 12px 13px; border-radius: 15px; background: var(--surface-soft); font-size: 13px; }
+      .fact span { color: var(--muted); }
+      .fact strong { text-align: right; }
+      .schedule-card { padding: 21px 20px; box-shadow: 5px 6px 14px oklch(70% .06 350 / .13), -4px -4px 12px oklch(100% .01 350 / .86); }
+      .driver-preview { margin-top: 20px; }
+      .schedule-card textarea { min-height: 76px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <p class="note"><strong>Mockup visual</strong> · fecha, hora exacta y ventana flexible para la clienta.</p>
+  <main class="frame" aria-label="Edición de entrega en móvil">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div>
+    <section class="person"><span class="eyebrow">Pedido #4821 · Entrega a domicilio</span><h1>Mariana López</h1><p>La clienta pidió mover la entrega para el viernes.</p></section>
+    <section class="schedule-card">
+      <h2>Horario acordado</h2>
+      <p class="helper">La nueva cita aparecerá en la ruta y en el enlace de Mariana.</p>
+      <label for="mobile-date">Fecha y hora exactas</label>
+      <input id="mobile-date" type="datetime-local" value="2026-10-16T17:30">
+      <div class="label-with-hint"><label for="mobile-window">Ventana o indicaciones de horario</label><small>Opcional</small></div>
+      <textarea id="mobile-window" placeholder="Ej. entre 5:30 y 6:30 pm; llamar al llegar">Entre 5:30 y 6:30 pm · llamar al llegar</textarea>
+      <div class="hint-card"><span aria-hidden="true">♡</span><div><strong>Sin cambiar las instrucciones del domicilio</strong>Este acuerdo es solo para esta entrega.</div></div>
+      <button class="save" type="button">Guardar horario</button>
+      <button class="reset" type="button">Restablecer fecha automática</button>
+      <div class="driver-preview"><h3>Así lo verá el chofer</h3><div class="driver-stop"><strong>Mariana López · Pedido #4821</strong><span>Vie 16 oct · 5:30 p. m.</span><small>Entre 5:30 y 6:30 pm · llamar al llegar</small></div></div>
+    </section>
+  </main>
+
+  <main class="desktop" aria-label="Edición de entrega en escritorio">
+    <aside class="rail"><div class="brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div><span class="rail-label">Pedidos</span><div class="rail-item">⌕ &nbsp; Todos los pedidos</div><div class="rail-item active">♡ &nbsp; Pedido #4821</div><div class="rail-item">⌖ &nbsp; Rutas</div></aside>
+    <section class="workspace">
+      <header class="workspace-head"><div><p>Pedidos / Pedido #4821</p><strong>Entrega a domicilio</strong></div><span class="eyebrow">Pendiente de entregar</span></header>
+      <div class="content-grid">
+        <section class="order-summary"><span class="eyebrow">Clienta</span><h1>Mariana López</h1><p class="helper">La clienta pidió mover la entrega para el viernes.</p><div class="order-facts"><div class="fact"><span>Dirección</span><strong>Calle Magnolia 122, Col. Jardín</strong></div><div class="fact"><span>Artículos</span><strong>3 artículos</strong></div><div class="fact"><span>Saldo pendiente</span><strong>$380.00</strong></div></div><div class="hint-card" style="margin-top:18px"><span aria-hidden="true">♡</span><div><strong>Un cambio solo para esta entrega</strong>Sus instrucciones de domicilio quedan intactas.</div></div></section>
+        <section class="schedule-card"><h2>Horario acordado</h2><p class="helper">La nueva cita aparecerá en la ruta y en el enlace de Mariana.</p><label for="desktop-date">Fecha y hora exactas</label><input id="desktop-date" type="datetime-local" value="2026-10-16T17:30"><div class="label-with-hint"><label for="desktop-window">Ventana o indicaciones de horario</label><small>Opcional</small></div><textarea id="desktop-window" placeholder="Ej. entre 5:30 y 6:30 pm; llamar al llegar">Entre 5:30 y 6:30 pm · llamar al llegar</textarea><div class="hint-card"><span aria-hidden="true">♡</span><div><strong>Sin cambiar las instrucciones del domicilio</strong>Este acuerdo es solo para esta entrega.</div></div><button class="save" type="button">Guardar horario</button><button class="reset" type="button">Restablecer fecha automática</button><div class="driver-preview"><h3>Así lo verá el chofer</h3><div class="driver-stop"><strong>Mariana López · Pedido #4821</strong><span>Vie 16 oct · 5:30 p. m.</span><small>Entre 5:30 y 6:30 pm · llamar al llegar</small></div></div></section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
