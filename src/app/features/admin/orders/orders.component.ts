@@ -1551,7 +1551,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
    * impresión del sistema como efecto secundario sorpresa de generar bolsas.
    */
   private async autoPrintPackages(packages: OrderPackageDto[]): Promise<void> {
-    if (!packages.length || !this.bluetoothPrinter.getPairedPrinter()) return;
+    if (!packages.length || !this.bluetoothPrinter.getPairedPrinter('AiyinE40_4x6')) return;
     try {
       await this.labelPrint.printPackages(packages.map(pkg => pkg.id));
     } catch (error) {

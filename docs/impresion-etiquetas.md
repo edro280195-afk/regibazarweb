@@ -33,39 +33,25 @@
   misma clienta. Las bolsas con QR son la fuente de verdad: el número del pedido
   siempre coincide con ellas y nunca se borran solas.
 
-## Desde iPad/iPhone/Android
+## Impresión directa desde Android
 
-El diseño se crea en web y se usa igual desde Android. En móvil aparece una
-vista previa a escala física:
+En **Administración → Etiquetas**, busca y selecciona una impresora compatible.
+La app recuerda esa selección en el teléfono. Al imprimir, usa la conexión BLE
+directa si el equipo seleccionado corresponde al formato de la plantilla:
 
-- **Enviar a app de impresora:** comparte el PNG con NIIMBOT o Label Expert.
-  Confirma ahí 50 × 50 mm para B1 o 4 × 6 in para E40.
-- **Impresión Android:** úsala si ya agregaste la impresora Bluetooth/USB al
-  sistema.
+- **NIIMBOT B1:** etiquetas de 50 × 50 mm, enviadas mediante el protocolo B1.
+  El diseño se adapta al cabezal útil de 384 puntos (48 mm a 203 DPI).
+- **AIYIN E40 Pro:** etiquetas de 4 × 6 in, enviadas como bitmap TSPL comprimido
+  por el servicio BLE FFF0 y la característica FFF2.
 
-En Safari de iPhone/iPad no existe Web Bluetooth confiable para la B1. Compartir
-el PNG evita una integración frágil y mantiene el diseño exacto.
+La primera conexión pide permisos Bluetooth. Si una etiqueta usa otro formato
+que el equipo seleccionado, Android abre el flujo de impresión del sistema en
+lugar de enviar un trabajo incompatible. Generar bolsas desde el pedido sólo
+las imprime automáticamente cuando está seleccionada una E40 para ese formato.
 
-### Impresión directa de bolsas desde Android
-
-En **Administrar ruta** hay una tarjeta de **Etiquetas de bolsas**. Está pensada
-para la AIYIN E40 Pro y permite enviar todas las bolsas de la ruta con un solo
-toque, sin abrir Label Expert por cada etiqueta.
-
-1. En los ajustes Bluetooth de Android, empareja primero la E40 Pro.
-2. En la tarjeta toca **Configurar**, autoriza Bluetooth y selecciona la E40.
-   Esa elección queda guardada sólo en ese teléfono.
-3. Toca **Imprimir N etiquetas**. La app prepara cada diseño publicado, lo
-   envía por Bluetooth en orden y muestra el avance de la cola.
-4. Si una bolsa no se envía, queda marcada como pendiente; usa **Reintentar**
-   sin volver a mandar las que ya aceptó la impresora.
-
-La E40 recibe el trabajo en TSPL por Bluetooth Classic (SPP), a 800 × 1200 dots
-para el área útil de una etiqueta de 100 × 150 mm. La bitácora registra el
-evento cuando el equipo acepta los bytes; como cualquier impresora térmica, eso
-no prueba que el papel haya salido físicamente. Si la E40 no aparece entre los
-equipos emparejados o no acepta SPP, abre **Vista previa** en la bolsa y usa el
-envío a Label Expert como respaldo.
+El evento de bitácora confirma que la app completó el envío del trabajo; no
+confirma que el papel haya salido físicamente. En iPhone/iPad se conserva la
+vista previa y el flujo de compartir PNG con la app del fabricante.
 
 ## Reglas de seguridad y recuperación
 
@@ -76,3 +62,11 @@ envío a Label Expert como respaldo.
 - La bitácora muestra qué versión se solicitó para cada caja, artículo o bolsa.
 - Si el equipo corta el borde o desplaza el diseño, calibra el rollo en la app
   del fabricante antes de modificar las medidas de la plantilla.
+
+## Hallazgos de ingeniería inversa
+
+REA inspeccionó Label Expert 2.1.2 (`in.kahub.labelexpert`, base APK SHA-256 `f329d7923fbe9e7b3daab259f266f59701734607a47c820e7729fba4e4ff4b0d`). Sus recursos describen cabezales de 203/300 DPI, ESC/TSPL/CPCL y los modos de imagen original, blanco y negro y tramado. La pantalla confirma accesos a crear etiquetas, importar Excel, imprimir PDF/imagen y escanear QR. No se configuró una impresora ni se imprimió desde esa app.
+
+La app oficial NIIMBOT inspeccionada fue la versión 6.6.9 (`com.gengcon.android.jccloudprinter`, base APK SHA-256 `4eb83cafcea38c3f2731e0d7098bfd00715957b7da668d34a2dc76c937903a8a`). La app usa Flutter; su `libapp.so` está empaquetado como Dart AOT y no se recuperó su lógica de impresión. El protocolo B1 se implementó a partir del cliente abierto `@slastra/nblib` 0.3.0 (MIT), cuyo autor registra impresión física validada en B1. Para E40, el repo Nenis Flutter aporta el builder TSPL modo 3 y el transporte BLE FFF0/FFF2.
+
+La impresión directa en Regi reutiliza esos protocolos, sin copiar código ni recursos de las apps de fabricante. Compatibilidad de artefactos y evidencia REA, con límites, está en `C:\Users\eduardo.rdz\.codex\skills\rea-evidence-memory\references\niimbot-2026-10-17.md` y el expediente de Label Expert del mismo directorio.

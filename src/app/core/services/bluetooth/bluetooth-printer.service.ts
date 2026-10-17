@@ -1,6 +1,8 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { BleClient } from '@capacitor-community/bluetooth-le';
+import type { LabelPrinterProfile } from '../../models';
+import { NiimbotB1PrintService } from './niimbot-b1-print.service';
 import { buildE40TsplCommand, TsplCommandOptions } from './tspl-command-builder';
 
 const SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb';
@@ -8,6 +10,7 @@ const WRITE_CHARACTERISTIC_UUID = '0000fff2-0000-1000-8000-00805f9b34fb';
 
 const PRINTER_DEVICE_ID_KEY = 'regi_bt_printer_device_id';
 const PRINTER_NAME_KEY = 'regi_bt_printer_name';
+const PRINTER_PROFILE_KEY = 'regi_bt_printer_profile';
 
 const DEFAULT_CHUNK_SIZE = 182;
 const CONNECT_RETRY_DELAYS_MS = [400, 1000, 2000];
@@ -22,6 +25,7 @@ export class BluetoothPrintError extends Error {
 export interface PairedPrinter {
     deviceId: string;
     name: string;
+    profile: LabelPrinterProfile;
 }
 
 /**
@@ -33,6 +37,7 @@ export interface PairedPrinter {
  */
 @Injectable({ providedIn: 'root' })
 export class BluetoothPrinterService {
+    private readonly niimbotPrinter = inject(NiimbotB1PrintService);
     private initialized = false;
     private connectedDeviceId: string | null = null;
     private jobQueue: Promise<void> = Promise.resolve();
@@ -57,21 +62,29 @@ export class BluetoothPrinterService {
         }
     }
 
-    getPairedPrinter(): PairedPrinter | null {
+    getPairedPrinter(profile?: LabelPrinterProfile): PairedPrinter | null {
         const deviceId = localStorage.getItem(PRINTER_DEVICE_ID_KEY);
         const name = localStorage.getItem(PRINTER_NAME_KEY);
-        return deviceId && name ? { deviceId, name } : null;
+        if (!deviceId || !name) return null;
+        const savedProfile = localStorage.getItem(PRINTER_PROFILE_KEY);
+        const printerProfile: LabelPrinterProfile = savedProfile === 'NiimbotB1_50x50' || savedProfile === 'AiyinE40_4x6'
+            ? savedProfile
+            : this.profileForName(name);
+        if (profile && profile !== printerProfile) return null;
+        return { deviceId, name, profile: printerProfile };
     }
 
     pairPrinter(printer: PairedPrinter): void {
         localStorage.setItem(PRINTER_DEVICE_ID_KEY, printer.deviceId);
         localStorage.setItem(PRINTER_NAME_KEY, printer.name);
+        localStorage.setItem(PRINTER_PROFILE_KEY, printer.profile);
     }
 
     forgetPrinter(): void {
         const current = this.connectedDeviceId;
         localStorage.removeItem(PRINTER_DEVICE_ID_KEY);
         localStorage.removeItem(PRINTER_NAME_KEY);
+        localStorage.removeItem(PRINTER_PROFILE_KEY);
         if (current) {
             this.connectedDeviceId = null;
             BleClient.disconnect(current).catch(() => undefined);
@@ -79,7 +92,7 @@ export class BluetoothPrinterService {
     }
 
     /**
-     * Escanea impresoras AIYIN cercanas por BLE. No filtra por servicio en la
+     * Escanea impresoras NIIMBOT B1 y AIYIN E40 cercanas por BLE. No filtra por servicio en la
      * radio: algunas unidades solo publican el servicio de impresión después
      * de conectar, y en iOS un filtro de servicio solo encuentra servicios
      * incluidos en el anuncio.
@@ -98,14 +111,18 @@ export class BluetoothPrinterService {
         await BleClient.requestLEScan({}, result => {
             const name = (result.device.name ?? result.localName ?? '').trim();
             console.log(`[BluetoothPrinter] visto: "${name || '(sin nombre)'}" (${result.device.deviceId})`);
-            if (name && this.isAiyinName(name)) {
-                found.set(result.device.deviceId, { deviceId: result.device.deviceId, name });
+            const upperName = name.toUpperCase();
+            const profile = upperName.startsWith('B1')
+                ? 'NiimbotB1_50x50'
+                : this.isAiyinName(upperName) ? 'AiyinE40_4x6' : null;
+            if (name && profile) {
+                found.set(result.device.deviceId, { deviceId: result.device.deviceId, name, profile });
             }
         });
         await new Promise(resolve => setTimeout(resolve, timeoutMs));
         await BleClient.stopLEScan();
 
-        console.log(`[BluetoothPrinter] fin del escaneo, ${found.size} impresora(s) AIYIN encontrada(s)`);
+        console.log(`[BluetoothPrinter] fin del escaneo, ${found.size} impresora(s) compatible(s) encontrada(s)`);
         return Array.from(found.values()).sort((a, b) => a.name.localeCompare(b.name));
     }
 
@@ -121,11 +138,34 @@ export class BluetoothPrinterService {
         if (!printer) {
             throw new BluetoothPrintError('Primero conecta la impresora Bluetooth desde Ajustes.', 'printer_not_paired');
         }
+        if (printer.profile === 'NiimbotB1_50x50') {
+            const job = this.jobQueue.then(() => this.niimbotPrinter.printCanvas(printer.deviceId, canvas));
+            this.jobQueue = job.catch(() => undefined);
+            return job;
+        }
+
         const command = buildE40TsplCommand(canvas, options);
 
         const job = this.jobQueue.then(() => this.sendCommand(printer, command));
         this.jobQueue = job.catch(() => undefined);
         return job;
+    }
+
+    async printCanvases(canvases: readonly HTMLCanvasElement[], options: TsplCommandOptions): Promise<void> {
+        const printer = this.getPairedPrinter();
+        if (!printer) {
+            throw new BluetoothPrintError('Primero conecta la impresora Bluetooth desde Ajustes.', 'printer_not_paired');
+        }
+        if (printer.profile === 'NiimbotB1_50x50') {
+            const job = this.jobQueue.then(() => this.niimbotPrinter.printCanvases(printer.deviceId, canvases));
+            this.jobQueue = job.catch(() => undefined);
+            return job;
+        }
+        for (const canvas of canvases) await this.printCanvas(canvas, options);
+    }
+
+    private profileForName(name: string): LabelPrinterProfile {
+        return name.trim().toUpperCase().startsWith('B1') ? 'NiimbotB1_50x50' : 'AiyinE40_4x6';
     }
 
     private isAiyinName(name: string): boolean {

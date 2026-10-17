@@ -119,17 +119,17 @@ interface TemplateStarter {
                         <div class="library-heading">
                             <div>
                                 <p class="eyebrow">IMPRESORA</p>
-                                <h3>🖨️ AIYIN E40 Pro por Bluetooth</h3>
+                                <h3>🖨️ Impresora térmica por Bluetooth</h3>
                             </div>
                         </div>
 
                         @if (pairedPrinter(); as printer) {
                             <div class="printer-status">
-                                <span>Conectada: <strong>{{ printer.name }}</strong></span>
+                                <span>Seleccionada: <strong>{{ printer.name }}</strong></span>
                                 <button type="button" class="secondary-action" (click)="forgetBluetoothPrinter()">Olvidar</button>
                             </div>
                         } @else {
-                            <p class="panel-copy">Conecta tu impresora una vez y las etiquetas de bolsa saldrán solas al generarlas, sin diálogo de impresión.</p>
+                            <p class="panel-copy">Conecta una NIIMBOT B1 o AIYIN E40 Pro una vez. Las etiquetas compatibles se enviarán directo, sin diálogo del sistema.</p>
                             <button type="button" class="primary-action" [disabled]="isScanningPrinters()" (click)="scanBluetoothPrinters()">
                                 {{ isScanningPrinters() ? 'Buscando…' : 'Buscar impresoras' }}
                             </button>
@@ -138,7 +138,7 @@ interface TemplateStarter {
                                     @for (printer of discoveredPrinters(); track printer.deviceId) {
                                         <button type="button" class="existing-template" (click)="selectBluetoothPrinter(printer)">
                                             <span><strong>{{ printer.name }}</strong></span>
-                                            <span class="template-status">Conectar</span>
+                                            <span class="template-status">{{ printer.profile === 'NiimbotB1_50x50' ? 'NIIMBOT B1' : 'AIYIN E40' }} · Conectar</span>
                                         </button>
                                     }
                                 </div>

@@ -19,9 +19,9 @@ export class LabelPrintService {
     private readonly renderer = inject(LabelRendererService);
     private readonly bluetoothPrinter = inject(BluetoothPrinterService);
 
-    /** Solo la AIYIN E40 (bolsas) tiene impresión Bluetooth directa por ahora; NIIMBOT sigue por el diálogo del SO. */
+    /** Solo activa BLE directo cuando la impresora guardada coincide con el formato de la etiqueta. */
     private canPrintViaBluetooth(profile: 'NiimbotB1_50x50' | 'AiyinE40_4x6'): boolean {
-        return profile === 'AiyinE40_4x6' && this.bluetoothPrinter.isSupported() && !!this.bluetoothPrinter.getPairedPrinter();
+        return this.bluetoothPrinter.isSupported() && !!this.bluetoothPrinter.getPairedPrinter(profile);
     }
 
     async printBox(boxId: string, method: LabelOutputMethod = 'browser'): Promise<void> {
@@ -77,9 +77,7 @@ export class LabelPrintService {
 
         if (viaBluetooth) {
             const profileSpec = this.renderer.getProfile(printerProfile);
-            for (const canvas of canvases) {
-                await this.bluetoothPrinter.printCanvas(canvas, profileSpec);
-            }
+            await this.bluetoothPrinter.printCanvases(canvases, profileSpec);
             return;
         }
         await this.renderer.printManyInBrowser(canvases, printerProfile, 'Etiquetas de bolsas · Regi Bazar');

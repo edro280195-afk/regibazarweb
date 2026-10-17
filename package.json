@@ -44,6 +44,7 @@
     "@capgo/capacitor-printer": "^8.0.10",
     "@mercadopago/sdk-js": "^0.0.3",
     "@microsoft/signalr": "^10.0.0",
+    "@slastra/nblib": "^0.3.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/google.maps": "^3.58.1",
     "@types/jsbarcode": "^3.11.4",
