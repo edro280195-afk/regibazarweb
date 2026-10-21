@@ -1758,6 +1758,18 @@ export interface TandaShuffleResultDto {
 
 // ── Reportes de Colonias y Distribución Geográfica (Nuevo Laredo) ──
 
+export interface ZoneSummaryDto {
+    zone: string;
+    displayName: string;
+    zoneLabel?: string;
+    emoji: string;
+    ordersCount: number;
+    percentage: number;
+    clientsCount?: number;
+    topColoniaName?: string | null;
+    topColoniaPercentage?: number;
+}
+
 export interface ColoniaStatsDto {
     coloniaName: string;
     ordersCount: number;
@@ -1767,6 +1779,7 @@ export interface ColoniaStatsDto {
     rank: number;
     isPickup: boolean;
     clientsCount: number;
+    zone: string;
 }
 
 export interface ColoniaReportDto {
@@ -1776,4 +1789,5 @@ export interface ColoniaReportDto {
     topColoniaName: string;
     topColoniaPercentage: number;
     colonias: ColoniaStatsDto[];
+    zones?: ZoneSummaryDto[];
 }

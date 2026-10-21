@@ -5,9 +5,91 @@ import {
 import { CommonModule } from '@angular/common';
 import { GoogleMap, MapMarker, MapCircle, MapInfoWindow } from '@angular/google-maps';
 import { ColoniaService, PINK_COQUETTE_MAP_STYLES, REGIBY_DEPOT } from '../../../../core/services/colonia.service';
-import { ColoniaReportDto, ColoniaStatsDto } from '../../../../core/models';
+import { ColoniaReportDto, ColoniaStatsDto, ZoneSummaryDto } from '../../../../core/models';
 import { ToastService } from '../../../../core/services/toast.service';
 import { environment } from '../../../../../environments/environment';
+
+export interface ZoneConfig {
+  key: string;
+  name: string;
+  emoji: string;
+  description: string;
+  lat: number;
+  lng: number;
+  zoom: number;
+  bgLight: string;
+  borderColor: string;
+  textColor: string;
+  badgeBg: string;
+}
+
+export const NLD_ZONE_CONFIGS: ZoneConfig[] = [
+  {
+    key: 'Poniente',
+    name: 'Poniente',
+    emoji: '❤️',
+    description: 'Villas de San Miguel, Buena Vista, Progreso, Campanario, Valles, etc.',
+    lat: 27.4850,
+    lng: -99.5850,
+    zoom: 14,
+    bgLight: 'from-rose-500/10 to-pink-500/10',
+    borderColor: 'border-rose-300',
+    textColor: 'text-rose-900',
+    badgeBg: 'bg-rose-500'
+  },
+  {
+    key: 'Oriente',
+    name: 'Oriente / Centro',
+    emoji: '⭐',
+    description: 'Centro, Madero, Viveros, Jardín, Campestre, Juárez, Guerrero, etc.',
+    lat: 27.4880,
+    lng: -99.5100,
+    zoom: 14,
+    bgLight: 'from-amber-500/10 to-pink-500/10',
+    borderColor: 'border-amber-300',
+    textColor: 'text-amber-950',
+    badgeBg: 'bg-amber-500'
+  },
+  {
+    key: 'Sur',
+    name: 'Sur',
+    emoji: '👍',
+    description: 'Fundadores, Los Fresnos, Concordia, Santa Fe, Presidentes, Encinos, etc.',
+    lat: 27.4450,
+    lng: -99.5300,
+    zoom: 14,
+    bgLight: 'from-sky-500/10 to-pink-500/10',
+    borderColor: 'border-sky-300',
+    textColor: 'text-sky-950',
+    badgeBg: 'bg-sky-500'
+  },
+  {
+    key: 'Kilometros',
+    name: 'Kilómetros',
+    emoji: '👏',
+    description: 'Valle Elizondo, Km 10 a Km 18, Cántaros, Granjas Treviño y Regina',
+    lat: 27.3700,
+    lng: -99.5380,
+    zoom: 13,
+    bgLight: 'from-emerald-500/10 to-pink-500/10',
+    borderColor: 'border-emerald-300',
+    textColor: 'text-emerald-950',
+    badgeBg: 'bg-emerald-600'
+  },
+  {
+    key: 'Pickup',
+    name: 'Pickup Matriz',
+    emoji: '🛍️',
+    description: 'C. Rio Indo 1601, Voluntad y Trabajo 3 (Pasan a Sucursal)',
+    lat: 27.50884,
+    lng: -99.56885,
+    zoom: 16,
+    bgLight: 'from-purple-500/10 to-pink-500/10',
+    borderColor: 'border-purple-300',
+    textColor: 'text-purple-950',
+    badgeBg: 'bg-purple-600'
+  }
+];
 
 @Component({
   selector: 'app-colonia-map-report',
@@ -25,23 +107,23 @@ import { environment } from '../../../../../environments/environment';
 
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
           <div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-pink-500 text-white shadow-sm shadow-pink-300">
-                <span>👑</span> Colonia Reina de Compras
+                <span>👑</span> {{ activeZone() === 'all' ? 'Reina Global de Compras' : 'Reina del Sector ' + getZoneEmoji(activeZone()) }}
               </span>
               <span class="text-xs font-bold text-pink-400">Nuevo Laredo, Tamaulipas</span>
             </div>
             
             <h2 class="text-2xl sm:text-3xl font-black text-pink-900 tracking-tight mt-1.5 flex items-center gap-2 flex-wrap">
-              <span>{{ report()?.topColoniaName || 'Calculando...' }}</span>
-              @if (report()?.topColoniaPercentage) {
+              <span>{{ (activeZoneTopColonia() ? activeZoneTopColonia()!.coloniaName : report()?.topColoniaName) || 'Calculando...' }}</span>
+              @if (activeZoneTopColonia(); as activeTop) {
                 <span class="text-lg sm:text-xl font-black text-pink-600 bg-white/80 px-3 py-0.5 rounded-2xl border border-pink-200 shadow-inner">
-                  {{ report()!.topColoniaPercentage }}% del total
+                  {{ activeTop.percentage }}% del total
                 </span>
               }
             </h2>
             <p class="text-xs sm:text-sm text-pink-700/80 font-medium mt-1">
-              {{ getCheerleaderMessage(report()?.topColoniaName) }}
+              {{ getCheerleaderMessage(activeZoneTopColonia() ? activeZoneTopColonia()!.coloniaName : undefined) }}
             </p>
           </div>
 
@@ -57,43 +139,109 @@ import { environment } from '../../../../../environments/environment';
             </button>
 
             <button
-              (click)="centerOnNLD()"
+              (click)="selectZone('all')"
               type="button"
               class="btn-coquette bg-white text-pink-700 border-2 border-pink-200 px-4 py-3 rounded-2xl font-black text-xs hover:bg-pink-50 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm">
-              <span>🎯</span>
-              <span>Centrar Mapa</span>
+              <span>🌸</span>
+              <span>Ver Toda la Ciudad</span>
             </button>
           </div>
         </div>
 
-        <!-- Mini métricas rápidas de distribución -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-pink-100/70">
-          <div class="bg-white/70 rounded-2xl p-3 border border-pink-100 shadow-sm">
-            <p class="text-[10px] font-black uppercase text-pink-400 tracking-widest">Total Pedidos</p>
-            <p class="text-xl font-black text-pink-900 mt-0.5">{{ report()?.totalOrders || 0 }}</p>
+        <!-- ── DISTRIBUCIÓN MACRO POR SECTORES DE NUEVO LAREDO ── -->
+        <div class="mt-5 pt-4 border-t border-pink-200/70">
+          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <span class="text-xs font-black uppercase text-pink-800 tracking-wider flex items-center gap-1.5">
+              <span>🧭</span> Distribución por Sectores (% de Ventas)
+            </span>
+            <span class="text-[11px] font-bold text-pink-500">Da clic en un sector para enfocarlo</span>
           </div>
 
-          <div class="bg-white/70 rounded-2xl p-3 border border-pink-100 shadow-sm">
-            <p class="text-[10px] font-black uppercase text-pink-400 tracking-widest">Colonias Activas</p>
-            <p class="text-xl font-black text-pink-900 mt-0.5">{{ deliveryColonias().length }}</p>
+          <!-- Barra de Segmentos Visuales -->
+          <div class="w-full h-3 bg-pink-100 rounded-full overflow-hidden flex shadow-inner mb-3">
+            @for (z of zoneSummaries(); track z.zone) {
+              <div
+                [title]="z.displayName + ': ' + z.percentage + '%'"
+                [style.width.%]="z.percentage"
+                [class]="getZoneBarColor(z.zone)"
+                class="h-full transition-all duration-500 hover:opacity-80">
+              </div>
+            }
           </div>
 
-          <div class="bg-white/70 rounded-2xl p-3 border border-pink-100 shadow-sm">
-            <p class="text-[10px] font-black uppercase text-pink-400 tracking-widest">A Domicilio</p>
-            <p class="text-xl font-black text-pink-900 mt-0.5">
-              {{ deliveryPercentage() }}%
-              <span class="text-[11px] font-bold text-pink-400">({{ report()?.totalColoniaOrders || 0 }})</span>
-            </p>
-          </div>
+          <!-- Píldoras / Botones de Filtro de Sectores -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <!-- Píldora Toda la Ciudad -->
+            <button
+              type="button"
+              (click)="selectZone('all')"
+              [class]="activeZone() === 'all' ? 'bg-pink-500 text-white shadow-md shadow-pink-300 ring-2 ring-pink-400' : 'bg-white/80 text-pink-900 border border-pink-200 hover:bg-pink-50'"
+              class="p-2.5 rounded-2xl text-left transition-all active:scale-95 flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black">🌸 Toda NLD</span>
+                <span class="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full" [class]="activeZone() === 'all' ? 'bg-white/20' : 'bg-pink-100 text-pink-700'">100%</span>
+              </div>
+              <p class="text-[10px] opacity-80 mt-1 font-semibold truncate">{{ report()?.totalOrders || 0 }} pedidos</p>
+            </button>
 
-          <div class="bg-white/70 rounded-2xl p-3 border border-pink-100 shadow-sm">
-            <p class="text-[10px] font-black uppercase text-purple-400 tracking-widest">Pasan a Pickup</p>
-            <p class="text-xl font-black text-purple-900 mt-0.5">
-              {{ pickupPercentage() }}%
-              <span class="text-[11px] font-bold text-purple-400">({{ report()?.totalPickupOrders || 0 }})</span>
-            </p>
+            <!-- Píldoras de los 4 Sectores + Pickup -->
+            @for (z of zoneSummaries(); track z.zone) {
+              <button
+                type="button"
+                (click)="selectZone(z.zone)"
+                [class]="activeZone() === z.zone ? 'bg-pink-500 text-white shadow-md shadow-pink-300 ring-2 ring-pink-400' : 'bg-white/80 text-pink-900 border border-pink-200 hover:bg-pink-50'"
+                class="p-2.5 rounded-2xl text-left transition-all active:scale-95 flex flex-col justify-between">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-black truncate">{{ z.emoji }} {{ z.displayName }}</span>
+                  <span class="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full" [class]="activeZone() === z.zone ? 'bg-white/20' : 'bg-pink-100 text-pink-700'">
+                    {{ z.percentage }}%
+                  </span>
+                </div>
+                <p class="text-[10px] opacity-80 mt-1 font-semibold truncate">
+                  {{ z.topColoniaName ? ('👑 ' + cleanColoniaName(z.topColoniaName)) : (z.ordersCount + ' pedidos') }}
+                </p>
+              </button>
+            }
           </div>
         </div>
+      </div>
+
+      <!-- ── TARJETAS DE LAS REINAS DE CADA SECTOR (4 ZONAS) ── -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        @for (item of zoneQueens(); track item.key) {
+          <div
+            (click)="selectZone(item.key)"
+            class="card-coquette p-3.5 bg-white/85 border-pink-200 shadow-sm rounded-2xl cursor-pointer hover:shadow-md hover:border-pink-300 transition-all group flex flex-col justify-between relative overflow-hidden"
+            [class.ring-2]="activeZone() === item.key"
+            [class.ring-pink-500]="activeZone() === item.key">
+            
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="inline-flex items-center gap-1 text-xs font-black px-2.5 py-0.5 rounded-full text-white" [class]="item.config.badgeBg">
+                <span>{{ item.emoji }}</span> Sector {{ item.name }}
+              </span>
+              <span class="text-xs font-black text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
+                {{ item.zoneStats?.percentage || 0 }}%
+              </span>
+            </div>
+
+            <div>
+              <p class="text-[10px] font-black uppercase text-pink-400 tracking-wider flex items-center gap-1">
+                <span>👑</span> Colonia Reina
+              </p>
+              <h4 class="text-sm font-black text-pink-900 truncate mt-0.5 group-hover:text-pink-600 transition-colors" [title]="item.queen ? item.queen.coloniaName : 'Sin colonias'">
+                {{ item.queen ? cleanColoniaName(item.queen.coloniaName) : 'Sin colonias' }}
+              </h4>
+              <p class="text-[11px] text-pink-600 font-bold mt-0.5">
+                {{ item.queen ? (item.queen.percentage + '% de compras') : '0 compras' }}
+              </p>
+            </div>
+
+            <div class="mt-2 pt-2 border-t border-pink-50 flex items-center justify-between text-[10px] text-pink-400 font-medium">
+              <span>{{ item.coloniasCount }} colonias</span>
+              <span class="group-hover:translate-x-1 transition-transform text-pink-600 font-bold">Ver en mapa →</span>
+            </div>
+          </div>
+        }
       </div>
 
       <!-- ── CONTENEDOR PRINCIPAL: MAPA ROSA + LEADERBOARD ── -->
@@ -104,21 +252,21 @@ import { environment } from '../../../../../environments/environment';
           <div class="card-coquette p-3 bg-white/80 border-pink-200/80 shadow-lg rounded-3xl overflow-hidden relative">
             
             <!-- Header del Mapa con controles sutiles -->
-            <div class="px-3 py-2 flex items-center justify-between border-b border-pink-50 mb-2">
+            <div class="px-3 py-2 flex items-center justify-between border-b border-pink-50 mb-2 flex-wrap gap-2">
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-pink-500 animate-ping"></span>
                 <h3 class="text-xs font-black text-pink-900 uppercase tracking-widest flex items-center gap-1.5">
-                  🗺️ Mapa de Calor Coquette • Nuevo Laredo
+                  🗺️ Mapa de Compras • {{ getActiveZoneTitle() }}
                 </h3>
               </div>
               <div class="flex items-center gap-1.5 text-[11px] font-bold text-pink-500">
                 <span class="inline-block w-2.5 h-2.5 rounded-full bg-pink-500 shadow-sm"></span>
-                <span>Burbujas por % de compras</span>
+                <span>{{ filteredColonias().length }} colonias en esta vista</span>
               </div>
             </div>
 
             <!-- Google Map Viewport -->
-            <div class="relative w-full h-[400px] sm:h-[480px] lg:h-[540px] rounded-2xl overflow-hidden bg-pink-50 shadow-inner">
+            <div class="relative w-full h-[420px] sm:h-[480px] lg:h-[540px] rounded-2xl overflow-hidden bg-pink-50 shadow-inner">
               <google-map
                 #googleMapRef
                 [center]="mapCenter()"
@@ -128,8 +276,8 @@ import { environment } from '../../../../../environments/environment';
                 height="100%"
                 (mapInitialized)="onMapInit($event)">
 
-                <!-- Círculos de calor para cada colonia -->
-                @for (c of report()?.colonias; track c.coloniaName) {
+                <!-- Círculos de calor para cada colonia mostrada -->
+                @for (c of filteredColonias(); track c.coloniaName) {
                   <map-circle
                     [center]="{ lat: c.latitude, lng: c.longitude }"
                     [radius]="getCircleRadius(c)"
@@ -139,7 +287,7 @@ import { environment } from '../../../../../environments/environment';
                 }
 
                 <!-- Marcadores con pines cute y coronas -->
-                @for (c of report()?.colonias; track c.coloniaName) {
+                @for (c of filteredColonias(); track c.coloniaName) {
                   <map-marker
                     [position]="{ lat: c.latitude, lng: c.longitude }"
                     [options]="getMarkerOptions(c)"
@@ -157,14 +305,21 @@ import { environment } from '../../../../../environments/environment';
                         <h4 class="font-black text-pink-900 text-sm leading-tight">{{ selectedColonia()!.coloniaName }}</h4>
                       </div>
 
+                      <div class="flex items-center gap-1.5 mb-2">
+                        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700">
+                          Sector: {{ getZoneDisplayName(selectedColonia()!.zone) }}
+                        </span>
+                        @if (!selectedColonia()!.isPickup) {
+                          <span class="text-[10px] font-bold text-pink-500">
+                            Lugar #{{ selectedColonia()!.rank }}
+                          </span>
+                        }
+                      </div>
+
                       @if (selectedColonia()!.isPickup) {
                         <p class="text-[11px] text-purple-700 font-bold mb-2">
-                          Clientas que acuden a recoger su paquete en la matriz de Regi Bazar.
+                          Clientas que acuden a recoger su paquete en la matriz de Regi Bazar (C. Rio Indo 1601).
                         </p>
-                      } @else {
-                        <div class="text-[11px] font-extrabold text-pink-500 mb-2">
-                          Lugar #{{ selectedColonia()!.rank }} en compras
-                        </div>
                       }
 
                       <div class="bg-pink-50 rounded-xl p-2.5 border border-pink-100 space-y-1.5">
@@ -208,9 +363,9 @@ import { environment } from '../../../../../environments/environment';
 
             <!-- Leyenda Coquette al pie del mapa -->
             <div class="px-3 pt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-pink-700">
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 flex-wrap">
                 <span class="flex items-center gap-1">
-                  <span class="text-sm">👑</span> Top 1
+                  <span class="text-sm">👑</span> Reina Sector
                 </span>
                 <span class="flex items-center gap-1">
                   <span class="text-sm">🥈</span> Top 2
@@ -219,10 +374,10 @@ import { environment } from '../../../../../environments/environment';
                   <span class="text-sm">🥉</span> Top 3
                 </span>
                 <span class="flex items-center gap-1">
-                  <span class="text-sm">🛍️</span> Pickup Matriz
+                  <span class="text-sm">🛍️</span> Matriz Pickup
                 </span>
               </div>
-              <span class="text-[11px] text-pink-400">💡 Da clic en cualquier punto para ver detalles</span>
+              <span class="text-[11px] text-pink-400">💡 Da clic en cualquier punto para enfocar y ver datos</span>
             </div>
           </div>
         </div>
@@ -230,22 +385,24 @@ import { environment } from '../../../../../environments/environment';
         <!-- ── COLUMNA DERECHA: PODIUM TOP 3 + LEADERBOARD + CARD PICKUP (5 COLS) ── -->
         <div class="lg:col-span-5 space-y-4">
 
-          <!-- ── EL PODIUM COQUETTE TOP 3 ── -->
-          @if (topThree().length > 0) {
+          <!-- ── EL PODIUM COQUETTE TOP 3 DEL SECTOR ACTIVO ── -->
+          @if (activeTopThree().length > 0) {
             <div class="card-coquette p-4 bg-gradient-to-b from-white/95 to-pink-50/80 border-pink-200/90 shadow-md">
               <div class="flex items-center justify-between mb-3 pb-2 border-b border-pink-100">
                 <div class="flex items-center gap-2">
                   <span class="text-xl">🏆</span>
-                  <h3 class="text-sm font-black text-pink-900 uppercase tracking-widest">Podium de Colonias</h3>
+                  <h3 class="text-sm font-black text-pink-900 uppercase tracking-widest">
+                    Podium {{ activeZone() === 'all' ? 'Nuevo Laredo' : ('Sector ' + getZoneEmoji(activeZone())) }}
+                  </h3>
                 </div>
-                <span class="text-[10px] font-bold text-pink-400 bg-pink-100/70 px-2 py-0.5 rounded-full">Top Compradoras</span>
+                <span class="text-[10px] font-bold text-pink-500 bg-pink-100/70 px-2 py-0.5 rounded-full">Top Compradoras</span>
               </div>
 
               <!-- Escenario del podium 3D -->
               <div class="grid grid-cols-3 gap-2 items-end pt-4 pb-2 text-center">
                 
                 <!-- 2do Lugar (Izquierda) -->
-                @if (topThree()[1]; as second) {
+                @if (activeTopThree()[1]; as second) {
                   <div
                     (click)="onSelectColonia(second)"
                     class="cursor-pointer group flex flex-col items-center transition-all hover:-translate-y-1">
@@ -263,7 +420,7 @@ import { environment } from '../../../../../environments/environment';
                 }
 
                 <!-- 1er Lugar (Centro - Más Alto) -->
-                @if (topThree()[0]; as first) {
+                @if (activeTopThree()[0]; as first) {
                   <div
                     (click)="onSelectColonia(first)"
                     class="cursor-pointer group flex flex-col items-center -mt-4 transition-all hover:-translate-y-1">
@@ -285,7 +442,7 @@ import { environment } from '../../../../../environments/environment';
                 }
 
                 <!-- 3er Lugar (Derecha) -->
-                @if (topThree()[2]; as third) {
+                @if (activeTopThree()[2]; as third) {
                   <div
                     (click)="onSelectColonia(third)"
                     class="cursor-pointer group flex flex-col items-center transition-all hover:-translate-y-1">
@@ -306,8 +463,8 @@ import { environment } from '../../../../../environments/environment';
             </div>
           }
 
-          <!-- ── CARD DE PICKUP (REGLA: CLIENTAS SIN DIRECCIÓN O RETIRO EN MATRIZ) ── -->
-          @if (pickupStats(); as pickup) {
+          <!-- ── CARD DE PICKUP (SI ESTAMOS EN TODA NLD O EN PICKUP) ── -->
+          @if ((activeZone() === 'all' || activeZone() === 'Pickup') && pickupStats(); as pickup) {
             <div
               (click)="onSelectColonia(pickup)"
               class="card-coquette p-4 bg-gradient-to-r from-purple-500/10 via-pink-500/5 to-white/90 border-purple-200/90 shadow-sm cursor-pointer hover:border-purple-300 transition-all group">
@@ -320,11 +477,11 @@ import { environment } from '../../../../../environments/environment';
                     <div class="flex items-center gap-2 flex-wrap">
                       <h4 class="text-sm font-black text-purple-950">Pickup (Matriz Regi Bazar)</h4>
                       <span class="text-[10px] font-black bg-purple-500 text-white px-2 py-0.5 rounded-full">
-                        Pasan por pedido
+                        Pasan a Matriz
                       </span>
                     </div>
                     <p class="text-xs text-purple-700/80 mt-1 leading-snug">
-                      Clientas que pasan a recoger su compra personalmente al domicilio oficial de Regi Bazar.
+                      C. Rio Indo 1601, Voluntad y Trabajo 3. Clientas que recogen personalmente su pedido.
                     </p>
                   </div>
                 </div>
@@ -347,17 +504,17 @@ import { environment } from '../../../../../environments/environment';
             </div>
           }
 
-          <!-- ── LISTA COMPLETA DE COLONIAS (LEADERBOARD) ── -->
+          <!-- ── LISTA DE COLONIAS DEL SECTOR ACTIVO (LEADERBOARD) ── -->
           <div class="card-coquette p-4 bg-white/90 border-pink-200/80 shadow-md">
             <div class="flex items-center justify-between mb-3 pb-2 border-b border-pink-100">
               <h3 class="text-xs font-black text-pink-900 uppercase tracking-widest flex items-center gap-1.5">
-                <span>📋</span> Ranking Completo por Colonia
+                <span>📋</span> {{ activeZone() === 'all' ? 'Ranking Completo de Colonias' : ('Colonias Sector ' + getZoneDisplayName(activeZone())) }}
               </h3>
-              <span class="text-[11px] font-bold text-pink-400">{{ deliveryColonias().length }} colonias</span>
+              <span class="text-[11px] font-bold text-pink-500">{{ activeDeliveryColonias().length }} colonias</span>
             </div>
 
-            <div class="max-h-[360px] overflow-y-auto space-y-2 pr-1 custom-pink-scroll">
-              @for (c of deliveryColonias(); track c.coloniaName) {
+            <div class="max-h-[380px] overflow-y-auto space-y-2 pr-1 custom-pink-scroll">
+              @for (c of activeDeliveryColonias(); track c.coloniaName; let i = $index) {
                 <div
                   (click)="onSelectColonia(c)"
                   [class.ring-2]="selectedColonia()?.coloniaName === c.coloniaName"
@@ -366,14 +523,19 @@ import { environment } from '../../../../../environments/environment';
                   
                   <div class="flex items-center gap-2.5 min-w-0">
                     <span
-                      [class]="c.rank === 1 ? 'bg-amber-400 text-white font-black' : (c.rank <= 3 ? 'bg-pink-200 text-pink-800 font-bold' : 'bg-pink-50 text-pink-500 font-semibold')"
+                      [class]="i === 0 ? 'bg-amber-400 text-white font-black' : (i <= 2 ? 'bg-pink-200 text-pink-800 font-bold' : 'bg-pink-50 text-pink-500 font-semibold')"
                       class="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0">
-                      {{ c.rank }}
+                      {{ i + 1 }}
                     </span>
                     <div class="min-w-0">
-                      <p class="text-xs font-black text-pink-900 truncate group-hover:text-pink-600 transition-colors">
-                        {{ c.coloniaName }}
-                      </p>
+                      <div class="flex items-center gap-1.5">
+                        <p class="text-xs font-black text-pink-900 truncate group-hover:text-pink-600 transition-colors">
+                          {{ c.coloniaName }}
+                        </p>
+                        <span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-pink-100/80 text-pink-700 shrink-0">
+                          {{ getZoneEmoji(c.zone) }}
+                        </span>
+                      </div>
                       <div class="flex items-center gap-2 text-[10px] text-pink-400 font-medium">
                         <span>{{ c.ordersCount }} compras</span>
                         <span>•</span>
@@ -392,6 +554,12 @@ import { environment } from '../../../../../environments/environment';
                     </div>
                   </div>
 
+                </div>
+              }
+
+              @if (activeDeliveryColonias().length === 0) {
+                <div class="p-6 text-center text-xs text-pink-400 font-bold">
+                  No hay pedidos registrados en este sector en el periodo seleccionado 🌸
                 </div>
               }
             </div>
@@ -426,25 +594,45 @@ import { environment } from '../../../../../environments/environment';
               </button>
             </div>
 
+            <!-- Selector de Sector a Presumir -->
+            <div class="px-6 pt-3 flex items-center gap-1.5 overflow-x-auto pb-1 custom-pink-scroll">
+              <button
+                type="button"
+                [class]="socialZone() === 'all' ? 'bg-pink-500 text-white shadow-sm' : 'bg-pink-50 text-pink-700 hover:bg-pink-100'"
+                (click)="socialZone.set('all')"
+                class="px-3 py-1.5 rounded-xl text-xs font-black transition-all shrink-0">
+                🌸 Toda la Ciudad
+              </button>
+              @for (z of zoneSummaries(); track z.zone) {
+                <button
+                  type="button"
+                  [class]="socialZone() === z.zone ? 'bg-pink-500 text-white shadow-sm' : 'bg-pink-50 text-pink-700 hover:bg-pink-100'"
+                  (click)="socialZone.set(z.zone)"
+                  class="px-3 py-1.5 rounded-xl text-xs font-black transition-all shrink-0">
+                  {{ z.emoji }} {{ z.displayName }}
+                </button>
+              }
+            </div>
+
             <!-- Selector de Formato: Historia (9:16) vs Post (1:1) -->
-            <div class="px-6 pt-4 flex items-center justify-center gap-3">
+            <div class="px-6 pt-2 pb-1 flex items-center justify-center gap-3">
               <button
                 type="button"
                 [class]="socialFormat() === 'story' ? 'bg-pink-500 text-white shadow-md' : 'bg-pink-50 text-pink-700 hover:bg-pink-100'"
                 (click)="socialFormat.set('story')"
-                class="px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5">
+                class="px-4 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5">
                 <span>📱</span> Historia (9:16)
               </button>
               <button
                 type="button"
                 [class]="socialFormat() === 'post' ? 'bg-pink-500 text-white shadow-md' : 'bg-pink-50 text-pink-700 hover:bg-pink-100'"
                 (click)="socialFormat.set('post')"
-                class="px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5">
+                class="px-4 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5">
                 <span>🖼️</span> Post Cuadrado (1:1)
               </button>
             </div>
 
-            <!-- Contenedor del Preview para html2canvas -->
+            <!-- Contenedor del Preview para Captura de Pantalla -->
             <div class="p-3 sm:p-5 flex items-center justify-center bg-gray-50/70 overflow-hidden">
               <div
                 id="socialCardExport"
@@ -465,14 +653,14 @@ import { environment } from '../../../../../environments/environment';
 
                   @if (socialFormat() === 'story') {
                     <h2 class="text-lg sm:text-xl font-black text-pink-900 tracking-tight leading-tight mt-0.5">
-                      👑 ¿CUÁL ES LA COLONIA MÁS REGIA? 💕
+                      {{ getSocialCardHeadline() }}
                     </h2>
                     <p class="text-[11px] text-pink-600/90 font-bold mt-0.5">
-                      Mapa oficial de entregas en vivo 🛍️
+                      {{ getSocialCardSubtitle() }}
                     </p>
                   } @else {
                     <h2 class="text-base font-black text-pink-900 tracking-tight leading-tight">
-                      👑 NUEVO LAREDO ES TERRITORIO REGI BAZAR 💖
+                      {{ getSocialCardHeadline() }}
                     </h2>
                   }
                 </div>
@@ -490,8 +678,8 @@ import { environment } from '../../../../../environments/environment';
                     class="w-full h-full object-cover select-none pointer-events-none" />
 
                   <!-- Badges Flotantes sobre el mapa real -->
-                  <!-- Reina #1 -->
-                  @if (topThree()[0]; as first) {
+                  <!-- Reina del sector o de NLD -->
+                  @if (socialTopColonia(); as first) {
                     <div class="absolute top-2.5 right-2.5 flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white text-[10px] font-black shadow-lg border border-white">
                       <span>👑</span>
                       <span class="truncate max-w-[130px]">#1 {{ cleanColoniaName(first.coloniaName) }}</span>
@@ -507,9 +695,9 @@ import { environment } from '../../../../../environments/environment';
                     </div>
                   }
 
-                  <!-- Tag de ciudad -->
+                  <!-- Tag de ciudad y sector -->
                   <div class="absolute bottom-2.5 right-2.5 text-[8.5px] font-extrabold text-pink-700 bg-white/90 px-2 py-0.5 rounded-full border border-pink-200 shadow-sm">
-                    📍 Nuevo Laredo
+                    📍 {{ socialZone() === 'all' ? 'Nuevo Laredo' : ('Sector ' + getZoneDisplayName(socialZone())) }}
                   </div>
                 </div>
 
@@ -517,7 +705,7 @@ import { environment } from '../../../../../environments/environment';
                 @if (socialFormat() === 'story') {
                   <!-- Mini Podium Cards -->
                   <div class="grid grid-cols-2 gap-1.5 my-1 text-left shrink-0">
-                    @if (topThree()[0]; as first) {
+                    @if (socialTopThree()[0]; as first) {
                       <div class="p-2 rounded-xl bg-pink-500 text-white flex items-center justify-between border border-pink-400 shadow-sm">
                         <div class="min-w-0 pr-1">
                           <p class="text-[9px] uppercase font-bold text-pink-100 flex items-center gap-0.5"><span>👑</span> Colonia Reina</p>
@@ -527,7 +715,7 @@ import { environment } from '../../../../../environments/environment';
                       </div>
                     }
 
-                    @if (topThree()[1]; as second) {
+                    @if (socialTopThree()[1]; as second) {
                       <div class="p-2 rounded-xl bg-white/90 text-pink-900 flex items-center justify-between border border-pink-200 shadow-sm">
                         <div class="min-w-0 pr-1">
                           <p class="text-[9px] uppercase font-bold text-pink-500 flex items-center gap-0.5"><span>🥈</span> 2do Lugar</p>
@@ -537,7 +725,7 @@ import { environment } from '../../../../../environments/environment';
                       </div>
                     }
 
-                    @if (topThree()[2]; as third) {
+                    @if (socialTopThree()[2]; as third) {
                       <div class="p-2 rounded-xl bg-white/90 text-pink-900 flex items-center justify-between border border-pink-200 shadow-sm">
                         <div class="min-w-0 pr-1">
                           <p class="text-[9px] uppercase font-bold text-pink-500 flex items-center gap-0.5"><span>🥉</span> 3er Lugar</p>
@@ -561,7 +749,7 @@ import { environment } from '../../../../../environments/environment';
                   <!-- Footer Story -->
                   <div class="pt-1 shrink-0">
                     <p class="text-[10px] font-black text-pink-800 bg-white/95 py-1 px-2.5 rounded-xl border border-pink-200/80 shadow-sm">
-                      💬 ¿Dónde vives tú? ¡Comenta en el live para que tu colonia suba al #1! 💕
+                      💬 ¿Vives aquí? ¡Comenta en el live para que tu colonia suba al #1! 💕
                     </p>
                     <p class="text-[9px] font-extrabold text-pink-400 mt-1">
                       @regibazar • Sistema de Entregas Oficial
@@ -571,7 +759,7 @@ import { environment } from '../../../../../environments/environment';
                   <!-- Post Cuadrado Footer -->
                   <div class="pt-1 shrink-0">
                     <div class="flex items-center justify-between gap-1 text-[9.5px] font-black bg-white/95 px-2.5 py-1.5 rounded-xl border border-pink-200 shadow-sm">
-                      <span class="truncate">👑 #1 {{ cleanColoniaName(topThree()[0]?.coloniaName || '') }} ({{ topThree()[0]?.percentage }}%)</span>
+                      <span class="truncate">👑 #1 {{ cleanColoniaName(socialTopThree()[0]?.coloniaName || '') }} ({{ socialTopThree()[0]?.percentage }}%)</span>
                       <span>•</span>
                       <span class="truncate">🛍️ Matriz ({{ pickupStats()?.percentage }}%)</span>
                     </div>
@@ -608,6 +796,7 @@ import { environment } from '../../../../../environments/environment';
   styles: [`
     .custom-pink-scroll::-webkit-scrollbar {
       width: 5px;
+      height: 5px;
     }
     .custom-pink-scroll::-webkit-scrollbar-track {
       background: #fdf2f8;
@@ -639,10 +828,14 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
   showSocialModal = signal(false);
   socialFormat = signal<'story' | 'post'>('story');
 
+  // Sector activo para filtrado y navegación ('all' | 'Poniente' | 'Oriente' | 'Sur' | 'Kilometros' | 'Pickup')
+  activeZone = signal<string>('all');
+  socialZone = signal<string>('all');
+
   selectedColonia = signal<ColoniaStatsDto | null>(null);
 
   // Mapa de Nuevo Laredo
-  mapCenter = signal<google.maps.LatLngLiteral>({ lat: 27.4861, lng: -99.5150 });
+  mapCenter = signal<google.maps.LatLngLiteral>({ lat: 27.4700, lng: -99.5400 });
   mapZoom = signal<number>(13);
 
   mapOptions: google.maps.MapOptions = {
@@ -657,35 +850,109 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
 
   nativeMap?: google.maps.Map;
 
-  // Colonias separadas para ranking y pickup
+  // ── RESUMEN MACRO DE ZONAS ──
+  zoneSummaries = computed<ZoneSummaryDto[]>(() => {
+    const r = this.report();
+    if (r?.zones && r.zones.length > 0) {
+      return r.zones;
+    }
+
+    const colonias = r?.colonias || [];
+    const total = r?.totalOrders || 1;
+
+    return NLD_ZONE_CONFIGS.map(cfg => {
+      const inZone = colonias.filter(c => c.zone === cfg.key);
+      const orders = inZone.reduce((sum, c) => sum + c.ordersCount, 0);
+      const clients = inZone.reduce((sum, c) => sum + c.clientsCount, 0);
+      const pct = total > 0 ? Number(((orders / total) * 100).toFixed(1)) : 0;
+      const top = inZone.find(c => !c.isPickup && c.coloniaName !== 'Otras Colonias (NLD)');
+      return {
+        zone: cfg.key,
+        displayName: cfg.name,
+        emoji: cfg.emoji,
+        ordersCount: orders,
+        percentage: pct,
+        clientsCount: clients,
+        topColoniaName: top?.coloniaName || null
+      };
+    });
+  });
+
+  // Reinas de las 4 Zonas Geográficas
+  zoneQueens = computed(() => {
+    const allDelivery = this.deliveryColonias();
+    const summaries = this.zoneSummaries();
+
+    return NLD_ZONE_CONFIGS
+      .filter(cfg => cfg.key !== 'Pickup')
+      .map(cfg => {
+        const inZone = allDelivery.filter(c => c.zone === cfg.key);
+        const queen = inZone[0] || null;
+        const stats = summaries.find(s => s.zone === cfg.key);
+        return {
+          key: cfg.key,
+          name: cfg.name,
+          emoji: cfg.emoji,
+          config: cfg,
+          queen,
+          coloniasCount: inZone.length,
+          zoneStats: stats
+        };
+      });
+  });
+
+  // Colonias totales a domicilio
   deliveryColonias = computed(() => {
     const list = this.report()?.colonias || [];
     return list.filter(c => !c.isPickup);
   });
 
+  // Pickup Stats
   pickupStats = computed(() => {
     const list = this.report()?.colonias || [];
     return list.find(c => c.isPickup) || null;
   });
 
-  topThree = computed(() => {
-    return this.deliveryColonias().slice(0, 3);
+  // Colonias filtradas según el sector seleccionado
+  filteredColonias = computed(() => {
+    const list = this.report()?.colonias || [];
+    const zone = this.activeZone();
+    if (zone === 'all') return list;
+    return list.filter(c => c.zone === zone);
   });
 
-  topColoniasForSocial = computed(() => {
-    return this.deliveryColonias().slice(0, 4);
+  // Colonias a domicilio filtradas por sector
+  activeDeliveryColonias = computed(() => {
+    const zone = this.activeZone();
+    if (zone === 'all') return this.deliveryColonias();
+    return this.filteredColonias().filter(c => !c.isPickup);
   });
 
-  deliveryPercentage = computed(() => {
-    const r = this.report();
-    if (!r || r.totalOrders === 0) return 0;
-    return Number(((r.totalColoniaOrders / r.totalOrders) * 100).toFixed(1));
+  // Reina del sector activo
+  activeZoneTopColonia = computed(() => {
+    const list = this.activeDeliveryColonias();
+    return list[0] || null;
   });
 
-  pickupPercentage = computed(() => {
-    const r = this.report();
-    if (!r || r.totalOrders === 0) return 0;
-    return Number(((r.totalPickupOrders / r.totalOrders) * 100).toFixed(1));
+  // Top 3 del sector activo para el podium
+  activeTopThree = computed(() => {
+    return this.activeDeliveryColonias().slice(0, 3);
+  });
+
+  // Colonias para el modal social
+  socialFilteredColonias = computed(() => {
+    const zone = this.socialZone();
+    const list = this.report()?.colonias || [];
+    if (zone === 'all') return list.filter(c => !c.isPickup);
+    return list.filter(c => c.zone === zone && !c.isPickup);
+  });
+
+  socialTopThree = computed(() => {
+    return this.socialFilteredColonias().slice(0, 3);
+  });
+
+  socialTopColonia = computed(() => {
+    return this.socialFilteredColonias()[0] || null;
   });
 
   ngOnInit(): void {
@@ -716,33 +983,52 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     });
   }
 
-  // Centrar mapa en Nuevo Laredo
-  centerOnNLD(): void {
-    this.mapCenter.set({ lat: 27.4861, lng: -99.5150 });
-    this.mapZoom.set(13);
-    if (this.nativeMap) {
-      this.nativeMap.panTo({ lat: 27.4861, lng: -99.5150 });
-      this.nativeMap.setZoom(13);
+  // Selección de Sector con navegación suave en el mapa
+  selectZone(zoneKey: string): void {
+    this.activeZone.set(zoneKey);
+    this.socialZone.set(zoneKey);
+
+    if (zoneKey === 'all') {
+      const center = { lat: 27.4700, lng: -99.5400 };
+      this.mapCenter.set(center);
+      this.mapZoom.set(13);
+      if (this.nativeMap) {
+        this.nativeMap.panTo(center);
+        this.nativeMap.setZoom(13);
+      }
+      return;
+    }
+
+    const cfg = NLD_ZONE_CONFIGS.find(c => c.key === zoneKey);
+    if (cfg) {
+      const center = { lat: cfg.lat, lng: cfg.lng };
+      this.mapCenter.set(center);
+      this.mapZoom.set(cfg.zoom);
+      if (this.nativeMap) {
+        this.nativeMap.panTo(center);
+        this.nativeMap.setZoom(cfg.zoom);
+      }
     }
   }
 
   onSelectColonia(c: ColoniaStatsDto): void {
     this.selectedColonia.set(c);
-    this.mapCenter.set({ lat: c.latitude, lng: c.longitude });
+    const pos = { lat: c.latitude, lng: c.longitude };
+    this.mapCenter.set(pos);
     this.mapZoom.set(16);
     if (this.nativeMap) {
-      this.nativeMap.panTo({ lat: c.latitude, lng: c.longitude });
+      this.nativeMap.panTo(pos);
       this.nativeMap.setZoom(16);
     }
 
-    // Abrir automáticamente el InfoWindow sobre la colonia seleccionada
-    const colonias = this.report()?.colonias || [];
+    // Abrir automáticamente el InfoWindow
+    const colonias = this.filteredColonias();
     const idx = colonias.findIndex(x => x.coloniaName === c.coloniaName);
     const marker = this.mapMarkers?.toArray()[idx];
     if (marker && this.infoWindow) {
       this.infoWindow.open(marker);
     } else if (this.infoWindow?.infoWindow && this.nativeMap) {
-      this.infoWindow.infoWindow.setPosition({ lat: c.latitude, lng: c.longitude });
+      this.infoWindow.infoWindow.setPosition(pos);
       this.infoWindow.infoWindow.open(this.nativeMap);
     }
   }
@@ -775,7 +1061,7 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     };
   }
 
-  // Generador de pines limpios, coquette y estéticos (sin números toscos de % sobre el mapa)
+  // Generador de pines limpios y estéticos
   getMarkerOptions(c: ColoniaStatsDto): google.maps.MarkerOptions {
     const isPickup = c.isPickup;
     const isTop1 = c.rank === 1 && !isPickup;
@@ -865,7 +1151,6 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
         </svg>
       `;
     } else {
-      // Punto fino y delicado para el resto de colonias
       width = 18;
       height = 18;
       anchorX = 9;
@@ -888,22 +1173,34 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     };
   }
 
-  // ── URL DE GOOGLE STATIC MAPS (MAPA REAL DE NUEVO LAREDO EN ROSA) ──
+  // ── URL DE GOOGLE STATIC MAPS DINÁMICA POR SECTOR O TODA LA CIUDAD ──
   staticMapUrl = computed(() => {
     const format = this.socialFormat();
     const width = format === 'story' ? 560 : 540;
     const height = format === 'story' ? 440 : 340;
     const key = environment.googleMapsApiKey;
+    const zone = this.socialZone();
 
-    const top1 = this.topThree()[0];
-    let centerLat = 27.4861;
-    let centerLng = -99.5300;
-    if (top1) {
-      centerLat = Number(((top1.latitude + 27.4861 + REGIBY_DEPOT.lat) / 3).toFixed(4));
-      centerLng = Number(((top1.longitude + -99.5300 + REGIBY_DEPOT.lng) / 3).toFixed(4));
+    let centerLat = 27.4700;
+    let centerLng = -99.5400;
+    let zoom = 13;
+
+    if (zone !== 'all') {
+      const cfg = NLD_ZONE_CONFIGS.find(c => c.key === zone);
+      if (cfg) {
+        centerLat = cfg.lat;
+        centerLng = cfg.lng;
+        zoom = cfg.zoom;
+      }
+    } else {
+      const top1 = this.socialTopColonia();
+      if (top1) {
+        centerLat = Number(((top1.latitude + 27.4861 + REGIBY_DEPOT.lat) / 3).toFixed(4));
+        centerLng = Number(((top1.longitude + -99.5300 + REGIBY_DEPOT.lng) / 3).toFixed(4));
+      }
     }
 
-    let url = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=13&size=${width}x${height}&scale=2&maptype=roadmap`;
+    let url = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=${zoom}&size=${width}x${height}&scale=2&maptype=roadmap`;
     url += '&style=element:geometry%7Ccolor:0xfff1f4';
     url += '&style=element:labels.text.fill%7Ccolor:0x831843';
     url += '&style=element:labels.text.stroke%7Ccolor:0xffffff';
@@ -916,20 +1213,18 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     url += '&style=feature:poi%7Cvisibility:off';
     url += '&style=feature:transit%7Cvisibility:off';
 
-    // Marcador #1 Reina
-    if (top1) {
-      url += `&markers=color:0xf43f5e%7Clabel:1%7C${top1.latitude},${top1.longitude}`;
+    // Marcadores del top 3 del sector o global
+    const top3 = this.socialTopThree();
+    if (top3[0]) {
+      url += `&markers=color:0xf43f5e%7Clabel:1%7C${top3[0].latitude},${top3[0].longitude}`;
     }
-    // Marcador #2
-    const top2 = this.topThree()[1];
-    if (top2) {
-      url += `&markers=color:0xec4899%7Clabel:2%7C${top2.latitude},${top2.longitude}`;
+    if (top3[1]) {
+      url += `&markers=color:0xec4899%7Clabel:2%7C${top3[1].latitude},${top3[1].longitude}`;
     }
-    // Marcador #3
-    const top3 = this.topThree()[2];
-    if (top3) {
-      url += `&markers=color:0xf472b6%7Clabel:3%7C${top3.latitude},${top3.longitude}`;
+    if (top3[2]) {
+      url += `&markers=color:0xf472b6%7Clabel:3%7C${top3[2].latitude},${top3[2].longitude}`;
     }
+
     // Marcador Matriz Regi Bazar
     url += `&markers=color:0x9333ea%7Clabel:M%7C${REGIBY_DEPOT.lat},${REGIBY_DEPOT.lng}`;
 
@@ -948,7 +1243,50 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     return `¡${topColonia} se lleva la corona en compras este periodo! Gracias por consentirse con Regi Bazar 💕`;
   }
 
+  getActiveZoneTitle(): string {
+    const z = this.activeZone();
+    if (z === 'all') return 'Toda la Ciudad (Nuevo Laredo)';
+    const cfg = NLD_ZONE_CONFIGS.find(c => c.key === z);
+    return cfg ? `${cfg.emoji} Sector ${cfg.name}` : z;
+  }
+
+  getZoneDisplayName(zoneKey: string): string {
+    const cfg = NLD_ZONE_CONFIGS.find(c => c.key === zoneKey);
+    return cfg ? cfg.name : zoneKey;
+  }
+
+  getZoneEmoji(zoneKey: string): string {
+    const cfg = NLD_ZONE_CONFIGS.find(c => c.key === zoneKey);
+    return cfg ? cfg.emoji : '🌸';
+  }
+
+  getZoneBarColor(zoneKey: string): string {
+    switch (zoneKey) {
+      case 'Poniente': return 'bg-rose-500';
+      case 'Oriente': return 'bg-amber-400';
+      case 'Sur': return 'bg-sky-500';
+      case 'Kilometros': return 'bg-emerald-500';
+      case 'Pickup': return 'bg-purple-500';
+      default: return 'bg-pink-400';
+    }
+  }
+
+  getSocialCardHeadline(): string {
+    const zone = this.socialZone();
+    if (zone === 'all') return '👑 ¿CUÁL ES LA COLONIA MÁS REGIA? 💕';
+    const cfg = NLD_ZONE_CONFIGS.find(c => c.key === zone);
+    return `👑 REINA DEL SECTOR ${cfg?.name.toUpperCase()} ${cfg?.emoji} 💕`;
+  }
+
+  getSocialCardSubtitle(): string {
+    const zone = this.socialZone();
+    if (zone === 'all') return 'Mapa oficial de entregas en vivo 🛍️';
+    const cfg = NLD_ZONE_CONFIGS.find(c => c.key === zone);
+    return `Distribución oficial en ${cfg?.name} • Regi Bazar 🛍️`;
+  }
+
   openSocialModal(): void {
+    this.socialZone.set(this.activeZone());
     this.showSocialModal.set(true);
   }
 

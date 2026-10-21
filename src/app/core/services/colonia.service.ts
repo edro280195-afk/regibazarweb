@@ -8,6 +8,7 @@ export interface NldColoniaInfo {
   name: string;
   lat: number;
   lng: number;
+  zone: string;
   keywords: string[];
 }
 
@@ -21,61 +22,64 @@ export const REGIBY_DEPOT = {
 };
 
 export const NLD_COLONIAS_CATALOG: NldColoniaInfo[] = [
-  // Matriz / Voluntad y Trabajo
-  { name: 'Col. Voluntad y Trabajo', lat: 27.5120, lng: -99.5690, keywords: ['voluntad y trabajo', 'borreguera', 'la borreguera', 'voluntad', 'vyt'] },
-  
-  // Poniente
-  { name: 'Col. Francisco Villa', lat: 27.4366, lng: -99.6078, keywords: ['francisco villa', 'pancho villa', 'fco villa'] },
-  { name: 'Col. Buena Vista', lat: 27.5015, lng: -99.5550, keywords: ['buena vista', 'buenavista'] },
-  { name: 'Col. Nueva Era', lat: 27.4808, lng: -99.5625, keywords: ['nueva era'] },
-  { name: 'Villas de San Miguel', lat: 27.4740, lng: -99.6050, keywords: ['villas de san miguel', 'san miguel', 'villas de sn miguel', 'v. san miguel'] },
-  { name: 'Fracc. El Campanario', lat: 27.4580, lng: -99.5910, keywords: ['campanario', 'el campanario'] },
-  { name: 'Col. Solidaridad', lat: 27.4920, lng: -99.5870, keywords: ['solidaridad'] },
-  { name: 'Col. La Fe', lat: 27.4790, lng: -99.5620, keywords: ['la fe', 'fracc la fe'] },
-  { name: 'Col. Las Torres', lat: 27.4730, lng: -99.5480, keywords: ['torres', 'las torres'] },
-  { name: 'Reservas Territoriales', lat: 27.4640, lng: -99.5760, keywords: ['reservas', 'reservas territoriales'] },
-  { name: 'Col. 150 Aniversario', lat: 27.4790, lng: -99.6220, keywords: ['150 aniversario', 'aniversario'] },
-  { name: 'Fracc. El Progreso', lat: 27.4700, lng: -99.6150, keywords: ['progreso', 'el progreso'] },
-  { name: 'Col. Cavazos Lerma', lat: 27.4390, lng: -99.6050, keywords: ['cavazos lerma', 'cavazos', 'manuel cavazos'] },
+  // ── ZONA PONIENTE (❤️ Corazón) ──
+  { name: 'Col. Voluntad y Trabajo', lat: 27.5120, lng: -99.5690, zone: 'Poniente', keywords: ['voluntad y trabajo', 'borreguera', 'la borreguera', 'voluntad', 'vyt'] },
+  { name: 'Col. Francisco Villa', lat: 27.4366, lng: -99.6078, zone: 'Poniente', keywords: ['francisco villa', 'pancho villa', 'fco villa'] },
+  { name: 'Col. Buena Vista', lat: 27.5015, lng: -99.5550, zone: 'Poniente', keywords: ['buena vista', 'buenavista'] },
+  { name: 'Col. Nueva Era', lat: 27.4808, lng: -99.5625, zone: 'Poniente', keywords: ['nueva era'] },
+  { name: 'Villas de San Miguel', lat: 27.4740, lng: -99.6050, zone: 'Poniente', keywords: ['villas de san miguel', 'san miguel', 'villas de sn miguel', 'v. san miguel'] },
+  { name: 'Fracc. El Campanario', lat: 27.4580, lng: -99.5910, zone: 'Poniente', keywords: ['campanario', 'el campanario', 'campanario y oradel'] },
+  { name: 'Col. Solidaridad', lat: 27.4920, lng: -99.5870, zone: 'Poniente', keywords: ['solidaridad'] },
+  { name: 'Col. La Fe', lat: 27.4790, lng: -99.5620, zone: 'Poniente', keywords: ['la fe', 'fracc la fe'] },
+  { name: 'Col. Las Torres', lat: 27.4730, lng: -99.5480, zone: 'Poniente', keywords: ['torres', 'las torres'] },
+  { name: 'Reservas Territoriales', lat: 27.4640, lng: -99.5760, zone: 'Poniente', keywords: ['reservas', 'reservas territoriales'] },
+  { name: 'Col. 150 Aniversario', lat: 27.4790, lng: -99.6220, zone: 'Poniente', keywords: ['150 aniversario', 'aniversario'] },
+  { name: 'Fracc. El Progreso', lat: 27.4700, lng: -99.6150, zone: 'Poniente', keywords: ['progreso', 'el progreso'] },
+  { name: 'Col. Cavazos Lerma', lat: 27.4390, lng: -99.6050, zone: 'Poniente', keywords: ['cavazos lerma', 'cavazos', 'manuel cavazos'] },
+  { name: 'Valles de San Agustín', lat: 27.4560, lng: -99.6120, zone: 'Poniente', keywords: ['valles de san agustin', 'san agustin', 'san agustín'] },
+  { name: 'Valles de Anáhuac', lat: 27.4950, lng: -99.6200, zone: 'Poniente', keywords: ['valles de anahuac', 'anahuac', 'anáhuac'] },
 
-  // Centro / Oriente
-  { name: 'Sector Centro', lat: 27.4950, lng: -99.5075, keywords: ['centro', 'sector centro', 'primer cuadro'] },
-  { name: 'Col. Madero', lat: 27.4880, lng: -99.5100, keywords: ['madero', 'fracc madero'] },
-  { name: 'Col. Viveros', lat: 27.4940, lng: -99.4990, keywords: ['viveros'] },
-  { name: 'Col. Jardín', lat: 27.4785, lng: -99.5130, keywords: ['jardin', 'jardín'] },
-  { name: 'Col. Campestre', lat: 27.4690, lng: -99.5240, keywords: ['campestre', 'fracc campestre'] },
-  { name: 'Col. Juárez', lat: 27.4840, lng: -99.5290, keywords: ['juarez', 'juárez', 'benito juarez', 'benito juárez'] },
-  { name: 'Col. Guerrero', lat: 27.4770, lng: -99.5030, keywords: ['guerrero'] },
-  { name: 'Col. Mirador', lat: 27.4610, lng: -99.5170, keywords: ['mirador', 'el mirador'] },
-  { name: 'Col. San Rafael', lat: 27.4635, lng: -99.5060, keywords: ['san rafael'] },
-  { name: 'Col. Palacios', lat: 27.4990, lng: -99.5330, keywords: ['palacios'] },
-  { name: 'Col. Victoria', lat: 27.4910, lng: -99.5220, keywords: ['victoria'] },
-  { name: 'Col. Hidalgo', lat: 27.4995, lng: -99.5220, keywords: ['hidalgo'] },
-  { name: 'Col. Militar', lat: 27.4705, lng: -99.5090, keywords: ['militar', 'cuartel militar'] },
-  { name: 'Col. Longoria', lat: 27.4850, lng: -99.5050, keywords: ['longoria'] },
-  { name: 'Col. Hipódromo', lat: 27.4950, lng: -99.5400, keywords: ['hipodromo', 'hipódromo'] },
-  { name: 'Col. 20 de Noviembre', lat: 27.4920, lng: -99.5140, keywords: ['20 de noviembre', 'veinte de noviembre'] },
-  { name: 'Col. La Rosita', lat: 27.4890, lng: -99.5350, keywords: ['rosita', 'la rosita'] },
+  // ── ZONA ORIENTE / CENTRO (⭐ Estrella) ──
+  { name: 'Sector Centro', lat: 27.4950, lng: -99.5075, zone: 'Oriente', keywords: ['centro', 'sector centro', 'primer cuadro'] },
+  { name: 'Col. Madero', lat: 27.4880, lng: -99.5100, zone: 'Oriente', keywords: ['madero', 'fracc madero'] },
+  { name: 'Col. Viveros', lat: 27.4940, lng: -99.4990, zone: 'Oriente', keywords: ['viveros'] },
+  { name: 'Col. Jardín', lat: 27.4785, lng: -99.5130, zone: 'Oriente', keywords: ['jardin', 'jardín'] },
+  { name: 'Col. Campestre', lat: 27.4690, lng: -99.5240, zone: 'Oriente', keywords: ['campestre', 'fracc campestre'] },
+  { name: 'Col. Juárez', lat: 27.4840, lng: -99.5290, zone: 'Oriente', keywords: ['juarez', 'juárez', 'benito juarez', 'benito juárez'] },
+  { name: 'Col. Guerrero', lat: 27.4770, lng: -99.5030, zone: 'Oriente', keywords: ['guerrero'] },
+  { name: 'Col. Mirador', lat: 27.4610, lng: -99.5170, zone: 'Oriente', keywords: ['mirador', 'el mirador'] },
+  { name: 'Col. San Rafael', lat: 27.4635, lng: -99.5060, zone: 'Oriente', keywords: ['san rafael'] },
+  { name: 'Col. Palacios', lat: 27.4990, lng: -99.5330, zone: 'Oriente', keywords: ['palacios'] },
+  { name: 'Col. Victoria', lat: 27.4910, lng: -99.5220, zone: 'Oriente', keywords: ['victoria'] },
+  { name: 'Col. Hidalgo', lat: 27.4995, lng: -99.5220, zone: 'Oriente', keywords: ['hidalgo'] },
+  { name: 'Col. Militar', lat: 27.4705, lng: -99.5090, zone: 'Oriente', keywords: ['militar', 'cuartel militar'] },
+  { name: 'Col. Longoria', lat: 27.4850, lng: -99.5050, zone: 'Oriente', keywords: ['longoria'] },
+  { name: 'Col. Hipódromo', lat: 27.4950, lng: -99.5400, zone: 'Oriente', keywords: ['hipodromo', 'hipódromo'] },
+  { name: 'Col. 20 de Noviembre', lat: 27.4920, lng: -99.5140, zone: 'Oriente', keywords: ['20 de noviembre', 'veinte de noviembre'] },
+  { name: 'Col. La Rosita', lat: 27.4890, lng: -99.5350, zone: 'Oriente', keywords: ['rosita', 'la rosita'] },
 
-  // Sur
-  { name: 'Infonavit Fundadores', lat: 27.4482, lng: -99.5114, keywords: ['fundadores', 'infonavit fundadores', 'infonavit'] },
-  { name: 'Fracc. Los Fresnos', lat: 27.4465, lng: -99.5525, keywords: ['fresnos', 'los fresnos'] },
-  { name: 'Col. Concordia', lat: 27.4370, lng: -99.5260, keywords: ['concordia', 'la concordia', 'haciendas de la concordia'] },
-  { name: 'Col. Santa Fe', lat: 27.4470, lng: -99.5110, keywords: ['santa fe'] },
-  { name: 'Col. Los Presidentes', lat: 27.4290, lng: -99.5360, keywords: ['presidentes', 'los presidentes'] },
-  { name: 'Col. Roma', lat: 27.4570, lng: -99.5390, keywords: ['roma', 'fracc roma'] },
-  { name: 'Col. Los Encinos', lat: 27.4310, lng: -99.5530, keywords: ['encinos', 'los encinos'] },
-  { name: 'Col. Las Alamedas', lat: 27.4600, lng: -99.5560, keywords: ['alamedas', 'las alamedas'] },
-  { name: 'Colinas del Sur', lat: 27.4140, lng: -99.5340, keywords: ['colinas del sur', 'colinas'] },
-  { name: 'Fracc. Los Aztecas', lat: 27.4800, lng: -99.5360, keywords: ['aztecas', 'los aztecas'] },
-  { name: 'Km 10 a Km 18', lat: 27.3800, lng: -99.5300, keywords: ['km 10', 'km 12', 'km 13', 'km 14', 'km 15', 'km 18', 'kilometro'] },
-  { name: 'Fracc. Los Cántaros', lat: 27.4180, lng: -99.5390, keywords: ['cantaros', 'los cantaros', 'cántaros'] },
-  { name: 'Col. ISSSTE', lat: 27.4700, lng: -99.5180, keywords: ['issste', 'fovissste'] },
-  { name: 'Fracc. San José', lat: 27.4550, lng: -99.5150, keywords: ['san jose', 'san josé'] },
-  { name: 'Fracc. Las Américas', lat: 27.4680, lng: -99.5380, keywords: ['americas', 'las americas', 'las américas'] },
-  { name: 'Col. Alianza', lat: 27.4860, lng: -99.5530, keywords: ['alianza', 'alianza para la produccion'] },
-  { name: 'Valles de San Agustín', lat: 27.4560, lng: -99.6120, keywords: ['valles de san agustin', 'san agustin', 'san agustín'] },
-  { name: 'Valles de Anáhuac', lat: 27.4950, lng: -99.6200, keywords: ['valles de anahuac', 'anahuac', 'anáhuac'] }
+  // ── ZONA SUR (👍 Manita Arriba) ──
+  { name: 'Infonavit Fundadores', lat: 27.4482, lng: -99.5114, zone: 'Sur', keywords: ['fundadores', 'infonavit fundadores', 'infonavit'] },
+  { name: 'Fracc. Los Fresnos', lat: 27.4465, lng: -99.5525, zone: 'Sur', keywords: ['fresnos', 'los fresnos'] },
+  { name: 'Col. Concordia', lat: 27.4370, lng: -99.5260, zone: 'Sur', keywords: ['concordia', 'la concordia', 'haciendas de la concordia'] },
+  { name: 'Col. Santa Fe', lat: 27.4470, lng: -99.5110, zone: 'Sur', keywords: ['santa fe'] },
+  { name: 'Col. Los Presidentes', lat: 27.4290, lng: -99.5360, zone: 'Sur', keywords: ['presidentes', 'los presidentes'] },
+  { name: 'Col. Roma', lat: 27.4570, lng: -99.5390, zone: 'Sur', keywords: ['roma', 'fracc roma'] },
+  { name: 'Col. Los Encinos', lat: 27.4310, lng: -99.5530, zone: 'Sur', keywords: ['encinos', 'los encinos'] },
+  { name: 'Col. Las Alamedas', lat: 27.4600, lng: -99.5560, zone: 'Sur', keywords: ['alamedas', 'las alamedas'] },
+  { name: 'Colinas del Sur', lat: 27.4140, lng: -99.5340, zone: 'Sur', keywords: ['colinas del sur', 'colinas'] },
+  { name: 'Fracc. Los Aztecas', lat: 27.4800, lng: -99.5360, zone: 'Sur', keywords: ['aztecas', 'los aztecas'] },
+  { name: 'Col. ISSSTE', lat: 27.4700, lng: -99.5180, zone: 'Sur', keywords: ['issste', 'fovissste'] },
+  { name: 'Fracc. San José', lat: 27.4550, lng: -99.5150, zone: 'Sur', keywords: ['san jose', 'san josé'] },
+  { name: 'Fracc. Las Américas', lat: 27.4680, lng: -99.5380, zone: 'Sur', keywords: ['americas', 'las americas', 'las américas'] },
+  { name: 'Col. Alianza', lat: 27.4860, lng: -99.5530, zone: 'Sur', keywords: ['alianza', 'alianza para la produccion'] },
+
+  // ── ZONA KILÓMETROS (👏 Aplauso) ──
+  { name: 'Valle Elizondo', lat: 27.3450, lng: -99.5550, zone: 'Kilometros', keywords: ['valle elizondo', 'elizondo'] },
+  { name: 'Km 10 a Km 18', lat: 27.3800, lng: -99.5300, zone: 'Kilometros', keywords: ['km 10', 'km 12', 'km 13', 'km 14', 'km 15', 'km 18', 'kilometro', 'kilometros'] },
+  { name: 'Fracc. Los Cántaros', lat: 27.4180, lng: -99.5390, zone: 'Kilometros', keywords: ['cantaros', 'los cantaros', 'cántaros'] },
+  { name: 'Granjas Treviño', lat: 27.3600, lng: -99.5400, zone: 'Kilometros', keywords: ['granjas trevino', 'granjas treviño', 'trevino', 'treviño'] },
+  { name: 'Granjas Regina', lat: 27.3550, lng: -99.5450, zone: 'Kilometros', keywords: ['granjas regina'] }
 ];
 
 export const ALL_CATALOG_KEYWORDS = NLD_COLONIAS_CATALOG
@@ -121,13 +125,15 @@ export class ColoniaService {
     lat: number;
     lng: number;
     isPickup: boolean;
+    zone: string;
   } {
     if (!address || !address.trim() || type === 'PickUp') {
       return {
         name: REGIBY_DEPOT.name,
         lat: REGIBY_DEPOT.lat,
         lng: REGIBY_DEPOT.lng,
-        isPickup: true
+        isPickup: true,
+        zone: 'Pickup'
       };
     }
 
@@ -138,7 +144,8 @@ export class ColoniaService {
         name: REGIBY_DEPOT.name,
         lat: REGIBY_DEPOT.lat,
         lng: REGIBY_DEPOT.lng,
-        isPickup: true
+        isPickup: true,
+        zone: 'Pickup'
       };
     }
 
@@ -146,7 +153,13 @@ export class ColoniaService {
       const normKw = this.normalize(entry.keyword);
       const regex = new RegExp(`\\b${normKw}\\b`, 'i');
       if (regex.test(norm)) {
-        return { name: entry.colonia.name, lat: entry.colonia.lat, lng: entry.colonia.lng, isPickup: false };
+        return {
+          name: entry.colonia.name,
+          lat: entry.colonia.lat,
+          lng: entry.colonia.lng,
+          isPickup: false,
+          zone: entry.colonia.zone
+        };
       }
     }
 
@@ -163,7 +176,13 @@ export class ColoniaService {
       }
 
       if (closest && minDistance <= 2.8) {
-        return { name: closest.name, lat: closest.lat, lng: closest.lng, isPickup: false };
+        return {
+          name: closest.name,
+          lat: closest.lat,
+          lng: closest.lng,
+          isPickup: false,
+          zone: closest.zone
+        };
       }
     }
 
@@ -171,7 +190,8 @@ export class ColoniaService {
       name: 'Otras Colonias (NLD)',
       lat: 27.4861,
       lng: -99.5150,
-      isPickup: false
+      isPickup: false,
+      zone: 'Poniente'
     };
   }
 
@@ -185,7 +205,8 @@ export class ColoniaService {
             totalPickupOrders: 0,
             topColoniaName: 'Sin datos',
             topColoniaPercentage: 0,
-            colonias: []
+            colonias: [],
+            zones: []
           };
         }
 
@@ -196,6 +217,7 @@ export class ColoniaService {
           lat: number;
           lng: number;
           isPickup: boolean;
+          zone: string;
           clientCoords: { lat: number; lng: number }[];
         }>();
 
@@ -213,6 +235,7 @@ export class ColoniaService {
             lat: match.lat,
             lng: match.lng,
             isPickup: match.isPickup,
+            zone: match.zone,
             clientCoords: []
           };
 
@@ -224,10 +247,8 @@ export class ColoniaService {
           groups.set(match.name, current);
         }
 
-        // Las coordenadas de cada colonia provienen de su centroide geográfico catalogado exacto
         const totalOrders = totalPurchases || 1;
 
-        // Separamos colonias nombradas válidas, otras colonias, y pickup
         const namedList = Array.from(groups.values())
           .filter(g => !g.isPickup && g.name !== 'Otras Colonias (NLD)')
           .sort((a, b) => b.ordersCount - a.ordersCount);
@@ -248,11 +269,12 @@ export class ColoniaService {
             longitude: g.lng,
             rank: rankCounter++,
             isPickup: false,
-            clientsCount: g.clientsCount
+            clientsCount: g.clientsCount,
+            zone: g.zone
           });
         }
 
-        // 2. Otras Colonias (al final de las colonias, sin corona de reina)
+        // 2. Otras Colonias
         if (othersGroup) {
           resultStats.push({
             coloniaName: othersGroup.name,
@@ -262,7 +284,8 @@ export class ColoniaService {
             longitude: othersGroup.lng,
             rank: rankCounter++,
             isPickup: false,
-            clientsCount: othersGroup.clientsCount
+            clientsCount: othersGroup.clientsCount,
+            zone: othersGroup.zone
           });
         }
 
@@ -276,13 +299,39 @@ export class ColoniaService {
             longitude: REGIBY_DEPOT.lng,
             rank: 0,
             isPickup: true,
-            clientsCount: pickupGroup.clientsCount
+            clientsCount: pickupGroup.clientsCount,
+            zone: 'Pickup'
           });
         }
 
         const totalPickupOrders = pickupGroup ? pickupGroup.ordersCount : 0;
-        // La reina es la colonia nombrada #1
         const topColonia = resultStats.find(c => !c.isPickup && c.coloniaName !== 'Otras Colonias (NLD)') || resultStats[0];
+
+        // Calcular resumen por zonas
+        const zoneConfigs = [
+          { key: 'Poniente', name: 'Poniente', emoji: '❤️' },
+          { key: 'Oriente', name: 'Oriente / Centro', emoji: '⭐' },
+          { key: 'Sur', name: 'Sur', emoji: '👍' },
+          { key: 'Kilometros', name: 'Kilómetros', emoji: '👏' },
+          { key: 'Pickup', name: 'Pickup Matriz', emoji: '🛍️' }
+        ];
+
+        const zones = zoneConfigs.map(cfg => {
+          const inZone = resultStats.filter(c => c.zone === cfg.key);
+          const zoneOrders = inZone.reduce((sum, c) => sum + c.ordersCount, 0);
+          const zoneClients = inZone.reduce((sum, c) => sum + c.clientsCount, 0);
+          const zonePercentage = totalOrders > 0 ? Number(((zoneOrders / totalOrders) * 100).toFixed(1)) : 0;
+          const topCol = inZone.find(c => !c.isPickup && c.coloniaName !== 'Otras Colonias (NLD)');
+          return {
+            zone: cfg.key,
+            displayName: cfg.name,
+            emoji: cfg.emoji,
+            ordersCount: zoneOrders,
+            percentage: zonePercentage,
+            clientsCount: zoneClients,
+            topColoniaName: topCol?.coloniaName || null
+          };
+        });
 
         return {
           totalOrders,
@@ -290,7 +339,8 @@ export class ColoniaService {
           totalPickupOrders,
           topColoniaName: topColonia?.coloniaName || 'Sin datos',
           topColoniaPercentage: topColonia?.percentage || 0,
-          colonias: resultStats
+          colonias: resultStats,
+          zones
         };
       })
     );
