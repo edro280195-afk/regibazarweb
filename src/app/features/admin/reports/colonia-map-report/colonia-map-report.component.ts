@@ -416,7 +416,7 @@ import { environment } from '../../../../../environments/environment';
                 <span class="text-2xl">🎀</span>
                 <div>
                   <h3 class="font-black text-base sm:text-lg leading-tight">Presumir en Redes Sociales</h3>
-                  <p class="text-[11px] text-pink-100 font-medium">Exporta tu gráfico aesthetic para Instagram & Facebook</p>
+                  <p class="text-[11px] text-pink-100 font-medium">Toma captura de pantalla para subir a Stories o Feed 💕</p>
                 </div>
               </div>
               <button
@@ -584,27 +584,18 @@ import { environment } from '../../../../../environments/environment';
               </div>
             </div>
 
-            <!-- Botones de Acción en el Modal -->
-            <div class="p-4 sm:px-6 bg-white border-t border-gray-100 flex flex-wrap items-center justify-end gap-2">
+            <!-- Tip de captura y botón de cerrar -->
+            <div class="p-4 sm:px-6 bg-pink-50/70 border-t border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div class="flex items-center gap-2 text-xs font-bold text-pink-700 text-center sm:text-left">
+                <span class="text-xl">📸</span>
+                <span>¡Toma captura de pantalla a la tarjeta y compártela en tus redes! ✨</span>
+              </div>
+
               <button
                 (click)="closeSocialModal()"
                 type="button"
-                class="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-all">
-                Cerrar
-              </button>
-
-              <button
-                (click)="exportSocialImage()"
-                [disabled]="exporting()"
-                type="button"
-                class="btn-coquette bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md shadow-pink-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
-                @if (exporting()) {
-                  <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  <span>Generando Imagen...</span>
-                } @else {
-                  <span>📲</span>
-                  <span>Compartir / Descargar</span>
-                }
+                class="btn-coquette bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2.5 rounded-xl text-xs font-black shadow-md shadow-pink-200 hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
+                Cerrar Vista Previa
               </button>
             </div>
 
@@ -645,7 +636,6 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
 
   report = signal<ColoniaReportDto | null>(null);
   loading = signal(false);
-  exporting = signal(false);
   showSocialModal = signal(false);
   socialFormat = signal<'story' | 'post'>('story');
 
@@ -964,30 +954,5 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
 
   closeSocialModal(): void {
     this.showSocialModal.set(false);
-  }
-
-  async exportSocialImage(): Promise<void> {
-    this.exporting.set(true);
-    try {
-      const topName = this.report()?.topColoniaName || 'Nuevo Laredo';
-      const result = await this.coloniaService.exportSocialImage(
-        'socialCardExport',
-        `regibazar_top_colonias_${Date.now()}`,
-        '👑 Top Colonias Regi Bazar',
-        `¡${topName} es la colonia reina de compras en Regi Bazar! 💖🛍️`
-      );
-
-      if (result.shared) {
-        this.toast.success('¡Listo para compartir en Instagram! 📸✨');
-      } else {
-        this.toast.success('¡Imagen descargada con éxito! 🌸💾');
-      }
-      this.closeSocialModal();
-    } catch (err) {
-      console.error(err);
-      this.toast.error('No se pudo generar la imagen para redes');
-    } finally {
-      this.exporting.set(false);
-    }
   }
 }
