@@ -7,6 +7,7 @@ import { GoogleMap, MapMarker, MapCircle, MapInfoWindow } from '@angular/google-
 import { ColoniaService, PINK_COQUETTE_MAP_STYLES, REGIBY_DEPOT } from '../../../../core/services/colonia.service';
 import { ColoniaReportDto, ColoniaStatsDto } from '../../../../core/models';
 import { ToastService } from '../../../../core/services/toast.service';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-colonia-map-report',
@@ -476,128 +477,40 @@ import { ToastService } from '../../../../core/services/toast.service';
                   }
                 </div>
 
-                <!-- ── HERO: EL MAPA ROSA VECTORIAL DE NUEVO LAREDO ── -->
+                <!-- ── HERO: EL MAPA REAL DE GOOGLE EN ROSA COQUETTE ── -->
                 <div
-                  [class]="socialFormat() === 'story' ? 'h-[270px] my-2' : 'h-[210px] my-1.5'"
-                  class="relative w-full rounded-2xl overflow-hidden border-2 border-pink-200/90 shadow-md bg-gradient-to-br from-[#fff1f5] via-[#ffe4ec] to-[#fce7f3] z-10 shrink-0">
+                  [class]="socialFormat() === 'story' ? 'h-[280px] my-2' : 'h-[215px] my-1.5'"
+                  class="relative w-full rounded-2xl overflow-hidden border-2 border-pink-200 shadow-md bg-pink-50 z-10 shrink-0">
 
-                  <!-- Fondo Cartográfico SVG de Nuevo Laredo -->
-                  <svg viewBox="0 0 100 100" class="w-full h-full absolute inset-0 pointer-events-none" preserveAspectRatio="none">
-                    <defs>
-                      <radialGradient id="queenHeat" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.8"/>
-                        <stop offset="40%" stop-color="#ec4899" stop-opacity="0.45"/>
-                        <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
-                      </radialGradient>
-                      <radialGradient id="coloniaHeat" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#f472b6" stop-opacity="0.7"/>
-                        <stop offset="60%" stop-color="#fda4af" stop-opacity="0.3"/>
-                        <stop offset="100%" stop-color="#fda4af" stop-opacity="0"/>
-                      </radialGradient>
-                      <radialGradient id="matrizHeat" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#a855f7" stop-opacity="0.8"/>
-                        <stop offset="60%" stop-color="#c084fc" stop-opacity="0.3"/>
-                        <stop offset="100%" stop-color="#c084fc" stop-opacity="0"/>
-                      </radialGradient>
-                    </defs>
+                  <!-- Imagen Real de Google Static Maps de Nuevo Laredo -->
+                  <img
+                    [src]="staticMapUrl()"
+                    crossOrigin="anonymous"
+                    alt="Mapa de Compras Nuevo Laredo"
+                    class="w-full h-full object-cover select-none pointer-events-none" />
 
-                    <!-- Cuadrícula sutil de coordenadas coquette -->
-                    <line x1="20" y1="0" x2="20" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
-                    <line x1="40" y1="0" x2="40" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
-                    <line x1="60" y1="0" x2="60" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
-                    <line x1="80" y1="0" x2="80" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
-                    <line x1="0" y1="30" x2="100" y2="30" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
-                    <line x1="0" y1="60" x2="100" y2="60" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
-
-                    <!-- Río Bravo (Ribbon de agua rosa/lavanda a lo largo del norte y oriente) -->
-                    <path d="M 0 6 Q 40 8, 86 16 T 98 28 Q 96 65, 92 100" fill="none" stroke="#fbcfe8" stroke-width="6" stroke-linecap="round"/>
-                    <path d="M 0 6 Q 40 8, 86 16 T 98 28 Q 96 65, 92 100" fill="none" stroke="#f472b6" stroke-width="1.8" stroke-linecap="round"/>
-
-                    <!-- Principales avenidas de Nuevo Laredo (blanco y blush) -->
-                    <path d="M 86 22 L 81 100" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
-                    <path d="M 86 22 L 81 100" stroke="#fecdd3" stroke-width="1" stroke-linecap="round"/>
-                    <path d="M 0 42 Q 45 38, 86 28" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M 0 42 Q 45 38, 86 28" stroke="#fecdd3" stroke-width="0.9" stroke-linecap="round"/>
-                    <path d="M 40 10 Q 82 20, 93 32 Q 91 65, 88 95" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
-                    <path d="M 15 58 L 94 54" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
-                    <path d="M 84 25 L 80 75" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
-
-                    <!-- Textos geográficos sutiles -->
-                    <text x="75" y="8" font-size="3.2" font-weight="bold" fill="#db2777" opacity="0.7">RÍO BRAVO 🌊</text>
-                    <text x="96" y="8" font-size="3" font-weight="bold" fill="#9d174d" opacity="0.6">USA 🇺🇸</text>
-                    <text x="6" y="94" font-size="3.2" font-weight="bold" fill="#be185d" opacity="0.6">NUEVO LAREDO, TAMPS. 🇲🇽</text>
-
-                    <!-- Roseta náutica coquette -->
-                    <text x="6" y="14" font-size="4" font-weight="900" fill="#be185d">N 🎀</text>
-
-                    <!-- Burbujas de calor bajo colonias -->
-                    @for (c of deliveryColonias(); track c.coloniaName) {
-                      @if (c.rank === 1) {
-                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="14" fill="url(#queenHeat)"/>
-                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="3" fill="#f43f5e" stroke="#ffffff" stroke-width="0.8"/>
-                      } @else if (c.rank <= 3) {
-                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="9" fill="url(#coloniaHeat)"/>
-                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="2" fill="#ec4899" stroke="#ffffff" stroke-width="0.6"/>
-                      } @else {
-                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="4" fill="#fda4af" opacity="0.5"/>
-                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="1.2" fill="#f472b6"/>
-                      }
-                    }
-
-                    <!-- Halo Matriz Pickup en C. Rio Indo 1601, Voluntad y Trabajo 3 -->
-                    @if (pickupStats(); as p) {
-                      <circle [attr.cx]="getSocialX(p.longitude)" [attr.cy]="getSocialY(p.latitude)" r="9" fill="url(#matrizHeat)"/>
-                      <circle [attr.cx]="getSocialX(p.longitude)" [attr.cy]="getSocialY(p.latitude)" r="2.2" fill="#9333ea" stroke="#ffffff" stroke-width="0.6"/>
-                    }
-                  </svg>
-
-                  <!-- Badges Flotantes sobre el mapa de la tarjeta -->
+                  <!-- Badges Flotantes sobre el mapa real -->
                   <!-- Reina #1 -->
                   @if (topThree()[0]; as first) {
-                    <div
-                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white text-[9.5px] font-black shadow-lg border-2 border-white whitespace-nowrap z-30 pointer-events-none"
-                      [style.left.%]="getBadgeX(first.longitude)"
-                      [style.top.%]="getBadgeY(first.latitude)">
+                    <div class="absolute top-2.5 right-2.5 flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white text-[10px] font-black shadow-lg border border-white">
                       <span>👑</span>
-                      <span>#1 {{ cleanColoniaName(first.coloniaName) }}</span>
+                      <span class="truncate max-w-[130px]">#1 {{ cleanColoniaName(first.coloniaName) }}</span>
                       <span class="bg-white/30 text-white px-1.5 py-0.2 rounded-full font-black text-[9px]">{{ first.percentage }}%</span>
                     </div>
                   }
 
-                  <!-- 2do Lugar -->
-                  @if (topThree()[1]; as second) {
-                    <div
-                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-pink-800 text-[8.5px] font-black shadow-md border border-pink-300 whitespace-nowrap z-20 pointer-events-none"
-                      [style.left.%]="getBadgeX(second.longitude)"
-                      [style.top.%]="getBadgeY(second.latitude)">
-                      <span>🥈</span>
-                      <span>{{ cleanColoniaName(second.coloniaName) }}</span>
-                      <span class="text-rose-600 font-black">{{ second.percentage }}%</span>
-                    </div>
-                  }
-
-                  <!-- 3er Lugar -->
-                  @if (topThree()[2]; as third) {
-                    <div
-                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-pink-800 text-[8.5px] font-black shadow-md border border-pink-300 whitespace-nowrap z-20 pointer-events-none"
-                      [style.left.%]="getBadgeX(third.longitude)"
-                      [style.top.%]="getBadgeY(third.latitude)">
-                      <span>🥉</span>
-                      <span>{{ cleanColoniaName(third.coloniaName) }}</span>
-                      <span class="text-rose-600 font-black">{{ third.percentage }}%</span>
-                    </div>
-                  }
-
-                  <!-- Matriz Regi Bazar Pickup -->
+                  <!-- Matriz Pickup -->
                   @if (pickupStats(); as p) {
-                    <div
-                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black shadow-md border border-white whitespace-nowrap z-20 pointer-events-none"
-                      [style.left.%]="getBadgeX(p.longitude)"
-                      [style.top.%]="getBadgeY(p.latitude)">
+                    <div class="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-700/95 text-white text-[9px] font-black shadow-md border border-white">
                       <span>🏠</span>
                       <span>Matriz ({{ p.percentage }}%)</span>
                     </div>
                   }
+
+                  <!-- Tag de ciudad -->
+                  <div class="absolute bottom-2.5 right-2.5 text-[8.5px] font-extrabold text-pink-700 bg-white/90 px-2 py-0.5 rounded-full border border-pink-200 shadow-sm">
+                    📍 Nuevo Laredo
+                  </div>
                 </div>
 
                 <!-- ── SECCIÓN INFERIOR: PODIUM Y VIRAL CTA ── -->
@@ -872,92 +785,105 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     };
   }
 
-  // Generador de pines/chips speech-bubble limpios, coquette y elegantes (sin emojis tacky de corazón)
+  // Generador de pines limpios, coquette y estéticos (sin números toscos de % sobre el mapa)
   getMarkerOptions(c: ColoniaStatsDto): google.maps.MarkerOptions {
     const isPickup = c.isPickup;
     const isTop1 = c.rank === 1 && !isPickup;
     const isTop2 = c.rank === 2 && !isPickup;
     const isTop3 = c.rank === 3 && !isPickup;
 
-    let width = 54;
-    let height = 28;
+    let width = 18;
+    let height = 18;
+    let anchorX = 9;
+    let anchorY = 9;
     let svg = '';
 
     if (isPickup) {
-      width = 86;
-      height = 34;
-      const w = width;
-      const h = height;
-      const halfW = w / 2;
+      width = 42;
+      height = 50;
+      anchorX = 21;
+      anchorY = 48;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="42" height="50" viewBox="0 0 42 50">
           <defs>
             <linearGradient id="mGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#9333ea"/>
               <stop offset="100%" stop-color="#7c3aed"/>
             </linearGradient>
-            <filter id="mSh" x="-10%" y="-10%" width="125%" height="135%">
-              <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#581c87" flood-opacity="0.35"/>
+            <filter id="mDrop" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2.5" stdDeviation="2" flood-color="#581c87" flood-opacity="0.35"/>
             </filter>
           </defs>
-          <path d="M 6 2 h ${w - 12} a 12 12 0 0 1 12 12 a 12 12 0 0 1 -12 12 h -${halfW - 6} l -6 6 l -6 -6 h -${halfW - 6} a 12 12 0 0 1 -12 -12 a 12 12 0 0 1 12 -12 z" fill="url(#mGrad)" stroke="#ffffff" stroke-width="2" filter="url(#mSh)"/>
-          <text x="${halfW}" y="15" font-family="Poppins, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="central">🏠 Matriz</text>
+          <path d="M 21 2 C 10.5 2 2 10.5 2 21 C 2 33 21 48 21 48 C 21 48 40 33 40 21 C 40 10.5 31.5 2 21 2 Z" fill="url(#mGrad)" stroke="#ffffff" stroke-width="2.2" filter="url(#mDrop)"/>
+          <circle cx="21" cy="21" r="13" fill="#ffffff"/>
+          <text x="21" y="26" font-size="15" text-anchor="middle" dominant-baseline="middle">🏠</text>
         </svg>
       `;
     } else if (isTop1) {
-      width = 80;
-      height = 34;
-      const w = width;
-      const h = height;
-      const halfW = w / 2;
+      width = 44;
+      height = 52;
+      anchorX = 22;
+      anchorY = 50;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="44" height="52" viewBox="0 0 44 52">
           <defs>
             <linearGradient id="qGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#ec4899"/>
-              <stop offset="100%" stop-color="#e11d48"/>
+              <stop offset="0%" stop-color="#f43f5e"/>
+              <stop offset="100%" stop-color="#ec4899"/>
             </linearGradient>
-            <filter id="qSh" x="-10%" y="-10%" width="125%" height="135%">
-              <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#881337" flood-opacity="0.35"/>
+            <filter id="qDrop" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#881337" flood-opacity="0.35"/>
             </filter>
           </defs>
-          <path d="M 6 2 h ${w - 12} a 12 12 0 0 1 12 12 a 12 12 0 0 1 -12 12 h -${halfW - 6} l -6 6 l -6 -6 h -${halfW - 6} a 12 12 0 0 1 -12 -12 a 12 12 0 0 1 12 -12 z" fill="url(#qGrad)" stroke="#ffffff" stroke-width="2" filter="url(#qSh)"/>
-          <text x="${halfW}" y="15" font-family="Poppins, -apple-system, sans-serif" font-size="11.5" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="central">👑 ${c.percentage}%</text>
+          <path d="M 22 2 C 11 2 2 11 2 22 C 2 34 22 50 22 50 C 22 50 42 34 42 22 C 42 11 33 2 22 2 Z" fill="url(#qGrad)" stroke="#ffffff" stroke-width="2.5" filter="url(#qDrop)"/>
+          <circle cx="22" cy="22" r="14" fill="#ffffff"/>
+          <text x="22" y="27" font-size="16" text-anchor="middle" dominant-baseline="middle">👑</text>
         </svg>
       `;
-    } else if (isTop2 || isTop3) {
-      width = 70;
-      height = 30;
-      const w = width;
-      const h = height;
-      const halfW = w / 2;
-      const label = isTop2 ? `#2 • ${c.percentage}%` : `#3 • ${c.percentage}%`;
+    } else if (isTop2) {
+      width = 36;
+      height = 44;
+      anchorX = 18;
+      anchorY = 42;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
           <defs>
-            <filter id="topSh" x="-10%" y="-10%" width="125%" height="135%">
-              <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#f43f5e" flood-opacity="0.25"/>
+            <filter id="t2Drop" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#f43f5e" flood-opacity="0.25"/>
             </filter>
           </defs>
-          <path d="M 5 2 h ${w - 10} a 11 11 0 0 1 11 11 a 11 11 0 0 1 -11 11 h -${halfW - 5} l -5 5 l -5 -5 h -${halfW - 5} a 11 11 0 0 1 -11 -11 a 11 11 0 0 1 11 -11 z" fill="#ffffff" stroke="#f472b6" stroke-width="2" filter="url(#topSh)"/>
-          <text x="${halfW}" y="14" font-family="Poppins, -apple-system, sans-serif" font-size="10.5" font-weight="900" fill="#be185d" text-anchor="middle" dominant-baseline="central">${label}</text>
+          <path d="M 18 2 C 9 2 2 9 2 18 C 2 28 18 42 18 42 C 18 42 34 28 34 18 C 34 9 27 2 18 2 Z" fill="#ffffff" stroke="#f472b6" stroke-width="2" filter="url(#t2Drop)"/>
+          <circle cx="18" cy="18" r="11" fill="#fdf2f8"/>
+          <text x="18" y="22" font-size="13" text-anchor="middle" dominant-baseline="middle">🥈</text>
+        </svg>
+      `;
+    } else if (isTop3) {
+      width = 36;
+      height = 44;
+      anchorX = 18;
+      anchorY = 42;
+      svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+          <defs>
+            <filter id="t3Drop" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#f43f5e" flood-opacity="0.25"/>
+            </filter>
+          </defs>
+          <path d="M 18 2 C 9 2 2 9 2 18 C 2 28 18 42 18 42 C 18 42 34 28 34 18 C 34 9 27 2 18 2 Z" fill="#ffffff" stroke="#f472b6" stroke-width="2" filter="url(#t3Drop)"/>
+          <circle cx="18" cy="18" r="11" fill="#fdf2f8"/>
+          <text x="18" y="22" font-size="13" text-anchor="middle" dominant-baseline="middle">🥉</text>
         </svg>
       `;
     } else {
-      width = 54;
-      height = 28;
-      const w = width;
-      const h = height;
-      const halfW = w / 2;
+      // Punto fino y delicado para el resto de colonias
+      width = 18;
+      height = 18;
+      anchorX = 9;
+      anchorY = 9;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-          <defs>
-            <filter id="pSh" x="-10%" y="-10%" width="125%" height="135%">
-              <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#f43f5e" flood-opacity="0.2"/>
-            </filter>
-          </defs>
-          <path d="M 5 2 h ${w - 10} a 10 10 0 0 1 10 10 a 10 10 0 0 1 -10 10 h -${halfW - 4} l -4 4 l -4 -4 h -${halfW - 4} a 10 10 0 0 1 -10 -10 a 10 10 0 0 1 10 -10 z" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.8" filter="url(#pSh)"/>
-          <text x="${halfW}" y="13" font-family="Poppins, -apple-system, sans-serif" font-size="10" font-weight="800" fill="#9d174d" text-anchor="middle" dominant-baseline="central">${c.percentage}%</text>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+          <circle cx="9" cy="9" r="8" fill="#ffffff" stroke="#ec4899" stroke-width="2.5"/>
+          <circle cx="9" cy="9" r="4" fill="#f43f5e"/>
         </svg>
       `;
     }
@@ -967,35 +893,59 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
         scaledSize: typeof google !== 'undefined' ? new google.maps.Size(width, height) : undefined,
-        anchor: typeof google !== 'undefined' ? new google.maps.Point(width / 2, height - 1) : undefined
+        anchor: typeof google !== 'undefined' ? new google.maps.Point(anchorX, anchorY) : undefined
       }
     };
   }
 
-  // ── PROYECCIÓN CARTOGRÁFICA PARA EL MAPA ROSA SOCIAL ──
-  getSocialX(lng: number): number {
-    const lngMin = -99.630;
-    const lngMax = -99.490;
-    const clamped = Math.max(lngMin, Math.min(lngMax, lng));
-    return Number((((clamped - lngMin) / (lngMax - lngMin)) * 100).toFixed(2));
-  }
+  // ── URL DE GOOGLE STATIC MAPS (MAPA REAL DE NUEVO LAREDO EN ROSA) ──
+  staticMapUrl = computed(() => {
+    const format = this.socialFormat();
+    const width = format === 'story' ? 560 : 540;
+    const height = format === 'story' ? 440 : 340;
+    const key = environment.googleMapsApiKey;
 
-  getSocialY(lat: number): number {
-    const latMin = 27.380;
-    const latMax = 27.525;
-    const clamped = Math.max(latMin, Math.min(latMax, lat));
-    return Number((((latMax - clamped) / (latMax - latMin)) * 100).toFixed(2));
-  }
+    const top1 = this.topThree()[0];
+    let centerLat = 27.4861;
+    let centerLng = -99.5300;
+    if (top1) {
+      centerLat = Number(((top1.latitude + 27.4861 + REGIBY_DEPOT.lat) / 3).toFixed(4));
+      centerLng = Number(((top1.longitude + -99.5300 + REGIBY_DEPOT.lng) / 3).toFixed(4));
+    }
 
-  getBadgeX(lng: number): number {
-    const x = this.getSocialX(lng);
-    return Math.max(16, Math.min(84, x));
-  }
+    let url = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=13&size=${width}x${height}&scale=2&maptype=roadmap`;
+    url += '&style=element:geometry%7Ccolor:0xfff1f4';
+    url += '&style=element:labels.text.fill%7Ccolor:0x831843';
+    url += '&style=element:labels.text.stroke%7Ccolor:0xffffff';
+    url += '&style=feature:water%7Celement:geometry%7Ccolor:0xfbcfe8';
+    url += '&style=feature:water%7Celement:labels.text.fill%7Ccolor:0xdb2777';
+    url += '&style=feature:road%7Celement:geometry%7Ccolor:0xffffff';
+    url += '&style=feature:road.highway%7Celement:geometry%7Ccolor:0xfda4af';
+    url += '&style=feature:road.arterial%7Celement:geometry%7Ccolor:0xfecdd3';
+    url += '&style=feature:administrative%7Celement:geometry%7Ccolor:0xfbcfe8';
+    url += '&style=feature:poi%7Cvisibility:off';
+    url += '&style=feature:transit%7Cvisibility:off';
 
-  getBadgeY(lat: number): number {
-    const y = this.getSocialY(lat);
-    return Math.max(12, Math.min(86, y));
-  }
+    // Marcador #1 Reina
+    if (top1) {
+      url += `&markers=color:0xf43f5e%7Clabel:1%7C${top1.latitude},${top1.longitude}`;
+    }
+    // Marcador #2
+    const top2 = this.topThree()[1];
+    if (top2) {
+      url += `&markers=color:0xec4899%7Clabel:2%7C${top2.latitude},${top2.longitude}`;
+    }
+    // Marcador #3
+    const top3 = this.topThree()[2];
+    if (top3) {
+      url += `&markers=color:0xf472b6%7Clabel:3%7C${top3.latitude},${top3.longitude}`;
+    }
+    // Marcador Matriz Regi Bazar
+    url += `&markers=color:0x9333ea%7Clabel:M%7C${REGIBY_DEPOT.lat},${REGIBY_DEPOT.lng}`;
+
+    url += `&key=${key}`;
+    return url;
+  });
 
   cleanColoniaName(name: string): string {
     return name.replace(/^Col\.\s*|^Fracc\.\s*/i, '');
