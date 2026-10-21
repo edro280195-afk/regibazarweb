@@ -1,5 +1,5 @@
 import {
-  Component, Input, OnInit, OnChanges, SimpleChanges, ViewChild,
+  Component, Input, OnInit, OnChanges, SimpleChanges, ViewChild, ViewChildren, QueryList,
   signal, computed, inject, CUSTOM_ELEMENTS_SCHEMA
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -444,76 +444,229 @@ import { ToastService } from '../../../../core/services/toast.service';
             </div>
 
             <!-- Contenedor del Preview para html2canvas -->
-            <div class="p-4 sm:p-6 flex items-center justify-center bg-gray-50/70 overflow-hidden">
+            <div class="p-3 sm:p-5 flex items-center justify-center bg-gray-50/70 overflow-hidden">
               <div
                 id="socialCardExport"
-                [class]="socialFormat() === 'story' ? 'w-[320px] min-h-[568px] py-6 px-5' : 'w-[320px] h-[320px] p-4'"
-                class="bg-gradient-to-b from-[#fff5f7] via-[#fdf2f8] to-[#fce7f3] rounded-[2rem] border-2 border-pink-300 shadow-xl flex flex-col justify-between relative overflow-hidden text-center select-none">
+                [class]="socialFormat() === 'story' ? 'w-[340px] min-h-[610px] p-4 sm:p-5' : 'w-[360px] h-[360px] p-3 sm:p-4'"
+                class="bg-gradient-to-b from-[#fff5f8] via-[#fdf2f8] to-[#fce7f3] rounded-[2.5rem] border-2 border-pink-300 shadow-2xl flex flex-col justify-between relative overflow-hidden text-center select-none font-sans">
                 
-                <!-- Decoración de lazo y destellos en el banner -->
-                <div class="absolute -top-6 -right-6 text-6xl opacity-15 pointer-events-none">🌸</div>
-                <div class="absolute -bottom-6 -left-6 text-6xl opacity-15 pointer-events-none">💖</div>
+                <!-- Decoración Coquette de fondo -->
+                <div class="absolute -top-8 -right-8 text-7xl opacity-10 pointer-events-none">🌸</div>
+                <div class="absolute -bottom-8 -left-8 text-7xl opacity-10 pointer-events-none">✨</div>
 
                 <!-- Header de la tarjeta social -->
-                <div>
-                  <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/90 border border-pink-200 text-[10px] font-black text-pink-600 shadow-sm mb-1.5">
+                <div class="relative z-10 shrink-0">
+                  <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 border border-pink-200 text-[10px] font-black text-pink-600 shadow-sm mb-1">
                     <span>🎀</span>
                     <span>REGI BAZAR • NUEVO LAREDO</span>
                     <span>✨</span>
                   </div>
 
-                  <h2 class="text-xl sm:text-2xl font-black text-pink-900 tracking-tight leading-tight">
-                    TOP COLONIAS MÁS REGIS 💖
-                  </h2>
-                  <p class="text-[11px] text-pink-600 font-bold mt-0.5">
-                    ¿De qué colonia eres tú? ¡Nuevo Laredo es territorio Regi Bazar! 🛍️
-                  </p>
+                  @if (socialFormat() === 'story') {
+                    <h2 class="text-lg sm:text-xl font-black text-pink-900 tracking-tight leading-tight mt-0.5">
+                      👑 ¿CUÁL ES LA COLONIA MÁS REGIA? 💕
+                    </h2>
+                    <p class="text-[11px] text-pink-600/90 font-bold mt-0.5">
+                      Mapa oficial de entregas en vivo 🛍️
+                    </p>
+                  } @else {
+                    <h2 class="text-base font-black text-pink-900 tracking-tight leading-tight">
+                      👑 NUEVO LAREDO ES TERRITORIO REGI BAZAR 💖
+                    </h2>
+                  }
                 </div>
 
-                <!-- Mini ilustración gráfica de mapa con pines coquette -->
-                <div class="my-2 p-3 bg-white/80 rounded-2xl border border-pink-200/70 shadow-inner flex flex-col gap-2">
-                  <div class="flex items-center justify-between text-[11px] font-black text-pink-800 pb-1 border-b border-pink-100">
-                    <span class="flex items-center gap-1">📍 Ranking Oficial</span>
-                    <span class="text-pink-500 font-bold">% de Compras</span>
-                  </div>
+                <!-- ── HERO: EL MAPA ROSA VECTORIAL DE NUEVO LAREDO ── -->
+                <div
+                  [class]="socialFormat() === 'story' ? 'h-[270px] my-2' : 'h-[210px] my-1.5'"
+                  class="relative w-full rounded-2xl overflow-hidden border-2 border-pink-200/90 shadow-md bg-gradient-to-br from-[#fff1f5] via-[#ffe4ec] to-[#fce7f3] z-10 shrink-0">
 
-                  <!-- Ranking Top 4 + Pickup -->
-                  <div class="space-y-1.5 text-left">
-                    @for (c of topColoniasForSocial(); track c.coloniaName; let idx = $index) {
-                      <div class="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-pink-50/80 border border-pink-100">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                          <span class="text-xs">{{ idx === 0 ? '👑' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '🌸')) }}</span>
-                          <span class="text-xs font-black text-pink-900 truncate">{{ c.coloniaName }}</span>
+                  <!-- Fondo Cartográfico SVG de Nuevo Laredo -->
+                  <svg viewBox="0 0 100 100" class="w-full h-full absolute inset-0 pointer-events-none" preserveAspectRatio="none">
+                    <defs>
+                      <radialGradient id="queenHeat" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.8"/>
+                        <stop offset="40%" stop-color="#ec4899" stop-opacity="0.45"/>
+                        <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+                      </radialGradient>
+                      <radialGradient id="coloniaHeat" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#f472b6" stop-opacity="0.7"/>
+                        <stop offset="60%" stop-color="#fda4af" stop-opacity="0.3"/>
+                        <stop offset="100%" stop-color="#fda4af" stop-opacity="0"/>
+                      </radialGradient>
+                      <radialGradient id="matrizHeat" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#a855f7" stop-opacity="0.8"/>
+                        <stop offset="60%" stop-color="#c084fc" stop-opacity="0.3"/>
+                        <stop offset="100%" stop-color="#c084fc" stop-opacity="0"/>
+                      </radialGradient>
+                    </defs>
+
+                    <!-- Cuadrícula sutil de coordenadas coquette -->
+                    <line x1="20" y1="0" x2="20" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
+                    <line x1="40" y1="0" x2="40" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
+                    <line x1="60" y1="0" x2="60" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
+                    <line x1="80" y1="0" x2="80" y2="100" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
+                    <line x1="0" y1="30" x2="100" y2="30" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
+                    <line x1="0" y1="60" x2="100" y2="60" stroke="#fbcfe8" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.6"/>
+
+                    <!-- Río Bravo (Ribbon de agua rosa/lavanda a lo largo del norte y oriente) -->
+                    <path d="M 0 6 Q 40 8, 86 16 T 98 28 Q 96 65, 92 100" fill="none" stroke="#fbcfe8" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M 0 6 Q 40 8, 86 16 T 98 28 Q 96 65, 92 100" fill="none" stroke="#f472b6" stroke-width="1.8" stroke-linecap="round"/>
+
+                    <!-- Principales avenidas de Nuevo Laredo (blanco y blush) -->
+                    <path d="M 86 22 L 81 100" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+                    <path d="M 86 22 L 81 100" stroke="#fecdd3" stroke-width="1" stroke-linecap="round"/>
+                    <path d="M 0 42 Q 45 38, 86 28" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M 0 42 Q 45 38, 86 28" stroke="#fecdd3" stroke-width="0.9" stroke-linecap="round"/>
+                    <path d="M 40 10 Q 82 20, 93 32 Q 91 65, 88 95" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M 15 58 L 94 54" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M 84 25 L 80 75" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+
+                    <!-- Textos geográficos sutiles -->
+                    <text x="75" y="8" font-size="3.2" font-weight="bold" fill="#db2777" opacity="0.7">RÍO BRAVO 🌊</text>
+                    <text x="96" y="8" font-size="3" font-weight="bold" fill="#9d174d" opacity="0.6">USA 🇺🇸</text>
+                    <text x="6" y="94" font-size="3.2" font-weight="bold" fill="#be185d" opacity="0.6">NUEVO LAREDO, TAMPS. 🇲🇽</text>
+
+                    <!-- Roseta náutica coquette -->
+                    <text x="6" y="14" font-size="4" font-weight="900" fill="#be185d">N 🎀</text>
+
+                    <!-- Burbujas de calor bajo colonias -->
+                    @for (c of deliveryColonias(); track c.coloniaName) {
+                      @if (c.rank === 1) {
+                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="14" fill="url(#queenHeat)"/>
+                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="3" fill="#f43f5e" stroke="#ffffff" stroke-width="0.8"/>
+                      } @else if (c.rank <= 3) {
+                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="9" fill="url(#coloniaHeat)"/>
+                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="2" fill="#ec4899" stroke="#ffffff" stroke-width="0.6"/>
+                      } @else {
+                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="4" fill="#fda4af" opacity="0.5"/>
+                        <circle [attr.cx]="getSocialX(c.longitude)" [attr.cy]="getSocialY(c.latitude)" r="1.2" fill="#f472b6"/>
+                      }
+                    }
+
+                    <!-- Halo Matriz Pickup en C. Rio Indo 1601, Voluntad y Trabajo 3 -->
+                    @if (pickupStats(); as p) {
+                      <circle [attr.cx]="getSocialX(p.longitude)" [attr.cy]="getSocialY(p.latitude)" r="9" fill="url(#matrizHeat)"/>
+                      <circle [attr.cx]="getSocialX(p.longitude)" [attr.cy]="getSocialY(p.latitude)" r="2.2" fill="#9333ea" stroke="#ffffff" stroke-width="0.6"/>
+                    }
+                  </svg>
+
+                  <!-- Badges Flotantes sobre el mapa de la tarjeta -->
+                  <!-- Reina #1 -->
+                  @if (topThree()[0]; as first) {
+                    <div
+                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white text-[9.5px] font-black shadow-lg border-2 border-white whitespace-nowrap z-30 pointer-events-none"
+                      [style.left.%]="getBadgeX(first.longitude)"
+                      [style.top.%]="getBadgeY(first.latitude)">
+                      <span>👑</span>
+                      <span>#1 {{ cleanColoniaName(first.coloniaName) }}</span>
+                      <span class="bg-white/30 text-white px-1.5 py-0.2 rounded-full font-black text-[9px]">{{ first.percentage }}%</span>
+                    </div>
+                  }
+
+                  <!-- 2do Lugar -->
+                  @if (topThree()[1]; as second) {
+                    <div
+                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-pink-800 text-[8.5px] font-black shadow-md border border-pink-300 whitespace-nowrap z-20 pointer-events-none"
+                      [style.left.%]="getBadgeX(second.longitude)"
+                      [style.top.%]="getBadgeY(second.latitude)">
+                      <span>🥈</span>
+                      <span>{{ cleanColoniaName(second.coloniaName) }}</span>
+                      <span class="text-rose-600 font-black">{{ second.percentage }}%</span>
+                    </div>
+                  }
+
+                  <!-- 3er Lugar -->
+                  @if (topThree()[2]; as third) {
+                    <div
+                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-pink-800 text-[8.5px] font-black shadow-md border border-pink-300 whitespace-nowrap z-20 pointer-events-none"
+                      [style.left.%]="getBadgeX(third.longitude)"
+                      [style.top.%]="getBadgeY(third.latitude)">
+                      <span>🥉</span>
+                      <span>{{ cleanColoniaName(third.coloniaName) }}</span>
+                      <span class="text-rose-600 font-black">{{ third.percentage }}%</span>
+                    </div>
+                  }
+
+                  <!-- Matriz Regi Bazar Pickup -->
+                  @if (pickupStats(); as p) {
+                    <div
+                      class="absolute -translate-x-1/2 -translate-y-full mb-1 flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-black shadow-md border border-white whitespace-nowrap z-20 pointer-events-none"
+                      [style.left.%]="getBadgeX(p.longitude)"
+                      [style.top.%]="getBadgeY(p.latitude)">
+                      <span>🏠</span>
+                      <span>Matriz ({{ p.percentage }}%)</span>
+                    </div>
+                  }
+                </div>
+
+                <!-- ── SECCIÓN INFERIOR: PODIUM Y VIRAL CTA ── -->
+                @if (socialFormat() === 'story') {
+                  <!-- Mini Podium Cards -->
+                  <div class="grid grid-cols-2 gap-1.5 my-1 text-left shrink-0">
+                    @if (topThree()[0]; as first) {
+                      <div class="p-2 rounded-xl bg-pink-500 text-white flex items-center justify-between border border-pink-400 shadow-sm">
+                        <div class="min-w-0 pr-1">
+                          <p class="text-[9px] uppercase font-bold text-pink-100 flex items-center gap-0.5"><span>👑</span> Colonia Reina</p>
+                          <p class="text-[11px] font-black truncate leading-tight">{{ first.coloniaName }}</p>
                         </div>
-                        <span class="text-xs font-black text-pink-600 bg-white px-2 py-0.5 rounded-full border border-pink-200">
-                          {{ c.percentage }}%
-                        </span>
+                        <span class="text-xs font-black bg-white/20 px-1.5 py-0.5 rounded-lg shrink-0">{{ first.percentage }}%</span>
+                      </div>
+                    }
+
+                    @if (topThree()[1]; as second) {
+                      <div class="p-2 rounded-xl bg-white/90 text-pink-900 flex items-center justify-between border border-pink-200 shadow-sm">
+                        <div class="min-w-0 pr-1">
+                          <p class="text-[9px] uppercase font-bold text-pink-500 flex items-center gap-0.5"><span>🥈</span> 2do Lugar</p>
+                          <p class="text-[11px] font-black truncate leading-tight">{{ second.coloniaName }}</p>
+                        </div>
+                        <span class="text-xs font-black text-rose-500 bg-pink-100 px-1.5 py-0.5 rounded-lg shrink-0">{{ second.percentage }}%</span>
+                      </div>
+                    }
+
+                    @if (topThree()[2]; as third) {
+                      <div class="p-2 rounded-xl bg-white/90 text-pink-900 flex items-center justify-between border border-pink-200 shadow-sm">
+                        <div class="min-w-0 pr-1">
+                          <p class="text-[9px] uppercase font-bold text-pink-500 flex items-center gap-0.5"><span>🥉</span> 3er Lugar</p>
+                          <p class="text-[11px] font-black truncate leading-tight">{{ third.coloniaName }}</p>
+                        </div>
+                        <span class="text-xs font-black text-rose-500 bg-pink-100 px-1.5 py-0.5 rounded-lg shrink-0">{{ third.percentage }}%</span>
                       </div>
                     }
 
                     @if (pickupStats(); as p) {
-                      <div class="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-purple-50/80 border border-purple-100">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                          <span class="text-xs">🛍️</span>
-                          <span class="text-xs font-black text-purple-900 truncate">Pickup en Matriz</span>
+                      <div class="p-2 rounded-xl bg-purple-50 text-purple-950 flex items-center justify-between border border-purple-200 shadow-sm">
+                        <div class="min-w-0 pr-1">
+                          <p class="text-[9px] uppercase font-bold text-purple-600 flex items-center gap-0.5"><span>🛍️</span> Matriz Pickup</p>
+                          <p class="text-[11px] font-black truncate leading-tight">Pasan a Sucursal</p>
                         </div>
-                        <span class="text-xs font-black text-purple-700 bg-white px-2 py-0.5 rounded-full border border-purple-200">
-                          {{ p.percentage }}%
-                        </span>
+                        <span class="text-xs font-black text-purple-700 bg-purple-200/80 px-1.5 py-0.5 rounded-lg shrink-0">{{ p.percentage }}%</span>
                       </div>
                     }
                   </div>
-                </div>
 
-                <!-- Footer de la tarjeta social con llamada a la acción -->
-                <div class="pt-1">
-                  <p class="text-[10px] font-black text-pink-700 bg-white/90 py-1 px-2 rounded-xl border border-pink-200/80 shadow-sm">
-                    💬 ¡Comenta tu colonia para que suba al #1 en el próximo live! 💕
-                  </p>
-                  <p class="text-[9px] font-extrabold text-pink-400 mt-1">
-                    @regibazar • Sistema de Entregas Oficial
-                  </p>
-                </div>
+                  <!-- Footer Story -->
+                  <div class="pt-1 shrink-0">
+                    <p class="text-[10px] font-black text-pink-800 bg-white/95 py-1 px-2.5 rounded-xl border border-pink-200/80 shadow-sm">
+                      💬 ¿Dónde vives tú? ¡Comenta en el live para que tu colonia suba al #1! 💕
+                    </p>
+                    <p class="text-[9px] font-extrabold text-pink-400 mt-1">
+                      @regibazar • Sistema de Entregas Oficial
+                    </p>
+                  </div>
+                } @else {
+                  <!-- Post Cuadrado Footer -->
+                  <div class="pt-1 shrink-0">
+                    <div class="flex items-center justify-between gap-1 text-[9.5px] font-black bg-white/95 px-2.5 py-1.5 rounded-xl border border-pink-200 shadow-sm">
+                      <span class="truncate">👑 #1 {{ cleanColoniaName(topThree()[0]?.coloniaName || '') }} ({{ topThree()[0]?.percentage }}%)</span>
+                      <span>•</span>
+                      <span class="truncate">🛍️ Matriz ({{ pickupStats()?.percentage }}%)</span>
+                    </div>
+                    <p class="text-[9px] font-black text-pink-600 mt-1">
+                      💬 ¡Comenta tu colonia para el próximo live! 💕 @regibazar
+                    </p>
+                  </div>
+                }
 
               </div>
             </div>
@@ -572,6 +725,7 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
 
   @ViewChild('googleMapRef') googleMap?: GoogleMap;
   @ViewChild('infoWindow') infoWindow?: MapInfoWindow;
+  @ViewChildren(MapMarker) mapMarkers?: QueryList<MapMarker>;
 
   private coloniaService = inject(ColoniaService);
   private toast = inject(ToastService);
@@ -672,10 +826,21 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
   onSelectColonia(c: ColoniaStatsDto): void {
     this.selectedColonia.set(c);
     this.mapCenter.set({ lat: c.latitude, lng: c.longitude });
-    this.mapZoom.set(15);
+    this.mapZoom.set(16);
     if (this.nativeMap) {
       this.nativeMap.panTo({ lat: c.latitude, lng: c.longitude });
-      this.nativeMap.setZoom(15);
+      this.nativeMap.setZoom(16);
+    }
+
+    // Abrir automáticamente el InfoWindow sobre la colonia seleccionada
+    const colonias = this.report()?.colonias || [];
+    const idx = colonias.findIndex(x => x.coloniaName === c.coloniaName);
+    const marker = this.mapMarkers?.toArray()[idx];
+    if (marker && this.infoWindow) {
+      this.infoWindow.open(marker);
+    } else if (this.infoWindow?.infoWindow && this.nativeMap) {
+      this.infoWindow.infoWindow.setPosition({ lat: c.latitude, lng: c.longitude });
+      this.infoWindow.infoWindow.open(this.nativeMap);
     }
   }
 
@@ -707,65 +872,129 @@ export class ColoniaMapReportComponent implements OnInit, OnChanges {
     };
   }
 
-  // Generador de iconos SVG vectoriales cute para marcadores
+  // Generador de pines/chips speech-bubble limpios, coquette y elegantes (sin emojis tacky de corazón)
   getMarkerOptions(c: ColoniaStatsDto): google.maps.MarkerOptions {
-    let svg = '';
-    let size = 36;
+    const isPickup = c.isPickup;
+    const isTop1 = c.rank === 1 && !isPickup;
+    const isTop2 = c.rank === 2 && !isPickup;
+    const isTop3 = c.rank === 3 && !isPickup;
 
-    if (c.isPickup) {
-      // Icono de Tienda / Regi Bazar Matriz
+    let width = 54;
+    let height = 28;
+    let svg = '';
+
+    if (isPickup) {
+      width = 86;
+      height = 34;
+      const w = width;
+      const h = height;
+      const halfW = w / 2;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
-          <circle cx="22" cy="22" r="20" fill="#9333ea" stroke="#ffffff" stroke-width="3"/>
-          <text x="22" y="27" font-size="18" text-anchor="middle" dominant-baseline="middle">🛍️</text>
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+          <defs>
+            <linearGradient id="mGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#9333ea"/>
+              <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+            <filter id="mSh" x="-10%" y="-10%" width="125%" height="135%">
+              <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#581c87" flood-opacity="0.35"/>
+            </filter>
+          </defs>
+          <path d="M 6 2 h ${w - 12} a 12 12 0 0 1 12 12 a 12 12 0 0 1 -12 12 h -${halfW - 6} l -6 6 l -6 -6 h -${halfW - 6} a 12 12 0 0 1 -12 -12 a 12 12 0 0 1 12 -12 z" fill="url(#mGrad)" stroke="#ffffff" stroke-width="2" filter="url(#mSh)"/>
+          <text x="${halfW}" y="15" font-family="Poppins, -apple-system, sans-serif" font-size="11" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="central">🏠 Matriz</text>
         </svg>
       `;
-      size = 44;
-    } else if (c.rank === 1) {
-      // Corona dorada para la Colonia Reina
+    } else if (isTop1) {
+      width = 80;
+      height = 34;
+      const w = width;
+      const h = height;
+      const halfW = w / 2;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="22" fill="#ec4899" stroke="#ffffff" stroke-width="3"/>
-          <circle cx="24" cy="24" r="18" fill="#f43f5e"/>
-          <text x="24" y="29" font-size="22" text-anchor="middle" dominant-baseline="middle">👑</text>
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+          <defs>
+            <linearGradient id="qGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ec4899"/>
+              <stop offset="100%" stop-color="#e11d48"/>
+            </linearGradient>
+            <filter id="qSh" x="-10%" y="-10%" width="125%" height="135%">
+              <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#881337" flood-opacity="0.35"/>
+            </filter>
+          </defs>
+          <path d="M 6 2 h ${w - 12} a 12 12 0 0 1 12 12 a 12 12 0 0 1 -12 12 h -${halfW - 6} l -6 6 l -6 -6 h -${halfW - 6} a 12 12 0 0 1 -12 -12 a 12 12 0 0 1 12 -12 z" fill="url(#qGrad)" stroke="#ffffff" stroke-width="2" filter="url(#qSh)"/>
+          <text x="${halfW}" y="15" font-family="Poppins, -apple-system, sans-serif" font-size="11.5" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="central">👑 ${c.percentage}%</text>
         </svg>
       `;
-      size = 48;
-    } else if (c.rank === 2) {
+    } else if (isTop2 || isTop3) {
+      width = 70;
+      height = 30;
+      const w = width;
+      const h = height;
+      const halfW = w / 2;
+      const label = isTop2 ? `#2 • ${c.percentage}%` : `#3 • ${c.percentage}%`;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="18" fill="#f472b6" stroke="#ffffff" stroke-width="2.5"/>
-          <text x="20" y="25" font-size="18" text-anchor="middle" dominant-baseline="middle">🥈</text>
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+          <defs>
+            <filter id="topSh" x="-10%" y="-10%" width="125%" height="135%">
+              <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#f43f5e" flood-opacity="0.25"/>
+            </filter>
+          </defs>
+          <path d="M 5 2 h ${w - 10} a 11 11 0 0 1 11 11 a 11 11 0 0 1 -11 11 h -${halfW - 5} l -5 5 l -5 -5 h -${halfW - 5} a 11 11 0 0 1 -11 -11 a 11 11 0 0 1 11 -11 z" fill="#ffffff" stroke="#f472b6" stroke-width="2" filter="url(#topSh)"/>
+          <text x="${halfW}" y="14" font-family="Poppins, -apple-system, sans-serif" font-size="10.5" font-weight="900" fill="#be185d" text-anchor="middle" dominant-baseline="central">${label}</text>
         </svg>
       `;
-      size = 40;
-    } else if (c.rank === 3) {
-      svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="18" fill="#f472b6" stroke="#ffffff" stroke-width="2.5"/>
-          <text x="20" y="25" font-size="18" text-anchor="middle" dominant-baseline="middle">🥉</text>
-        </svg>
-      `;
-      size = 40;
     } else {
-      // Pin rosa estándar con corazón o punto
+      width = 54;
+      height = 28;
+      const w = width;
+      const h = height;
+      const halfW = w / 2;
       svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r="14" fill="#fb7185" stroke="#ffffff" stroke-width="2"/>
-          <text x="16" y="20" font-size="12" text-anchor="middle" dominant-baseline="middle">💖</text>
+        <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+          <defs>
+            <filter id="pSh" x="-10%" y="-10%" width="125%" height="135%">
+              <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#f43f5e" flood-opacity="0.2"/>
+            </filter>
+          </defs>
+          <path d="M 5 2 h ${w - 10} a 10 10 0 0 1 10 10 a 10 10 0 0 1 -10 10 h -${halfW - 4} l -4 4 l -4 -4 h -${halfW - 4} a 10 10 0 0 1 -10 -10 a 10 10 0 0 1 10 -10 z" fill="#ffffff" stroke="#fbcfe8" stroke-width="1.8" filter="url(#pSh)"/>
+          <text x="${halfW}" y="13" font-family="Poppins, -apple-system, sans-serif" font-size="10" font-weight="800" fill="#9d174d" text-anchor="middle" dominant-baseline="central">${c.percentage}%</text>
         </svg>
       `;
-      size = 32;
     }
 
     return {
       title: `${c.coloniaName} (${c.percentage}%)`,
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-        scaledSize: typeof google !== 'undefined' ? new google.maps.Size(size, size) : undefined,
-        anchor: typeof google !== 'undefined' ? new google.maps.Point(size / 2, size / 2) : undefined
+        scaledSize: typeof google !== 'undefined' ? new google.maps.Size(width, height) : undefined,
+        anchor: typeof google !== 'undefined' ? new google.maps.Point(width / 2, height - 1) : undefined
       }
     };
+  }
+
+  // ── PROYECCIÓN CARTOGRÁFICA PARA EL MAPA ROSA SOCIAL ──
+  getSocialX(lng: number): number {
+    const lngMin = -99.630;
+    const lngMax = -99.490;
+    const clamped = Math.max(lngMin, Math.min(lngMax, lng));
+    return Number((((clamped - lngMin) / (lngMax - lngMin)) * 100).toFixed(2));
+  }
+
+  getSocialY(lat: number): number {
+    const latMin = 27.380;
+    const latMax = 27.525;
+    const clamped = Math.max(latMin, Math.min(latMax, lat));
+    return Number((((latMax - clamped) / (latMax - latMin)) * 100).toFixed(2));
+  }
+
+  getBadgeX(lng: number): number {
+    const x = this.getSocialX(lng);
+    return Math.max(16, Math.min(84, x));
+  }
+
+  getBadgeY(lat: number): number {
+    const y = this.getSocialY(lat);
+    return Math.max(12, Math.min(86, y));
   }
 
   cleanColoniaName(name: string): string {
