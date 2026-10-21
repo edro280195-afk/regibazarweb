@@ -9,11 +9,12 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsOption } from 'echarts';
 import { gsap } from 'gsap';
 import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/utils/messenger.util';
+import { ColoniaMapReportComponent } from './colonia-map-report/colonia-map-report.component';
 
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, CurrencyPipe, DecimalPipe, DatePipe, NgxEchartsDirective],
+  imports: [CommonModule, FormsModule, CurrencyPipe, DecimalPipe, DatePipe, NgxEchartsDirective, ColoniaMapReportComponent],
   template: `
     <div class="space-y-6 pb-20">
       <!-- Header -->
@@ -669,6 +670,14 @@ import { buildMessengerLink, buildPaymentReminderMessage } from '../../../core/u
           </div>
         }
 
+        @if (activeTab() === 'colonias') {
+          <app-colonia-map-report
+            [startDate]="startDate"
+            [endDate]="endDate"
+            [salesPeriodId]="selectedPeriodId()">
+          </app-colonia-map-report>
+        }
+
       } @else {
         <div class="card-coquette py-40 px-12 text-center animate-bounce-in bg-white/40 border-dashed border-2 border-pink-200">
           <div class="text-9xl mb-10 filter drop-shadow-2xl">📉</div>
@@ -917,13 +926,15 @@ export class ReportsComponent implements OnInit {
   showGeminiModal = signal(false);
   closingGeminiModal = signal(false);
 
-  activeTab = signal<'resumen' | 'financiero' | 'operativo' | 'clientes' | 'porCobrar'>('resumen');
+  selectedPeriodId = signal<number | undefined>(undefined);
+  activeTab = signal<'resumen' | 'financiero' | 'operativo' | 'clientes' | 'colonias' | 'porCobrar'>('resumen');
 
   tabs = [
     { id: 'resumen', label: 'Resumen', icon: '💎' },
     { id: 'financiero', label: 'Finanzas', icon: '💰' },
     { id: 'operativo', label: 'Operativo', icon: '🚚' },
     { id: 'clientes', label: 'Clientes', icon: '👑' },
+    { id: 'colonias', label: 'Mapa Colonias', icon: '🌸' },
     { id: 'porCobrar', label: 'Por Cobrar', icon: '💸' }
   ] as const;
 
@@ -1016,8 +1027,8 @@ export class ReportsComponent implements OnInit {
 
     // Si llegamos desde el Dashboard (?tab=porCobrar) abrimos esa pestaña directo
     const tab = this.route.snapshot.queryParamMap.get('tab');
-    if (tab === 'porCobrar' || tab === 'financiero' || tab === 'operativo' || tab === 'clientes' || tab === 'resumen') {
-      this.activeTab.set(tab);
+    if (tab === 'porCobrar' || tab === 'financiero' || tab === 'operativo' || tab === 'clientes' || tab === 'resumen' || tab === 'colonias') {
+      this.activeTab.set(tab as any);
     }
 
     this.loadPeriods();
@@ -1117,8 +1128,12 @@ export class ReportsComponent implements OnInit {
 
   onPeriodChange(event: any): void {
     const id = event.target.value;
-    if (!id) return;
+    if (!id) {
+      this.selectedPeriodId.set(undefined);
+      return;
+    }
 
+    this.selectedPeriodId.set(parseInt(id, 10));
     const period = this.periods().find(p => p.id === parseInt(id));
     if (period) {
       this.startDate = period.startDate.toString().split('T')[0];

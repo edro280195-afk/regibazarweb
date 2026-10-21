@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-    DashboardDto, OrderSummaryDto, ClientOrderViewDto, PagedResult, ReportDto, ClientDto,
+    DashboardDto, OrderSummaryDto, ClientOrderViewDto, PagedResult, ReportDto, ClientDto, ColoniaReportDto,
     RouteDto, SupplierDto, InvestmentDto, SalesPeriodDto, PeriodReportDto,
     FinancialReportDto, DriverExpenseDto, ManualOrderRequest, OrderStatsDto,
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
@@ -311,6 +311,14 @@ export class ApiService {
 
     getReportInsights(report: ReportDto): Observable<AiInsight[]> {
         return this.http.post<AiInsight[]>(`${this.base}/reports/ai-insights`, report);
+    }
+
+    getColoniaReport(start?: string, end?: string, salesPeriodId?: number): Observable<ColoniaReportDto> {
+        let params = new HttpParams();
+        if (start) params = params.set('start', start);
+        if (end) params = params.set('end', end);
+        if (salesPeriodId) params = params.set('salesPeriodId', salesPeriodId.toString());
+        return this.http.get<ColoniaReportDto>(`${this.base}/reports/colonias`, { params });
     }
 
     getGlowUp(): Observable<GlowUpReportDto> {

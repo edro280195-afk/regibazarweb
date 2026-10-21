@@ -1754,3 +1754,26 @@ export interface TandaShuffleResultDto {
     turnAssignments: TandaTurnAssignmentDto[];
     shuffleDate: string;
 }
+
+
+// ── Reportes de Colonias y Distribución Geográfica (Nuevo Laredo) ──
+
+export interface ColoniaStatsDto {
+    coloniaName: string;
+    ordersCount: number;
+    percentage: number;
+    latitude: number;
+    longitude: number;
+    rank: number;
+    isPickup: boolean;
+    clientsCount: number;
+}
+
+export interface ColoniaReportDto {
+    totalOrders: number;
+    totalColoniaOrders: number;
+    totalPickupOrders: number;
+    topColoniaName: string;
+    topColoniaPercentage: number;
+    colonias: ColoniaStatsDto[];
+}
