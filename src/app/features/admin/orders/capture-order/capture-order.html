@@ -1,20 +1,32 @@
-<div class="space-y-6">
+<div class="rb-capture-shell space-y-6">
     <!-- Header -->
-    <div class="flex flex-col gap-2 animate-slide-down">
-        <h2 class="text-2xl font-bold text-pink-900 m-0">📦 Captura Rápida</h2>
-        <p class="text-pink-400 font-medium m-0">Sube tu Excel del Live o captura a mano, tú decides bewis ✨</p>
+    <div class="rb-capture-header flex flex-col gap-2 animate-slide-down">
+        <div class="rb-capture-heading">
+            <p>Hola, {{ auth.userName() || 'Hermosa' }} 💕</p>
+            <h2 class="text-2xl font-bold text-pink-900 m-0">Crear pedido <span aria-hidden="true">✨</span></h2>
+        </div>
+        <p class="rb-capture-subtitle text-pink-400 font-medium m-0">Elige cómo capturarlo y te dejo todo listo para confirmar.</p>
     </div>
 
-    <div class="tab-switch">
-        <button [class.active]="mode() === 'excel'" (click)="mode.set('excel')">📄 Excel</button>
+    <section class="rb-capture-hero" aria-label="Resumen de creación de pedidos">
+        <div>
+            <p class="rb-capture-eyebrow">Captura sin pensar de más</p>
+            <h3>Un pedido = clienta + artículos + entrega</h3>
+            <p>Turbo, Manual, IA o Excel: tú eliges el camino que mejor se adapta a tu Live.</p>
+        </div>
+        <span class="rb-capture-hero-icon" aria-hidden="true">🪄</span>
+    </section>
+
+    <div class="tab-switch rb-capture-methods" role="tablist" aria-label="Método de captura">
         <button [class.active]="mode() === 'manual'" (click)="mode.set('manual')">🚀 Turbo</button>
         <button [class.active]="mode() === 'traditional'" (click)="mode.set('traditional')">✏️ Manual</button>
         <button [class.active]="mode() === 'live'" (click)="mode.set('live')" class="live-tab">✨ IA Gemini</button>
+        <button [class.active]="mode() === 'excel'" (click)="mode.set('excel')">📄 Excel</button>
     </div>
 
     <!-- ═══════════ EXCEL TAB ═══════════ -->
     @if (mode() === 'excel') {
-    <div class="card-coquette p-8 min-h-[400px] flex flex-col items-center justify-center animate-fade-in relative z-10 border-2 border-dashed transition-all duration-300"
+    <div class="rb-capture-mode rb-capture-excel-mode card-coquette p-8 min-h-[400px] flex flex-col items-center justify-center animate-fade-in relative z-10 border-2 border-dashed transition-all duration-300"
         [class.border-pink-400]="dragging()" [class.bg-pink-50]="dragging()" [class.border-pink-200]="!dragging()"
         (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)"
         (click)="fileInput.click()">
@@ -59,7 +71,7 @@
     }
 
     @if (mode() === 'manual') {
-    <div class="animate-fade-in relative z-20 space-y-4">
+    <div class="rb-capture-mode rb-capture-turbo-mode animate-fade-in relative z-20 space-y-4">
         <!-- ORDER TYPE TOGGLE -->
         <div class="flex flex-wrap items-center gap-3 justify-between">
             <div class="flex gap-2">
@@ -78,12 +90,12 @@
         <!-- PIN FORM -->
         @if (showPinForm() && !pinnedProduct()) {
         <div class="card-coquette p-4 flex flex-wrap gap-3 items-end animate-scale-in border-2 border-amber-300">
-            <div class="flex-1 min-w-[150px]">
+            <div class="w-full min-w-0 sm:flex-1 sm:min-w-[150px]">
                 <label class="label-coquette text-xs">Artículo base</label>
                 <input type="text" class="input-coquette" [(ngModel)]="pinProductName" placeholder="Ej. Toalla"
                     (keydown.enter)="setPin()">
             </div>
-            <div class="w-28">
+            <div class="w-full sm:w-28">
                 <label class="label-coquette text-xs">Precio $</label>
                 <input type="number" class="input-coquette font-bold" [(ngModel)]="pinProductPrice" placeholder="50"
                     (keydown.enter)="setPin()">
@@ -106,7 +118,7 @@
             <div class="lg:col-span-7 space-y-3">
                 <div class="turbo-input-wrapper" [class.has-pin]="!!pinnedProduct()">
                     <span class="turbo-prompt">🚀</span>
-                    <input type="text" class="turbo-input" [(ngModel)]="turboInput" (input)="onTurboType()"
+                    <input type="text" inputmode="text" enterkeyhint="done" class="turbo-input" [(ngModel)]="turboInput" (input)="onTurboType()"
                         (keydown)="onTurboKeydown($event)" (focus)="showTurboSuggestions.set(true)"
                         (blur)="hideTurboSuggestionsDelay()"
                         [placeholder]="pinnedProduct() ? 'Nombre (+ variante)... ej: Pedro azul' : 'Nombre, Artículo, Precio... ej: Lupe, sabana, 100'"
@@ -231,7 +243,7 @@
                             <span class="text-2xl font-black text-pink-600 leading-none">{{ turboTotal() | currency:'MXN':'symbol-narrow' }}</span>
                         </div>
                         <button class="btn-coquette btn-pink w-full py-4 text-lg shadow-lg" (click)="submitTurboQueue()"
-                            [disabled]="uploading() || turboQueue().length === 0">
+                            [disabled]="uploading() || openOrderPrompt() || turboQueue().length === 0">
                             @if (uploading()) { <span class="spinner mr-2"></span> {{ turboProgress() }} }
                             @else { 💖 Crear {{ turboClientCount() }} Pedidos }
                         </button>
@@ -244,7 +256,7 @@
 
     <!-- ═══════════ TRADITIONAL MANUAL TAB ═══════════ -->
     @if (mode() === 'traditional') {
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 animate-fade-in relative z-20">
+    <div class="rb-capture-mode rb-capture-manual-mode grid grid-cols-1 md:grid-cols-12 gap-6 animate-fade-in relative z-20">
 
         <!-- DATA ENTRY (Left/Top) -->
         <div class="md:col-span-7 space-y-5">
@@ -290,16 +302,15 @@
                                 @if ((client.ordersCount || 0) >= 1) {
                                 <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">👑 Frecuente</span>
                                 } @else {
-                                <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">✨ Nueva</span>
+                                <span class="text-xs bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full border border-pink-200">✨ Nueva</span>
                                 }
                             </li>
                             }
                         </ul>
                         }
 
-                        <!-- Resolver multi-señal: aparece cuando hay texto y no es match exacto del autocomplete.
-                             Muestra candidatas con score y permite confirmar identidad con 1 tap. -->
-                        @if (manualClient().trim().length >= 2 && !manualResolvedClientId()) {
+                        <!-- Resolver inteligente: es la única sugerencia visible para confirmar identidad. -->
+                        @if (manualClient().trim().length >= 3 && !manualResolvedClientId() && filteredClients().length === 0) {
                         <div class="mt-2">
                             <app-client-resolver
                                 [name]="manualClient()"
@@ -321,10 +332,21 @@
                     </div>
 
                     <div>
-                        <label class="label-coquette">📍 Dirección Alternativa (Opcional)</label>
+                        <label class="label-coquette">📍 Dirección de entrega (Opcional)</label>
                         <input type="text" class="input-coquette text-lg py-3" [ngModel]="manualAlternativeAddress()"
                             (ngModelChange)="manualAlternativeAddress.set($event)"
-                            placeholder="Ej. Casa de su mamá / Oficina">
+                            placeholder="Ej. Calle Perú 123, Col. Centro">
+                        <label class="mt-2 flex items-start gap-2 text-xs text-pink-700 cursor-pointer">
+                            <input type="checkbox" class="mt-0.5 accent-pink-500"
+                                [checked]="manualAddressOnlyForOrder()"
+                                (change)="manualAddressOnlyForOrder.set($any($event.target).checked)">
+                            <span>
+                                Usar solo para este pedido
+                                <small class="block text-[10px] text-pink-400">
+                                    Déjala desmarcada para guardarla en la clienta y reutilizarla la próxima semana.
+                                </small>
+                            </span>
+                        </label>
                     </div>
 
                     <div>
@@ -425,12 +447,51 @@
                 </div>
 
                 <div class="bg-white p-4 border-t border-pink-50 shadow-[0_-4px_15px_rgba(255,107,157,0.05)] z-10 pb-0">
+                    <!-- 🛍️ Bolsas: se captura en el momento, un tap. "No sé" lo deja pendiente. -->
+                    <div class="mb-4 bg-gradient-to-tr from-pink-50/60 to-rose-50/40 p-3 rounded-xl border border-pink-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-pink-600 font-bold text-sm flex items-center gap-1">🛍️ ¿Cuántas bolsas?</span>
+                            @if (manualBags() === null) {
+                                <span class="text-[10px] text-rose-400 font-bold bg-rose-50 px-2 py-0.5 rounded-full">Sin capturar</span>
+                            } @else if (manualBags() === 0) {
+                                <span class="text-[10px] text-purple-500 font-bold bg-purple-50 px-2 py-0.5 rounded-full">Va sin bolsas</span>
+                            } @else {
+                                <span class="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">{{ manualBags() }} bolsa{{ manualBags() === 1 ? '' : 's' }} ✓</span>
+                            }
+                        </div>
+                        <div class="flex flex-wrap gap-2 items-center">
+                            @for (n of [1,2,3,4,5]; track n) {
+                                <button type="button"
+                                    class="w-10 h-10 rounded-xl font-black text-sm transition-all active:scale-90"
+                                    [class]="manualBags() === n ? 'bg-pink-500 text-white shadow-md shadow-pink-200' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
+                                    (click)="manualBags.set(n)">{{ n }}</button>
+                            }
+                            <button type="button"
+                                class="w-10 h-10 rounded-xl font-black text-lg transition-all active:scale-90"
+                                title="Más bolsas"
+                                [class]="(manualBags() ?? 0) > 5 ? 'bg-pink-500 text-white shadow-md shadow-pink-200' : 'bg-white text-pink-500 border border-pink-100 hover:bg-pink-100'"
+                                (click)="bumpManualBags()">＋</button>
+                            <button type="button"
+                                class="px-3 h-10 rounded-xl font-bold text-xs transition-all active:scale-90"
+                                [class]="manualBags() === 0 ? 'bg-purple-500 text-white shadow-md' : 'bg-white text-purple-500 border border-purple-100 hover:bg-purple-50'"
+                                (click)="manualBags.set(0)">Sin bolsas</button>
+                            <button type="button"
+                                class="px-3 h-10 rounded-xl font-bold text-xs transition-all active:scale-90 ml-auto"
+                                [class]="manualBags() === null ? 'bg-rose-400 text-white shadow-md' : 'bg-white border border-rose-200 text-rose-400 hover:bg-rose-50'"
+                                (click)="manualBags.set(null)">🤷‍♀️ No sé</button>
+                        </div>
+                        @if (manualBags() === null) {
+                            <p class="text-[10px] text-pink-400 mt-2">Puedes agregarlas después — te lo recordaremos y te lo pediremos antes de mandarlo a ruta 💕</p>
+                        } @else if (manualBags()! > 0) {
+                            <p class="text-[10px] text-pink-400 mt-2">Se crean con su QR al guardar el pedido y las imprimes desde "Logística y Etiquetas" 🏷️ Si el pedido ya tenía bolsas, se completan hasta este total sin borrar ninguna.</p>
+                        }
+                    </div>
                     <div class="flex justify-between items-end mb-4 bg-pink-50/50 p-3 rounded-xl border border-pink-100">
                         <span class="text-pink-600 font-bold text-sm uppercase tracking-wide">Total a Cobrar</span>
                         <span class="text-2xl font-black text-pink-600 leading-none">{{ getManualTotal() | currency:'MXN':'symbol-narrow' }}</span>
                     </div>
                     <button class="btn-coquette btn-pink w-full py-4 text-lg shadow-lg mb-4" (click)="createManual()"
-                        [disabled]="uploading() || manualItems.length === 0">
+                        [disabled]="uploading() || openOrderPrompt() || manualItems.length === 0">
                         @if (uploading()) { <span class="spinner mr-2"></span> Guardando... }
                         @else { 💖 Crear Pedido }
                     </button>
@@ -442,7 +503,7 @@
 
     <!-- ═══════════ AI GEMINI TAB ═══════════ -->
     @if (mode() === 'live') {
-    <div class="animate-fade-in relative z-20">
+    <div class="rb-capture-mode rb-capture-ai-mode animate-fade-in relative z-20">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
             <!-- LEFT: Input Panel -->
@@ -641,7 +702,7 @@
 
                     <div class="flex gap-2 pr-4">
                         <input type="text" [value]="order.link" readonly #linkInput
-                            class="flex-1 bg-pink-50 border border-pink-100 rounded-lg px-2 py-1.5 text-xs text-pink-500 focus:outline-none">
+                            class="min-w-0 flex-1 bg-pink-50 border border-pink-100 rounded-lg px-2 py-1.5 text-xs text-pink-500 focus:outline-none">
                         <button
                             class="bg-pink-100 text-pink-600 hover:bg-pink-500 hover:text-white rounded-lg px-2 text-sm transition-colors"
                             (click)="copyLink(linkInput)" title="Copiar enlace">📋</button>
@@ -658,6 +719,76 @@
         class="mt-4 bg-red-50 border-2 border-red-200 text-red-600 px-6 py-4 rounded-xl font-bold flex items-center gap-3 animate-shake shadow-lg relative z-20">
         <span class="text-2xl">😿</span>
         {{ error() }}
+    </div>
+    }
+
+    <!-- ═══════════ MODAL: ¿Nuevo pedido o agregar a uno abierto? ═══════════ -->
+    @if (openOrderPrompt(); as prompt) {
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-pink-900/40 backdrop-blur-sm animate-fade-in"
+        (click)="cancelOrderPrompt()">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden border-2 border-pink-100 animate-scale-in"
+            (click)="$event.stopPropagation()">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-pink-500 to-rose-400 text-white px-6 py-4 shrink-0">
+                <h3 class="text-lg font-black m-0 flex items-center gap-2">
+                    <span>💖</span> {{ prompt.clientName }} ya tiene pedido(s) abierto(s)
+                </h3>
+                <p class="text-pink-50 text-sm m-0 mt-1">
+                    ¿Creamos un pedido nuevo o le agregamos los artículos a uno existente?
+                </p>
+            </div>
+
+            <!-- Lista de pedidos abiertos -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-pink-50/40">
+                @for (order of prompt.orders; track order.id) {
+                <div class="bg-white rounded-2xl border-2 transition-colors"
+                    [class.border-pink-300]="expandedPromptOrderId() === order.id"
+                    [class.border-pink-100]="expandedPromptOrderId() !== order.id">
+                    <button type="button" class="w-full flex items-center gap-3 p-3 text-left"
+                        (click)="togglePromptOrder(order.id)">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-pink-700">Pedido #{{ order.id }}</span>
+                                <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-pink-100 text-pink-600">{{
+                                    promptStatusLabel[order.status] || order.status }}</span>
+                            </div>
+                            <div class="text-xs text-gray-400 mt-0.5">{{ order.createdAt | date:'d MMM, h:mm a' }} · {{
+                                order.items.length }} producto(s)</div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="font-black text-pink-600">{{ order.total | currency:'MXN':'symbol-narrow' }}</div>
+                            <div class="text-xs text-pink-400">{{ expandedPromptOrderId() === order.id ? '▲ ocultar' : '▼ ver' }}</div>
+                        </div>
+                    </button>
+
+                    @if (expandedPromptOrderId() === order.id) {
+                    <div class="px-3 pb-3 border-t border-pink-50 pt-2 space-y-1">
+                        @for (item of order.items; track item.id) {
+                        <div class="flex justify-between text-sm gap-2">
+                            <span class="text-gray-600 truncate">{{ item.quantity }}× {{ item.productName }}</span>
+                            <span class="text-gray-500 font-medium whitespace-nowrap">{{ item.lineTotal | currency:'MXN':'symbol-narrow' }}</span>
+                        </div>
+                        } @empty {
+                        <div class="text-xs text-gray-400 italic">Este pedido aún no tiene artículos.</div>
+                        }
+                        <button type="button" class="btn-coquette btn-pink w-full mt-2 py-2 text-sm font-bold"
+                            (click)="chooseExistingOrder(order.id)">➕ Agregar aquí</button>
+                    </div>
+                    }
+                </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="p-4 border-t border-pink-100 bg-white flex flex-col sm:flex-row gap-2 shrink-0">
+                <button type="button"
+                    class="flex-1 py-3 rounded-2xl font-black bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg hover:shadow-xl transition-all"
+                    (click)="chooseNewOrder()">🆕 Crear pedido nuevo</button>
+                <button type="button"
+                    class="py-3 px-4 rounded-2xl font-bold text-pink-500 bg-pink-50 hover:bg-pink-100 transition-colors"
+                    (click)="cancelOrderPrompt()">Cancelar</button>
+            </div>
+        </div>
     </div>
     }
 </div>

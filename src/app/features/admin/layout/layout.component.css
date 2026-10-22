@@ -1,0 +1,527 @@
+:host {
+  --rb-pink: #ff5fa2;
+  --rb-pink-strong: #d9367d;
+  --rb-pink-deep: #a92863;
+  --rb-pink-soft: #ffe4ef;
+  --rb-lilac: #b991e8;
+  --rb-lilac-soft: #eee5ff;
+  --rb-cream: #fffafc;
+  --rb-ink: #63314e;
+  --rb-muted: #ad7d98;
+  --rb-line: rgba(239, 190, 215, .62);
+  --rb-shadow: rgba(184, 89, 143, .18);
+  display: block;
+  min-height: 100svh;
+  color: var(--rb-ink);
+  font-family: var(--font-body, 'Quicksand', sans-serif);
+}
+
+.rb-layout-shell {
+  position: relative;
+  display: flex;
+  min-height: 100svh;
+  overflow-x: clip;
+  background:
+    radial-gradient(circle at 9% 7%, rgba(255, 255, 255, .86) 0 4px, transparent 5px),
+    radial-gradient(circle at 87% 16%, rgba(255, 255, 255, .64) 0 3px, transparent 4px),
+    radial-gradient(circle at 76% 86%, rgba(255, 255, 255, .7) 0 3px, transparent 4px),
+    linear-gradient(145deg, #fff4f8 0%, #fbf2ff 53%, #fff9fb 100%);
+  background-size: 126px 126px, 178px 178px, 156px 156px, auto;
+}
+
+.rb-layout-shell::before,
+.rb-layout-shell::after {
+  position: fixed;
+  z-index: 0;
+  color: rgba(255, 95, 162, .22);
+  content: '✦  ♡';
+  font-size: 19px;
+  letter-spacing: 13px;
+  pointer-events: none;
+}
+
+.rb-layout-shell::before { top: 8%; right: 7%; transform: rotate(8deg); }
+.rb-layout-shell::after { bottom: 17%; left: 6%; transform: rotate(-12deg); }
+
+.rb-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.rb-icon-sprite symbol,
+.rb-nav-icon svg,
+.rb-cami-icon svg,
+.rb-cami-arrow,
+.rb-logout-button svg,
+.rb-top-cami svg,
+.rb-icon-button svg,
+.rb-user-summary > svg,
+.rb-sheet-icon svg,
+.rb-dock-icon svg {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.rb-nav-rail {
+  position: fixed;
+  z-index: 20;
+  top: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  width: 238px;
+  flex-direction: column;
+  padding: 18px 12px 13px;
+  border: 1px solid rgba(255, 255, 255, .88);
+  border-radius: 29px;
+  background: rgba(255, 250, 252, .83);
+  box-shadow:
+    0 24px 48px rgba(178, 86, 137, .15),
+    inset 3px 3px 8px rgba(255, 255, 255, .98),
+    inset -4px -4px 11px rgba(215, 157, 194, .12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.rb-rail-brand {
+  padding: 0 6px 16px;
+  border-bottom: 1px dashed rgba(201, 44, 112, .15);
+}
+
+.rb-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rb-brand-logo,
+.rb-mobile-logo {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, .94);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #ffe6f0, #f2e8ff);
+  box-shadow: 0 7px 0 rgba(201, 44, 112, .1), 5px 6px 13px rgba(177, 90, 135, .13);
+}
+
+.rb-brand-logo { width: 46px; height: 46px; }
+.rb-brand-logo img { width: 100%; height: 100%; object-fit: contain; }
+
+.rb-brand-copy,
+.rb-user-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.rb-brand-copy strong {
+  overflow: hidden;
+  color: var(--rb-pink-deep);
+  font-family: var(--font-headings, 'Alice', serif);
+  font-size: 1.22rem;
+  line-height: 1.05;
+  letter-spacing: -.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rb-brand-copy small,
+.rb-mobile-brand small {
+  margin-top: 3px;
+  color: var(--rb-muted);
+  font-size: .59rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.rb-rail-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 19px 10px 8px;
+  color: #c092aa;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.rb-rail-caption i {
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: var(--rb-line);
+}
+
+.rb-rail-list {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  gap: 4px;
+  overflow: auto;
+  padding: 0 0 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 95, 162, .22) transparent;
+}
+
+.rb-rail-link {
+  position: relative;
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  color: #ad829b;
+  font-size: .75rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: color .2s ease, background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+
+.rb-rail-link:hover {
+  color: var(--rb-pink-deep);
+  background: rgba(255, 228, 239, .48);
+  transform: translateX(2px);
+}
+
+.rb-rail-link.is-active {
+  color: var(--rb-pink-deep);
+  border-color: rgba(255, 255, 255, .8);
+  background: var(--rb-pink-soft);
+  box-shadow: inset 2px 2px 5px rgba(209, 137, 173, .16), inset -2px -2px 5px rgba(255, 255, 255, .86);
+}
+
+.rb-rail-link.is-active::before {
+  position: absolute;
+  left: -13px;
+  width: 4px;
+  height: 25px;
+  border-radius: 0 5px 5px 0;
+  background: linear-gradient(180deg, #ff80b8, #d9367d);
+  box-shadow: 0 0 13px rgba(255, 95, 162, .46);
+  content: '';
+}
+
+.rb-nav-icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.rb-rail-link.is-active .rb-nav-icon {
+  color: var(--rb-pink);
+  background: rgba(255, 255, 255, .65);
+}
+
+.rb-nav-icon svg { width: 17px; height: 17px; }
+.rb-link-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rb-cami-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 7px 0 10px;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, .58);
+  border-radius: 17px;
+  color: #fff;
+  background: linear-gradient(135deg, #b78ee7, #e65f9f);
+  box-shadow: 0 6px 0 rgba(144, 93, 189, .16), 4px 5px 12px rgba(184, 101, 160, .17);
+  text-decoration: none;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.rb-cami-card:hover { transform: translateY(-2px); box-shadow: 0 8px 0 rgba(144, 93, 189, .16), 4px 8px 15px rgba(184, 101, 160, .18); }
+.rb-cami-card.is-active { outline: 3px solid rgba(255, 255, 255, .55); }
+.rb-cami-icon { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 9px; background: rgba(255,255,255,.2); }
+.rb-cami-icon svg { width: 17px; height: 17px; }
+.rb-cami-card span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; }
+.rb-cami-card strong { font-size: .7rem; letter-spacing: .04em; }
+.rb-cami-card small { margin-top: 1px; color: rgba(255,255,255,.78); font-size: .59rem; font-weight: 700; }
+.rb-cami-arrow { width: 14px; height: 14px; margin-left: auto; color: rgba(255,255,255,.75); }
+
+.rb-rail-footer { padding-top: 10px; border-top: 1px dashed rgba(201, 44, 112, .15); }
+
+.rb-user-summary,
+.rb-top-user {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.rb-user-summary { gap: 8px; padding: 0 7px; }
+.rb-user-summary > svg { width: 14px; height: 14px; margin-left: auto; color: #c08da8; }
+.rb-user-copy { overflow: hidden; }
+.rb-user-copy strong { overflow: hidden; color: var(--rb-ink); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.rb-user-copy small { margin-top: 1px; color: var(--rb-muted); font-size: .58rem; font-weight: 800; }
+
+.rb-user-avatar {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 2px solid rgba(255,255,255,.9);
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(145deg, #ff82b8, #b487e3);
+  box-shadow: 0 5px 0 rgba(196, 45, 111, .12), 3px 4px 9px rgba(177, 90, 135, .14);
+  font-size: .75rem;
+  font-weight: 900;
+}
+
+.rb-logout-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 9px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 12px;
+  color: #c792a8;
+  background: transparent;
+  font: inherit;
+  font-size: .66rem;
+  font-weight: 800;
+  text-align: left;
+  transition: background .2s ease, color .2s ease;
+}
+
+.rb-logout-button:hover { color: var(--rb-pink-deep); background: rgba(255, 228, 239, .5); }
+.rb-logout-button svg { width: 16px; height: 16px; }
+
+.rb-main-area {
+  position: relative;
+  display: flex;
+  width: calc(100% - 270px);
+  min-width: 0;
+  min-height: 100svh;
+  margin-left: 270px;
+  flex-direction: column;
+}
+
+.rb-topbar {
+  display: flex;
+  min-height: 98px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 21px 30px 16px 27px;
+}
+
+.rb-page-heading { min-width: 0; }
+.rb-page-heading p { margin: 0 0 3px; color: var(--rb-pink); font-family: var(--font-accent, 'Great Vibes', cursive); font-size: 1.65rem; line-height: 1; }
+.rb-page-heading h1 { margin: 0; overflow: hidden; color: var(--rb-pink-deep); font-family: var(--font-headings, 'Alice', serif); font-size: 1.65rem; line-height: 1.1; letter-spacing: -.035em; text-overflow: ellipsis; white-space: nowrap; }
+
+.rb-mobile-brand { display: none; align-items: center; gap: 9px; }
+.rb-mobile-logo { width: 40px; height: 40px; border-radius: 14px; }
+.rb-mobile-logo img { width: 100%; height: 100%; object-fit: contain; }
+.rb-mobile-brand > span:last-child { display: flex; min-width: 0; flex-direction: column; }
+.rb-mobile-brand strong { color: var(--rb-pink-deep); font-family: var(--font-headings, 'Alice', serif); font-size: 1rem; line-height: 1; }
+.rb-mobile-brand small { font-size: .47rem; }
+
+.rb-topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+.rb-top-cami,
+.rb-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, .88);
+  color: var(--rb-pink-deep);
+  background: rgba(255, 250, 252, .8);
+  box-shadow: 4px 4px 10px rgba(199, 140, 173, .12), -4px -4px 10px rgba(255,255,255,.88);
+  text-decoration: none;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.rb-top-cami { gap: 6px; min-height: 39px; padding: 0 12px; border-radius: 14px; font-size: .68rem; font-weight: 900; }
+.rb-top-cami svg { width: 16px; height: 16px; color: var(--rb-lilac); }
+.rb-top-cami:hover,
+.rb-icon-button:hover { transform: translateY(-2px); box-shadow: 5px 7px 13px rgba(199, 140, 173, .16), -4px -4px 10px rgba(255,255,255,.9); }
+
+.rb-icon-button { position: relative; width: 40px; height: 40px; border-radius: 14px; }
+.rb-icon-button svg { width: 18px; height: 18px; }
+.rb-notification-dot { position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border: 1px solid #fff; border-radius: 50%; background: var(--rb-pink); }
+
+.rb-top-user { gap: 8px; padding: 4px 11px 4px 4px; border: 1px solid rgba(255, 255, 255, .8); border-radius: 999px; background: rgba(255, 250, 252, .68); box-shadow: inset 2px 2px 5px rgba(218, 164, 195, .08), inset -2px -2px 5px rgba(255,255,255,.9); }
+.rb-top-user .rb-user-avatar { width: 32px; height: 32px; }
+
+.rb-page-content { min-width: 0; flex: 1; padding: 8px 30px 30px 27px; }
+
+.rb-bottom-dock,
+.rb-more-sheet,
+.rb-more-backdrop { display: none; }
+
+/* The address editor and order detail drawer own the mobile viewport while open.
+   Keeping the dock above them covers bottom action buttons (copy link, WhatsApp)
+   and blocks touch targets on iOS. */
+.rb-layout-shell:has(app-address-editor-v2) .rb-bottom-dock,
+.rb-layout-shell:has(app-address-editor-v2) .rb-more-sheet,
+.rb-layout-shell:has(app-address-editor-v2) .rb-more-backdrop,
+.rb-layout-shell:has(.rb-order-drawer) .rb-bottom-dock,
+.rb-layout-shell:has(.rb-order-drawer) .rb-more-sheet,
+.rb-layout-shell:has(.rb-order-drawer) .rb-more-backdrop,
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-bottom-dock,
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-sheet,
+.rb-layout-shell:has(aside[aria-label="Detalle del pedido"]) .rb-more-backdrop,
+.rb-layout-shell:has([role="dialog"]) .rb-bottom-dock,
+.rb-layout-shell:has([role="dialog"]) .rb-more-sheet,
+.rb-layout-shell:has([role="dialog"]) .rb-more-backdrop,
+.rb-layout-shell:has([role="alertdialog"]) .rb-bottom-dock,
+.rb-layout-shell:has([role="alertdialog"]) .rb-more-sheet,
+.rb-layout-shell:has([role="alertdialog"]) .rb-more-backdrop,
+.rb-layout-shell:has(app-raffle-animation) .rb-bottom-dock,
+.rb-layout-shell:has(app-raffle-animation) .rb-more-sheet,
+.rb-layout-shell:has(app-raffle-animation) .rb-more-backdrop { display: none !important; }
+
+@media (max-width: 1024px) {
+  .rb-layout-shell { display: block; min-height: 100svh; padding-bottom: calc(91px + env(safe-area-inset-bottom, 0px)); }
+  .rb-nav-rail { display: none; }
+  .rb-main-area { width: 100%; min-height: 100svh; margin-left: 0; }
+  .rb-topbar { min-height: 85px; padding: 15px 17px 10px; }
+  .rb-mobile-brand { display: flex; }
+  .rb-page-heading { display: none; }
+  .rb-topbar-actions { gap: 7px; margin-left: auto; }
+  .rb-top-cami { display: none; }
+  .rb-top-user { padding-right: 5px; }
+  .rb-top-user .rb-user-copy { display: none; }
+  .rb-icon-button { width: 39px; height: 39px; }
+  .rb-page-content { padding: 8px 17px 22px; }
+
+  .rb-bottom-dock {
+    position: fixed;
+    z-index: 60;
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    width: min(calc(100% - 20px), 680px);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 7px;
+    border: 1px solid rgba(255, 255, 255, .86);
+    border-radius: 24px;
+    background: rgba(255, 250, 252, .91);
+    box-shadow: 0 16px 34px rgba(176, 85, 135, .2), inset 3px 3px 8px rgba(255,255,255,.95), inset -3px -3px 8px rgba(218,164,195,.13);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .rb-dock-item {
+    display: flex;
+    min-width: 0;
+    min-height: 56px;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 7px 3px;
+    border: 0;
+    border-radius: 17px;
+    color: var(--rb-muted);
+    background: transparent;
+    font: inherit;
+    font-size: .61rem;
+    font-weight: 900;
+    text-decoration: none;
+    transition: color .2s ease, background .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+
+  .rb-dock-item:hover { color: var(--rb-pink-deep); }
+  .rb-dock-item.is-active:not(.rb-dock-create) { color: var(--rb-pink-deep); background: var(--rb-pink-soft); box-shadow: inset 2px 2px 5px rgba(209,137,173,.18), inset -2px -2px 5px rgba(255,255,255,.82); }
+  .rb-dock-icon { display: grid; width: 22px; height: 22px; place-items: center; }
+  .rb-dock-icon svg { width: 18px; height: 18px; }
+  .rb-dock-item:not(.rb-dock-create) { flex-direction: column; }
+
+  .rb-dock-create { align-self: start; min-height: 65px; margin-top: -13px; color: #fff; background: linear-gradient(145deg, #ff74ad, #db3f84); box-shadow: 0 6px 0 #c42e70, 0 10px 15px rgba(214, 57, 125, .22); transform: translateY(-1px); }
+  .rb-dock-create:hover { color: #fff; transform: translateY(-3px); }
+  .rb-dock-create .rb-dock-icon { width: 27px; height: 27px; border-radius: 10px; background: rgba(255,255,255,.18); }
+  .rb-dock-create .rb-dock-icon svg { width: 20px; height: 20px; stroke-width: 2.4; }
+  .rb-dock-create.is-active { box-shadow: 0 4px 0 #c42e70, 0 7px 12px rgba(214, 57, 125, .22); transform: translateY(2px); }
+  .rb-dock-more.is-active { color: var(--rb-pink-deep); background: var(--rb-pink-soft); }
+
+  .rb-more-backdrop { position: fixed; z-index: 45; inset: 0; display: block; border: 0; background: rgba(99, 49, 78, .12); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .rb-more-sheet {
+    position: fixed;
+    z-index: 55;
+    right: 10px;
+    left: 10px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    display: block;
+    max-height: min(62svh, 420px);
+    overflow: auto;
+    padding: 10px 14px 16px;
+    border: 1px solid rgba(255, 255, 255, .9);
+    border-radius: 26px;
+    background: rgba(255, 250, 252, .96);
+    box-shadow: 0 22px 45px rgba(176,85,135,.24), inset 2px 2px 6px rgba(255,255,255,.94);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    animation: rb-sheet-in .24s cubic-bezier(.34,1.56,.64,1);
+  }
+  .rb-sheet-handle { width: 35px; height: 4px; margin: 0 auto 9px; border-radius: 999px; background: #eab5ce; }
+  .rb-sheet-heading { display: flex; align-items: center; justify-content: space-between; padding: 3px 2px 12px; color: var(--rb-pink-deep); font-family: var(--font-headings, 'Alice', serif); font-size: 1.1rem; }
+  .rb-sheet-heading button { width: 28px; height: 28px; border: 0; border-radius: 50%; color: var(--rb-muted); background: var(--rb-pink-soft); font-size: 1.25rem; line-height: 1; }
+  .rb-sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .rb-sheet-grid a { display: flex; min-height: 55px; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .72); border-radius: 15px; color: var(--rb-ink); background: rgba(255,255,255,.46); font-size: .72rem; font-weight: 900; text-decoration: none; }
+  .rb-sheet-grid a.is-active { color: var(--rb-pink-deep); background: var(--rb-pink-soft); box-shadow: inset 2px 2px 5px rgba(209,137,173,.14), inset -2px -2px 5px rgba(255,255,255,.8); }
+  .rb-sheet-icon { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; border-radius: 10px; color: var(--rb-pink); background: #fff3f8; }
+  .rb-sheet-icon svg { width: 16px; height: 16px; }
+}
+
+@media (max-width: 390px) {
+  .rb-mobile-brand small { display: none; }
+  .rb-topbar { padding-right: 13px; padding-left: 13px; }
+  .rb-page-content { padding-right: 13px; padding-left: 13px; }
+  .rb-bottom-dock { width: calc(100% - 14px); padding: 6px; border-radius: 21px; }
+  .rb-dock-item { min-height: 54px; font-size: .55rem; }
+  .rb-dock-icon svg { width: 17px; height: 17px; }
+}
+
+@media (min-width: 1025px) and (max-width: 1180px) {
+  .rb-nav-rail { width: 220px; }
+  .rb-main-area { width: calc(100% - 248px); margin-left: 248px; }
+  .rb-topbar { padding-right: 20px; padding-left: 22px; }
+  .rb-page-content { padding-right: 20px; padding-left: 22px; }
+  .rb-top-cami { display: none; }
+}
+
+@keyframes rb-sheet-in {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-rail-link,
+  .rb-cami-card,
+  .rb-top-cami,
+  .rb-icon-button,
+  .rb-dock-item { transition: none; }
+  .rb-more-sheet { animation: none; }
+}
