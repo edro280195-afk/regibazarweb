@@ -210,6 +210,11 @@ export interface OrderSummaryDto {
     totalPackages?: number | null;
     /** True cuando ya se resolvió el tema de bolsas (número puesto o "va sin bolsas"). */
     packagesConfirmed?: boolean;
+    isOpenDate?: boolean;
+
+
+
+
     /** Evidencia de entrega (fotos). Solo si status = Delivered. */
     evidenceUrls?: string[];
     /** Firma digital de quien recibió (SVG). */
@@ -878,8 +883,16 @@ export interface ManualOrderRequest {
      *  bolsas") marca packagesConfirmed = true y el backend crea las bolsas con QR
      *  que falten hasta ese total (nunca borra las que ya existen). */
     totalPackages?: number | null;
+    tags?: string;
+    initialPaymentAmount?: number;
+    initialPaymentMethod?: string;
     /** True cuando la dueña resolvió el tema de bolsas al capturar. */
     packagesConfirmed?: boolean;
+    isOpenDate?: boolean;
+
+
+
+
 }
 
 export interface LoginRequest {
@@ -1207,6 +1220,11 @@ export interface UpdateOrderDetailsRequest {
     totalPackages?: number | null;
     /** Confirmación explícita de bolsas (permite "va sin bolsas" con totalPackages = 0). */
     packagesConfirmed?: boolean;
+    isOpenDate?: boolean;
+
+
+
+
 }
 
 export interface CreateAdminExpenseRequest {
@@ -1305,6 +1323,7 @@ export interface TandaProductDto {
     name: string;
     description?: string;
     basePrice: number;
+    cashPrice?: number;
     isActive: boolean;
     createdAt: string;
 }

@@ -24,6 +24,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/orders/orders.component').then(m => m.OrdersComponent)
             },
             {
+                path: 'orders/cash-sales',
+                loadComponent: () => import('./features/admin/orders/cash-sales/cash-sales.component').then(m => m.CashSalesComponent)
+            },
+            {
                 path: 'order-consolidations',
                 loadComponent: () => import('./features/admin/orders/order-consolidations/order-consolidations.component').then(m => m.OrderConsolidationsComponent)
             },

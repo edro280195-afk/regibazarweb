@@ -25,8 +25,12 @@ export class TandaService {
     return this.http.get<TandaProductDto[]>(`${this.base}/products`);
   }
 
-  createProduct(name: string): Observable<TandaProductDto> {
-    return this.http.post<TandaProductDto>(`${this.base}/products`, { name, basePrice: 0 });
+  createProduct(name: string, basePrice = 0, cashPrice?: number): Observable<TandaProductDto> {
+    return this.http.post<TandaProductDto>(`${this.base}/products`, { name, basePrice, cashPrice });
+  }
+
+  updateProductPrice(id: string, cashPrice?: number, basePrice?: number): Observable<TandaProductDto> {
+    return this.http.put<TandaProductDto>(`${this.base}/products/${id}/price`, { cashPrice, basePrice });
   }
 
   // ── Tandas ──

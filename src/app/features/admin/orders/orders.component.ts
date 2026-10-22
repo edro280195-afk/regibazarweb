@@ -41,6 +41,10 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
           </label>
+          <a routerLink="/admin/orders/cash-sales" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Ventas al contado de tandas">
+            <span class="sm:hidden">💵 Contado</span>
+            <span class="hidden sm:inline">💵 Venta Contado</span>
+          </a>
           <a routerLink="/admin/send-links" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-4 sm:text-sm" aria-label="Enviar enlaces">
             <span class="sm:hidden">💌 Enlaces</span>
             <span class="hidden sm:inline">💌 Enviar Enlaces</span>
@@ -167,7 +171,14 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                 <!-- Card Header -->
                 <div class="flex justify-between items-start mb-4">
                   <div class="flex flex-col gap-1.5">
-                    <span class="text-[10px] font-black text-pink-400 tracking-[0.2em] uppercase">Pedido #{{ order.id }}</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="text-[10px] font-black text-pink-400 tracking-[0.2em] uppercase">Pedido #{{ order.id }}</span>
+                      @if (order.isOpenDate || (order.tags && order.tags.includes('ContadoTanda'))) {
+                        <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-pink-100 text-pink-700 border border-pink-200">
+                          💵 Contado Tanda
+                        </span>
+                      }
+                    </div>
                     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-gradient-to-r from-pink-50 to-rose-50 text-pink-600 border border-pink-100/60 shadow-sm">
                       {{ order.orderType === 'Delivery' ? '🚗 Domicilio' : '🏪 Recoger' }}
                     </span>
@@ -201,6 +212,11 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                       @if (hasScheduledTime(order.scheduledDeliveryDate)) {
                         · {{ order.scheduledDeliveryDate | date:'h:mm a' }}
                       }
+                    </p>
+                  }
+                  @if (!order.scheduledDeliveryDate) {
+                    <p class="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-black">
+                      🌸 Entrega: Fecha abierta
                     </p>
                   }
                   @if (order.deliveryTime) {
