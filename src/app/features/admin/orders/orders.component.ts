@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { BluetoothPrinterService } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto } from '../../../core/models';
+import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderPaymentDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
@@ -719,12 +719,21 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                 <div class="mt-4 pt-3 border-t border-pink-100/50 space-y-2">
                   <p class="text-[9px] font-black text-pink-400 uppercase tracking-widest">💕 Historial de Pagos</p>
                   @for (p of selectedOrder()!.payments; track p.id) {
-                    <div class="flex justify-between items-center text-sm bg-white/50 rounded-xl px-3 py-1.5">
-                      <div class="flex flex-col">
+                    <div class="flex justify-between items-center gap-2 text-sm bg-white/50 rounded-xl px-3 py-1.5">
+                      <div class="flex flex-col min-w-0">
                         <span class="text-pink-700 font-medium">{{ p.method }}</span>
-                        <span class="text-pink-400 text-[10px]">📅 {{ p.date | date:'dd MMM yyyy' }}</span>
+                        <span class="text-pink-400 text-[10px]">📅 {{ p.date | date:'dd MMM yyyy' }} · {{ paymentSourceLabel(p) }}</span>
                       </div>
-                      <span class="font-black text-pink-800">{{ p.amount | currency:'MXN':'symbol-narrow' }}</span>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <span class="font-black text-pink-800">{{ p.amount | currency:'MXN':'symbol-narrow' }}</span>
+                        <button type="button"
+                                class="relative w-8 h-8 rounded-full border border-rose-200/60 bg-rose-50/80 text-sm text-rose-500 flex items-center justify-center transition-all hover:bg-rose-100 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 after:content-[''] after:absolute after:-inset-1.5"
+                                [disabled]="removingPaymentId() !== null"
+                                title="Quitar este pago" aria-label="Quitar este pago del pedido"
+                                (click)="removePayment(p)">
+                          {{ removingPaymentId() === p.id ? '⏳' : '🗑️' }}
+                        </button>
+                      </div>
                     </div>
                   }
                 </div>
@@ -850,6 +859,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
   paymentAmount = 0;
   paymentMethod = 'Efectivo';
   paymentDate = '';  // Fecha real del pago (YYYY-MM-DD)
+  /** Id del pago que se está quitando (null = ninguno). Deshabilita los botones mientras responde la API. */
+  removingPaymentId = signal<number | null>(null);
 
   /** Retorna la fecha de hoy como string YYYY-MM-DD en hora local */
   private getTodayLocal(): string {
@@ -1388,6 +1399,58 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.loadOrders();
       },
       error: () => this.toast.error('Error al registrar pago')
+    });
+  }
+
+  /** De dónde salió un pago, para que se reconozca cuál es el que hay que quitar. */
+  paymentSourceLabel(p: OrderPaymentDto): string {
+    switch (p.registeredBy) {
+      case 'Cliente': return 'desde su enlace';
+      case 'Sistema (Webhook)': return 'automático de Mercado Pago';
+      case 'Driver': return 'chofer';
+      case 'POS_Tienda': return 'caja';
+      case 'Admin': return 'admin';
+      default: return p.registeredBy || 'admin';
+    }
+  }
+
+  /**
+   * Quita un pago/abono del pedido (borrado definitivo). La API verifica con Mercado Pago los pagos
+   * con tarjeta: si MP los tiene aprobados, o si son de una caja cerrada, responde con el motivo.
+   */
+  removePayment(p: OrderPaymentDto): void {
+    const order = this.selectedOrder();
+    if (!order || this.removingPaymentId() !== null) return;
+
+    const amount = p.amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+    const isMercadoPago = /MP#\d+/.test(p.notes ?? '');
+    const message =
+      `¿Quitar el pago de ${amount} (${p.method}) del pedido de ${order.clientName}?\n\n` +
+      'El pedido volverá a mostrar ese saldo pendiente y los reportes de cobros se ajustan. ' +
+      'Esta acción no se puede deshacer.' +
+      (isMercadoPago ? '\n\nSe verificará con Mercado Pago: si ahí aparece como aprobado, no se podrá quitar.' : '');
+    if (!confirm(message)) return;
+
+    this.removingPaymentId.set(p.id);
+    this.api.deletePayment(order.id, p.id).subscribe({
+      next: (res) => {
+        this.removingPaymentId.set(null);
+        const mayReturn = ['in_process', 'pending', 'authorized'].includes(res?.mercadoPagoStatus);
+        if (mayReturn) {
+          this.toast.warning(res?.message ?? 'Pago quitado');
+        } else {
+          this.toast.success(res?.message ?? 'Pago quitado');
+        }
+        this.reloadSelectedOrder();
+        this.loadOrders();
+      },
+      error: (err) => {
+        this.removingPaymentId.set(null);
+        // La API explica el motivo en { message } (409 bloqueado, 502 no se pudo verificar en MP)
+        // o como texto plano (404).
+        const reason = err?.error?.message ?? (typeof err?.error === 'string' ? err.error : null);
+        this.toast.error(reason ?? 'No se pudo quitar el pago');
+      }
     });
   }
 
