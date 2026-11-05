@@ -24,8 +24,28 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/orders/orders.component').then(m => m.OrdersComponent)
             },
             {
+                path: 'orders/cash-sales',
+                loadComponent: () => import('./features/admin/orders/cash-sales/cash-sales.component').then(m => m.CashSalesComponent)
+            },
+            {
+                path: 'order-consolidations',
+                loadComponent: () => import('./features/admin/orders/order-consolidations/order-consolidations.component').then(m => m.OrderConsolidationsComponent)
+            },
+            {
+                path: 'inventory',
+                loadComponent: () => import('./features/admin/inventory/inventory.component').then(m => m.InventoryComponent)
+            },
+            {
+                path: 'labels',
+                loadComponent: () => import('./features/admin/labels/label-designer.component').then(m => m.LabelDesignerComponent)
+            },
+            {
                 path: 'capture',
                 loadComponent: () => import('./features/admin/orders/capture-order/capture-order').then(m => m.CaptureOrderComponent)
+            },
+            {
+                path: 'send-links',
+                loadComponent: () => import('./features/admin/orders/send-links/send-links.component').then(m => m.SendLinksComponent)
             },
             {
                 path: 'live/import',
@@ -42,6 +62,10 @@ export const routes: Routes = [
             {
                 path: 'clients/duplicates',
                 loadComponent: () => import('./features/admin/clients/duplicates/duplicates.component').then(m => m.ClientsDuplicatesComponent)
+            },
+            {
+                path: 'clients/facebook-import',
+                loadComponent: () => import('./features/admin/clients/facebook-import/facebook-import.component').then(m => m.FacebookImportComponent)
             },
             {
                 path: 'clients/:id',
@@ -92,6 +116,14 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/tandas/tanda-detail.component').then(m => m.TandaDetailComponent)
             },
             {
+                path: 'live',
+                loadComponent: () => import('./features/admin/live/live-import.component').then(m => m.LiveImportComponent)
+            },
+            {
+                path: 'live/:id/review',
+                loadComponent: () => import('./features/admin/live/live-review.component').then(m => m.LiveReviewComponent)
+            },
+            {
                 path: 'raffles',
                 loadComponent: () => import('./features/admin/raffles/raffles.component').then(m => m.RafflesComponent)
             },
@@ -105,6 +137,10 @@ export const routes: Routes = [
     {
         path: 'pedido/:token',
         loadComponent: () => import('./features/client/order-view/order-view.component').then(m => m.OrderViewComponent)
+    },
+    {
+        path: 'caja/:token',
+        loadComponent: () => import('./features/client/inventory-tag-redirect/inventory-tag-redirect.component').then(m => m.InventoryTagRedirectComponent)
     },
     {
         path: 'live/:id',

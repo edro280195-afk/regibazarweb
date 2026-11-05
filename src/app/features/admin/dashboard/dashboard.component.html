@@ -1,0 +1,150 @@
+<section class="rb-dashboard-page">
+  @if (loading()) {
+    <div class="rb-dashboard-loading" aria-label="Cargando resumen">
+      <div class="rb-loading-hero"></div>
+      <div class="rb-loading-kpis"><span></span><span></span><span></span></div>
+      <div class="rb-loading-grid"><span></span><span></span></div>
+    </div>
+  } @else if (data(); as dashboard) {
+    <header class="rb-dashboard-header">
+      <div>
+        <p class="rb-dashboard-eyebrow">Tu espacio cute para vender mejor</p>
+        <h1>Resumen de hoy <span>✨</span></h1>
+        <p class="rb-dashboard-date">Una vista clara de lo que está pasando en Regi Bazar.</p>
+      </div>
+      <a routerLink="/admin/capture" class="rb-dashboard-primary-action">
+        <span>＋</span>
+        <span>Nuevo pedido</span>
+      </a>
+    </header>
+
+    <section class="rb-dash-hero" [class.is-attention]="dashboard.pendingOrders > 0">
+      <div class="rb-dash-hero-copy">
+        <p class="rb-dash-hero-kicker">✦ Lo más importante ahora</p>
+        <h2>{{ dashboardStatus() }}</h2>
+        <p>{{ dashboardStatusDetail() }}</p>
+      </div>
+      <div class="rb-dash-hero-status">
+        <span class="rb-dash-status-dot"></span>
+        {{ dashboard.pendingOrders > 0 ? 'Requiere revisión' : 'Operación tranquila' }}
+      </div>
+    </section>
+
+    <div class="rb-dash-section-heading">
+      <div>
+        <h2>Lo que necesita tu atención</h2>
+        <p>Los tres datos para decidir rápido.</p>
+      </div>
+      <span>Actualizado ahora</span>
+    </div>
+
+    <section class="rb-dash-kpis" aria-label="Indicadores clave">
+      <article class="rb-dash-kpi rb-dash-kpi-pink">
+        <div class="rb-dash-kpi-head"><span class="rb-dash-kpi-icon">📦</span><span>Pedidos pendientes</span></div>
+        <strong class="rb-dash-count-val" [attr.data-value]="dashboard.pendingOrders">0</strong>
+        <small>Revisa y prepara</small>
+        <a routerLink="/admin/orders" [queryParams]="{ status: 'Pending' }">Ver pendientes <span>→</span></a>
+      </article>
+
+      <article class="rb-dash-kpi rb-dash-kpi-lilac">
+        <div class="rb-dash-kpi-head"><span class="rb-dash-kpi-icon">💳</span><span>Por cobrar</span></div>
+        <strong>{{ dashboard.pendingAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
+        <small>{{ dashboard.pendingAmount > 0 ? 'Hay pagos por confirmar' : 'Todo al corriente' }}</small>
+        <a routerLink="/admin/reports" [queryParams]="{ tab: 'porCobrar' }">Ver cobros <span>→</span></a>
+      </article>
+
+      <article class="rb-dash-kpi rb-dash-kpi-rose">
+        <div class="rb-dash-kpi-head"><span class="rb-dash-kpi-icon">🚗</span><span>Rutas activas</span></div>
+        <strong class="rb-dash-count-val" [attr.data-value]="dashboard.activeRoutes">0</strong>
+        <small>{{ dashboard.activeRoutes > 0 ? 'Entregas en camino' : 'Sin entregas en curso' }}</small>
+        <a routerLink="/admin/routes">Ver rutas <span>→</span></a>
+      </article>
+    </section>
+
+    <div class="rb-dash-main-grid">
+      <section class="rb-dash-panel rb-dash-flow-panel" aria-label="Flujo de pedidos">
+        <div class="rb-dash-panel-heading">
+          <div><h2>Flujo de pedidos</h2><p>Así se distribuyen tus {{ dashboard.totalOrders | number:'1.0-0' }} pedidos.</p></div>
+          <a routerLink="/admin/orders">Ver pedidos</a>
+        </div>
+
+        <div class="rb-dash-flow-total"><strong>{{ dashboard.totalOrders | number:'1.0-0' }}</strong><span>pedidos en total</span></div>
+        <div class="rb-dash-flow-bar" aria-label="Distribución de pedidos">
+          <span class="is-delivered" [style.width.%]="orderShare(dashboard.deliveredOrders, dashboard.totalOrders)"></span>
+          <span class="is-process" [style.width.%]="orderShare(getInProcessOrders(dashboard), dashboard.totalOrders)"></span>
+          <span class="is-pending" [style.width.%]="orderShare(dashboard.pendingOrders, dashboard.totalOrders)"></span>
+          @if (dashboard.notDeliveredOrders > 0) {
+            <span class="is-not-delivered" [style.width.%]="orderShare(dashboard.notDeliveredOrders, dashboard.totalOrders)"></span>
+          }
+        </div>
+        <div class="rb-dash-flow-legend">
+          <div><span><i class="is-delivered"></i>Entregados</span><strong>{{ dashboard.deliveredOrders | number:'1.0-0' }}</strong></div>
+          <div><span><i class="is-process"></i>En proceso</span><strong>{{ getInProcessOrders(dashboard) | number:'1.0-0' }}</strong></div>
+          <div><span><i class="is-pending"></i>Pendientes</span><strong>{{ dashboard.pendingOrders | number:'1.0-0' }}</strong></div>
+        </div>
+      </section>
+
+      <section class="rb-dash-panel rb-dash-activity-panel" aria-label="Actividad reciente">
+        <div class="rb-dash-panel-heading"><div><h2>Últimos movimientos</h2><p>Lo más reciente en pedidos.</p></div><a routerLink="/admin/orders">Ver todo</a></div>
+        <div class="rb-dash-activity-list">
+          @for (order of dashboard.recentOrders; track order.id) {
+            <div class="rb-dash-activity">
+              <span class="rb-dash-activity-icon">{{ getStatusEmoji(order.status) }}</span>
+              <span class="rb-dash-activity-copy"><strong>{{ order.clientName }}</strong><small>{{ order.createdAt | date:'shortTime' }} · {{ order.orderType }}</small></span>
+              <span class="rb-dash-activity-total"><strong>{{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong><em [class]="'rb-dash-status ' + getStatusClass(order.status)">{{ getStatusLabel(order.status) }}</em></span>
+            </div>
+          } @empty {
+            <div class="rb-dash-empty"><span>🎀</span><p>Aún no hay actividad reciente.</p></div>
+          }
+        </div>
+      </section>
+    </div>
+
+    <div class="rb-dash-secondary-grid">
+      <section class="rb-dash-panel rb-dash-sales-panel" aria-label="Ventas de los últimos meses">
+        <div class="rb-dash-panel-heading"><div><h2>Ventas de los últimos meses</h2><p>Una mirada rápida a tu ritmo de venta.</p></div><strong>{{ dashboard.revenueMonth | currency:'MXN':'symbol-narrow':'1.0-0' }} este mes</strong></div>
+        <div class="rb-dash-chart-wrap"><canvas #salesChart aria-label="Gráfica de ventas mensuales"></canvas></div>
+      </section>
+
+      <section class="rb-dash-panel rb-dash-actions-panel" aria-label="Acciones rápidas">
+        <div class="rb-dash-panel-heading"><div><h2>Acciones rápidas</h2><p>Lo que más haces, a un toque.</p></div></div>
+        <div class="rb-dash-actions-grid">
+          <a routerLink="/admin/capture" class="is-primary"><span>＋</span><strong>Nuevo pedido</strong></a>
+          <a routerLink="/admin/orders"><span>📦</span><strong>Pedidos</strong></a>
+          <a routerLink="/admin/clients"><span>👩‍💼</span><strong>Clientas</strong></a>
+          <a routerLink="/admin/routes"><span>🚗</span><strong>Rutas</strong></a>
+        </div>
+      </section>
+    </div>
+
+    <div class="rb-dash-detail-grid">
+      <section class="rb-dash-panel rb-dash-payment-panel" aria-label="Resumen de cobros">
+        <div class="rb-dash-panel-heading"><div><h2>Resumen de cobros</h2><p>Cómo se están pagando tus pedidos.</p></div><a routerLink="/admin/reports">Ver reportes</a></div>
+        <div class="rb-dash-payment-list">
+          <div><span>💵 Efectivo</span><strong>{{ dashboard.totalCashOrders }} pedidos · {{ dashboard.totalCashAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong></div>
+          <div><span>🏦 Transferencia</span><strong>{{ dashboard.totalTransferOrders }} pedidos · {{ dashboard.totalTransferAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong></div>
+          <div><span>💳 Otros</span><strong>{{ dashboard.totalDepositOrders }} pedidos · {{ dashboard.totalDepositAmount | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong></div>
+        </div>
+      </section>
+
+      <section class="rb-dash-panel rb-dash-insight-card" aria-label="Insight de C.A.M.I.">
+        <div class="rb-dash-insight-heading"><span class="rb-dash-insight-icon">✦</span><div><h2>Insight de C.A.M.I.</h2><p>Una ayudita para decidir.</p></div></div>
+        <button type="button" (click)="loadAiInsight()" [disabled]="loadingInsight()">
+          {{ loadingInsight() ? 'Analizando…' : (aiInsight() ? 'Actualizar insight' : 'Generar insight') }}
+        </button>
+        @if (aiInsight()) {
+          <p class="rb-dash-insight-text">{{ aiInsight() }}</p>
+        } @else if (!loadingInsight()) {
+          <p class="rb-dash-insight-help">Genera un resumen inteligente con los datos de hoy.</p>
+        }
+      </section>
+    </div>
+  } @else {
+    <section class="rb-dash-error" role="alert">
+      <span>🌸</span>
+      <h1>No pudimos cargar tu resumen</h1>
+      <p>Intenta actualizar la página en un momento.</p>
+      <button type="button" (click)="loadDashboard()">Intentar de nuevo</button>
+    </section>
+  }
+</section>

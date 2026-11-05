@@ -1,0 +1,191 @@
+:host {
+  display: block;
+  min-height: 100%;
+  color-scheme: light;
+  --font-headings: 'Alice', serif;
+  --font-body: 'Quicksand', sans-serif;
+  --font-accent: 'Great Vibes', cursive;
+
+  /* Redesign Autumn Girly Tokens */
+  --rb-pumpkin: #f48242;
+  --rb-pumpkin-dark: #d46328;
+  --rb-pumpkin-soft: #ffe8db;
+  --rb-terracota: #cf5038;
+  --rb-terracota-dark: #ad3924;
+  --rb-berry: #c43254;
+  --rb-berry-dark: #8b233a;
+  --rb-berry-soft: #fcdde4;
+  --rb-rose: #e0536c;
+  --rb-honey: #fec84d;
+  --rb-honey-soft: #fff3d6;
+  --rb-cream: #fff9f5;
+  --rb-surface: #fff3ea;
+  --rb-ink: #52232b;
+  --rb-muted: #9e646d;
+  --rb-line: #edd5c8;
+  --rb-highlight: rgba(255, 255, 255, 0.96);
+  --rb-soft-shadow: rgba(184, 80, 60, 0.16);
+  --rb-shadow-3d: #8b233a;
+}
+
+/* Page Background with Warm Polka Dots & Sparkle Atmosphere */
+.rb-client-page {
+  position: relative;
+  min-height: 100svh;
+  overflow-x: clip;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(80px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  color: var(--rb-ink);
+  font-family: var(--font-body, 'Quicksand', sans-serif);
+  background:
+    radial-gradient(circle at 10% 12%, rgba(255, 255, 255, 0.85) 0 4px, transparent 5px),
+    radial-gradient(circle at 90% 28%, rgba(255, 255, 255, 0.75) 0 3px, transparent 4px),
+    radial-gradient(circle at 18% 75%, rgba(255, 255, 255, 0.7) 0 4px, transparent 5px),
+    radial-gradient(circle at 82% 85%, rgba(255, 255, 255, 0.65) 0 3px, transparent 4px),
+    linear-gradient(160deg, #fff7f2 0%, #fef0ea 42%, #fae6dc 100%);
+  background-size: 130px 130px, 160px 160px, 140px 140px, 170px 170px, auto;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Tactile 3D Buttons (Approved Project Redesign Style) */
+.rb-btn-autumn {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(110deg, #f48242 0%, #e0536c 50%, #c43254 100%);
+  box-shadow: 0 7px 0 var(--rb-shadow-3d), 0 14px 20px rgba(196, 50, 84, 0.28);
+  font-family: var(--font-body, 'Quicksand', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rb-btn-autumn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 0 var(--rb-shadow-3d), 0 16px 24px rgba(196, 50, 84, 0.32);
+}
+
+.rb-btn-autumn:active {
+  transform: translateY(4px);
+  box-shadow: 0 3px 0 var(--rb-shadow-3d), 0 6px 10px rgba(196, 50, 84, 0.2);
+}
+
+.rb-btn-cozy-white {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 18px;
+  color: var(--rb-berry-dark);
+  background: #ffffff;
+  box-shadow: 0 5px 0 #ebd3c8, 0 10px 16px rgba(180, 80, 60, 0.12);
+  font-family: var(--font-body, 'Quicksand', sans-serif);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.rb-btn-cozy-white:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #ebd3c8, 0 4px 6px rgba(180, 80, 60, 0.1);
+}
+
+/* Neumorphic Autumn Cards */
+.rb-card-autumn {
+  position: relative;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 28px;
+  background: var(--rb-cream);
+  box-shadow:
+    0 14px 0 rgba(196, 50, 84, 0.06),
+    0 22px 36px rgba(180, 50, 75, 0.12),
+    inset 2px 2px 8px rgba(255, 255, 255, 0.95),
+    inset -3px -3px 8px rgba(220, 160, 180, 0.1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Cute Circular Autumn Sticker */
+.rb-sticker-autumn {
+  display: inline-grid;
+  place-items: center;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--rb-honey), var(--rb-pumpkin));
+  color: var(--rb-ink);
+  box-shadow: 0 6px 0 rgba(196, 50, 84, 0.18), 0 10px 18px rgba(244, 130, 66, 0.25);
+  user-select: none;
+}
+
+/* Navigation Tabs (Pill Segments) */
+.rb-nav-pill-container {
+  display: flex;
+  padding: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 24px;
+  background: rgba(255, 250, 246, 0.85);
+  box-shadow: inset 2px 2px 6px rgba(184, 80, 60, 0.08), inset -2px -2px 6px rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.rb-nav-pill-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--rb-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rb-nav-pill-btn.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--rb-ink) 0%, #752e3b 100%);
+  box-shadow: 0 4px 0 #2e1116, 0 8px 14px rgba(82, 35, 43, 0.25);
+  transform: scale(1.02);
+}
+
+/* Inset Neumorphic Input Shell */
+.rb-input-neumorphic {
+  width: 100%;
+  border: 2px solid var(--rb-line);
+  border-radius: 18px;
+  background: #fffcf9;
+  padding: 12px 16px;
+  color: var(--rb-ink);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: inset 3px 3px 6px rgba(184, 80, 60, 0.06), inset -3px -3px 6px rgba(255, 255, 255, 0.9);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.rb-input-neumorphic:focus {
+  border-color: var(--rb-pumpkin);
+  box-shadow: inset 3px 3px 6px rgba(184, 80, 60, 0.06), inset -3px -3px 6px rgba(255, 255, 255, 0.9), 0 0 0 3px rgba(244, 130, 66, 0.15);
+}

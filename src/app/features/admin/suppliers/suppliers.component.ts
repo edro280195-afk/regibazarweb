@@ -92,17 +92,17 @@ import { SupplierDto, InvestmentDto, SalesPeriodDto, CreateInvestmentRequest } f
             <div class="p-8 pb-6 border-b border-pink-50 relative">
               <button class="absolute top-6 right-8 text-pink-300 hover:text-pink-600 transition-colors text-2xl" (click)="closeDetails()">✕</button>
               
-              <div class="flex items-center gap-4 mb-4">
+               <div class="flex min-w-0 items-center gap-4 mb-4">
                 <div class="w-16 h-16 bg-pink-500 text-white rounded-[24px] flex items-center justify-center text-3xl font-black shadow-lg shadow-pink-200">
                   {{ selectedSupplier()!.name.charAt(0).toUpperCase() }}
                 </div>
-                <div>
-                  <h2 class="text-2xl font-black text-pink-900 -mb-1">{{ selectedSupplier()!.name }}</h2>
+                 <div class="min-w-0">
+                   <h2 class="break-words text-2xl font-black text-pink-900 -mb-1">{{ selectedSupplier()!.name }}</h2>
                   <span class="text-xs font-black text-pink-400 uppercase tracking-[2px]">Proveedor Oficial 🏭</span>
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-4 mt-6">
+              <div class="grid grid-cols-1 gap-4 mt-6 sm:grid-cols-2">
                 <div class="bg-pink-50/50 p-4 rounded-3xl border border-pink-100/50">
                   <p class="text-[10px] uppercase font-black text-pink-400 tracking-wider mb-1">Inversión Total</p>
                   <p class="text-2xl font-black text-pink-600">{{ totalInvestedInDrawer() | currency:'MXN':'symbol-narrow':'1.0-0' }}</p>
@@ -125,7 +125,7 @@ import { SupplierDto, InvestmentDto, SalesPeriodDto, CreateInvestmentRequest } f
                 </h3>
                 
                 <div class="bg-pink-50/30 p-6 rounded-[32px] border border-pink-100/50 space-y-4">
-                  <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="space-y-1">
                       <label class="text-[10px] font-black text-pink-400 uppercase ml-2">Monto</label>
                       <input type="number" class="input-coquette bg-white" [(ngModel)]="newInv.amount" placeholder="0.00" />
@@ -146,7 +146,7 @@ import { SupplierDto, InvestmentDto, SalesPeriodDto, CreateInvestmentRequest } f
                     </div>
                   }
 
-                  <div class="grid grid-cols-2 gap-3">
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="space-y-1">
                       <label class="text-[10px] font-black text-pink-400 uppercase ml-2">Fecha</label>
                       <input type="date" class="input-coquette bg-white" [(ngModel)]="newInv.date" />
