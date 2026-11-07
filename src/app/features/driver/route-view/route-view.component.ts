@@ -32,6 +32,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
     private routeParam = inject(ActivatedRoute);
+    private host = inject<ElementRef<HTMLElement>>(ElementRef);
     private api = inject(ApiService);
     private signalr = inject(SignalRService);
     private push = inject(PushNotificationService);
@@ -519,6 +520,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         if (method === 'Efectivo' && this.cashReceived[deliveryId] == null) {
             this.cashReceived[deliveryId] = null;
         }
+        this.revealInSheet(method === 'Efectivo' ? '.cash-payment-card' : '.non-cash-panel');
     }
 
     selectPaymentMode(deliveryId: number, mode: DeliveryPaymentMode): void {
@@ -527,6 +529,15 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             delete this.paymentMethods[deliveryId];
             delete this.cashReceived[deliveryId];
         }
+        this.revealInSheet(mode === 'collect' ? '.payment-detail-panel' : '.no-charge-panel');
+    }
+
+    /** La tarjeta de la entrega hace scroll interno: al abrir un panel de cobro lo acercamos a la vista. */
+    private revealInSheet(selector: string): void {
+        setTimeout(() => {
+            const el = (this.host.nativeElement as HTMLElement).querySelector(selector);
+            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 60);
     }
 
     canMarkDelivered(deliveryId: number, balanceDue: number, kind?: string): boolean {
