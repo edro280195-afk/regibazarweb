@@ -140,11 +140,15 @@ export function buildOrderMessage(data: OrderMessageData): string {
     if (status === 'Delivered' && saldo > 0) {
         lineas.push(
             '🚨 ¡Tu pedido ya fue entregado!',
+            'Esperamos que disfrutes mucho tus artículos 💕',
             `Aún queda un saldo pendiente de ${formatCurrency(saldo)}.`,
-            'Puedes liquidarlo y consultar los detalles de tu entrega aquí:',
+            '',
+            '🔗 Los datos de pago los encuentras directamente en tu enlace:',
             data.publicLink,
             '',
-            'Por favor ayúdame a dejarlo liquidado. Si ya pagaste, mándame tu comprobante ✨'
+            'Te invitamos cordialmente a realizar tu pago para no perder los beneficios de ser una clienta distinguida en Regi Bazar 🥰🎀',
+            '',
+            'En cuanto realices tu pago, compártenos tu comprobante para dejar tu cuenta al 100%. ¡Muchas gracias! ✨'
         );
         return lineas.join('\n');
     }
@@ -179,15 +183,18 @@ export function buildPaymentReminderMessage(clientName: string, balanceDue: numb
     const saldo = formatCurrency(balanceDue);
     const delivered = status === 'Delivered';
     return [
-        `Hola ${nombre} 💕`,
+        `Hola ${nombre} 💕✨`,
         delivered
-            ? `🚨 Tu pedido ya fue entregado y tiene un saldo pendiente de ${saldo}.`
-            : `Te recuerdo que tu pedido tiene un saldo pendiente de ${saldo}.`,
-        publicLink,
+            ? `Esperamos que disfrutes mucho tus artículos de Regi Bazar 🌸\nTe recordamos con cariño que tu paquete fue entregado con un saldo pendiente de ${saldo}.`
+            : `Te recordamos con cariño que tu pedido tiene un saldo pendiente de ${saldo}.`,
+        '',
+        `🔗 Dentro de tu enlace encontrarás los datos de pago:\n${publicLink}`,
+        '',
+        'Te invitamos cordialmente a realizar tu pago a la brevedad posible para no perder los beneficios de ser una clienta distinguida en Regi Bazar 🥰🎀',
         '',
         delivered
-            ? 'Por favor ayúdame a dejarlo liquidado. Si ya pagaste, mándame tu comprobante ✨'
-            : '¿Cómo te gustaría pagarlo? Quedo al pendiente ✨🛍️'
+            ? 'En cuanto realices tu pago, por favor compártenos tu comprobante por aquí para dejar tu cuenta al 100%. ¡Muchas gracias! ✨'
+            : '¿Cómo te gustaría pagarlo? Quedamos al pendiente ✨🛍️'
     ].join('\n');
 }
 

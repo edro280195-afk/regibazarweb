@@ -1196,12 +1196,30 @@ export class OrdersComponent implements OnInit, OnDestroy {
     return this.unpaidDeliveredOrders().length;
   }
 
+  getOrderPublicLink(order: OrderSummaryDto): string {
+    if (order.link) {
+      return order.link
+        .replace('/o/', '/pedido/')
+        .replace('http://localhost:56164', 'https://regibazar.com')
+        .replace('http://regibazarapi.onrender.com', 'https://regibazar.com')
+        .replace('https://regibazarapi.onrender.com', 'https://regibazar.com');
+    }
+    if (order.accessToken) {
+      return `https://regibazar.com/pedido/${order.accessToken}`;
+    }
+    return '';
+  }
+
   buildUnpaidPaymentReminderMessage(order: OrderSummaryDto): string {
     const due = order.balanceDue > 0 ? order.balanceDue : order.total;
-    const clientFirstName = order.clientName?.split(' ')[0] || 'Hermosa';
+    const clientFirstName = order.clientName?.trim() ? order.clientName.trim().split(' ')[0] : 'Hermosa';
     const reasonText = order.unpaidDeliveryReason ? `\n📝 *Nota del repartidor:* ${order.unpaidDeliveryReason}` : '';
+    const orderLink = this.getOrderPublicLink(order);
+    const linkSection = orderLink
+      ? `\n\n🔗 *Enlace de tu pedido con tus datos de pago:*\n${orderLink}\n*(Dentro de tu enlace encontrarás los datos para transferir y todas las opciones de pago ✨)*`
+      : '';
 
-    return `¡Hola ${clientFirstName}! 🌸✨ Esperamos que disfrutes mucho tus prendas del pedido #${order.id} de Regi Bazar 💕\n\nTe escribimos con mucho cariño para recordarte que tu paquete fue entregado con un saldo pendiente de *$${due.toFixed(2)} MXN*${reasonText}.\n\nPor favor, ayúdanos realizando tu transferencia o pago a la brevedad posible para dejar tu cuenta al 100% y que puedas seguir participando en nuestros en vivos y apartados sin contratiempos 🥰🎀\n\n💳 *Datos de pago:*\nBanco: BBVA / Transferencia\nBeneficiario: Regi Bazar\n(En cuanto realices tu pago, envíanos tu comprobante por aquí para registrarlo en el sistema)\n\n¡Muchísimas gracias por tu confianza y preferencia siempre! 💖🌷`;
+    return `¡Hola ${clientFirstName}! 🌸✨ Esperamos que disfrutes mucho tus artículos del pedido #${order.id} de Regi Bazar 💕\n\nTe escribimos con mucho cariño para recordarte que tu paquete fue entregado con un saldo pendiente de *$${due.toFixed(2)} MXN*${reasonText}.${linkSection}\n\nTe invitamos cordialmente a realizar tu pago a la brevedad posible para no perder los beneficios de ser una clienta distinguida en Regi Bazar 🥰🎀 (como tus apartados y promociones exclusivas).\n\nEn cuanto realices tu pago, por favor compártenos tu comprobante por aquí para registrarlo en el sistema y dejar tu cuenta al 100% 💖🌷\n\n¡Muchísimas gracias por tu confianza y preferencia siempre! ✨`;
   }
 
   copyUnpaidPaymentReminder(order: OrderSummaryDto): void {
