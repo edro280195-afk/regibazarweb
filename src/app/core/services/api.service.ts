@@ -25,7 +25,7 @@ import {
     LabelTemplateSummaryDto, LabelTemplateDetailDto, CreateLabelTemplateDto,
     UpdateLabelTemplateDto, SaveLabelTemplateDraftDto, SaveLabelTemplateDraftResultDto,
     PublishLabelTemplateResultDto, LabelAssetDto, LabelPrintContextDto,
-    CreateLabelPrintEventDto, OrderConsolidationDto, CreateOrderConsolidationRequest
+    CreateLabelPrintEventDto, OrderConsolidationDto, CreateOrderConsolidationRequest, CashDenominations, StartRouteRequest, DriverTandaPaymentRequest, RouteSettlementRequest, RouteSettlementDto, DailyExchangeRateDto
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -614,8 +614,29 @@ export class ApiService {
         return this.http.get(`${this.base}/driver/${driverToken}`);
     }
 
-    startRoute(driverToken: string): Observable<any> {
-        return this.http.post(`${this.base}/driver/${driverToken}/start`, {});
+    startRoute(driverToken: string, initialCash?: number, breakdown?: CashDenominations, exchangeRate?: number): Observable<any> {
+        const body: StartRouteRequest = {
+            initialCash,
+            breakdown,
+            exchangeRate
+        };
+        return this.http.post(`${this.base}/driver/${driverToken}/start`, body);
+    }
+
+    recordDriverTandaPayment(driverToken: string, req: DriverTandaPaymentRequest): Observable<any> {
+        return this.http.post(`${this.base}/driver/${driverToken}/tanda-payment`, req);
+    }
+
+    settleRoute(driverToken: string, req: RouteSettlementRequest): Observable<RouteSettlementDto> {
+        return this.http.post<RouteSettlementDto>(`${this.base}/driver/${driverToken}/settle`, req);
+    }
+
+    getRouteSettlement(driverToken: string): Observable<RouteSettlementDto> {
+        return this.http.get<RouteSettlementDto>(`${this.base}/driver/${driverToken}/settlement`);
+    }
+
+    getAdminRouteSettlement(routeId: number): Observable<RouteSettlementDto> {
+        return this.http.get<RouteSettlementDto>(`${this.base}/routes/${routeId}/settlement`);
     }
 
     updateLocation(driverToken: string, lat: number, lng: number): Observable<any> {
@@ -630,7 +651,7 @@ export class ApiService {
         return this.http.post(`${this.base}/driver/${driverToken}/transit/${deliveryId}`, {});
     }
 
-    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[], signature?: { svg: string; signedByName?: string }): Observable<any> {
+    markDelivered(driverToken: string, deliveryId: number, notes: string, photos: File[], payments?: { amount: number; method: string; notes?: string }[], signature?: { svg: string; signedByName?: string }, deliveredWithoutPayment?: boolean, unpaidReason?: string): Observable<any> {
         const fd = new FormData();
         fd.append('notes', notes);
         photos.forEach(p => fd.append('photos', p));
@@ -639,7 +660,29 @@ export class ApiService {
             fd.append('signatureSvg', signature.svg);
             if (signature.signedByName) fd.append('signedByName', signature.signedByName);
         }
+        if (deliveredWithoutPayment !== undefined && deliveredWithoutPayment !== null) {
+            fd.append('deliveredWithoutPayment', String(deliveredWithoutPayment));
+        }
+        if (unpaidReason) {
+            fd.append('unpaidReason', unpaidReason);
+        }
         return this.http.post(`${this.base}/driver/${driverToken}/deliver/${deliveryId}`, fd);
+    }
+
+    getDailyExchangeRate(): Observable<DailyExchangeRateDto> {
+        return this.http.get<DailyExchangeRateDto>(`${this.base}/routes/exchange-rate`);
+    }
+
+    setDailyExchangeRate(exchangeRate: number): Observable<DailyExchangeRateDto> {
+        return this.http.post<DailyExchangeRateDto>(`${this.base}/routes/exchange-rate`, { exchangeRate });
+    }
+
+    getDriverExchangeRate(): Observable<DailyExchangeRateDto> {
+        return this.http.get<DailyExchangeRateDto>(`${this.base}/driver/exchange-rate`);
+    }
+
+    getUnpaidDeliveredOrders(): Observable<OrderSummaryDto[]> {
+        return this.http.get<OrderSummaryDto[]>(`${this.base}/orders/unpaid-delivered`);
     }
 
     markFailed(driverToken: string, deliveryId: number, reason: string, notes: string, photos: File[]): Observable<any> {

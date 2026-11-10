@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, computed, ElementRef, ViewChild, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { moveItemInArray } from '@angular/cdk/drag-drop';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
@@ -10,7 +10,7 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { GpsService } from '../../../core/services/gps.service';
-import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage, RouteDeliveryDto } from '../../../core/models';
+import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage, RouteDeliveryDto, CashDenominations, createEmptyCashDenominations, calculateCashTotalMxn, calculateCashTotalUsd, calculateCashTotalInMxn, ActiveTandaInfo, DriverTandaPaymentRequest, RouteSettlementRequest, RouteSettlementDto } from '../../../core/models';
 import { effect } from '@angular/core';
 
 declare const google: any;
@@ -37,6 +37,33 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     private signalr = inject(SignalRService);
     private push = inject(PushNotificationService);
     public gps = inject(GpsService);
+    public router = inject(Router);
+
+    // ── Caja chica inicial ──
+    showStartRouteModal = signal(false);
+    initialBreakdown: CashDenominations = createEmptyCashDenominations(18);
+
+    // ── Abono de Tanda en Parada ──
+    showTandaModal = signal(false);
+    tandaModalDelivery = signal<any>(null);
+    submittingTanda = signal(false);
+    tandaForm = {
+        participantId: '',
+        clientName: '',
+        tandaName: '',
+        weekNumber: 1,
+        amount: null as number | null,
+        paymentMethod: 'Efectivo' as 'Efectivo' | 'Transferencia',
+        notes: '',
+        cashReceived: null as number | null
+    };
+
+    // ── Corte de Caja Final ──
+    showSettlementModal = signal(false);
+    finalBreakdown: CashDenominations = createEmptyCashDenominations(18);
+    settlementNotes = '';
+    submittingSettlement = signal(false);
+    settlementResult = signal<RouteSettlementDto | null>(null);
 
     route = signal<any>(null);
     loading = signal(true);
@@ -499,7 +526,10 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         }
         const sig = this.signatures[id];
         const signature = sig ? { svg: sig.svg, signedByName: sig.name } : undefined;
-        this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature).subscribe({
+        const deliveredWithoutPayment = paymentMode === 'leaveBalance' || (due > 0 && (!payments || payments.length === 0));
+        const unpaidReason = deliveredWithoutPayment ? (notes || 'Entregado con saldo pendiente') : undefined;
+
+        this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature, deliveredWithoutPayment, unpaidReason).subscribe({
             next: () => {
                 const toast = paymentMode === 'leaveBalance'
                     ? `¡Entregada! · $${due.toFixed(2)} quedan pendientes`
@@ -563,6 +593,161 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         if (!value) return false;
         const date = new Date(value);
         return !Number.isNaN(date.getTime()) && (date.getHours() !== 0 || date.getMinutes() !== 0);
+    }
+
+    // ── Operaciones de Caja Chica y Denominaciones ──
+    openStartRouteModal(): void {
+        const rate = this.route()?.dailyExchangeRate || 18;
+        this.initialBreakdown = createEmptyCashDenominations(rate);
+        this.showStartRouteModal.set(true);
+    }
+
+    closeStartRouteModal(): void {
+        this.showStartRouteModal.set(false);
+    }
+
+    initialCashTotal(): number {
+        return calculateCashTotalInMxn(this.initialBreakdown);
+    }
+
+    confirmStartRoute(): void {
+        const total = this.initialCashTotal();
+        this.api.startRoute(this.token, total, this.initialBreakdown, this.initialBreakdown.exchangeRate).subscribe({
+            next: () => {
+                this.showToast('🚀 ¡Ruta Iniciada! Caja chica: $' + total.toFixed(2));
+                this.closeStartRouteModal();
+                this.loadRoute();
+            },
+            error: () => {
+                this.showToast('Error al iniciar ruta');
+            }
+        });
+    }
+
+    // Calculadora rápida de billetes al cobrar entrega
+    setQuickCash(deliveryId: number, amount: number): void {
+        this.paymentModes[deliveryId] = 'collect';
+        this.paymentMethods[deliveryId] = 'Efectivo';
+        this.cashReceived[deliveryId] = amount;
+    }
+
+    // Modal de Tanda en Parada
+    openTandaModal(delivery: any, tanda?: ActiveTandaInfo): void {
+        this.tandaModalDelivery.set(delivery);
+        this.tandaForm = {
+            participantId: tanda?.participantId || '',
+            clientName: delivery?.clientName || '',
+            tandaName: tanda?.tandaName || 'Tanda',
+            weekNumber: tanda?.nextPendingWeek || 1,
+            amount: tanda?.weeklyAmount || null,
+            paymentMethod: 'Efectivo',
+            notes: '',
+            cashReceived: null
+        };
+        this.showTandaModal.set(true);
+    }
+
+    closeTandaModal(): void {
+        this.showTandaModal.set(false);
+        this.tandaModalDelivery.set(null);
+    }
+
+    tandaChange(): number {
+        const received = Math.max(0, this.tandaForm.cashReceived ?? 0);
+        const amount = Math.max(0, this.tandaForm.amount ?? 0);
+        return Math.max(0, received - amount);
+    }
+
+    submitTandaPayment(): void {
+        if (!this.tandaForm.amount || this.tandaForm.amount <= 0) return;
+        this.submittingTanda.set(true);
+
+        const delivery = this.tandaModalDelivery();
+        const req: DriverTandaPaymentRequest = {
+            deliveryId: delivery?.id,
+            tandaParticipantId: this.tandaForm.participantId || undefined,
+            clientName: this.tandaForm.clientName,
+            weekNumber: this.tandaForm.weekNumber,
+            amount: this.tandaForm.amount,
+            paymentMethod: this.tandaForm.paymentMethod,
+            notes: this.tandaForm.notes,
+            cashReceived: this.tandaForm.cashReceived ?? undefined,
+            cashChange: this.tandaChange() > 0 ? this.tandaChange() : undefined
+        };
+
+        this.api.recordDriverTandaPayment(this.token, req).subscribe({
+            next: () => {
+                this.showToast('🌸 ¡Pago de tanda registrado exitosamente!');
+                this.submittingTanda.set(false);
+                this.closeTandaModal();
+                this.loadRoute();
+            },
+            error: () => {
+                this.showToast('Error al registrar pago de tanda');
+                this.submittingTanda.set(false);
+            }
+        });
+    }
+
+    // Arqueo y Corte de Caja
+    openSettlementModal(): void {
+        const rate = this.route()?.initialExchangeRate || this.route()?.dailyExchangeRate || 18;
+        this.finalBreakdown = createEmptyCashDenominations(rate);
+        this.settlementNotes = '';
+        this.settlementResult.set(null);
+        this.showSettlementModal.set(true);
+    }
+
+    closeSettlementModal(): void {
+        this.showSettlementModal.set(false);
+    }
+
+    expectedCashAtClose(): number {
+        const r = this.route();
+        const initial = r?.initialCash || 0;
+        const totalCash = this.totalCobrado();
+        const expenses = this.totalGastos();
+        return initial + totalCash - expenses;
+    }
+
+    finalBreakdownTotal(): number {
+        return calculateCashTotalInMxn(this.finalBreakdown);
+    }
+
+    settlementDifference(): number {
+        return this.finalBreakdownTotal() - this.expectedCashAtClose();
+    }
+
+    submitSettlement(): void {
+        this.submittingSettlement.set(true);
+        const totalContado = this.finalBreakdownTotal();
+        const req: RouteSettlementRequest = {
+            finalCashActual: totalContado,
+            breakdown: this.finalBreakdown,
+            notes: this.settlementNotes
+        };
+
+        this.api.settleRoute(this.token, req).subscribe({
+            next: (res) => {
+                this.settlementResult.set(res);
+                this.submittingSettlement.set(false);
+                this.showToast('🏁 ¡Corte de caja guardado con éxito!');
+            },
+            error: () => {
+                this.showToast('Error al guardar corte de caja');
+                this.submittingSettlement.set(false);
+            }
+        });
+    }
+
+    shareWhatsAppReport(text?: string): void {
+        const share = text || this.settlementResult()?.whatsAppShareText;
+        if (!share) return;
+        window.open('https://wa.me/?text=' + encodeURIComponent(share), '_blank');
+    }
+
+    goToCorteWeb(): void {
+        this.router.navigate(['/repartidor', this.token, 'corte']);
     }
 
     private roundMoney(value: number): number {

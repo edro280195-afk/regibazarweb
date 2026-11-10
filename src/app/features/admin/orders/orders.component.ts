@@ -37,6 +37,10 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <h1 class="text-2xl font-bold text-pink-900">Pedidos <span aria-hidden="true">📦</span></h1>
         </div>
         <div class="rb-orders-header-actions grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <button type="button" class="btn-coquette btn-outline-pink min-w-0 justify-center px-2 py-2 text-center text-[10px] sm:px-3 sm:text-xs font-black flex items-center gap-1 shadow-sm" (click)="openExchangeRateModal()" title="Tipo de cambio del día para el repartidor">
+            <span>💵 TC:</span>
+            <strong>\${{ dailyExchangeRate() }}</strong>
+          </button>
           <label class="btn-coquette btn-outline-pink min-w-0 cursor-pointer justify-center px-2 py-2 text-[10px] sm:px-4 sm:text-sm" aria-label="Importar pedidos desde Excel">
             📤 Excel
             <input type="file" accept=".xlsx,.xls" class="hidden" (change)="uploadExcel($event)" />
@@ -82,6 +86,11 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <strong>{{ getPendingAmount() | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
           <small>Saldo pendiente</small>
         </article>
+        <article class="rb-orders-summary-card cursor-pointer transition-all hover:scale-105" [class.border-rose-300]="getUnpaidDeliveredCount() > 0" [class.bg-rose-50]="getUnpaidDeliveredCount() > 0" (click)="setStatusFilter('unpaid_delivered')">
+          <span class="text-rose-700 font-bold flex items-center gap-1">🚨 Sin pago</span>
+          <strong class="text-rose-600">{{ getUnpaidDeliveredCount() | number:'1.0-0' }}</strong>
+          <small class="text-rose-400">Entregados sin cobrar</small>
+        </article>
       </section>
 
       <section class="rb-orders-priority-note" aria-label="Prioridad de pedidos">
@@ -112,6 +121,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <div>
             <label class="label-coquette">📋 Estado</label>
             <select class="input-coquette" [(ngModel)]="statusFilter" (change)="loadOrders()">
+              <option value="unpaid_delivered">🚨 Entregado sin pago</option>
               <option value="">Todos</option>
               <option value="Pending">⏳ Pendiente</option>
               <option value="Confirmed">💖 Confirmado</option>
@@ -145,6 +155,7 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'Confirmed'" (click)="setStatusFilter('Confirmed')">Confirmados</button>
           <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'InRoute'" (click)="setStatusFilter('InRoute')">En ruta <strong>{{ getInRouteCount() }}</strong></button>
           <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'Delivered'" (click)="setStatusFilter('Delivered')">Entregados</button>
+          <button type="button" class="rb-orders-chip" [class.is-active]="statusFilter === 'unpaid_delivered'" [class.border-rose-400]="getUnpaidDeliveredCount() > 0" (click)="setStatusFilter('unpaid_delivered')">🚨 Sin pago <strong>{{ getUnpaidDeliveredCount() }}</strong></button>
         </div>
       </div>
 
@@ -302,6 +313,32 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                   }
                 </div>
 
+                  @if (isUnpaidDelivered(order)) {
+                    <div class="mt-3 p-3 bg-gradient-to-r from-rose-50 to-pink-50 border-2 border-rose-300 rounded-2xl flex flex-col gap-2 shadow-sm">
+                      <div class="flex items-center justify-between">
+                        <span class="inline-flex items-center gap-1 text-[11px] font-black text-rose-700 bg-rose-100/90 px-2 py-0.5 rounded-lg">
+                          🚨 Entregado sin recibir pago
+                        </span>
+                        <span class="text-xs font-black text-rose-800">
+                          Resta: {{ order.balanceDue | currency:'MXN':'symbol-narrow' }}
+                        </span>
+                      </div>
+                      @if (order.unpaidDeliveryReason) {
+                        <p class="text-[10px] text-rose-700 italic bg-white/80 px-2 py-1 rounded-lg border border-rose-100">
+                          "{{ order.unpaidDeliveryReason }}"
+                        </p>
+                      }
+                      <div class="grid grid-cols-2 gap-2 mt-1">
+                        <button type="button" class="btn-coquette btn-outline-pink py-1.5 px-2 text-[10px] font-bold flex items-center justify-center gap-1 bg-white hover:bg-pink-50" (click)="$event.stopPropagation(); copyUnpaidPaymentReminder(order)">
+                          📋 Copiar cobro
+                        </button>
+                        <button type="button" class="btn-coquette py-1.5 px-2 text-[10px] font-bold flex items-center justify-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm" (click)="$event.stopPropagation(); sendUnpaidWhatsApp(order)">
+                          💬 WhatsApp
+                        </button>
+                      </div>
+                    </div>
+                  }
+
                 <!-- Actions (Bottom) -->
                 <div class="rb-order-actions flex flex-col gap-2.5 mt-auto">
                   <button class="btn-coquette btn-pink w-full py-3 shadow-md shadow-pink-200/30 hover:shadow-lg hover:shadow-pink-300/40 transition-all flex justify-center items-center gap-2 group/btn text-sm" (click)="selectOrder(order)">
@@ -343,6 +380,34 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
             <button class="btn-coquette btn-ghost text-sm" [disabled]="currentPage() >= totalPages()" (click)="goToPage(currentPage() + 1)">Siguiente →</button>
           </div>
         }
+      }
+
+      <!-- Modal Tipo de Cambio del Día -->
+      @if (showExchangeRateModal()) {
+        <div class="fixed inset-0 z-[120] bg-pink-900/30 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" (click)="closeExchangeRateModal()">
+          <div class="card-coquette bg-white/95 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl border border-pink-200" (click)="$event.stopPropagation()">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-black text-pink-900 flex items-center gap-2">
+                💵 Tipo de Cambio del Día
+              </h3>
+              <button type="button" class="text-pink-400 hover:text-pink-600 font-bold text-lg" (click)="closeExchangeRateModal()">✕</button>
+            </div>
+            <p class="text-xs text-pink-600 leading-relaxed">
+              Define el tipo de cambio oficial para las entregas de hoy. El repartidor lo verá reflejado en su caja chica inicial y para recibir dólares.
+            </p>
+            <div>
+              <label class="label-coquette">Valor en Pesos por 1 USD</label>
+              <div class="relative mt-1">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-500 font-bold">$</span>
+                <input type="number" step="0.1" min="1" max="100" class="input-coquette pl-8 pr-3 font-black text-lg text-pink-900" [(ngModel)]="tempExchangeRate" />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" class="btn-coquette btn-ghost text-xs" (click)="closeExchangeRateModal()">Cancelar</button>
+              <button type="button" class="btn-coquette btn-pink text-xs px-4 py-2 font-black" (click)="saveExchangeRate()">Guardar y Notificar ✨</button>
+            </div>
+          </div>
+        </div>
       }
 
       <!-- Smart Order Drawer -->
@@ -419,6 +484,31 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
             
             <!-- Resumen -->
             @if (drawerTab() === 'summary') {
+            @if (isUnpaidDelivered(selectedOrder()!)) {
+              <div class="rounded-2xl border-2 border-rose-300 bg-gradient-to-r from-rose-50 via-amber-50 to-pink-50 p-4 shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="inline-flex items-center gap-1.5 text-xs font-black text-rose-800 bg-rose-100 px-3 py-1 rounded-xl">
+                    🚨 Entregado sin recibir pago (Fiar)
+                  </span>
+                  <span class="text-sm font-black text-rose-700">
+                    Pendiente: {{ selectedOrder()!.balanceDue | currency:'MXN':'symbol-narrow' }}
+                  </span>
+                </div>
+                @if (selectedOrder()!.unpaidDeliveryReason) {
+                  <p class="text-xs text-rose-700 bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                    <strong>Motivo registrado:</strong> {{ selectedOrder()!.unpaidDeliveryReason }}
+                  </p>
+                }
+                <div class="flex flex-wrap gap-2 pt-1">
+                  <button type="button" class="btn-coquette btn-outline-pink py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1.5 bg-white shadow-sm" (click)="copyUnpaidPaymentReminder(selectedOrder()!)">
+                    📋 Copiar mensaje de cobro
+                  </button>
+                  <button type="button" class="btn-coquette py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm" (click)="sendUnpaidWhatsApp(selectedOrder()!)">
+                    💬 Cobrar por WhatsApp
+                  </button>
+                </div>
+              </div>
+            }
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
               <div class="flex items-center justify-between gap-3 mb-3">
                 <div>
@@ -855,6 +945,10 @@ export class OrdersComponent implements OnInit, OnDestroy {
   // 🛍️ Quick-set de bolsas desde la tarjeta del Kanban (id del pedido en edición inline)
   bagsEditFor = signal<number | null>(null);
   savingQuickBags = signal(false);
+  unpaidDeliveredOrders = signal<OrderSummaryDto[]>([]);
+  dailyExchangeRate = signal<number>(18);
+  showExchangeRateModal = signal<boolean>(false);
+  tempExchangeRate = 18;
 
   paymentAmount = 0;
   paymentMethod = 'Efectivo';
@@ -913,6 +1007,8 @@ export class OrdersComponent implements OnInit, OnDestroy {
       next: result => this.inRouteCount.set(result.totalCount)
     });
     this.initSignalR();
+    this.loadUnpaidDelivered();
+    this.loadExchangeRate();
     this.api.getLoyaltyRewards().subscribe({
       next: (r) => this.rewards.set(r),
       error: () => { /* el catálogo es opcional; no bloquea el panel */ }
@@ -955,6 +1051,17 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   initSignalR(): void {
     this.signalr.joinAdminGroup();
+    this.signalr.orderDeliveredWithoutPayment$.subscribe(data => {
+      this.toast.error(`🚨 ¡Alerta! Pedido #${data?.orderId || ''} entregado SIN pago por repartidor.`);
+      this.loadUnpaidDelivered();
+      this.loadOrders();
+    });
+    this.signalr.exchangeRateUpdated$.subscribe(data => {
+      if (data?.exchangeRate) {
+        this.dailyExchangeRate.set(data.exchangeRate);
+        this.tempExchangeRate = data.exchangeRate;
+      }
+    });
     this.signalr.deliveryUpdate$.subscribe({
       next: (data) => {
         // ✨ Sincronización Magistral recibida
@@ -968,6 +1075,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
   }
 
   loadOrders(): void {
+    this.loadUnpaidDelivered();
     this.loading.set(true);
     this.api.getOrdersPaged(this.currentPage(), this.pageSize, this.statusFilter, this.search, this.orderTypeFilter, undefined, undefined, this.typeFilter).subscribe({
       next: (res) => {
@@ -1034,6 +1142,85 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   getStatusClass(status: string): string {
     return 'badge ' + (ORDER_STATUS_CSS[status] || 'badge-pending');
+  }
+
+  loadUnpaidDelivered(): void {
+    this.api.getUnpaidDeliveredOrders().subscribe({
+      next: (orders) => this.unpaidDeliveredOrders.set(orders || []),
+      error: () => {}
+    });
+  }
+
+  loadExchangeRate(): void {
+    this.api.getDailyExchangeRate().subscribe({
+      next: (res) => {
+        if (res?.exchangeRate) {
+          this.dailyExchangeRate.set(res.exchangeRate);
+          this.tempExchangeRate = res.exchangeRate;
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  openExchangeRateModal(): void {
+    this.tempExchangeRate = this.dailyExchangeRate();
+    this.showExchangeRateModal.set(true);
+  }
+
+  closeExchangeRateModal(): void {
+    this.showExchangeRateModal.set(false);
+  }
+
+  saveExchangeRate(): void {
+    const rate = Number(this.tempExchangeRate);
+    if (!rate || rate <= 0) {
+      this.toast.error('Ingresa un tipo de cambio válido mayor a 0');
+      return;
+    }
+    this.api.setDailyExchangeRate(rate).subscribe({
+      next: (res) => {
+        this.dailyExchangeRate.set(res.exchangeRate);
+        this.toast.success(`Tipo de cambio fijado en $${res.exchangeRate.toFixed(2)} MXN/USD ✨`);
+        this.closeExchangeRateModal();
+      },
+      error: () => this.toast.error('Error al actualizar tipo de cambio')
+    });
+  }
+
+  isUnpaidDelivered(order: OrderSummaryDto): boolean {
+    return Boolean(order.deliveredWithoutPayment || (order.status === 'Delivered' && order.balanceDue > 0.01));
+  }
+
+  getUnpaidDeliveredCount(): number {
+    return this.unpaidDeliveredOrders().length;
+  }
+
+  buildUnpaidPaymentReminderMessage(order: OrderSummaryDto): string {
+    const due = order.balanceDue > 0 ? order.balanceDue : order.total;
+    const clientFirstName = order.clientName?.split(' ')[0] || 'Hermosa';
+    const reasonText = order.unpaidDeliveryReason ? `\n📝 *Nota del repartidor:* ${order.unpaidDeliveryReason}` : '';
+
+    return `¡Hola ${clientFirstName}! 🌸✨ Esperamos que disfrutes mucho tus prendas del pedido #${order.id} de Regi Bazar 💕\n\nTe escribimos con mucho cariño para recordarte que tu paquete fue entregado con un saldo pendiente de *$${due.toFixed(2)} MXN*${reasonText}.\n\nPor favor, ayúdanos realizando tu transferencia o pago a la brevedad posible para dejar tu cuenta al 100% y que puedas seguir participando en nuestros en vivos y apartados sin contratiempos 🥰🎀\n\n💳 *Datos de pago:*\nBanco: BBVA / Transferencia\nBeneficiario: Regi Bazar\n(En cuanto realices tu pago, envíanos tu comprobante por aquí para registrarlo en el sistema)\n\n¡Muchísimas gracias por tu confianza y preferencia siempre! 💖🌷`;
+  }
+
+  copyUnpaidPaymentReminder(order: OrderSummaryDto): void {
+    const msg = this.buildUnpaidPaymentReminderMessage(order);
+    navigator.clipboard.writeText(msg).then(() => {
+      this.toast.success('¡Mensaje de cobro copiado al portapapeles! 📋💖');
+    }).catch(() => {
+      this.toast.error('No se pudo copiar el mensaje');
+    });
+  }
+
+  sendUnpaidWhatsApp(order: OrderSummaryDto): void {
+    if (!order.clientPhone) {
+      this.toast.error('Este pedido no tiene número de teléfono registrado');
+      return;
+    }
+    const cleanPhone = order.clientPhone.replace(/\D/g, '');
+    const msg = encodeURIComponent(this.buildUnpaidPaymentReminderMessage(order));
+    window.open(`https://wa.me/52${cleanPhone}?text=${msg}`, '_blank');
   }
 
   getStatusLabel(status: string): string {

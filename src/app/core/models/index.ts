@@ -211,6 +211,9 @@ export interface OrderSummaryDto {
     /** True cuando ya se resolvió el tema de bolsas (número puesto o "va sin bolsas"). */
     packagesConfirmed?: boolean;
     isOpenDate?: boolean;
+    deliveredWithoutPayment?: boolean;
+    unpaidDeliveryReason?: string;
+    deliveredWithoutPaymentAt?: string;
 
 
 
@@ -665,6 +668,21 @@ export interface RouteDeliveryDto {
     consolidationOwnerName?: string;
     consolidationPrimaryClientName?: string;
     isConsolidationPrimaryOrder?: boolean;
+    clientId?: number;
+    activeTandas?: ActiveTandaInfo[];
+}
+
+export interface ActiveTandaInfo {
+    participantId: string;
+    tandaId: string;
+    tandaName: string;
+    productName?: string;
+    nextPendingWeek: number;
+    totalWeeks: number;
+    weeklyAmount: number;
+    currency: string;
+    totalPaid: number;
+    balanceRemaining: number;
 }
 
 export interface AvailableTandaDto {
@@ -781,8 +799,166 @@ export interface RouteDto {
     status: string;
     createdAt: string;
     startedAt?: string;
+    completedAt?: string;
+    initialCash?: number;
+    initialCashBreakdownJson?: string;
+    initialExchangeRate?: number;
+    dailyExchangeRate?: number;
+    exchangeRateUpdatedAt?: string;
+    finalCashActual?: number;
+    finalCashBreakdownJson?: string;
+    settledAt?: string;
+    settlementDifference?: number;
+    settlementNotes?: string;
     deliveries: RouteDeliveryDto[];
     expenses?: DriverExpenseDto[];
+}
+
+export interface DailyExchangeRateDto {
+    exchangeRate: number;
+    updatedAt?: string;
+}
+
+export interface CashDenominations {
+    coins: number;
+    b20: number;
+    b50: number;
+    b100: number;
+    b200: number;
+    b500: number;
+    b1000: number;
+    usd1: number;
+    usd5: number;
+    usd10: number;
+    usd20: number;
+    usd50: number;
+    usd100: number;
+    exchangeRate: number;
+}
+
+export function createEmptyCashDenominations(exchangeRate = 18): CashDenominations {
+    return {
+        coins: 0,
+        b20: 0,
+        b50: 0,
+        b100: 0,
+        b200: 0,
+        b500: 0,
+        b1000: 0,
+        usd1: 0,
+        usd5: 0,
+        usd10: 0,
+        usd20: 0,
+        usd50: 0,
+        usd100: 0,
+        exchangeRate
+    };
+}
+
+export function calculateCashTotalMxn(d?: CashDenominations | null): number {
+    if (!d) return 0;
+    return (d.coins || 0) +
+        (d.b20 || 0) * 20 +
+        (d.b50 || 0) * 50 +
+        (d.b100 || 0) * 100 +
+        (d.b200 || 0) * 200 +
+        (d.b500 || 0) * 500 +
+        (d.b1000 || 0) * 1000;
+}
+
+export function calculateCashTotalUsd(d?: CashDenominations | null): number {
+    if (!d) return 0;
+    return (d.usd1 || 0) * 1 +
+        (d.usd5 || 0) * 5 +
+        (d.usd10 || 0) * 10 +
+        (d.usd20 || 0) * 20 +
+        (d.usd50 || 0) * 50 +
+        (d.usd100 || 0) * 100;
+}
+
+export function calculateCashTotalInMxn(d?: CashDenominations | null): number {
+    if (!d) return 0;
+    return calculateCashTotalMxn(d) + (calculateCashTotalUsd(d) * (d.exchangeRate || 18));
+}
+
+export interface StartRouteRequest {
+    initialCash?: number;
+    breakdown?: CashDenominations;
+    exchangeRate?: number;
+}
+
+export interface DriverTandaPaymentRequest {
+    deliveryId?: number;
+    tandaParticipantId?: string;
+    clientName?: string;
+    weekNumber?: number;
+    amount: number;
+    paymentMethod: string;
+    notes?: string;
+    cashReceived?: number;
+    cashChange?: number;
+}
+
+export interface RouteSettlementRequest {
+    finalCashActual: number;
+    breakdown?: CashDenominations;
+    notes?: string;
+}
+
+export interface RouteSettlementOrderPayment {
+    orderId: number;
+    clientName: string;
+    address?: string;
+    total: number;
+    amountPaid: number;
+    method: string;
+    notes?: string;
+    date: string;
+}
+
+export interface RouteSettlementTandaPayment {
+    paymentId?: string;
+    clientName: string;
+    tandaName: string;
+    weekNumber?: number;
+    amount: number;
+    method: string;
+    notes?: string;
+    date: string;
+}
+
+export interface RouteSettlementDto {
+    routeId: number;
+    routeName: string;
+    driverToken: string;
+    status: string;
+    startedAt?: string;
+    completedAt?: string;
+    settledAt?: string;
+    initialCash: number;
+    initialBreakdown?: CashDenominations;
+    expectedCash: number;
+    actualCash?: number;
+    finalBreakdown?: CashDenominations;
+    difference?: number;
+    settlementStatus: string; // 'Cuadrado' | 'Faltante' | 'Sobrante' | 'Pendiente'
+    notes?: string;
+    totalDeliveries: number;
+    deliveredCount: number;
+    failedCount: number;
+    orderCashTotal: number;
+    orderTransferTotal: number;
+    orderDepositTotal: number;
+    orderTotal: number;
+    tandaCashTotal: number;
+    tandaTransferTotal: number;
+    tandaTotal: number;
+    expensesTotal: number;
+    orderPayments: RouteSettlementOrderPayment[];
+    tandaPayments: RouteSettlementTandaPayment[];
+    expenses: DriverExpenseDto[];
+    whatsAppShareText: string;
+    webReportUrl: string;
 }
 
 export interface SupplierDto {
@@ -889,6 +1065,9 @@ export interface ManualOrderRequest {
     /** True cuando la dueña resolvió el tema de bolsas al capturar. */
     packagesConfirmed?: boolean;
     isOpenDate?: boolean;
+    deliveredWithoutPayment?: boolean;
+    unpaidDeliveryReason?: string;
+    deliveredWithoutPaymentAt?: string;
 
 
 
@@ -1221,6 +1400,9 @@ export interface UpdateOrderDetailsRequest {
     /** Confirmación explícita de bolsas (permite "va sin bolsas" con totalPackages = 0). */
     packagesConfirmed?: boolean;
     isOpenDate?: boolean;
+    deliveredWithoutPayment?: boolean;
+    unpaidDeliveryReason?: string;
+    deliveredWithoutPaymentAt?: string;
 
 
 

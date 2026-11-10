@@ -147,6 +147,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/live/live-view/live-view.component').then(m => m.LiveViewComponent)
     },
     {
+        path: 'repartidor/:token/corte',
+        loadComponent: () => import('./features/driver/route-settlement/route-settlement.component').then(m => m.RouteSettlementComponent)
+    },
+    {
         path: 'repartidor/:token',
         loadComponent: () => import('./features/driver/route-view/route-view.component').then(m => m.RouteViewComponent)
     },

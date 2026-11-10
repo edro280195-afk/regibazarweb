@@ -1,4 +1,4 @@
-<div class="h-[100dvh] bg-black text-white relative overflow-hidden select-none transition-all duration-500"
+﻿<div class="h-[100dvh] bg-black text-white relative overflow-hidden select-none transition-all duration-500"
      [class.shadow-[inset_0_0_60px_rgba(236,72,153,0.6)]]="isCamiListening()">
 
     @if (loading()) {
@@ -224,6 +224,39 @@
                                 }
                             }
 
+                            <!-- DETECCION Y COBRO DE TANDAS EN PARADA -->
+                            @if (d.activeTandas && d.activeTandas.length > 0) {
+                                <div class="p-3 bg-fuchsia-950/40 border border-fuchsia-500/40 rounded-2xl space-y-2 mb-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-base">âœ¨</span>
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="text-xs font-black uppercase text-fuchsia-300 truncate">Clienta en Tanda Activa</h4>
+                                            <p class="text-[10px] text-fuchsia-200/70">Â¿Manda abono de tanda hoy?</p>
+                                        </div>
+                                    </div>
+                                    @for (at of d.activeTandas; track at.participantId) {
+                                        <div class="flex items-center justify-between p-2 bg-white/5 border border-fuchsia-400/20 rounded-xl">
+                                            <div class="min-w-0 pr-2">
+                                                <p class="text-xs font-bold text-white truncate">{{ at.tandaName }}</p>
+                                                <p class="text-[10px] text-fuchsia-300">Semana {{ at.nextPendingWeek }} Â· Cuota: ${{ at.weeklyAmount | number:'1.0-0' }} {{ at.currency }}</p>
+                                            </div>
+                                            <button type="button" (click)="openTandaModal(d, at)"
+                                                    class="px-3 py-1.5 bg-fuchsia-600 rounded-xl text-xs font-black uppercase active:scale-95 transition-all text-white shrink-0">
+                                                Cobrar ${{ at.weeklyAmount | number:'1.0-0' }}
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            } @else if (d.kind !== 'Tanda') {
+                                <div class="mb-3">
+                                    <button type="button" (click)="openTandaModal(d)"
+                                            class="w-full py-2.5 px-3 bg-fuchsia-950/30 border border-fuchsia-500/30 rounded-2xl text-[11px] font-bold text-fuchsia-200 active:bg-fuchsia-900/40 transition-all flex items-center justify-center gap-1.5">
+                                        <span>ðŸŒ¸</span>
+                                        <span>Â¿MandÃ³ dinero de tanda o extra? Registrar abono</span>
+                                    </button>
+                                </div>
+                            }
+
                             <!-- ACTIONS AREA -->
                             <div class="grid grid-cols-2 gap-3">
                                 <!-- DECISIÓN DE COBRO -->
@@ -275,34 +308,73 @@
                                                 </div>
 
                                                 @if (!paymentMethods[d.id]) {
-                                                    <p class="payment-selection-hint">Selecciona el método que recibiste.</p>
+                                                    <p class="payment-selection-hint">Selecciona el mÃ©todo que recibiste.</p>
                                                 }
 
                                                 @if (paymentMethods[d.id] === 'Efectivo') {
-                                                    <div class="cash-payment-card">
-                                                        <label class="cash-payment-label" for="driver-cash-{{d.id}}">¿Cuánto efectivo recibió?</label>
+                                                    <div class="cash-payment-card space-y-2">
+                                                        <label class="cash-payment-label font-bold text-xs text-pink-300 uppercase block" for="driver-cash-{{d.id}}">
+                                                            Â¿CuÃ¡nto efectivo le dio la clienta?
+                                                        </label>
+
+                                                        <!-- Botones rÃ¡pidos de denominaciones -->
+                                                        <div class="flex gap-1.5 overflow-x-auto py-1 no-scrollbar">
+                                                            <button type="button" (click)="setQuickCash(d.id, d.balanceDue ?? d.total)"
+                                                                    class="px-2.5 py-1.5 bg-pink-500/20 border border-pink-500/40 text-pink-200 rounded-xl text-[11px] font-bold active:scale-95 transition-all shrink-0">
+                                                                Exacto (${{ d.balanceDue ?? d.total | number:'1.0-0' }})
+                                                            </button>
+                                                            <button type="button" (click)="setQuickCash(d.id, 50)" class="px-2.5 py-1.5 bg-white/10 border border-white/20 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-all shrink-0">$50</button>
+                                                            <button type="button" (click)="setQuickCash(d.id, 100)" class="px-2.5 py-1.5 bg-white/10 border border-white/20 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-all shrink-0">$100</button>
+                                                            <button type="button" (click)="setQuickCash(d.id, 200)" class="px-2.5 py-1.5 bg-white/10 border border-white/20 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-all shrink-0">$200</button>
+                                                            <button type="button" (click)="setQuickCash(d.id, 500)" class="px-2.5 py-1.5 bg-white/10 border border-white/20 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-all shrink-0">$500</button>
+                                                            <button type="button" (click)="setQuickCash(d.id, 1000)" class="px-2.5 py-1.5 bg-white/10 border border-white/20 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-all shrink-0">$1,000</button>
+                                                        </div>
+
                                                         <div class="cash-payment-input">
                                                             <span aria-hidden="true">$</span>
                                                             <input id="driver-cash-{{d.id}}" name="cash-received-{{d.id}}" type="number" inputmode="decimal" min="0" step="0.01"
-                                                                   [(ngModel)]="cashReceived[d.id]" aria-describedby="cash-result-{{d.id}}" />
+                                                                   [(ngModel)]="cashReceived[d.id]" placeholder="0.00" aria-describedby="cash-result-{{d.id}}" />
                                                         </div>
+
+                                                        <!-- AVISO DE CAMBIO GRANDE Y PROMINENTE -->
+                                                        @if (cashChange(d.id, d.balanceDue ?? d.total) > 0) {
+                                                            <div class="p-3 bg-emerald-500/25 border-2 border-emerald-400 rounded-2xl flex items-center justify-between shadow-lg animate-pulse-gentle">
+                                                                <div class="flex items-center gap-2.5">
+                                                                    <span class="text-2xl">ðŸ’µ</span>
+                                                                    <div>
+                                                                        <small class="block text-[10px] uppercase font-bold text-emerald-300">Dar de cambio a la clienta:</small>
+                                                                        <strong class="text-xl font-black text-emerald-300">${{ cashChange(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }} MXN</strong>
+                                                                    </div>
+                                                                </div>
+                                                                <span class="text-[10px] font-extrabold px-2 py-1 bg-emerald-400 text-black rounded-lg uppercase">Devolver</span>
+                                                            </div>
+                                                        } @else if ((cashReceived[d.id] ?? 0) > 0 && balanceAfterCash(d.id, d.balanceDue ?? d.total) > 0) {
+                                                            <div class="p-2.5 bg-rose-500/20 border border-rose-500/50 rounded-2xl flex items-center justify-between">
+                                                                <div>
+                                                                    <small class="block text-[9px] uppercase font-bold text-rose-300">Faltante para liquidar:</small>
+                                                                    <strong class="text-sm font-black text-rose-400">${{ balanceAfterCash(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }} MXN</strong>
+                                                                </div>
+                                                                <span class="text-[9px] font-bold text-rose-300">Pago incompleto</span>
+                                                            </div>
+                                                        }
+
                                                         <div class="cash-result-grid" id="cash-result-{{d.id}}" aria-live="polite">
                                                             <div class="cash-result change-result">
                                                                 <span>Cambio para la clienta</span>
                                                                 <strong>${{ cashChange(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }}</strong>
                                                             </div>
                                                             <div class="cash-result">
-                                                                <span>Saldo después del pago</span>
+                                                                <span>Saldo despuÃ©s del pago</span>
                                                                 <strong>${{ balanceAfterCash(d.id, d.balanceDue ?? d.total) | number:'1.2-2' }}</strong>
                                                             </div>
                                                         </div>
-                                                        <p class="cash-payment-hint">El registro no superará el saldo pendiente.</p>
+                                                        <p class="cash-payment-hint">El registro no superarÃ¡ el saldo pendiente.</p>
                                                     </div>
                                                 }
 
                                                 @if (paymentMethods[d.id] === 'Transferencia' || paymentMethods[d.id] === 'Deposito') {
                                                     <div class="non-cash-panel" role="status">
-                                                        Se registrarán ${{ d.balanceDue ?? d.total | number:'1.2-2' }} por {{ paymentMethods[d.id] === 'Transferencia' ? 'transferencia' : 'depósito' }}.
+                                                        Se registrarÃ¡n ${{ d.balanceDue ?? d.total | number:'1.2-2' }} por {{ paymentMethods[d.id] === 'Transferencia' ? 'transferencia' : 'depÃ³sito' }}.
                                                     </div>
                                                 }
                                             </div>
@@ -312,14 +384,16 @@
                                                 [class.is-selected]="paymentModes[d.id] === 'leaveBalance'"
                                                 [attr.aria-pressed]="paymentModes[d.id] === 'leaveBalance'"
                                                 (click)="selectPaymentMode(d.id, 'leaveBalance')">
-                                            <span class="payment-mode-icon pending-icon" aria-hidden="true">♡</span>
-                                            <span class="payment-mode-copy"><strong>Entregar con saldo pendiente</strong><small>No pagó hoy · conservar la deuda</small></span>
-                                            <span class="payment-mode-check" aria-hidden="true">{{ paymentModes[d.id] === 'leaveBalance' ? '✓' : '' }}</span>
+                                            <span class="payment-mode-icon pending-icon" aria-hidden="true">â™¡</span>
+                                            <span class="payment-mode-copy"><strong>Entregar con saldo pendiente (Fiar)</strong><small>No pagÃ³ hoy Â· registrar motivo</small></span>
+                                            <span class="payment-mode-check" aria-hidden="true">{{ paymentModes[d.id] === 'leaveBalance' ? 'âœ“' : '' }}</span>
                                         </button>
 
                                         @if (paymentModes[d.id] === 'leaveBalance') {
-                                            <div class="no-charge-panel" role="status">
-                                                Se marcará como <strong>entregada</strong>. No se registrará ningún pago y <strong>${{ d.balanceDue ?? d.total | number:'1.2-2' }}</strong> seguirán pendientes.
+                                            <div class="no-charge-panel space-y-2" role="status">
+                                                <p>Se marcarÃ¡ como <strong>entregada sin pago</strong>. <strong>${{ d.balanceDue ?? d.total | number:'1.2-2' }}</strong> seguirÃ¡n pendientes y se notificarÃ¡ a la dueÃ±a.</p>
+                                                <input type="text" [(ngModel)]="deliveryNotes[d.id]" placeholder="Motivo/observaciÃ³n obligatoria (ej: paga maÃ±ana, etc.)"
+                                                       class="w-full bg-white/10 border border-amber-400/40 rounded-xl px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-amber-400" />
                                             </div>
                                         }
                                     </section>
@@ -376,9 +450,25 @@
                 <h2 class="text-2xl font-black uppercase italic tracking-tighter mb-2">¡Ruta Completada!</h2>
                 <p class="text-white/40 text-sm mb-6">Todas las entregas han sido procesadas.</p>
                 @if (r.status === 'Pending') {
-                    <button (click)="startRoute()" class="w-full py-4 bg-pink-600 rounded-2xl font-bold uppercase">Iniciar Ruta</button>
-                } @else if (!gpsActive()) {
-                    <button (click)="startGps()" class="w-full py-4 bg-blue-600 rounded-2xl font-bold uppercase">Activar Radar GPS</button>
+                    <button (click)="openStartRouteModal()" class="w-full py-4 bg-gradient-to-r from-pink-600 to-fuchsia-600 rounded-2xl font-black uppercase tracking-wider text-sm shadow-lg shadow-pink-600/30 active:scale-95 transition-all">
+                        🚀 Iniciar Ruta con Caja Chica
+                    </button>
+                } @else {
+                    <div class="w-full flex flex-col gap-2.5">
+                        <button type="button" (click)="openSettlementModal()"
+                                class="w-full py-4 bg-gradient-to-r from-pink-600 to-fuchsia-600 rounded-2xl font-black uppercase tracking-wider text-sm shadow-lg shadow-pink-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <span>💵</span>
+                            <span>Hacer Corte de Caja y Arqueo</span>
+                        </button>
+                        <button type="button" (click)="goToCorteWeb()"
+                                class="w-full py-3.5 bg-white/10 border border-white/20 rounded-2xl font-bold uppercase text-xs active:bg-white/20 transition-all flex items-center justify-center gap-2">
+                            <span>🔗</span>
+                            <span>Ver Reporte Web Completo</span>
+                        </button>
+                        @if (!gpsActive()) {
+                            <button (click)="startGps()" class="w-full py-3 bg-blue-600/60 rounded-xl font-bold uppercase text-xs">Activar Radar GPS</button>
+                        }
+                    </div>
                 }
             </div>
         }
@@ -563,6 +653,303 @@
                     <button (click)="saveSignaturePad()"
                             [disabled]="!signatureHasInk()"
                             class="flex-1 py-3 bg-pink-600 rounded-2xl font-bold uppercase text-xs disabled:opacity-40">Guardar</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    
+    <!-- ── MODAL 1: APERTURA DE RUTA Y CAJA CHICA CON DENOMINACIONES ── -->
+    @if (showStartRouteModal()) {
+        <div class="fixed inset-0 z-[120] bg-black/85 backdrop-blur-2xl flex items-center justify-center p-4 animate-fade-in"
+             (click)="closeStartRouteModal()">
+            <div class="bg-black/90 border border-pink-500/30 rounded-[2.5rem] w-full max-w-md p-6 max-h-[90dvh] flex flex-col shadow-2xl animate-slide-up"
+                 (click)="$event.stopPropagation()">
+                
+                <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                    <div>
+                        <h3 class="text-xl font-black uppercase text-pink-400">💵 Caja Chica Inicial</h3>
+                        <p class="text-[11px] text-white/60">Ingresa la feria con la que arrancas</p>
+                    </div>
+                    <button type="button" (click)="closeStartRouteModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">✕</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-4 no-scrollbar pr-1">
+                    <!-- Billetes MXN -->
+                    <div>
+                        <h4 class="text-xs font-black uppercase text-pink-300 mb-2">Billetes MXN (Cantidad)</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$1,000</span>
+                                <input type="number" min="0" [(ngModel)]="initialBreakdown.b1000" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$500</span>
+                                <input type="number" min="0" [(ngModel)]="initialBreakdown.b500" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$200</span>
+                                <input type="number" min="0" [(ngModel)]="initialBreakdown.b200" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$100</span>
+                                <input type="number" min="0" [(ngModel)]="initialBreakdown.b100" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$50</span>
+                                <input type="number" min="0" [(ngModel)]="initialBreakdown.b50" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$20</span>
+                                <input type="number" min="0" [(ngModel)]="initialBreakdown.b20" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monedas y Tipo de Cambio -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-white/5 border border-white/10 rounded-xl p-2.5">
+                            <span class="block text-[10px] text-white/60 uppercase font-bold">Monedas (MXN)</span>
+                            <input type="number" min="0" step="0.5" [(ngModel)]="initialBreakdown.coins" class="w-full bg-transparent font-black text-lg text-emerald-400 focus:outline-none" placeholder="0.00">
+                        </div>
+                        <div class="bg-white/5 border border-white/10 rounded-xl p-2.5">
+                            <span class="block text-[10px] text-white/60 uppercase font-bold">Tipo Cambio USD</span>
+                            <input type="number" min="1" step="0.5" [(ngModel)]="initialBreakdown.exchangeRate" class="w-full bg-transparent font-black text-lg text-amber-300 focus:outline-none" placeholder="18.00">
+                        </div>
+                    </div>
+
+                    <!-- Billetes USD opcionales -->
+                    <details class="bg-white/5 border border-white/10 rounded-xl p-2.5">
+                        <summary class="text-xs font-bold text-emerald-300 cursor-pointer">💵 Dólares USD (opcional)</summary>
+                        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-white/10">
+                            <div class="text-center"><span class="text-[9px] text-white/50">$100</span><input type="number" min="0" [(ngModel)]="initialBreakdown.usd100" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$50</span><input type="number" min="0" [(ngModel)]="initialBreakdown.usd50" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$20</span><input type="number" min="0" [(ngModel)]="initialBreakdown.usd20" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$10</span><input type="number" min="0" [(ngModel)]="initialBreakdown.usd10" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$5</span><input type="number" min="0" [(ngModel)]="initialBreakdown.usd5" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$1</span><input type="number" min="0" [(ngModel)]="initialBreakdown.usd1" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="pt-4 border-t border-white/10 mt-3 space-y-2">
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-xs font-bold text-white/60 uppercase">Total Caja Chica:</span>
+                        <strong class="text-2xl font-black text-emerald-400">${{ initialCashTotal() | number:'1.2-2' }}</strong>
+                    </div>
+                    <button type="button" (click)="confirmStartRoute()"
+                            class="w-full py-4 bg-gradient-to-r from-pink-600 to-fuchsia-600 rounded-2xl font-black uppercase text-sm tracking-wide shadow-lg shadow-pink-600/30 active:scale-95 transition-all">
+                        Arrancar Ruta ✓
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ── MODAL 2: COBRO DE TANDA EN PARADA DE CLIENTA ── -->
+    @if (showTandaModal()) {
+        <div class="fixed inset-0 z-[120] bg-black/85 backdrop-blur-2xl flex items-center justify-center p-4 animate-fade-in"
+             (click)="closeTandaModal()">
+            <div class="bg-black/90 border border-fuchsia-500/40 rounded-[2.5rem] w-full max-w-md p-6 max-h-[90dvh] flex flex-col shadow-2xl animate-slide-up"
+                 (click)="$event.stopPropagation()">
+                
+                <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                    <div>
+                        <h3 class="text-xl font-black uppercase text-fuchsia-300">🌸 Cobro de Tanda</h3>
+                        <p class="text-[11px] text-white/60">Registrar abono de {{ tandaForm.clientName }}</p>
+                    </div>
+                    <button type="button" (click)="closeTandaModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">✕</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-3 no-scrollbar pr-1">
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-fuchsia-300 mb-1">Concepto / Nombre Tanda</label>
+                        <input type="text" [(ngModel)]="tandaForm.tandaName" class="w-full bg-white/5 border border-white/20 rounded-xl px-3 py-2 text-sm text-white" placeholder="Ej: Tanda Dyson">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-fuchsia-300 mb-1">Semana #</label>
+                            <input type="number" min="1" [(ngModel)]="tandaForm.weekNumber" class="w-full bg-white/5 border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold" placeholder="1">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-fuchsia-300 mb-1">Monto de Cuota</label>
+                            <input type="number" min="1" [(ngModel)]="tandaForm.amount" class="w-full bg-white/5 border border-white/20 rounded-xl px-3 py-2 text-sm text-emerald-400 font-black text-base" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-fuchsia-300 mb-1">Método de Pago</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" (click)="tandaForm.paymentMethod = 'Efectivo'"
+                                    class="py-2.5 rounded-xl border text-xs font-bold uppercase transition-all"
+                                    [class.bg-emerald-500/20]="tandaForm.paymentMethod === 'Efectivo'"
+                                    [class.border-emerald-500]="tandaForm.paymentMethod === 'Efectivo'"
+                                    [class.text-emerald-300]="tandaForm.paymentMethod === 'Efectivo'"
+                                    [class.bg-white/5]="tandaForm.paymentMethod !== 'Efectivo'"
+                                    [class.border-white/10]="tandaForm.paymentMethod !== 'Efectivo'">
+                                💵 Efectivo
+                            </button>
+                            <button type="button" (click)="tandaForm.paymentMethod = 'Transferencia'"
+                                    class="py-2.5 rounded-xl border text-xs font-bold uppercase transition-all"
+                                    [class.bg-indigo-500/20]="tandaForm.paymentMethod === 'Transferencia'"
+                                    [class.border-indigo-500]="tandaForm.paymentMethod === 'Transferencia'"
+                                    [class.text-indigo-300]="tandaForm.paymentMethod === 'Transferencia'"
+                                    [class.bg-white/5]="tandaForm.paymentMethod !== 'Transferencia'"
+                                    [class.border-white/10]="tandaForm.paymentMethod !== 'Transferencia'">
+                                💳 Transferencia
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (tandaForm.paymentMethod === 'Efectivo') {
+                        <div class="p-3 bg-white/5 border border-white/10 rounded-xl space-y-2">
+                            <label class="block text-[10px] uppercase font-bold text-pink-300">¿Cuánto efectivo recibió?</label>
+                            <input type="number" min="0" [(ngModel)]="tandaForm.cashReceived" placeholder="0.00"
+                                   class="w-full bg-black/40 border border-white/20 rounded-xl px-3 py-2 text-base text-white font-bold">
+
+                            @if (tandaChange() > 0) {
+                                <div class="p-2 bg-emerald-500/20 border border-emerald-400 rounded-xl flex items-center justify-between">
+                                    <span class="text-xs font-bold text-emerald-300">Dar de cambio:</span>
+                                    <strong class="text-base font-black text-emerald-400">${{ tandaChange() | number:'1.2-2' }} MXN</strong>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-fuchsia-300 mb-1">Observaciones / Mensaje para Dueña</label>
+                        <input type="text" [(ngModel)]="tandaForm.notes" class="w-full bg-white/5 border border-white/20 rounded-xl px-3 py-2 text-xs text-white" placeholder="Ej: Ya le avisó a Regi por WhatsApp">
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-white/10 mt-3">
+                    <button type="button" (click)="submitTandaPayment()"
+                            [disabled]="submittingTanda() || !tandaForm.amount"
+                            class="w-full py-4 bg-fuchsia-600 rounded-2xl font-black uppercase text-sm tracking-wide shadow-lg shadow-fuchsia-600/30 active:scale-95 transition-all disabled:opacity-40">
+                        {{ submittingTanda() ? 'Guardando...' : 'Confirmar Abono de Tanda ✓' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ── MODAL 3: ARQUEO DE BILLETES Y CORTE FINAL DE CAJA ── -->
+    @if (showSettlementModal()) {
+        <div class="fixed inset-0 z-[120] bg-black/85 backdrop-blur-2xl flex items-center justify-center p-4 animate-fade-in"
+             (click)="closeSettlementModal()">
+            <div class="bg-black/90 border border-pink-500/30 rounded-[2.5rem] w-full max-w-md p-6 max-h-[92dvh] flex flex-col shadow-2xl animate-slide-up"
+                 (click)="$event.stopPropagation()">
+                
+                <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                    <div>
+                        <h3 class="text-xl font-black uppercase text-pink-400">🏁 Arqueo y Corte de Caja</h3>
+                        <p class="text-[11px] text-white/60">Conteo físico de billetes al volver</p>
+                    </div>
+                    <button type="button" (click)="closeSettlementModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">✕</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-3 no-scrollbar pr-1">
+                    <!-- RESUMEN ESPERADO VS CONTADO -->
+                    <div class="grid grid-cols-2 gap-2 p-3 bg-white/5 border border-white/10 rounded-2xl">
+                        <div>
+                            <span class="block text-[9px] uppercase font-bold text-white/50">Efectivo Esperado</span>
+                            <strong class="text-lg font-black text-pink-300">${{ expectedCashAtClose() | number:'1.2-2' }}</strong>
+                        </div>
+                        <div>
+                            <span class="block text-[9px] uppercase font-bold text-white/50">Efectivo Contado</span>
+                            <strong class="text-lg font-black text-emerald-400">${{ finalBreakdownTotal() | number:'1.2-2' }}</strong>
+                        </div>
+                        
+                        <!-- DIFERENCIA EN VIVO -->
+                        <div class="col-span-2 pt-2 border-t border-white/10 flex justify-between items-center">
+                            <span class="text-xs font-bold text-white/70">Diferencia:</span>
+                            @if (settlementDifference() === 0) {
+                                <span class="text-xs font-black text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-lg">¡CUADRADO EXACTO! ✓</span>
+                            } @else if (settlementDifference() > 0) {
+                                <span class="text-xs font-black text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-lg">+${{ settlementDifference() | number:'1.2-2' }} SOBRANTE</span>
+                            } @else {
+                                <span class="text-xs font-black text-rose-400 bg-rose-500/25 px-2 py-0.5 rounded-lg">-${{ -settlementDifference() | number:'1.2-2' }} FALTANTE ⚠️</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- DESGLOSE DE BILLETES MXN -->
+                    <div>
+                        <h4 class="text-xs font-black uppercase text-pink-300 mb-2">Billetes MXN en Mano (Cantidad)</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$1,000</span>
+                                <input type="number" min="0" [(ngModel)]="finalBreakdown.b1000" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$500</span>
+                                <input type="number" min="0" [(ngModel)]="finalBreakdown.b500" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$200</span>
+                                <input type="number" min="0" [(ngModel)]="finalBreakdown.b200" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$100</span>
+                                <input type="number" min="0" [(ngModel)]="finalBreakdown.b100" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$50</span>
+                                <input type="number" min="0" [(ngModel)]="finalBreakdown.b50" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                            <div class="bg-white/5 border border-white/10 rounded-xl p-2 text-center">
+                                <span class="block text-[10px] text-white/60">$20</span>
+                                <input type="number" min="0" [(ngModel)]="finalBreakdown.b20" class="w-full bg-transparent text-center font-bold text-base text-pink-300 focus:outline-none" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monedas y USD -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-white/5 border border-white/10 rounded-xl p-2.5">
+                            <span class="block text-[10px] text-white/60 uppercase font-bold">Monedas / Feria</span>
+                            <input type="number" min="0" step="0.5" [(ngModel)]="finalBreakdown.coins" class="w-full bg-transparent font-black text-lg text-emerald-400 focus:outline-none" placeholder="0.00">
+                        </div>
+                        <div class="bg-white/5 border border-white/10 rounded-xl p-2.5">
+                            <span class="block text-[10px] text-white/60 uppercase font-bold">Tipo Cambio USD</span>
+                            <input type="number" min="1" step="0.5" [(ngModel)]="finalBreakdown.exchangeRate" class="w-full bg-transparent font-black text-lg text-amber-300 focus:outline-none" placeholder="18.00">
+                        </div>
+                    </div>
+
+                    <!-- Dólares USD opcionales -->
+                    <details class="bg-white/5 border border-white/10 rounded-xl p-2.5">
+                        <summary class="text-xs font-bold text-emerald-300 cursor-pointer">💵 Dólares USD recibidos</summary>
+                        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-white/10">
+                            <div class="text-center"><span class="text-[9px] text-white/50">$100</span><input type="number" min="0" [(ngModel)]="finalBreakdown.usd100" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$50</span><input type="number" min="0" [(ngModel)]="finalBreakdown.usd50" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$20</span><input type="number" min="0" [(ngModel)]="finalBreakdown.usd20" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$10</span><input type="number" min="0" [(ngModel)]="finalBreakdown.usd10" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$5</span><input type="number" min="0" [(ngModel)]="finalBreakdown.usd5" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                            <div class="text-center"><span class="text-[9px] text-white/50">$1</span><input type="number" min="0" [(ngModel)]="finalBreakdown.usd1" class="w-full bg-white/5 rounded text-center text-xs py-1" placeholder="0"></div>
+                        </div>
+                    </details>
+
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-pink-300 mb-1">Observaciones finales del corte</label>
+                        <textarea [(ngModel)]="settlementNotes" rows="2" class="w-full bg-white/5 border border-white/20 rounded-xl p-2.5 text-xs text-white" placeholder="Ej: Se entregó feria completa a la dueña"></textarea>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-white/10 mt-3 space-y-2">
+                    <button type="button" (click)="submitSettlement()"
+                            [disabled]="submittingSettlement()"
+                            class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl font-black uppercase text-sm tracking-wide shadow-lg shadow-emerald-600/30 active:scale-95 transition-all">
+                        {{ submittingSettlement() ? 'Guardando Arqueo...' : 'Guardar y Cerrar Caja ✓' }}
+                    </button>
+
+                    @if (settlementResult(); as sr) {
+                        <button type="button" (click)="shareWhatsAppReport(sr.whatsAppShareText)"
+                                class="w-full py-3.5 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <span>📲</span>
+                            <span>Enviar Corte por WhatsApp a Dueña</span>
+                        </button>
+                    }
                 </div>
             </div>
         </div>
