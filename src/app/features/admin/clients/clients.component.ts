@@ -1,15 +1,17 @@
-import { Component, inject, signal, OnInit, HostListener, computed, effect } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnInit, HostListener, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { ClientDto, CLIENT_TAG_LABELS } from '../../../core/models';
+import { ClientDto, CreateClientRequest, CLIENT_TAG_LABELS } from '../../../core/models';
 import { gsap } from 'gsap';
 
 @Component({
   selector: 'app-clients',
+  standalone: true,
   imports: [FormsModule, CurrencyPipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="rb-clients-page relative min-h-[80vh] overflow-hidden -m-4 lg:-m-8 px-4 py-5 lg:p-8">
       <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-pink-50/70 via-white/40 to-purple-50/70"></div>
@@ -17,18 +19,76 @@ import { gsap } from 'gsap';
       <div class="pointer-events-none absolute left-[7%] top-[40%] text-4xl opacity-30">♡</div>
 
       <div class="relative z-10 mx-auto max-w-6xl space-y-5">
-        <header class="flex items-end justify-between gap-3 animate-slide-down">
+        <header class="flex flex-col gap-3 animate-slide-down sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p class="text-[10px] font-black uppercase tracking-[0.16em] text-pink-500">Tu comunidad bonita</p>
             <h1 class="mt-1 flex items-center gap-2 font-display text-3xl font-black leading-none text-pink-950">Mis clientas <span aria-hidden="true">💕</span></h1>
             <p class="mt-2 text-sm font-semibold text-pink-400">Encuentra a cualquiera en un parpadeo.</p>
           </div>
-          <div class="grid min-w-[74px] justify-items-center rounded-2xl border border-white/80 bg-white/80 px-3 py-2 shadow-[6px_7px_14px_rgba(200,105,153,0.12)] backdrop-blur-md">
-            <span class="text-lg leading-none">🌸</span>
-            <strong class="text-xl leading-none text-pink-700">{{ clients().length }}</strong>
-            <small class="text-[9px] font-black uppercase tracking-wider text-pink-400">Clientas</small>
+          <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+            <div class="grid min-w-[74px] justify-items-center rounded-2xl border border-white/80 bg-white/80 px-3 py-2 shadow-[6px_7px_14px_rgba(200,105,153,0.12)] backdrop-blur-md">
+              <span class="text-lg leading-none">🌸</span>
+              <strong class="text-xl leading-none text-pink-700">{{ clients().length }}</strong>
+              <small class="text-[9px] font-black uppercase tracking-wider text-pink-400">Clientas</small>
+            </div>
+            <button type="button" class="btn-coquette btn-pink flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-black shadow-md" (click)="openCreateClient()">
+              <span aria-hidden="true">＋</span><span>Agregar clienta</span>
+            </button>
           </div>
         </header>
+
+        @if (createClientOpen()) {
+          <section class="rounded-3xl border border-pink-100 bg-white/80 p-4 shadow-[0_14px_30px_rgba(244,114,182,0.12)] backdrop-blur-xl sm:p-5" aria-labelledby="create-client-title" [attr.aria-busy]="isCreatingClient()">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-[0.14em] text-pink-500">Alta manual</p>
+                <h2 id="create-client-title" class="mt-1 font-display text-xl font-black text-pink-950">Agregar clienta</h2>
+                <p class="mt-1 text-xs font-semibold text-pink-400">Se guardará en tu directorio, sin crear ningún pedido.</p>
+              </div>
+              <button type="button" class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-pink-50 text-xl font-bold text-pink-500" aria-label="Cancelar alta de clienta" [disabled]="isCreatingClient()" (click)="closeCreateClient()">×</button>
+            </div>
+
+            <form class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" (ngSubmit)="saveNewClient()">
+              <label class="grid gap-1.5 text-xs font-black text-pink-700 sm:col-span-2">
+                <span>Nombre completo <span aria-hidden="true">*</span></span>
+                <input name="clientName" type="text" required maxlength="200" autocomplete="name" [(ngModel)]="newClientForm.name" class="input-coquette w-full text-base" placeholder="Nombre de la clienta" />
+              </label>
+
+              <label class="grid gap-1.5 text-xs font-black text-pink-700">
+                <span>Teléfono</span>
+                <input name="clientPhone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" [(ngModel)]="newClientForm.phone" class="input-coquette w-full text-base" placeholder="Número de teléfono" />
+              </label>
+
+              <label class="grid gap-1.5 text-xs font-black text-pink-700">
+                <span>Etiqueta</span>
+                <select name="clientTag" [(ngModel)]="newClientForm.tag" class="input-coquette w-full text-base">
+                  <option value="None">🌸 Normal</option>
+                  <option value="RisingStar">🚀 En ascenso</option>
+                  <option value="Vip">👑 Consentida VIP</option>
+                  <option value="Blacklist">🚫 Lista negra</option>
+                </select>
+              </label>
+
+              <label class="grid gap-1.5 text-xs font-black text-pink-700 sm:col-span-2">
+                <span>Dirección</span>
+                <textarea name="clientAddress" rows="2" maxlength="500" autocomplete="street-address" [(ngModel)]="newClientForm.address" class="input-coquette w-full resize-y text-base" placeholder="Calle, número, colonia y ciudad"></textarea>
+              </label>
+
+              <label class="grid gap-1.5 text-xs font-black text-pink-700 sm:col-span-2">
+                <span>Instrucciones de entrega</span>
+                <textarea name="clientInstructions" rows="2" maxlength="1000" [(ngModel)]="newClientForm.deliveryInstructions" class="input-coquette w-full resize-y text-base" placeholder="Referencias para encontrar su domicilio (opcional)"></textarea>
+              </label>
+
+              <div class="flex flex-col-reverse gap-2 pt-1 sm:col-span-2 sm:flex-row sm:justify-end">
+                <button type="button" class="btn-coquette btn-ghost" [disabled]="isCreatingClient()" (click)="closeCreateClient()">Cancelar</button>
+                <button type="submit" class="btn-coquette btn-pink flex items-center justify-center gap-2" [disabled]="isCreatingClient()">
+                  @if (isCreatingClient()) { <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true"></span> Guardando... }
+                  @else { Guardar clienta }
+                </button>
+              </div>
+            </form>
+          </section>
+        }
 
         <div class="grid grid-cols-3 gap-2.5" aria-label="Resumen de clientas">
           <div class="rounded-2xl border border-white/80 bg-white/65 p-3 text-center shadow-sm"><strong class="block text-xl leading-none text-pink-700">{{ clients().length }}</strong><span class="mt-1 block text-[9px] font-black uppercase tracking-wider text-pink-400">Todas</span></div>
@@ -103,6 +163,9 @@ export class ClientsComponent implements OnInit {
 
   clients = signal<ClientDto[]>([]);
   loading = signal(true);
+  createClientOpen = signal(false);
+  isCreatingClient = signal(false);
+  newClientForm = this.createEmptyClientForm();
   
   // Use signals for filters to make them reactive
   search = signal('');
@@ -168,6 +231,57 @@ export class ClientsComponent implements OnInit {
         this.toast.error('Error al cargar clientas'); 
       }
     });
+  }
+
+  openCreateClient(): void {
+    this.newClientForm = this.createEmptyClientForm();
+    this.createClientOpen.set(true);
+  }
+
+  closeCreateClient(): void {
+    if (this.isCreatingClient()) return;
+    this.createClientOpen.set(false);
+    this.newClientForm = this.createEmptyClientForm();
+  }
+
+  saveNewClient(): void {
+    if (this.isCreatingClient()) return;
+
+    const name = this.newClientForm.name.trim();
+    if (!name) {
+      this.toast.warning('Escribe el nombre de la clienta.');
+      return;
+    }
+
+    const request: CreateClientRequest = {
+      name,
+      phone: this.newClientForm.phone.trim() || undefined,
+      address: this.newClientForm.address.trim() || undefined,
+      tag: this.newClientForm.tag,
+      deliveryInstructions: this.newClientForm.deliveryInstructions.trim() || undefined
+    };
+
+    this.isCreatingClient.set(true);
+    this.api.createClient(request).subscribe({
+      next: (client) => {
+        this.clients.update(current => [client, ...current.filter(existing => existing.id !== client.id)]);
+        this.search.set(client.name);
+        this.tagFilter.set('');
+        this.typeFilter.set('Nueva');
+        this.createClientOpen.set(false);
+        this.newClientForm = this.createEmptyClientForm();
+        this.isCreatingClient.set(false);
+        this.toast.success('Clienta agregada. No se creó ningún pedido.');
+      },
+      error: () => {
+        this.isCreatingClient.set(false);
+        this.toast.error('No se pudo agregar la clienta. Intenta de nuevo.');
+      }
+    });
+  }
+
+  private createEmptyClientForm(): { name: string; phone: string; address: string; tag: string; deliveryInstructions: string } {
+    return { name: '', phone: '', address: '', tag: 'None', deliveryInstructions: '' };
   }
 
   private animateList(): void {

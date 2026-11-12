@@ -316,6 +316,14 @@ export interface ClientDto {
     aliases?: string[];
 }
 
+export interface CreateClientRequest {
+    name: string;
+    phone?: string;
+    address?: string;
+    tag: string;
+    deliveryInstructions?: string;
+}
+
 // ── Resolver multi-señal de clientas ──
 
 export interface ResolveClientRequest {

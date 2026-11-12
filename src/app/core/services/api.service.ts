@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-    DashboardDto, OrderSummaryDto, ClientOrderViewDto, PagedResult, ReportDto, ClientDto, ColoniaReportDto,
+    DashboardDto, OrderSummaryDto, ClientOrderViewDto, PagedResult, ReportDto, ClientDto, CreateClientRequest, ColoniaReportDto,
     RouteDto, SupplierDto, InvestmentDto, SalesPeriodDto, PeriodReportDto,
     FinancialReportDto, DriverExpenseDto, ManualOrderRequest, OrderStatsDto,
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
@@ -328,6 +328,10 @@ export class ApiService {
     // ── Clients ──
     getClients(): Observable<ClientDto[]> {
         return this.http.get<ClientDto[]>(`${this.base}/clients`);
+    }
+
+    createClient(req: CreateClientRequest): Observable<ClientDto> {
+        return this.http.post<ClientDto>(`${this.base}/clients`, req);
     }
 
     getClient(id: number): Observable<ClientDto> {
