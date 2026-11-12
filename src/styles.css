@@ -31,7 +31,12 @@
 html {
   scroll-behavior: smooth;
   max-width: 100%;
+  overflow-x: hidden;
   overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-block-start: max(1rem, env(safe-area-inset-top, 0px));
+  scroll-padding-block-end: calc(104px + env(safe-area-inset-bottom, 0px));
 }
 
 body {
@@ -44,6 +49,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
   max-width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
   overflow-x: clip;
   /* Coquette Heart Cursor 💖 */
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="%23f472b6" stroke="%23be185d" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>') 10 10, auto;
@@ -62,8 +70,7 @@ button:active,
 a:active,
 [role="button"]:active,
 .card-coquette:active {
-  transform: scale(0.95);
-  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  opacity: 0.86;
 }
 
 .btn-coquette,
@@ -628,6 +635,7 @@ textarea {
   max-width: 100%;
   min-width: 0;
   font-size: 16px;
+  font-family: inherit;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
@@ -643,6 +651,105 @@ input:not([type]),
 select,
 textarea {
   font-size: 16px;
+}
+
+/* Controles cómodos para dedos y compatibles con el zoom automático de iOS. */
+app-root {
+  display: block;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+button,
+a,
+input[type='button'],
+input[type='submit'],
+input[type='reset'],
+[role='button'],
+[role='tab'],
+[role='option'],
+[role='menuitem'],
+summary {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input[type='button'],
+input[type='submit'],
+input[type='reset'] {
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  flex: 0 0 auto;
+  accent-color: #db2777;
+}
+
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  button,
+  a[routerLink],
+  a[href],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  [role='button'],
+  [role='tab'],
+  [role='option'],
+  [role='menuitem'],
+  [role='link'],
+  summary {
+    min-height: 44px;
+  }
+
+  button,
+  a[routerLink],
+  a[href],
+  [role='button'],
+  [role='link'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    min-width: 44px;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px !important;
+    scroll-margin-block: 1rem 7rem;
+  }
+}
+
+button {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button:hover,
+  a:hover,
+  [role='button']:hover {
+    transform: none !important;
+  }
+
+  .btn-coquette:hover,
+  .card-coquette:hover,
+  .card-metric:hover,
+  .btn-pink:hover,
+  .btn-rose:hover,
+  .btn-lavender:hover,
+  .btn-purple:hover {
+    transform: none;
+  }
 }
 
 .bg-coquette-pattern {
@@ -803,7 +910,19 @@ textarea {
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-container > * {
+  max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2rem);
+  max-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2rem);
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Loading Shimmer ── */

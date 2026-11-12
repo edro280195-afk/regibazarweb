@@ -20,6 +20,7 @@ import { BluetoothPrinterService } from './core/services/bluetooth/bluetooth-pri
     :host {
       display: block;
       min-height: 100vh;
+      min-height: 100svh;
     }
   `]
 })

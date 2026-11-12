@@ -1,4 +1,6 @@
 .settlement-container {
+    min-height: 100vh;
+    min-height: 100svh;
     min-height: 100dvh;
     background: linear-gradient(135deg, #fff0f5 0%, #fce7f3 45%, #f3e8ff 100%);
     padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(2rem + env(safe-area-inset-bottom, 0px)) 1rem;

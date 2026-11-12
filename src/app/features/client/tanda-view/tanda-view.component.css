@@ -31,6 +31,7 @@
 /* Page Background with Warm Polka Dots & Sparkle Atmosphere */
 .rb-client-page {
   position: relative;
+  min-height: 100vh;
   min-height: 100svh;
   overflow-x: clip;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(80px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));

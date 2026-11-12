@@ -25,10 +25,15 @@
   --rb-highlight: rgba(255, 255, 255, 0.96);
   --rb-soft-shadow: rgba(207, 137, 171, 0.24);
   display: flex;
+  min-height: 100vh;
   min-height: 100svh;
+  min-height: 100dvh;
   align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   color: var(--rb-ink);
   background:
