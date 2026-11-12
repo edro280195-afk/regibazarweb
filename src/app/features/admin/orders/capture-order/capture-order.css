@@ -157,11 +157,15 @@
     border: none;
     outline: none;
     background: transparent;
-    font-size: 1.1rem;
+    font-size: 16px; /* iOS Safari: nunca < 16px para evitar zoom al enfocar */
     font-weight: 600;
     color: #831843;
     padding: 0.8rem 0.5rem;
     font-family: var(--font-body);
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0.75rem;
+    touch-action: manipulation;
 }
 .turbo-input::placeholder {
     color: #f9a8d4;
@@ -331,3 +335,310 @@
     display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══ Regi Bazar capture command center ═══ */
+.rb-capture-shell {
+    --capture-pink: #ff5fa2;
+    --capture-deep: #bd2b70;
+    --capture-ink: #63314e;
+    --capture-muted: #a57993;
+    --capture-soft: #ffe4ef;
+    --capture-lilac: #e8ddff;
+    min-width: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    color: var(--capture-ink);
+}
+
+.rb-capture-header {
+    position: relative;
+    z-index: 1;
+}
+
+.rb-capture-heading p {
+    margin: 0 0 4px;
+    color: var(--capture-pink);
+    font-size: 0.92rem;
+    font-weight: 900;
+    letter-spacing: .03em;
+}
+
+.rb-capture-heading h2 {
+    margin: 0;
+    color: var(--capture-deep);
+    font-size: clamp(1.7rem, 5vw, 2.1rem);
+    line-height: 1;
+    letter-spacing: -.05em;
+}
+
+.rb-capture-subtitle {
+    font-size: .78rem;
+    font-weight: 800;
+}
+
+.rb-capture-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 17px 19px;
+    border: 1px solid rgba(255, 255, 255, .8);
+    border-radius: 22px;
+    color: #fff;
+    background: linear-gradient(135deg, #ff82b8, #d83d83 70%, #c14d96);
+    box-shadow: 0 6px 0 #c42e70, 0 12px 22px rgba(214, 57, 125, .12);
+}
+
+.rb-capture-eyebrow {
+    margin: 0 0 3px;
+    color: rgba(255, 255, 255, .78);
+    font-size: .68rem;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.rb-capture-hero h3 {
+    margin: 0;
+    font-size: clamp(1.15rem, 4vw, 1.42rem);
+    font-weight: 900;
+    letter-spacing: -.04em;
+}
+
+.rb-capture-hero p:last-child {
+    margin: 4px 0 0;
+    color: rgba(255, 255, 255, .82);
+    font-size: .74rem;
+    font-weight: 700;
+}
+
+.rb-capture-hero-icon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .28);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, .15);
+    font-size: 1.45rem;
+}
+
+.rb-capture-methods {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, .88);
+    border-radius: 19px;
+    background: rgba(255, 255, 255, .68);
+    box-shadow: inset 2px 2px 6px rgba(212, 157, 192, .08), inset -2px -2px 6px rgba(255, 255, 255, .9);
+}
+
+.rb-capture-methods button {
+    min-height: 52px;
+    border-radius: 14px;
+    color: var(--capture-muted);
+    font-size: .75rem;
+    font-weight: 900;
+}
+
+.rb-capture-methods button.active {
+    color: var(--capture-deep);
+    background: var(--capture-soft);
+    box-shadow: inset 2px 2px 5px rgba(209, 137, 173, .14), inset -2px -2px 5px rgba(255, 255, 255, .86);
+}
+
+.rb-capture-methods button.live-tab.active {
+    color: #795aa4;
+    background: var(--capture-lilac);
+    box-shadow: inset 2px 2px 5px rgba(153, 116, 202, .13), inset -2px -2px 5px rgba(255, 255, 255, .86);
+}
+
+.rb-capture-mode {
+    animation: fadeIn .24s ease-out;
+}
+
+.rb-capture-mode .card-coquette {
+    border-color: rgba(255, 255, 255, .84);
+    border-radius: 22px;
+    background: rgba(255, 250, 252, .78);
+    box-shadow: 0 10px 20px rgba(186, 94, 145, .07), inset 2px 2px 6px rgba(255, 255, 255, .9);
+}
+
+.rb-capture-turbo-mode > .flex:first-child {
+    align-items: center;
+    padding: 7px;
+    border: 1px solid rgba(255, 255, 255, .78);
+    border-radius: 17px;
+    background: rgba(255, 250, 252, .68);
+}
+
+.rb-capture-turbo-mode .turbo-type-btn {
+    min-height: 40px;
+    border: 1px solid rgba(235, 194, 216, .72);
+    border-radius: 13px;
+    font-size: .72rem;
+}
+
+.rb-capture-turbo-mode .pin-toggle-btn {
+    min-height: 40px;
+    border-radius: 13px;
+    font-size: .72rem;
+}
+
+.rb-capture-turbo-mode .turbo-input-wrapper {
+    min-height: 54px;
+    border-width: 2px;
+    border-radius: 17px;
+    background: rgba(255, 255, 255, .82);
+}
+
+.rb-capture-turbo-mode .turbo-shortcuts {
+    padding: 7px 10px;
+    color: var(--capture-muted);
+    font-size: .72rem;
+}
+
+.rb-capture-turbo-mode .turbo-shortcuts-keys {
+    color: var(--capture-deep);
+    font-size: .68rem;
+}
+
+.rb-capture-turbo-mode .card-coquette.sticky,
+.rb-capture-manual-mode .card-coquette.sticky {
+    top: 80px;
+    border-radius: 22px;
+    overflow: hidden;
+}
+
+.rb-capture-turbo-mode .card-coquette.sticky > div:first-child,
+.rb-capture-manual-mode .card-coquette.sticky > div:first-child {
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #ff82b8, #d83d83);
+    box-shadow: 0 5px 0 #c42e70;
+}
+
+.rb-capture-turbo-mode .card-coquette.sticky > div:first-child h4,
+.rb-capture-manual-mode .card-coquette.sticky > div:first-child h4 {
+    font-size: 1rem;
+}
+
+.rb-capture-turbo-mode .card-coquette.sticky > div:nth-child(2),
+.rb-capture-manual-mode .card-coquette.sticky > div:nth-child(2) {
+    background: rgba(255, 239, 247, .5);
+}
+
+.rb-capture-turbo-mode .card-coquette.sticky > div:last-child,
+.rb-capture-manual-mode .card-coquette.sticky > div:last-child {
+    background: rgba(255, 255, 255, .88);
+}
+
+.rb-capture-turbo-mode .queue-group,
+.rb-capture-manual-mode .group.relative {
+    border-color: rgba(255, 255, 255, .86);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, .76);
+}
+
+.rb-capture-turbo-mode .queue-group-header {
+    padding: 10px;
+    border-left-color: var(--capture-pink);
+}
+
+.rb-capture-turbo-mode .queue-group-item {
+    padding: 7px 8px;
+}
+
+.rb-capture-excel-mode {
+    min-height: 360px;
+    border-color: rgba(255, 95, 162, .3) !important;
+    border-radius: 22px;
+    background: rgba(255, 250, 252, .78) !important;
+}
+
+.rb-capture-excel-mode .text-pink-800 {
+    color: var(--capture-ink);
+}
+
+.rb-capture-manual-mode .input-coquette,
+.rb-capture-ai-mode .input-coquette,
+.rb-capture-ai-mode textarea,
+.rb-capture-excel-mode input {
+    min-height: 44px;
+    border-radius: 14px;
+    font-size: 16px;
+}
+
+.rb-capture-manual-mode .label-coquette,
+.rb-capture-ai-mode label {
+    font-size: .72rem;
+}
+
+.rb-capture-ai-mode .card-coquette {
+    border-radius: 22px;
+}
+
+@media (max-width: 767px) {
+    .rb-capture-shell {
+        padding-right: 1px;
+        padding-left: 1px;
+    }
+
+    .rb-capture-heading p {
+        font-size: .86rem;
+    }
+
+    .rb-capture-heading h2 {
+        font-size: 1.75rem;
+    }
+
+    .rb-capture-hero {
+        padding: 14px 15px;
+        border-radius: 19px;
+    }
+
+    .rb-capture-hero h3 {
+        font-size: 1.12rem;
+    }
+
+    .rb-capture-hero p:last-child {
+        max-width: 255px;
+        font-size: .68rem;
+    }
+
+    .rb-capture-methods {
+        gap: 4px;
+        padding: 5px;
+    }
+
+    .rb-capture-methods button {
+        min-height: 48px;
+        padding: .55rem .25rem;
+        font-size: .66rem;
+    }
+
+    .rb-capture-turbo-mode > .flex:first-child {
+        gap: 7px;
+    }
+
+    .rb-capture-turbo-mode .turbo-type-btn,
+    .rb-capture-turbo-mode .pin-toggle-btn {
+        padding-right: .7rem;
+        padding-left: .7rem;
+        font-size: .66rem;
+    }
+
+    .rb-capture-turbo-mode .turbo-shortcuts-keys {
+        gap: .4rem;
+        font-size: .62rem;
+    }
+
+    .rb-capture-turbo-mode .card-coquette.sticky,
+    .rb-capture-manual-mode .card-coquette.sticky {
+        position: relative;
+        top: auto;
+        height: auto;
+        min-height: 430px;
+    }
+}

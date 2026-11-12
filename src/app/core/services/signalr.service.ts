@@ -18,6 +18,9 @@ export class SignalRService {
     deliveryUpdate$ = new Subject<any>();
     expenseAdded$ = new Subject<any>();
     routeUpdated$ = new Subject<void>();
+    orderDataChanged$ = new Subject<void>();
+    exchangeRateUpdated$ = new Subject<{ exchangeRate: number }>();
+    orderDeliveredWithoutPayment$ = new Subject<any>();
     messageReceived$ = new Subject<{ group: string; data: any }>();
 
     // Compatibility subjects (keep for now to avoid breaking existing code)
@@ -59,6 +62,9 @@ export class SignalRService {
         this.connection.on('ExpenseAdded', (data: any) => this.expenseAdded$.next(data));
         this.connection.on('OrderConfirmed', (data: any) => this.deliveryUpdate$.next({ ...data, type: 'Confirmed' }));
         this.connection.on('RouteUpdated', () => this.routeUpdated$.next());
+        this.connection.on('OrderDataChanged', () => this.orderDataChanged$.next());
+        this.connection.on('ExchangeRateUpdated', (data: any) => this.exchangeRateUpdated$.next(data));
+        this.connection.on('OrderDeliveredWithoutPayment', (data: any) => this.orderDeliveredWithoutPayment$.next(data));
         // Feature #9 — CAMI greeting pushed when driver marks InTransit
         this.connection.on('CamiGreeting', (data: { message: string; audioBase64?: string }) => {
             this.camiGreeting$.next(data);

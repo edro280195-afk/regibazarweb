@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff4f8">
+  <meta name="description" content="Mockup de entrega, registro de efectivo y cálculo de cambio para Regi Bazar.">
+  <title>Entrega y cobro · Regi Bazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alice&family=Quicksand:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: oklch(35% .075 350);
+      --ink-soft: oklch(48% .07 350);
+      --muted: oklch(61% .055 350);
+      --canvas: oklch(97.5% .022 350);
+      --surface: oklch(99.5% .007 350);
+      --surface-soft: oklch(96% .025 350);
+      --rose: oklch(64% .21 4);
+      --rose-dark: oklch(51% .19 5);
+      --rose-pale: oklch(92% .055 4);
+      --lavender: oklch(93% .035 300);
+      --line: oklch(89% .045 350);
+      --shadow: 0 12px 28px oklch(60% .09 350 / .16);
+      --font: 'Quicksand', 'Segoe UI', sans-serif;
+      --heading: 'Alice', Georgia, serif;
+    }
+    * { box-sizing: border-box; }
+    html { min-width: 320px; overflow-x: clip; background: var(--canvas); }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 12%, oklch(100% .01 350 / .8) 0 2px, transparent 3px),
+        radial-gradient(circle at 84% 72%, oklch(100% .01 350 / .8) 0 2px, transparent 3px),
+        var(--canvas);
+      background-size: 66px 66px, 90px 90px, auto;
+      font: 500 16px/1.5 var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid var(--rose); outline-offset: 3px; }
+    .top-note { width: min(1120px, calc(100% - 32px)); margin: 26px auto 16px; color: var(--muted); font-size: 13px; text-align: center; }
+    .top-note strong { color: var(--rose-dark); }
+    .mobile-shell { width: min(100% - 24px, 430px); margin: 0 auto 32px; padding: 15px 14px calc(22px + env(safe-area-inset-bottom)); border: 1px solid oklch(100% .01 350 / .9); border-radius: 31px; background: color-mix(in oklch, var(--surface) 94%, var(--lavender)); box-shadow: 9px 9px 23px oklch(69% .07 350 / .17), -8px -8px 22px oklch(100% .01 350 / .92); }
+    .mobile-top { display: flex; align-items: center; justify-content: space-between; padding: 2px 5px 14px; }
+    .brand { display: flex; align-items: center; gap: 8px; color: var(--rose-dark); font-family: var(--heading); font-size: 20px; }
+    .brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 12px; color: var(--rose-dark); background: var(--rose-pale); box-shadow: inset 2px 2px 5px oklch(75% .06 350 / .22), 2px 3px 6px oklch(70% .08 350 / .13); }
+    .route-chip { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); background: var(--surface); font-size: 11px; font-weight: 800; }
+    .stop-heading { padding: 14px 9px 18px; }
+    .eyebrow { color: var(--rose-dark); font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    h1 { margin: 5px 0 1px; font: 31px/1.1 var(--heading); }
+    .address { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .order-lines { padding: 14px 14px 10px; border-radius: 20px; background: var(--surface-soft); }
+    .section-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .item-line, .total-line { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; }
+    .item-line span:first-child { color: var(--ink-soft); }
+    .total-line { margin-top: 7px; padding-top: 9px; border-top: 1px solid var(--line); font-weight: 800; }
+    .balance-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 19px; padding: 13px 15px; border: 1px solid oklch(81% .11 6); border-radius: 18px; background: var(--rose-pale); }
+    .balance-bar small { display: block; color: var(--rose-dark); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .balance-bar strong { color: var(--rose-dark); font-size: 23px; font-weight: 800; }
+    .balance-bar .sparkle { font-size: 22px; }
+    .payment-section h2 { margin: 0 0 3px; font-size: 16px; font-weight: 800; }
+    .payment-hint { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+    .methods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+    .method {
+      min-height: 58px; padding: 7px 2px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); color: var(--ink-soft); font-size: 10px; font-weight: 800; line-height: 1.2; cursor: pointer;
+      box-shadow: 3px 4px 8px oklch(68% .07 350 / .12), -3px -3px 7px oklch(100% .01 350 / .9);
+      transition: transform .16s ease-out, box-shadow .16s ease-out, background .16s ease-out;
+    }
+    .method span { display: block; margin-bottom: 3px; font-size: 17px; }
+    .method[aria-pressed="true"] { border-color: oklch(73% .15 5); color: var(--rose-dark); background: var(--rose-pale); box-shadow: inset 2px 2px 5px oklch(76% .08 350 / .2); }
+    .method:active { transform: translateY(2px); }
+    .cash-area { margin-top: 13px; padding: 13px; border: 1px solid var(--line); border-radius: 19px; background: var(--surface); }
+    .cash-area[hidden] { display: none; }
+    .cash-label { display: block; margin-bottom: 6px; color: var(--ink-soft); font-size: 12px; font-weight: 800; }
+    .cash-input { display: flex; align-items: center; min-height: 54px; gap: 8px; padding: 0 13px; border: 1px solid oklch(84% .065 350); border-radius: 15px; background: var(--surface-soft); color: var(--rose-dark); font-size: 21px; font-weight: 800; }
+    .cash-input input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 18px; font-weight: 800; }
+    .cash-input input:focus-visible { outline: 0; }
+    .cash-details { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 11px; }
+    .cash-detail { padding: 9px 10px; border-radius: 13px; background: var(--lavender); }
+    .cash-detail small { display: block; color: var(--muted); font-size: 10px; font-weight: 800; }
+    .cash-detail strong { color: var(--ink); font-size: 14px; }
+    .cash-detail.change strong { color: var(--rose-dark); }
+    .balance-note { min-height: 20px; margin: 9px 2px 0; color: var(--muted); font-size: 11px; }
+    .no-charge-note { display: none; margin: 13px 0 0; padding: 11px 12px; border-radius: 15px; color: var(--ink-soft); background: var(--lavender); font-size: 12px; }
+    .no-charge-note.is-visible { display: block; }
+    .confirm { width: 100%; min-height: 59px; margin-top: 16px; border: 0; border-radius: 19px; color: oklch(99% .012 350); background: var(--rose); box-shadow: 0 6px 0 var(--rose-dark), 0 12px 18px oklch(64% .16 5 / .2); font-size: 15px; font-weight: 800; cursor: pointer; transition: transform .16s ease-out, box-shadow .16s ease-out; }
+    .confirm:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--rose-dark), 0 6px 10px oklch(64% .16 5 / .16); }
+    .footer-hint { margin: 12px 5px 0; color: var(--muted); font-size: 10px; text-align: center; }
+
+    .desktop-shell { display: none; }
+    @media (min-width: 900px) {
+      .top-note { margin-top: 38px; }
+      .mobile-shell { display: none; }
+      .desktop-shell { display: grid; grid-template-columns: 210px 1fr; width: min(1220px, calc(100% - 48px)); min-height: 680px; margin: 0 auto 48px; overflow: hidden; border: 1px solid var(--line); border-radius: 28px; background: var(--surface); box-shadow: var(--shadow); }
+      .rail { padding: 25px 17px; background: oklch(96% .026 350); }
+      .rail .brand { margin: 0 0 36px 4px; }
+      .rail-label { display: block; margin: 12px 0 7px 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .rail-item { display: flex; gap: 11px; align-items: center; min-height: 44px; padding: 0 11px; border-radius: 13px; color: var(--ink-soft); font-size: 13px; font-weight: 700; }
+      .rail-item.active { color: var(--rose-dark); background: var(--rose-pale); }
+      .rail-note { margin-top: 260px; padding: 12px; border-radius: 15px; color: var(--muted); background: var(--surface); font-size: 11px; }
+      .workspace { padding: 27px 34px 35px; }
+      .desk-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+      .desk-head p { margin: 0; color: var(--muted); font-size: 12px; }
+      .desk-head strong { color: var(--ink); font-size: 14px; }
+      .workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(370px, .85fr); gap: 26px; align-items: start; }
+      .desk-order { padding: 25px 25px 20px; border: 1px solid var(--line); border-radius: 23px; background: var(--surface); }
+      .desk-order h1 { margin-top: 8px; font-size: 38px; }
+      .desk-order .order-lines { margin-top: 25px; padding: 19px; }
+      .desk-order .item-line { padding: 8px 0; font-size: 14px; }
+      .desk-order .balance-bar { margin-top: 17px; }
+      .desk-payment { padding: 23px; border: 1px solid var(--line); border-radius: 23px; background: color-mix(in oklch, var(--surface) 78%, var(--lavender)); box-shadow: 5px 6px 14px oklch(70% .06 350 / .13), -4px -4px 12px oklch(100% .01 350 / .86); }
+      .desk-payment .payment-section h2 { font-size: 18px; }
+      .desk-payment .method { min-height: 69px; font-size: 11px; }
+      .desk-payment .method span { font-size: 20px; }
+      .desk-payment .cash-input { min-height: 60px; }
+      .desk-payment .cash-detail { padding: 12px; }
+      .desk-payment .cash-detail strong { font-size: 16px; }
+      .desk-payment .confirm { min-height: 64px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <p class="top-note"><strong>Mockup interactivo</strong> · cambia el tipo de pago o captura otro efectivo recibido.</p>
+
+  <main class="mobile-shell" aria-label="Entrega del pedido en móvil">
+    <header class="mobile-top">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div>
+      <span class="route-chip">Ruta de hoy · Parada 5</span>
+    </header>
+    <section class="stop-heading">
+      <span class="eyebrow">Entrega activa · Pedido #4821</span>
+      <h1>Mariana López</h1>
+      <p class="address">Calle Magnolia 122, Col. Jardín</p>
+    </section>
+    <section class="order-lines" aria-label="Artículos y total del pedido">
+      <span class="section-label">Artículos de esta bolsita</span>
+      <div class="item-line"><span>1 × Blusa rosa bordada</span><strong>$280.00</strong></div>
+      <div class="item-line"><span>2 × Diadema satinada</span><strong>$200.00</strong></div>
+      <div class="total-line"><span>Total del pedido</span><strong>$480.00</strong></div>
+    </section>
+    <div class="balance-bar"><div><small>Saldo pendiente</small><strong>$380.00</strong></div><span class="sparkle" aria-hidden="true">✿</span></div>
+    <section class="payment-section" aria-labelledby="mobile-payment-title">
+      <h2 id="mobile-payment-title">¿Cómo va a pagar?</h2>
+      <p class="payment-hint">Elige una opción; puedes dejar el saldo pendiente.</p>
+      <div class="methods" role="group" aria-label="Forma de pago">
+        <button class="method" data-method="cash" aria-pressed="true"><span aria-hidden="true">💵</span>Efectivo</button>
+        <button class="method" data-method="transfer" aria-pressed="false"><span aria-hidden="true">💳</span>Transferencia</button>
+        <button class="method" data-method="deposit" aria-pressed="false"><span aria-hidden="true">🏦</span>Depósito</button>
+        <button class="method" data-method="none" aria-pressed="false"><span aria-hidden="true">♡</span>Sin cobrar</button>
+      </div>
+      <div class="cash-area">
+        <label class="cash-label" for="mobile-cash">¿Cuánto efectivo recibió?</label>
+        <div class="cash-input"><span aria-hidden="true">$</span><input id="mobile-cash" class="received-input" type="number" inputmode="decimal" min="0" step="0.01" value="500" aria-describedby="mobile-cash-help"></div>
+        <div class="cash-details"><div class="cash-detail change"><small>Cambio para la clienta</small><strong class="change-output">$120.00</strong></div><div class="cash-detail"><small>Saldo después del pago</small><strong class="remaining-output">$0.00</strong></div></div>
+        <p class="balance-note" id="mobile-cash-help">Se registrarán $380.00 como pago. El sobrante se anota para el cambio.</p>
+      </div>
+      <p class="no-charge-note">La entrega se cerrará como entregada. Los $380.00 seguirán pendientes de cobro.</p>
+      <button class="confirm" type="button">✓ Entregar y registrar pago</button>
+      <p class="footer-hint">El saldo y los pagos de la clienta conservan su historial.</p>
+    </section>
+  </main>
+
+  <main class="desktop-shell" aria-label="Entrega del pedido en escritorio">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div>
+      <span class="rail-label">Reparto</span>
+      <div class="rail-item active"><span aria-hidden="true">♡</span> Ruta de hoy</div>
+      <div class="rail-item"><span aria-hidden="true">⌖</span> Mapa y paradas</div>
+      <div class="rail-item"><span aria-hidden="true">☷</span> Entregas recientes</div>
+      <div class="rail-note">Cada pedido conserva el saldo de su dueña, aunque se entregue en una misma ruta.</div>
+    </aside>
+    <section class="workspace">
+      <header class="desk-head"><div><p>Ruta de hoy / Parada 5</p><strong>Registrar entrega</strong></div><span class="route-chip">En camino · 8 pedidos</span></header>
+      <div class="workspace-grid">
+        <section class="desk-order">
+          <span class="eyebrow">Entrega activa · Pedido #4821</span>
+          <h1>Mariana López</h1>
+          <p class="address">Calle Magnolia 122, Col. Jardín</p>
+          <div class="order-lines" aria-label="Artículos y total del pedido">
+            <span class="section-label">Artículos de esta bolsita</span>
+            <div class="item-line"><span>1 × Blusa rosa bordada</span><strong>$280.00</strong></div>
+            <div class="item-line"><span>2 × Diadema satinada</span><strong>$200.00</strong></div>
+            <div class="total-line"><span>Total del pedido</span><strong>$480.00</strong></div>
+          </div>
+          <div class="balance-bar"><div><small>Saldo pendiente</small><strong>$380.00</strong></div><span class="sparkle" aria-hidden="true">✿</span></div>
+          <p class="payment-hint">Los artículos y el saldo se conservan asociados a Mariana.</p>
+        </section>
+        <section class="desk-payment payment-section" aria-labelledby="desktop-payment-title">
+          <h2 id="desktop-payment-title">¿Cómo va a pagar?</h2>
+          <p class="payment-hint">Elige una opción; puedes dejar el saldo pendiente.</p>
+          <div class="methods" role="group" aria-label="Forma de pago">
+            <button class="method" data-method="cash" aria-pressed="true"><span aria-hidden="true">💵</span>Efectivo</button>
+            <button class="method" data-method="transfer" aria-pressed="false"><span aria-hidden="true">💳</span>Transferencia</button>
+            <button class="method" data-method="deposit" aria-pressed="false"><span aria-hidden="true">🏦</span>Depósito</button>
+            <button class="method" data-method="none" aria-pressed="false"><span aria-hidden="true">♡</span>Sin cobrar</button>
+          </div>
+          <div class="cash-area">
+            <label class="cash-label" for="desktop-cash">¿Cuánto efectivo recibió?</label>
+            <div class="cash-input"><span aria-hidden="true">$</span><input id="desktop-cash" class="received-input" type="number" inputmode="decimal" min="0" step="0.01" value="500" aria-describedby="desktop-cash-help"></div>
+            <div class="cash-details"><div class="cash-detail change"><small>Cambio para la clienta</small><strong class="change-output">$120.00</strong></div><div class="cash-detail"><small>Saldo después del pago</small><strong class="remaining-output">$0.00</strong></div></div>
+            <p class="balance-note" id="desktop-cash-help">Se registrarán $380.00 como pago. El sobrante se anota para el cambio.</p>
+          </div>
+          <p class="no-charge-note">La entrega se cerrará como entregada. Los $380.00 seguirán pendientes de cobro.</p>
+          <button class="confirm" type="button">✓ Entregar y registrar pago</button>
+          <p class="footer-hint">El saldo y los pagos de la clienta conservan su historial.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script>
+    const pendingBalance = 380;
+    const money = value => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+    function refreshAmounts(input) {
+      const received = Math.max(0, Number(input.value) || 0);
+      const applied = Math.min(received, pendingBalance);
+      const change = Math.max(0, received - pendingBalance);
+      const remaining = Math.max(0, pendingBalance - applied);
+      const container = input.closest('.payment-section');
+      container.querySelector('.change-output').textContent = money(change);
+      container.querySelector('.remaining-output').textContent = money(remaining);
+      const note = container.querySelector('.balance-note');
+      note.textContent = change > 0
+        ? `Se registrarán ${money(applied)} como pago. El sobrante se anota para el cambio.`
+        : remaining > 0
+          ? `Se registrarán ${money(applied)}; quedarán ${money(remaining)} pendientes.`
+          : `Se registrarán ${money(applied)} como pago.`;
+    }
+    function updateSection(section, method) {
+      section.querySelectorAll('.method').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.method === method)));
+      section.querySelector('.cash-area').hidden = method !== 'cash';
+      section.querySelector('.no-charge-note').classList.toggle('is-visible', method === 'none');
+      section.querySelector('.confirm').textContent = method === 'none' ? '✓ Entregar sin cobrar' : method === 'cash' ? '✓ Entregar y registrar pago' : `✓ Entregar con ${method === 'transfer' ? 'transferencia' : 'depósito'}`;
+    }
+    document.querySelectorAll('.payment-section').forEach(section => {
+      section.addEventListener('click', event => {
+        const button = event.target.closest('.method');
+        if (button) updateSection(section, button.dataset.method);
+        if (event.target.closest('.confirm')) section.querySelector('.footer-hint').textContent = 'Vista previa: la entrega quedó registrada con la opción seleccionada.';
+      });
+      section.querySelector('.received-input').addEventListener('input', event => refreshAmounts(event.target));
+    });
+  </script>
+</body>
+</html>

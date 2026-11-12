@@ -1,0 +1,303 @@
+<div class="settlement-container">
+    @if (loading()) {
+        <div class="loading-state">
+            <div class="cute-spinner"></div>
+            <p>Calculando corte de caja... ✨</p>
+        </div>
+    } @else if (error()) {
+        <div class="error-state card-cute">
+            <span class="error-icon">😿</span>
+            <h3>No encontramos este corte</h3>
+            <p>{{ error() }}</p>
+        </div>
+    } @else if (settlement(); as s) {
+        <!-- HEADER -->
+        <header class="settlement-header card-cute">
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                <span>Regi Bazar · Corte de Ruta</span>
+            </div>
+            <h1 class="route-title">{{ s.routeName }}</h1>
+            <div class="route-meta">
+                <span>🚗 Repartidor</span>
+                @if (s.settledAt) {
+                    <span>· ⏰ {{ s.settledAt | date:'shortTime' }}</span>
+                }
+                <span class="status-pill status-{{ s.settlementStatus.toLowerCase() }}">
+                    {{ s.settlementStatus === 'Cuadrado' ? '✓ Cuadrado' : s.settlementStatus }}
+                </span>
+            </div>
+        </header>
+
+        <!-- RESUMEN DE ARQUEO HERO CARD -->
+        <section class="card-cute hero-card">
+            <div class="hero-header">
+                <h2>Balance de Efectivo</h2>
+                <span class="hero-chip">Arqueo Final</span>
+            </div>
+
+            <!-- DIFERENCIA BADGE -->
+            <div class="difference-banner diff-{{ s.settlementStatus.toLowerCase() }}">
+                @if (s.settlementStatus === 'Cuadrado') {
+                    <div class="diff-icon">🎉</div>
+                    <div class="diff-content">
+                        <strong>¡Caja Cuadrada Perfecta!</strong>
+                        <span>Todo el efectivo coincide al centavo ✓</span>
+                    </div>
+                } @else if (s.settlementStatus === 'Sobrante') {
+                    <div class="diff-icon">✨</div>
+                    <div class="diff-content">
+                        <strong>Sobrante de {{ formatMoney(s.difference) }}</strong>
+                        <span>Hay más efectivo del registrado en sistema</span>
+                    </div>
+                } @else if (s.settlementStatus === 'Faltante') {
+                    <div class="diff-icon">⚠️</div>
+                    <div class="diff-content">
+                        <strong>Faltante de {{ formatMoney(s.difference) }}</strong>
+                        <span>Posible cambio entregado de más o cobro pendiente</span>
+                    </div>
+                } @else {
+                    <div class="diff-icon">⏳</div>
+                    <div class="diff-content">
+                        <strong>Arqueo en Proceso</strong>
+                        <span>El repartidor no ha ingresado el conteo de billetes</span>
+                    </div>
+                }
+            </div>
+
+            <!-- CUADRE COMPARATIVO -->
+            <div class="comparison-grid">
+                <div class="comparison-card expected">
+                    <span class="card-label">Efectivo Esperado</span>
+                    <strong class="card-val">{{ formatMoney(s.expectedCash) }}</strong>
+                    <span class="card-sub">Caja chica + cobros - gastos</span>
+                </div>
+                <div class="comparison-card actual">
+                    <span class="card-label">Efectivo Entregado</span>
+                    <strong class="card-val">{{ formatMoney(s.actualCash) }}</strong>
+                    <span class="card-sub">{{ s.actualCash != null ? 'Físico contado en mano' : 'Por contar' }}</span>
+                </div>
+            </div>
+
+            <!-- MATEMÁTICA DE CAJA DETALLADA -->
+            <div class="math-breakdown">
+                <div class="math-row">
+                    <span class="math-concept">
+                        <span class="math-tag tag-initial">INICIO</span>
+                        Caja chica inicial (feria)
+                    </span>
+                    <span class="math-amt">{{ formatMoney(s.initialCash) }}</span>
+                </div>
+                <div class="math-row">
+                    <span class="math-concept">
+                        <span class="math-tag tag-income">+</span>
+                        Cobros de pedidos (efectivo)
+                    </span>
+                    <span class="math-amt text-income">+{{ formatMoney(s.orderCashTotal) }}</span>
+                </div>
+                @if (s.tandaCashTotal > 0) {
+                    <div class="math-row">
+                        <span class="math-concept">
+                            <span class="math-tag tag-tanda">+</span>
+                            Cobros de tandas (efectivo)
+                        </span>
+                        <span class="math-amt text-income">+{{ formatMoney(s.tandaCashTotal) }}</span>
+                    </div>
+                }
+                @if (s.expensesTotal > 0) {
+                    <div class="math-row">
+                        <span class="math-concept">
+                            <span class="math-tag tag-expense">-</span>
+                            Gastos de ruta (gasolina, etc.)
+                        </span>
+                        <span class="math-amt text-expense">-{{ formatMoney(s.expensesTotal) }}</span>
+                    </div>
+                }
+                <div class="math-row math-total">
+                    <span class="math-concept font-bold">Total Efectivo a Entregar</span>
+                    <span class="math-amt font-bold">{{ formatMoney(s.expectedCash) }}</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ACCIONES RÁPIDAS (WHATSAPP & COPIAR) -->
+        <section class="actions-section">
+            <button type="button" class="btn-cute-3d btn-whatsapp" (click)="shareWhatsApp()">
+                <span class="btn-icon">📲</span>
+                <span>Enviar reporte a Dueña por WhatsApp</span>
+            </button>
+            <button type="button" class="btn-cute-3d btn-secondary" (click)="copyToClipboard()">
+                <span class="btn-icon">📋</span>
+                <span>Copiar desglose</span>
+            </button>
+            @if (copiedToast()) {
+                <div class="toast-bubble animate-bounce-in">
+                    ✓ ¡Reporte copiado al portapapeles!
+                </div>
+            }
+        </section>
+
+        <!-- DESGLOSE DE BILLETES (ARQUEO FÍSICO) -->
+        @if (s.finalBreakdown; as fb) {
+            <section class="card-cute section-card">
+                <div class="section-heading">
+                    <h3>💵 Desglose de Billetes Contados (Cierre)</h3>
+                    <span class="heading-tag">Físico</span>
+                </div>
+                <div class="denominations-grid">
+                    @if (fb.b1000 > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">$1,000 MXN</span>
+                            <span class="denom-count">{{ fb.b1000 }}×</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.b1000 * 1000) }}</span>
+                        </div>
+                    }
+                    @if (fb.b500 > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">$500 MXN</span>
+                            <span class="denom-count">{{ fb.b500 }}×</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.b500 * 500) }}</span>
+                        </div>
+                    }
+                    @if (fb.b200 > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">$200 MXN</span>
+                            <span class="denom-count">{{ fb.b200 }}×</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.b200 * 200) }}</span>
+                        </div>
+                    }
+                    @if (fb.b100 > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">$100 MXN</span>
+                            <span class="denom-count">{{ fb.b100 }}×</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.b100 * 100) }}</span>
+                        </div>
+                    }
+                    @if (fb.b50 > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">$50 MXN</span>
+                            <span class="denom-count">{{ fb.b50 }}×</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.b50 * 50) }}</span>
+                        </div>
+                    }
+                    @if (fb.b20 > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">$20 MXN</span>
+                            <span class="denom-count">{{ fb.b20 }}×</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.b20 * 20) }}</span>
+                        </div>
+                    }
+                    @if (fb.coins > 0) {
+                        <div class="denom-pill">
+                            <span class="denom-face">🪙 Monedas</span>
+                            <span class="denom-count">Feria</span>
+                            <span class="denom-subtotal">{{ formatMoney(fb.coins) }}</span>
+                        </div>
+                    }
+                </div>
+
+                @if ((fb.usd1 + fb.usd5 + fb.usd10 + fb.usd20 + fb.usd50 + fb.usd100) > 0) {
+                    <div class="usd-section">
+                        <h4>💵 Dólares Recibidos</h4>
+                        <div class="denominations-grid">
+                            @if (fb.usd100 > 0) { <div class="denom-pill usd"><span class="denom-face">$100 USD</span><span class="denom-count">{{ fb.usd100 }}×</span></div> }
+                            @if (fb.usd50 > 0) { <div class="denom-pill usd"><span class="denom-face">$50 USD</span><span class="denom-count">{{ fb.usd50 }}×</span></div> }
+                            @if (fb.usd20 > 0) { <div class="denom-pill usd"><span class="denom-face">$20 USD</span><span class="denom-count">{{ fb.usd20 }}×</span></div> }
+                            @if (fb.usd10 > 0) { <div class="denom-pill usd"><span class="denom-face">$10 USD</span><span class="denom-count">{{ fb.usd10 }}×</span></div> }
+                            @if (fb.usd5 > 0) { <div class="denom-pill usd"><span class="denom-face">$5 USD</span><span class="denom-count">{{ fb.usd5 }}×</span></div> }
+                            @if (fb.usd1 > 0) { <div class="denom-pill usd"><span class="denom-face">$1 USD</span><span class="denom-count">{{ fb.usd1 }}×</span></div> }
+                        </div>
+                        <p class="usd-hint">Tipo de cambio aplicado: ${{ fb.exchangeRate }} MXN por dólar.</p>
+                    </div>
+                }
+            </section>
+        }
+
+        <!-- COBROS DE TANDA EN RUTA -->
+        @if (s.tandaPayments.length > 0) {
+            <section class="card-cute section-card">
+                <div class="section-heading">
+                    <h3>🌸 Tandas Cobradas en Ruta ({{ s.tandaPayments.length }})</h3>
+                    <span class="heading-tag tanda-tag">{{ formatMoney(s.tandaTotal) }}</span>
+                </div>
+                <div class="items-list">
+                    @for (tp of s.tandaPayments; track $index) {
+                        <div class="tanda-item-card">
+                            <div class="tanda-item-main">
+                                <strong>{{ tp.clientName }}</strong>
+                                <span class="tanda-subtitle">{{ tp.tandaName }} @if (tp.weekNumber) { · Sem. {{ tp.weekNumber }} }</span>
+                                @if (tp.notes) {
+                                    <p class="tanda-notes">↳ {{ tp.notes }}</p>
+                                }
+                            </div>
+                            <div class="tanda-item-right">
+                                <span class="tanda-amount">{{ formatMoney(tp.amount) }}</span>
+                                <span class="method-tag">{{ tp.method }}</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- PAGOS DE PEDIDOS ENTREGADOS -->
+        <section class="card-cute section-card">
+            <div class="section-heading">
+                <h3>🛍️ Cobros de Pedidos ({{ s.deliveredCount }} entregas)</h3>
+                <span class="heading-tag">{{ formatMoney(s.orderTotal) }}</span>
+            </div>
+            <div class="items-list">
+                @for (op of s.orderPayments; track op.orderId + '-' + $index) {
+                    <div class="order-payment-card">
+                        <div class="order-payment-info">
+                            <strong>{{ op.clientName }}</strong>
+                            <span class="order-addr">{{ op.address || 'Sin dirección' }}</span>
+                            @if (op.notes) {
+                                <span class="order-notes">↳ {{ op.notes }}</span>
+                            }
+                        </div>
+                        <div class="order-payment-amount">
+                            <span class="pay-val">{{ formatMoney(op.amountPaid) }}</span>
+                            <span class="method-tag tag-{{ op.method.toLowerCase().includes('efectivo') ? 'cash' : 'transfer' }}">{{ op.method }}</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <!-- GASTOS REPORTADOS -->
+        @if (s.expenses.length > 0) {
+            <section class="card-cute section-card">
+                <div class="section-heading">
+                    <h3>⛽ Gastos de Chofer ({{ s.expenses.length }})</h3>
+                    <span class="heading-tag text-expense">{{ formatMoney(s.expensesTotal) }}</span>
+                </div>
+                <div class="items-list">
+                    @for (exp of s.expenses; track exp.id) {
+                        <div class="expense-card">
+                            <div class="expense-icon">⛽</div>
+                            <div class="expense-info">
+                                <strong>{{ exp.expenseType }}</strong>
+                                @if (exp.notes) { <span>{{ exp.notes }}</span> }
+                                <small>{{ exp.date | date:'shortTime' }}</small>
+                            </div>
+                            <span class="expense-amt">{{ formatMoney(exp.amount) }}</span>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- NOTAS FINALES -->
+        @if (s.notes) {
+            <section class="card-cute notes-card">
+                <h4>📝 Observaciones del Repartidor</h4>
+                <p>{{ s.notes }}</p>
+            </section>
+        }
+
+        <footer class="settlement-footer">
+            <p>Regi Bazar · Sistema de Entregas & Seguimiento 🌸</p>
+        </footer>
+    }
+</div>

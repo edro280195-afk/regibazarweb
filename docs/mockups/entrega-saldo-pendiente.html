@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff5f8">
+  <meta name="description" content="Mockup del flujo para entregar un pedido y conservar su saldo pendiente en Regi Bazar.">
+  <title>Entrega con saldo pendiente · Regi Bazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: oklch(35% .075 350);
+      --ink-soft: oklch(47% .065 350);
+      --muted: oklch(59% .045 350);
+      --canvas: oklch(97.5% .022 350);
+      --surface: oklch(99.5% .009 350);
+      --surface-soft: oklch(96% .025 350);
+      --rose: oklch(63% .205 5);
+      --rose-deep: oklch(49% .17 5);
+      --rose-soft: oklch(93% .055 5);
+      --lavender: oklch(94% .04 300);
+      --line: oklch(88% .045 350);
+      --success: oklch(55% .13 155);
+      --success-soft: oklch(94% .045 155);
+      --shadow: 0 20px 55px oklch(58% .08 350 / .16);
+      --font: 'Quicksand', 'Segoe UI', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { min-width: 320px; overflow-x: clip; background: var(--canvas); }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 8%, oklch(100% .01 350 / .92) 0 2px, transparent 3px),
+        radial-gradient(circle at 84% 72%, oklch(100% .01 350 / .82) 0 2px, transparent 3px),
+        var(--canvas);
+      background-size: 68px 68px, 90px 90px, auto;
+      font: 500 15px/1.5 var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid var(--rose); outline-offset: 3px; }
+    .page { width: min(1360px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 56px; }
+    .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 18px; margin-bottom: 22px; }
+    .kicker { color: var(--rose-deep); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 5px 0 5px; font-size: clamp(26px, 4vw, 38px); line-height: 1.12; letter-spacing: -.04em; }
+    .intro p { max-width: 68ch; margin: 0; color: var(--muted); }
+    .prototype-badge { align-self: start; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--rose-deep); background: var(--surface); box-shadow: 3px 4px 9px oklch(67% .07 350 / .11), -3px -3px 8px oklch(100% .01 350 / .9); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .view-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 18px; }
+    .view-tab { min-height: 43px; padding: 0 15px; border: 1px solid var(--line); border-radius: 15px; color: var(--ink-soft); background: var(--surface); box-shadow: 3px 4px 9px oklch(67% .07 350 / .11), -3px -3px 8px oklch(100% .01 350 / .9); font-size: 12px; font-weight: 800; cursor: pointer; transition: transform .16s ease-out, background .16s ease-out; }
+    .view-tab:active { transform: translateY(2px); }
+    .view-tab[aria-selected="true"] { border-color: oklch(74% .14 5); color: var(--rose-deep); background: var(--rose-soft); }
+    .view-pane { display: none; }
+    .view-pane.is-active { display: block; }
+    .preview-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 12px; }
+    .preview-heading h2 { margin: 0; font-size: 15px; }
+    .preview-heading span { color: var(--muted); font-size: 11px; }
+    .mobile-stage, .android-stage { display: flex; justify-content: center; }
+    .phone-frame { width: min(100%, 414px); padding: 9px; overflow: hidden; border: 1px solid oklch(100% .01 350 / .94); border-radius: 35px; background: color-mix(in oklch, var(--surface) 90%, var(--lavender)); box-shadow: 11px 12px 30px oklch(62% .07 350 / .19), -8px -8px 22px oklch(100% .01 350 / .96); }
+    .phone-screen { min-height: 820px; overflow: hidden; border: 1px solid var(--line); border-radius: 28px; background: var(--canvas); }
+    .status-bar { display: flex; justify-content: space-between; padding: 10px 18px 5px; color: var(--ink-soft); font-size: 11px; font-weight: 800; }
+    .app-bar { display: flex; align-items: center; gap: 10px; padding: 10px 17px 13px; }
+    .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 14px; color: var(--rose-deep); background: var(--rose-soft); box-shadow: inset 2px 2px 5px oklch(73% .08 350 / .2), 2px 3px 6px oklch(67% .08 350 / .14); font-size: 21px; }
+    .brand-name { font-size: 14px; font-weight: 800; }
+    .brand-subtitle { color: var(--muted); font-size: 10px; }
+    .icon-button { display: grid; width: 38px; height: 38px; place-items: center; margin-left: auto; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); box-shadow: 3px 3px 7px oklch(68% .07 350 / .1), -3px -3px 7px oklch(100% .01 350 / .84); }
+    .map-preview { position: relative; height: 188px; margin: 0 13px; overflow: hidden; border: 1px solid oklch(85% .045 350); border-radius: 21px; background:
+      linear-gradient(31deg, transparent 48%, oklch(100% .01 350 / .9) 49% 53%, transparent 54%),
+      linear-gradient(140deg, transparent 37%, oklch(100% .01 350 / .88) 38% 42%, transparent 43%),
+      linear-gradient(77deg, transparent 65%, oklch(100% .01 350 / .9) 66% 70%, transparent 71%),
+      linear-gradient(0deg, oklch(94% .04 138) 0 24%, oklch(95% .025 178) 24% 35%, oklch(94% .04 138) 35% 100%);
+    }
+    .map-road { position: absolute; width: 72%; height: 5px; top: 52%; left: 12%; border-radius: 9px; background: oklch(73% .17 5); box-shadow: 0 0 0 4px oklch(100% .01 350 / .72); transform: rotate(-17deg); }
+    .map-road::before, .map-road::after { position: absolute; top: 50%; display: grid; width: 25px; height: 25px; place-items: center; border: 3px solid var(--surface); border-radius: 50%; color: var(--surface); background: var(--rose); box-shadow: 0 3px 8px oklch(50% .12 5 / .25); font-size: 10px; font-weight: 800; transform: translateY(-50%); }
+    .map-road::before { content: '4'; left: 3%; }
+    .map-road::after { content: '5'; right: 3%; }
+    .map-label { position: absolute; right: 12px; top: 11px; padding: 6px 9px; border: 1px solid oklch(100% .01 350 / .8); border-radius: 999px; color: var(--rose-deep); background: oklch(100% .01 350 / .88); font-size: 9px; font-weight: 800; }
+    .map-street { position: absolute; color: oklch(48% .035 165); font-size: 9px; font-weight: 700; }
+    .map-street.one { left: 18px; bottom: 18px; transform: rotate(-18deg); }
+    .map-street.two { right: 28px; top: 66px; transform: rotate(35deg); }
+    .stop-summary { padding: 16px 18px 10px; }
+    .stop-kicker { display: flex; align-items: center; gap: 7px; color: var(--rose-deep); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .stop-kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rose); box-shadow: 0 0 0 4px var(--rose-soft); }
+    h3 { margin: 5px 0 1px; font-size: 22px; line-height: 1.18; letter-spacing: -.025em; }
+    .address { margin: 0; color: var(--muted); font-size: 11px; }
+    .order-ref { color: var(--muted); font-size: 10px; font-weight: 700; }
+    .amount-summary { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; margin: 2px 15px 15px; padding: 13px 15px; border: 1px solid oklch(81% .095 5); border-radius: 18px; background: var(--rose-soft); }
+    .amount-summary small { display: block; color: var(--rose-deep); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .amount-summary strong { color: var(--rose-deep); font-size: 23px; font-weight: 800; }
+    .amount-summary .caption { color: var(--ink-soft); font-size: 10px; }
+    .amount-summary .flower { font-size: 23px; }
+    .collection-panel { margin: 0 15px 12px; padding: 14px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 4px 5px 12px oklch(70% .06 350 / .11), -4px -4px 10px oklch(100% .01 350 / .9); }
+    .collection-heading { margin: 0; font-size: 14px; font-weight: 800; }
+    .collection-hint { margin: 2px 0 11px; color: var(--muted); font-size: 10px; }
+    .choice { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink-soft); background: var(--surface); text-align: left; cursor: pointer; }
+    .choice + .choice { margin-top: 7px; }
+    .choice[aria-pressed="true"] { border-color: oklch(75% .14 5); color: var(--rose-deep); background: var(--rose-soft); box-shadow: inset 2px 2px 5px oklch(79% .06 350 / .18); }
+    .choice-icon { display: grid; flex: 0 0 29px; width: 29px; height: 29px; place-items: center; border-radius: 10px; background: var(--surface-soft); font-size: 15px; }
+    .choice[aria-pressed="true"] .choice-icon { background: oklch(100% .008 350 / .8); }
+    .choice-copy { flex: 1; min-width: 0; }
+    .choice-copy strong { display: block; font-size: 11px; font-weight: 800; line-height: 1.25; }
+    .choice-copy small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; line-height: 1.3; }
+    .choice-check { display: grid; flex: 0 0 19px; width: 19px; height: 19px; place-items: center; border: 1px solid var(--line); border-radius: 50%; font-size: 11px; }
+    .choice[aria-pressed="true"] .choice-check { border-color: var(--rose); color: oklch(100% .005 350); background: var(--rose); }
+    .pending-explanation { display: flex; gap: 8px; margin-top: 10px; padding: 10px 11px; border: 1px solid oklch(85% .05 300); border-radius: 13px; color: var(--ink-soft); background: var(--lavender); font-size: 10px; line-height: 1.45; }
+    .pending-explanation[hidden] { display: none; }
+    .pending-explanation strong { color: var(--rose-deep); }
+    .confirm-button { width: calc(100% - 30px); min-height: 54px; margin: 0 15px; border: 0; border-radius: 18px; color: oklch(99% .012 350); background: var(--rose); box-shadow: 0 5px 0 var(--rose-deep), 0 10px 16px oklch(62% .15 5 / .2); font-size: 12px; font-weight: 800; cursor: pointer; transition: transform .16s ease-out, box-shadow .16s ease-out; }
+    .confirm-button:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--rose-deep), 0 5px 9px oklch(62% .15 5 / .16); }
+    .confirm-button[disabled] { cursor: default; opacity: .78; }
+    .result-note { display: none; margin: 10px 15px 0; padding: 10px 11px; border: 1px solid oklch(84% .08 150); border-radius: 13px; color: var(--success); background: var(--success-soft); font-size: 10px; font-weight: 800; }
+    .result-note.is-visible { display: block; }
+    .safe-footer { padding: 12px 15px calc(12px + env(safe-area-inset-bottom)); color: var(--muted); font-size: 9px; text-align: center; }
+    .phone-screen--android { background: oklch(97.2% .018 350); }
+    .android-topbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; }
+    .android-topbar .back { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    .android-topbar .title { flex: 1; }
+    .android-topbar .title strong { display: block; font-size: 13px; }
+    .android-topbar .title small { color: var(--muted); font-size: 9px; }
+    .android-map { height: 161px; margin: 0 12px; }
+    .android-sheet { margin-top: -14px; padding: 13px 0 0; border-radius: 25px 25px 0 0; background: var(--surface); box-shadow: 0 -6px 18px oklch(60% .06 350 / .12); }
+    .sheet-handle { width: 43px; height: 5px; margin: 0 auto 12px; border-radius: 9px; background: var(--line); }
+    .android-sheet .stop-summary { padding-top: 0; }
+    .android-sheet .amount-summary { margin-bottom: 12px; }
+    .android-sheet .collection-panel { border-radius: 18px; }
+    .swipe-button { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 15px; padding: 6px; border-radius: 19px; color: oklch(99% .01 350); background: var(--rose); box-shadow: 0 5px 0 var(--rose-deep), 0 10px 16px oklch(62% .15 5 / .18); }
+    .swipe-knob { display: grid; flex: 0 0 43px; width: 43px; height: 43px; place-items: center; border-radius: 15px; color: var(--rose-deep); background: oklch(99% .01 350); font-size: 18px; }
+    .swipe-label { flex: 1; padding-right: 8px; font-size: 11px; font-weight: 800; text-align: center; }
+    .desktop-shell { min-height: 690px; display: grid; grid-template-columns: 185px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 27px; background: var(--surface); box-shadow: var(--shadow); }
+    .sidebar { padding: 24px 14px; background: oklch(96.5% .025 350); }
+    .sidebar-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 27px; color: var(--rose-deep); font-size: 13px; font-weight: 800; }
+    .sidebar-brand .brand-mark { width: 32px; height: 32px; font-size: 18px; }
+    .sidebar-label { margin: 15px 9px 7px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .sidebar-item { display: flex; align-items: center; gap: 9px; min-height: 39px; padding: 0 10px; border-radius: 12px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
+    .sidebar-item.is-active { color: var(--rose-deep); background: var(--rose-soft); }
+    .desktop-workspace { min-width: 0; padding: 25px 27px; }
+    .desktop-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 18px; }
+    .desktop-head h2 { margin: 0; font-size: 21px; }
+    .desktop-head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+    .route-status { padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--rose-deep); background: var(--rose-soft); font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .desktop-content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, .76fr); gap: 17px; align-items: stretch; }
+    .desktop-map { position: relative; min-height: 550px; overflow: hidden; border: 1px solid oklch(85% .045 350); border-radius: 21px; background:
+      linear-gradient(32deg, transparent 47%, oklch(100% .01 350 / .91) 48% 51%, transparent 52%),
+      linear-gradient(140deg, transparent 33%, oklch(100% .01 350 / .88) 34% 37%, transparent 38%),
+      linear-gradient(82deg, transparent 68%, oklch(100% .01 350 / .9) 69% 72%, transparent 73%),
+      linear-gradient(0deg, oklch(94% .04 138) 0 20%, oklch(95% .025 178) 20% 29%, oklch(94% .04 138) 29% 100%);
+    }
+    .desktop-map .map-road { width: 62%; top: 47%; left: 17%; transform: rotate(-26deg); }
+    .desktop-map .map-label { top: 15px; right: 15px; }
+    .map-stop { position: absolute; display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid oklch(100% .01 350 / .85); border-radius: 12px; color: var(--ink-soft); background: oklch(100% .01 350 / .9); box-shadow: 0 4px 9px oklch(57% .055 350 / .12); font-size: 10px; font-weight: 800; }
+    .map-stop b { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; color: oklch(100% .01 350); background: var(--rose); font-size: 9px; }
+    .map-stop.first { left: 12%; top: 25%; }
+    .map-stop.current { left: 56%; top: 53%; border-color: oklch(73% .13 5); color: var(--rose-deep); background: var(--rose-soft); }
+    .map-stop.last { right: 8%; bottom: 17%; }
+    .map-attribution { position: absolute; left: 12px; bottom: 10px; padding: 4px 7px; border-radius: 7px; color: var(--muted); background: oklch(100% .01 350 / .78); font-size: 8px; }
+    .desktop-detail { display: flex; flex-direction: column; min-width: 0; padding: 19px; border: 1px solid var(--line); border-radius: 21px; background: color-mix(in oklch, var(--surface) 79%, var(--lavender)); }
+    .desktop-detail .stop-summary { padding: 0 0 11px; }
+    .desktop-detail h3 { font-size: 23px; }
+    .desktop-detail .amount-summary { margin: 0 0 14px; }
+    .desktop-detail .collection-panel { flex: 1; margin: 0 0 13px; }
+    .desktop-detail .confirm-button { width: 100%; margin: 0; }
+    .desktop-detail .result-note { margin-right: 0; margin-left: 0; }
+    .desktop-detail .safe-footer { padding-bottom: 0; }
+    .prototype-note { margin: 14px 2px 0; color: var(--muted); font-size: 10px; text-align: center; }
+    @media (max-width: 850px) {
+      .page { width: min(100% - 22px, 620px); padding-top: 24px; }
+      .intro { grid-template-columns: 1fr; align-items: start; }
+      .prototype-badge { justify-self: start; }
+      .desktop-shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .desktop-workspace { padding: 17px 13px; }
+      .desktop-content { grid-template-columns: 1fr; }
+      .desktop-map { min-height: 220px; }
+      .desktop-detail { max-width: none; }
+      .preview-heading { align-items: start; flex-direction: column; gap: 2px; }
+    }
+    @media (max-width: 440px) {
+      .page { width: calc(100% - 16px); padding-top: 19px; }
+      .view-tabs { gap: 6px; }
+      .view-tab { flex: 1 1 auto; min-height: 42px; padding: 0 10px; font-size: 10px; }
+      .phone-frame { padding: 6px; border-radius: 29px; }
+      .phone-screen { min-height: 0; border-radius: 24px; }
+      .map-preview { height: 165px; }
+      .desktop-head { align-items: start; flex-direction: column; }
+      .desktop-detail { padding: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="intro">
+      <div>
+        <span class="kicker">Regi Bazar · Entregas</span>
+        <h1>Entregar y dejar saldo pendiente</h1>
+        <p>El pedido queda entregado, no se crea un pago y el saldo sigue visible en la cuenta de la clienta.</p>
+      </div>
+      <span class="prototype-badge">Mockup interactivo · no guarda datos</span>
+    </header>
+
+    <nav class="view-tabs" role="tablist" aria-label="Vista del mockup">
+      <button class="view-tab" id="tab-mobile" role="tab" aria-selected="true" aria-controls="pane-mobile" data-view="mobile">Web · móvil</button>
+      <button class="view-tab" id="tab-desktop" role="tab" aria-selected="false" aria-controls="pane-desktop" data-view="desktop">Web · escritorio</button>
+      <button class="view-tab" id="tab-android" role="tab" aria-selected="false" aria-controls="pane-android" data-view="android">Android nativo</button>
+    </nav>
+
+    <section class="view-pane is-active" id="pane-mobile" role="tabpanel" aria-labelledby="tab-mobile">
+      <div class="preview-heading"><h2>Chofer · web móvil</h2><span>Diseño para uso con una mano durante la entrega</span></div>
+      <div class="mobile-stage">
+        <div class="phone-frame">
+          <div class="phone-screen flow-demo" data-flow="web-mobile">
+            <div class="status-bar"><span>9:41</span><span>●●● ◖ ▰</span></div>
+            <header class="app-bar">
+              <span class="brand-mark" aria-hidden="true">♡</span>
+              <div><div class="brand-name">Regi Bazar</div><div class="brand-subtitle">Ruta · Parada 5 de 8</div></div>
+              <button class="icon-button" type="button" aria-label="Más opciones">···</button>
+            </header>
+            <div class="map-preview" aria-label="Mapa de la ruta">
+              <span class="map-label">EN CAMINO</span><span class="map-road"></span>
+              <span class="map-street one">Calle Magnolia</span><span class="map-street two">Av. Jardín</span>
+            </div>
+            <section class="stop-summary">
+              <span class="stop-kicker"><i class="dot"></i>Entrega activa · Pedido #4821</span>
+              <h3>Mariana López</h3>
+              <p class="address">Calle Magnolia 122, Col. Jardín</p>
+              <span class="order-ref">2 artículos · bolsa 1 de 1</span>
+            </section>
+            <div class="amount-summary">
+              <div><small>Saldo por cobrar</small><strong>$380.00</strong><div class="caption">Total $480 · ya abonó $100</div></div>
+              <span class="flower" aria-hidden="true">✿</span>
+            </div>
+            <section class="collection-panel" aria-label="Resultado del cobro">
+              <h4 class="collection-heading">¿Recibiste algún pago?</h4>
+              <p class="collection-hint">Elige qué ocurrió antes de cerrar la entrega.</p>
+              <button class="choice" type="button" data-mode="pay" aria-pressed="false">
+                <span class="choice-icon" aria-hidden="true">💵</span><span class="choice-copy"><strong>Registrar un pago</strong><small>Capturar efectivo, transferencia o depósito</small></span><span class="choice-check" aria-hidden="true"></span>
+              </button>
+              <button class="choice" type="button" data-mode="pending" aria-pressed="true">
+                <span class="choice-icon" aria-hidden="true">♡</span><span class="choice-copy"><strong>Entregar con saldo pendiente</strong><small>No pagó hoy · conservar la deuda</small></span><span class="choice-check" aria-hidden="true">✓</span>
+              </button>
+              <p class="pending-explanation" data-explanation><span aria-hidden="true">ℹ</span><span>Se marcará como <strong>entregada</strong>. No se registrará pago y <strong>$380.00</strong> seguirán pendientes.</span></p>
+              <p class="pending-explanation" data-payment-hint hidden><span aria-hidden="true">↗</span><span>Elige el método y captura cuánto recibiste. Se calculará el cambio y el saldo restante.</span></p>
+            </section>
+            <button class="confirm-button" type="button" data-confirm>Entregar · quedan $380.00 pendientes</button>
+            <p class="result-note" role="status" data-result>Entrega marcada como entregada. El saldo de $380.00 se conserva pendiente.</p>
+            <p class="safe-footer">El historial de pagos de Mariana no se modifica.</p>
+          </div>
+        </div>
+      </div>
+      <p class="prototype-note">En la pantalla real, este control mantendrá el mismo endpoint de entrega y enviará una lista de pagos vacía cuando no se recibió dinero.</p>
+    </section>
+
+    <section class="view-pane" id="pane-desktop" role="tabpanel" aria-labelledby="tab-desktop" hidden>
+      <div class="preview-heading"><h2>Chofer · web escritorio</h2><span>Mapa y estado de cobro visibles al mismo tiempo</span></div>
+      <div class="desktop-shell flow-demo" data-flow="web-desktop">
+        <aside class="sidebar">
+          <div class="sidebar-brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div>
+          <div class="sidebar-label">Reparto</div>
+          <div class="sidebar-item is-active"><span>⌖</span> Ruta de hoy</div>
+          <div class="sidebar-item"><span>☷</span> Paradas</div>
+          <div class="sidebar-item"><span>♡</span> Entregas recientes</div>
+        </aside>
+        <div class="desktop-workspace">
+          <header class="desktop-head"><div><h2>Ruta de hoy</h2><p>Parada 5 de 8 · Entrega activa</p></div><span class="route-status">En camino · #26</span></header>
+          <div class="desktop-content">
+            <div class="desktop-map" aria-label="Mapa de la ruta">
+              <span class="map-label">RUTA ACTIVA</span><span class="map-road"></span>
+              <span class="map-stop first"><b>4</b> Laura</span>
+              <span class="map-stop current"><b>5</b> Mariana · aquí</span>
+              <span class="map-stop last"><b>6</b> Andrea</span>
+              <span class="map-attribution">Vista previa del mapa · Nuevo Laredo</span>
+            </div>
+            <section class="desktop-detail">
+              <div class="stop-summary">
+                <span class="stop-kicker"><i class="dot"></i>Pedido #4821 · bolsa 1 de 1</span>
+                <h3>Mariana López</h3><p class="address">Calle Magnolia 122, Col. Jardín</p>
+              </div>
+              <div class="amount-summary"><div><small>Saldo por cobrar</small><strong>$380.00</strong><div class="caption">Total $480 · abono previo $100</div></div><span class="flower" aria-hidden="true">✿</span></div>
+              <div class="collection-panel" aria-label="Resultado del cobro">
+                <h4 class="collection-heading">¿Recibiste algún pago?</h4>
+                <p class="collection-hint">Define cómo cerrar esta parada.</p>
+                <button class="choice" type="button" data-mode="pay" aria-pressed="false"><span class="choice-icon" aria-hidden="true">💵</span><span class="choice-copy"><strong>Registrar un pago</strong><small>Capturar método y monto recibido</small></span><span class="choice-check" aria-hidden="true"></span></button>
+                <button class="choice" type="button" data-mode="pending" aria-pressed="true"><span class="choice-icon" aria-hidden="true">♡</span><span class="choice-copy"><strong>Entregar con saldo pendiente</strong><small>Sin pago recibido en esta visita</small></span><span class="choice-check" aria-hidden="true">✓</span></button>
+                <p class="pending-explanation" data-explanation><span aria-hidden="true">ℹ</span><span>Quedará <strong>entregada</strong> y conservará <strong>$380.00</strong> pendientes. No se creará un pago.</span></p>
+                <p class="pending-explanation" data-payment-hint hidden><span aria-hidden="true">↗</span><span>Captura el pago recibido para ver el cambio y el saldo que quedaría.</span></p>
+              </div>
+              <button class="confirm-button" type="button" data-confirm>Entregar · quedan $380.00 pendientes</button>
+              <p class="result-note" role="status" data-result>Entrega registrada. Saldo pendiente: $380.00.</p>
+              <p class="safe-footer">El saldo y los pagos de Mariana conservan su historial.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view-pane" id="pane-android" role="tabpanel" aria-labelledby="tab-android" hidden>
+      <div class="preview-heading"><h2>Chofer · Android nativo</h2><span>Decisión clara dentro de la hoja inferior existente</span></div>
+      <div class="android-stage">
+        <div class="phone-frame">
+          <div class="phone-screen phone-screen--android flow-demo" data-flow="android">
+            <div class="status-bar"><span>9:41</span><span>●●● ◖ ▰</span></div>
+            <header class="android-topbar"><span class="back" aria-hidden="true">‹</span><div class="title"><strong>Ruta #26</strong><small>Parada 5 de 8 · Chofer</small></div><span class="route-status">Activa</span></header>
+            <div class="map-preview android-map" aria-label="Mapa con la ruta activa"><span class="map-label">TU UBICACIÓN</span><span class="map-road"></span></div>
+            <div class="android-sheet">
+              <div class="sheet-handle"></div>
+              <section class="stop-summary">
+                <span class="stop-kicker"><i class="dot"></i>Entrega activa</span>
+                <h3>Mariana López</h3><p class="address">Calle Magnolia 122, Col. Jardín</p><span class="order-ref">Pedido #4821 · 2 artículos</span>
+              </section>
+              <div class="amount-summary"><div><small>Saldo por cobrar</small><strong>$380.00</strong><div class="caption">Ya abonó $100 de $480</div></div><span class="flower" aria-hidden="true">✿</span></div>
+              <section class="collection-panel" aria-label="Resultado del cobro">
+                <h4 class="collection-heading">¿Recibiste algún pago?</h4>
+                <p class="collection-hint">Selecciona una opción para continuar.</p>
+                <button class="choice" type="button" data-mode="pay" aria-pressed="false"><span class="choice-icon" aria-hidden="true">💵</span><span class="choice-copy"><strong>Registrar un pago</strong><small>Elegir método y monto</small></span><span class="choice-check" aria-hidden="true"></span></button>
+                <button class="choice" type="button" data-mode="pending" aria-pressed="true"><span class="choice-icon" aria-hidden="true">♡</span><span class="choice-copy"><strong>Entregar con saldo pendiente</strong><small>No recibió pago hoy</small></span><span class="choice-check" aria-hidden="true">✓</span></button>
+                <p class="pending-explanation" data-explanation><span aria-hidden="true">ℹ</span><span>La entrega se completará. <strong>$380.00</strong> quedan pendientes y no se registrará pago.</span></p>
+                <p class="pending-explanation" data-payment-hint hidden><span aria-hidden="true">↗</span><span>Al registrar un abono se actualizará el saldo y se mostrará el cambio.</span></p>
+              </section>
+              <div class="swipe-button" data-confirm role="button" tabindex="0"><span class="swipe-knob" aria-hidden="true">›</span><span class="swipe-label">Desliza para entregar · saldo pendiente</span></div>
+              <p class="result-note" role="status" data-result>Entrega marcada como realizada. Saldo pendiente: $380.00.</p>
+              <p class="safe-footer">El pedido de Mariana conserva su historial.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="prototype-note">La app nativa reutilizará el endpoint actual y pondrá en cola la entrega sin pagos si el dispositivo está sin conexión.</p>
+    </section>
+  </main>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll('.view-tab'));
+    const panes = Array.from(document.querySelectorAll('.view-pane'));
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((item, itemIndex) => item.setAttribute('aria-selected', itemIndex === index ? 'true' : 'false'));
+        panes.forEach((pane, paneIndex) => {
+          const isActive = paneIndex === index;
+          pane.classList.toggle('is-active', isActive);
+          pane.hidden = !isActive;
+        });
+      });
+    });
+    document.querySelectorAll('.flow-demo').forEach(flow => {
+      const choices = Array.from(flow.querySelectorAll('.choice'));
+      const pendingExplanation = flow.querySelector('[data-explanation]');
+      const paymentHint = flow.querySelector('[data-payment-hint]');
+      const confirm = flow.querySelector('[data-confirm]');
+      const result = flow.querySelector('[data-result]');
+      const formatBalance = '$380.00';
+      function selectMode(mode) {
+        choices.forEach(choice => {
+          const selected = choice.dataset.mode === mode;
+          choice.setAttribute('aria-pressed', selected ? 'true' : 'false');
+          const check = choice.querySelector('.choice-check');
+          check.textContent = selected ? '✓' : '';
+        });
+        const pending = mode === 'pending';
+        pendingExplanation.hidden = !pending;
+        paymentHint.hidden = pending;
+        if (confirm.classList.contains('swipe-button')) {
+          confirm.querySelector('.swipe-label').textContent = pending ? 'Desliza para entregar · saldo pendiente' : 'Desliza para cobrar y entregar';
+        } else {
+          confirm.textContent = pending ? `Entregar · quedan ${formatBalance} pendientes` : 'Entregar y registrar pago';
+        }
+        result.classList.remove('is-visible');
+      }
+      choices.forEach(choice => choice.addEventListener('click', () => selectMode(choice.dataset.mode)));
+      const complete = () => result.classList.toggle('is-visible');
+      confirm.addEventListener('click', complete);
+      confirm.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          complete();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

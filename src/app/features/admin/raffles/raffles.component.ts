@@ -65,7 +65,7 @@ import { gsap } from 'gsap';
 
                 <div class="card-coquette bg-white/30 backdrop-blur-lg p-6 border-white/40 animate-slide-up delay-100">
                     <div class="flex flex-wrap gap-6 items-end">
-                        <div class="flex-1 min-w-[300px] relative">
+                        <div class="w-full min-w-0 md:flex-1 md:min-w-[300px] relative">
                             <label class="label-coquette text-pink-800 font-bold mb-2 block">🔍 Filtrar por nombre</label>
                             <div class="relative group">
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400 group-focus-within:text-pink-600 transition-colors">🔍</span>
