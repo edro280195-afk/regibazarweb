@@ -445,3 +445,13 @@
   }
 }
 
+
+/* 🎯 Pedido al que apuntó un aviso push (?focusOrder=ID) */
+.rb-focus-pulse {
+  animation: rbFocusPulse 1.4s ease-in-out 3;
+}
+
+@keyframes rbFocusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 114, 182, 0); }
+  50% { box-shadow: 0 0 0 10px rgba(244, 114, 182, 0.35); }
+}

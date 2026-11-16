@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Capacitor } from '@capacitor/core';
@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { BluetoothPrinterService } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderPaymentDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto } from '../../../core/models';
+import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderPaymentDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto, OrderReminderDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
@@ -19,6 +19,11 @@ import { SignalRService } from '../../../core/services/signalr.service';
 import { GoogleAutocompleteDirective } from '../../../shared/directives/google-autocomplete.directive';
 import { buildMessengerLink, buildOrderMessage } from '../../../core/utils/messenger.util';
 import { bagLabel, missingPackageCount } from './order-bags.util';
+import { PushNotificationService } from '../../../core/services/push-notification.service';
+import {
+  buildReminderRequest, draftFromReminder, draftPreview, emptyDraft, REMINDER_LEAD_OPTIONS,
+  reminderState, reminderSummary, ReminderDraft, ReminderState
+} from './order-reminder.util';
 
 type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
 
@@ -176,7 +181,8 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
       } @else {
         <div class="rb-orders-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7 pb-8">
           @for (order of orders(); track order.id; let i = $index) {
-            <div class="rb-order-card order-card-anim group relative rounded-[1.75rem] p-[1px] bg-gradient-to-br from-pink-200/60 via-white to-rose-200/60 hover:from-pink-300/80 hover:to-rose-300/80 transition-all duration-500 opacity-0 translate-y-8">
+            <div class="rb-order-card order-card-anim group relative rounded-[1.75rem] p-[1px] bg-gradient-to-br from-pink-200/60 via-white to-rose-200/60 hover:from-pink-300/80 hover:to-rose-300/80 transition-all duration-500 opacity-0 translate-y-8"
+                 [attr.id]="'order-card-' + order.id" [class.rb-focus-pulse]="highlightOrderId() === order.id">
               <div class="rb-order-card-surface relative bg-white/90 backdrop-blur-xl rounded-[1.7rem] p-6 flex flex-col h-full shadow-[0_8px_32px_rgba(244,114,182,0.08),0_2px_8px_rgba(0,0,0,0.04)] group-hover:shadow-[0_20px_50px_rgba(244,114,182,0.18),0_8px_20px_rgba(0,0,0,0.06)] transition-shadow duration-500">
               
                 <!-- Card Header -->
@@ -194,9 +200,20 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                       {{ order.orderType === 'Delivery' ? '🚗 Domicilio' : '🏪 Recoger' }}
                     </span>
                   </div>
-                  <span class="badge shadow-sm status-badge" [class]="getStatusClass(order.status)" [attr.data-id]="order.id">
-                    {{ getStatusLabel(order.status) }}
-                  </span>
+                  <div class="flex items-center gap-2">
+                    @if (canHaveReminder(order)) {
+                      <button type="button"
+                              class="w-8 h-8 rounded-full border text-sm leading-none flex items-center justify-center transition-all active:scale-90"
+                              [class]="reminderBellClass(order)"
+                              [attr.aria-label]="reminderBellTitle(order)"
+                              [attr.aria-pressed]="reminderEditFor() === order.id"
+                              [title]="reminderBellTitle(order)"
+                              (click)="toggleReminderEditor(order)">🔔</button>
+                    }
+                    <span class="badge shadow-sm status-badge" [class]="getStatusClass(order.status)" [attr.data-id]="order.id">
+                      {{ getStatusLabel(order.status) }}
+                    </span>
+                  </div>
                 </div>
 
                 <!-- Main Info -->
@@ -232,6 +249,69 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                   }
                   @if (order.deliveryTime) {
                     <p class="text-[10px] text-purple-600 mt-1 font-bold">🕒 {{ order.deliveryTime }}</p>
+                  }
+
+                  <!-- 🔔 Campanita: recordatorio privado (no cambia la fecha de entrega ni el enlace de la clienta) -->
+                  @if (reminderEditFor() === order.id) {
+                    <div class="mt-2.5 bg-amber-50/70 rounded-xl p-3 border border-amber-200 space-y-2.5 animate-[fadeIn_.15s_ease]"
+                         [attr.id]="'rem-editor-' + order.id">
+                      <p class="text-[9px] font-black text-amber-600 uppercase tracking-wider">🔔 Campanita · avísame</p>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block text-[10px] font-bold text-pink-800 mb-1" [attr.for]="'rem-date-' + order.id">Día</label>
+                          <input [id]="'rem-date-' + order.id" type="date" class="input-coquette text-base py-2 w-full" [(ngModel)]="reminderDraft.date" />
+                        </div>
+                        <div>
+                          <label class="block text-[10px] font-bold text-pink-800 mb-1" [attr.for]="'rem-time-' + order.id">Hora que pidió</label>
+                          <input [id]="'rem-time-' + order.id" type="time" class="input-coquette text-base py-2 w-full" [(ngModel)]="reminderDraft.time" />
+                        </div>
+                      </div>
+                      <div>
+                        <p class="text-[10px] font-bold text-pink-800 mb-1">Avisarme</p>
+                        <div class="flex flex-wrap gap-1.5">
+                          @for (opt of reminderLeadOptions; track opt.value) {
+                            <button type="button"
+                                    class="px-2.5 min-h-8 rounded-full text-[10px] font-bold border transition-all active:scale-95"
+                                    [class]="reminderDraft.leadMinutes === opt.value
+                                      ? 'bg-amber-400 text-white border-amber-400 shadow-sm'
+                                      : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-100'"
+                                    (click)="reminderDraft.leadMinutes = opt.value">{{ opt.label }}</button>
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <label class="block text-[10px] font-bold text-pink-800 mb-1" [attr.for]="'rem-note-' + order.id">Nota <span class="font-medium text-pink-400">(opcional)</span></label>
+                        <textarea [id]="'rem-note-' + order.id" rows="2" maxlength="500" class="input-coquette text-base py-2 w-full"
+                                  placeholder="Ej. será en su trabajo, otra dirección"
+                                  [(ngModel)]="reminderDraft.note"></textarea>
+                      </div>
+                      @if (reminderPreview()) {
+                        <p class="text-[10px] font-bold text-amber-700">⏰ {{ reminderPreview() }}</p>
+                      }
+                      <div class="flex flex-wrap gap-2">
+                        <button type="button" class="btn-coquette btn-pink min-h-10 flex-1 justify-center text-xs" [disabled]="savingReminder()" (click)="saveReminder(order)">
+                          {{ savingReminder() ? 'Guardando…' : 'Guardar campanita' }}
+                        </button>
+                        @if (reminderFor(order)) {
+                          <button type="button" class="btn-coquette btn-outline-pink min-h-10 justify-center text-xs" [disabled]="savingReminder()" (click)="removeReminder(order)">Quitar</button>
+                        }
+                        <button type="button" class="px-3 min-h-10 rounded-xl text-xs font-bold text-pink-400 hover:text-pink-600" [disabled]="savingReminder()" (click)="reminderEditFor.set(null)">Cancelar</button>
+                      </div>
+                    </div>
+                  } @else if (reminderFor(order); as rem) {
+                    <button type="button"
+                            class="mt-2.5 w-full text-left rounded-xl px-3 py-2 border transition-all hover:shadow-sm"
+                            [class]="reminderPillClass(rem)"
+                            title="Editar campanita"
+                            (click)="openReminderEditor(order)">
+                      <span class="block text-[10px] font-black">
+                        {{ reminderStateOf(rem) === 'sent' ? '✅ Ya sonó' : reminderStateOf(rem) === 'due' ? '⏰ Toca avisar' : '🔔 Campanita' }}
+                        · {{ reminderSummaryText(rem) }}
+                      </span>
+                      @if (rem.note) {
+                        <span class="block text-[10px] font-medium mt-0.5 break-words">📝 {{ rem.note }}</span>
+                      }
+                    </button>
                   }
 
                   <!-- 🛍️ Bolsas reales: creación rápida con QR -->
@@ -922,6 +1002,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private couponService = inject(CouponService);
   private signalr = inject(SignalRService);
+  private push = inject(PushNotificationService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   orders = signal<OrderSummaryDto[]>([]);
   orderStats = signal<OrderStatsDto | null>(null);
@@ -941,6 +1024,21 @@ export class OrdersComponent implements OnInit, OnDestroy {
   scheduleTimeDraft = '';
   deliveryTimeDraft = '';
   savingDeliverySchedule = signal(false);
+
+  // 🔔 Campanita (recordatorio privado) por pedido
+  reminders = signal<Record<number, OrderReminderDto>>({});
+  reminderEditFor = signal<number | null>(null);
+  savingReminder = signal(false);
+  reminderDraft: ReminderDraft = emptyDraft(new Date());
+  readonly reminderLeadOptions = REMINDER_LEAD_OPTIONS;
+  /** "Ahora" reactivo: se refresca cada 30 s para que las campanitas cambien de estado solas. */
+  private reminderNow = signal(new Date());
+  private reminderTimer?: ReturnType<typeof setInterval>;
+  private reminderTicks = 0;
+
+  // 🎯 Abrir un pedido desde un aviso push (?focusOrder=ID)
+  highlightOrderId = signal<number | null>(null);
+  private pendingFocusId: number | null = null;
 
   // 🛍️ Quick-set de bolsas desde la tarjeta del Kanban (id del pedido en edición inline)
   bagsEditFor = signal<number | null>(null);
@@ -999,7 +1097,20 @@ export class OrdersComponent implements OnInit, OnDestroy {
   private printIframe?: HTMLIFrameElement;
 
   ngOnInit(): void {
+    // Un aviso push abre /admin/orders?focusOrder=ID: buscamos ese pedido y lo resaltamos.
+    const focusId = Number(this.route.snapshot.queryParamMap.get('focusOrder'));
+    if (Number.isInteger(focusId) && focusId > 0) {
+      this.pendingFocusId = focusId;
+      this.search = `#${focusId}`;
+    }
+
     this.loadOrders();
+    this.loadReminders();
+    this.reminderTimer = setInterval(() => {
+      this.reminderNow.set(new Date());
+      // Cada minuto trae el estado real (ej. una campanita que ya sonó en el servidor).
+      if (++this.reminderTicks % 2 === 0 && !document.hidden) this.loadReminders();
+    }, 30_000);
     this.api.getOrderStats().subscribe({
       next: stats => this.orderStats.set(stats)
     });
@@ -1017,6 +1128,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     document.body.style.overflow = '';
+    if (this.reminderTimer) clearInterval(this.reminderTimer);
   }
 
   /** ¿La clienta del pedido tiene puntos suficientes para este premio? */
@@ -1084,12 +1196,177 @@ export class OrdersComponent implements OnInit, OnDestroy {
         this.totalPages.set(Math.ceil(res.totalCount / this.pageSize));
         this.loading.set(false);
         setTimeout(() => this.animateList(), 50);
+        if (this.pendingFocusId !== null) this.focusPendingOrder(res.items);
       },
       error: () => {
         this.loading.set(false);
         this.toast.error('Error al cargar pedidos');
       }
     });
+  }
+
+  // ───────────────────────── 🔔 Campanita ─────────────────────────
+
+  /** La campanita solo tiene sentido mientras el pedido siga pendiente de entregar. */
+  canHaveReminder(order: OrderSummaryDto): boolean {
+    return order.status !== 'Delivered' && order.status !== 'Canceled';
+  }
+
+  reminderFor(order: OrderSummaryDto): OrderReminderDto | undefined {
+    return this.reminders()[order.id];
+  }
+
+  reminderStateOf(rem: OrderReminderDto): ReminderState {
+    return reminderState(rem, this.reminderNow());
+  }
+
+  reminderSummaryText(rem: OrderReminderDto): string {
+    return reminderSummary(rem, this.reminderNow());
+  }
+
+  reminderPreview(): string {
+    return draftPreview(this.reminderDraft, this.reminderNow());
+  }
+
+  reminderBellClass(order: OrderSummaryDto): string {
+    const rem = this.reminderFor(order);
+    if (this.reminderEditFor() === order.id) return 'bg-amber-100 border-amber-400 shadow-sm';
+    if (!rem) return 'bg-white border-pink-100 grayscale opacity-60 hover:opacity-100 hover:grayscale-0 hover:border-amber-300';
+    switch (this.reminderStateOf(rem)) {
+      case 'sent': return 'bg-purple-50 border-purple-300';
+      case 'due': return 'bg-rose-100 border-rose-400 animate-pulse-pink';
+      default: return 'bg-amber-100 border-amber-300 shadow-sm';
+    }
+  }
+
+  reminderBellTitle(order: OrderSummaryDto): string {
+    const rem = this.reminderFor(order);
+    return rem ? `Campanita: ${this.reminderSummaryText(rem)}` : 'Activar campanita: avisarme de este pedido';
+  }
+
+  reminderPillClass(rem: OrderReminderDto): string {
+    switch (this.reminderStateOf(rem)) {
+      case 'sent': return 'bg-purple-50 border-purple-200 text-purple-700';
+      case 'due': return 'bg-rose-50 border-rose-300 text-rose-600 animate-pulse-pink';
+      default: return 'bg-amber-50 border-amber-200 text-amber-700';
+    }
+  }
+
+  toggleReminderEditor(order: OrderSummaryDto): void {
+    if (this.reminderEditFor() === order.id) {
+      this.reminderEditFor.set(null);
+      return;
+    }
+    this.openReminderEditor(order);
+  }
+
+  openReminderEditor(order: OrderSummaryDto): void {
+    const now = new Date();
+    this.reminderNow.set(now);
+    const existing = this.reminderFor(order);
+    this.reminderDraft = existing ? draftFromReminder(existing) : emptyDraft(now);
+    this.reminderEditFor.set(order.id);
+    // El editor se despliega dentro de la tarjeta: lo centramos para que el botón "Guardar" no
+    // quede tapado por la barra de navegación fija de abajo en el celular.
+    setTimeout(() => document.getElementById(`rem-editor-${order.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+  }
+
+  loadReminders(): void {
+    this.api.getOrderReminders().subscribe({
+      next: list => this.reminders.set(Object.fromEntries(list.map(r => [r.orderId, r]))),
+      error: () => { /* las campanitas son un extra: si falla la carga no se bloquea el tablero */ }
+    });
+  }
+
+  async saveReminder(order: OrderSummaryDto): Promise<void> {
+    if (this.savingReminder()) return;
+
+    const built = buildReminderRequest(this.reminderDraft, new Date());
+    if (!built.request) {
+      this.toast.error(built.error ?? 'Revisa la hora de la campanita.');
+      return;
+    }
+    const request = built.request;
+
+    this.savingReminder.set(true);
+    // Solo el permiso va antes de guardar: en iPhone únicamente se puede pedir dentro del toque
+    // del botón, y responde al instante si ya está concedido o negado. La suscripción (que depende
+    // del service worker y puede tardar) va después, sin hacer esperar el guardado.
+    const permitted = await this.push.requestPermission().catch(() => false);
+
+    this.api.saveOrderReminder(order.id, request).subscribe({
+      next: saved => {
+        this.reminders.update(map => ({ ...map, [order.id]: saved }));
+        this.savingReminder.set(false);
+        this.reminderEditFor.set(null);
+        this.toast.success(built.soundsNow ? 'Campanita guardada: sonará de inmediato 🔔' : 'Campanita guardada 🔔');
+        void this.enableAdminPush(permitted);
+      },
+      error: err => {
+        this.savingReminder.set(false);
+        this.toast.error(typeof err?.error === 'string' && err.error ? err.error : 'No se pudo guardar la campanita');
+      }
+    });
+  }
+
+  removeReminder(order: OrderSummaryDto): void {
+    if (this.savingReminder()) return;
+    this.savingReminder.set(true);
+    this.api.deleteOrderReminder(order.id).subscribe({
+      next: () => {
+        this.reminders.update(map => {
+          const { [order.id]: _removed, ...rest } = map;
+          return rest;
+        });
+        this.savingReminder.set(false);
+        this.reminderEditFor.set(null);
+        this.toast.success('Campanita quitada');
+      },
+      error: () => {
+        this.savingReminder.set(false);
+        this.toast.error('No se pudo quitar la campanita');
+      }
+    });
+  }
+
+  /**
+   * Deja este dispositivo suscrito a los avisos de la dueña (se hace aquí, al crear una campanita,
+   * y no solo al abrir Rutas). Si no se puede, se lo decimos: de lo contrario la campanita sonaría
+   * en el servidor pero no llegaría a ningún lado y ella creería que sí.
+   */
+  private async enableAdminPush(permitted: boolean): Promise<void> {
+    if (!permitted) {
+      this.toast.warning('Este dispositivo no recibirá el aviso. Acepta las notificaciones (en iPhone, primero agrega la app a la pantalla de inicio).');
+      return;
+    }
+    try {
+      // Sin service worker (ej. en desarrollo) `ready` nunca resuelve: no dejamos la promesa colgada.
+      await Promise.race([
+        this.push.subscribeToNotifications('admin'),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+      ]);
+    } catch {
+      this.toast.warning('Guardé la campanita, pero no pude activar los avisos en este dispositivo. Intenta de nuevo o abre la app instalada.');
+    }
+  }
+
+  /** Resalta y desplaza hasta el pedido al que apuntaba el aviso push. */
+  private focusPendingOrder(items: OrderSummaryDto[]): void {
+    const id = this.pendingFocusId;
+    this.pendingFocusId = null;
+    if (id === null) return;
+
+    // Quita el parámetro para que recargar la página no vuelva a enfocar el pedido.
+    void this.router.navigate([], { queryParams: { focusOrder: null }, queryParamsHandling: 'merge', replaceUrl: true });
+
+    if (!items.some(o => o.id === id)) {
+      this.toast.info(`No encontré el pedido #${id}. Puede que ya no exista.`);
+      return;
+    }
+    this.highlightOrderId.set(id);
+    // Espera a que termine la animación de entrada de las tarjetas antes de desplazar.
+    setTimeout(() => document.getElementById(`order-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 700);
+    setTimeout(() => this.highlightOrderId.set(null), 5500);
   }
 
   goToPage(page: number): void {

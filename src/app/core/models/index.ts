@@ -2000,3 +2000,24 @@ export interface ColoniaReportDto {
     colonias: ColoniaStatsDto[];
     zones?: ZoneSummaryDto[];
 }
+
+// ── Campanita (recordatorio privado) de un pedido ──
+export interface OrderReminderDto {
+  id: number;
+  orderId: number;
+  /** Hora que pidió la clienta (ISO UTC). */
+  targetAt: string;
+  /** Minutos de anticipación del aviso (0 = a la hora exacta). */
+  leadMinutes: number;
+  /** Cuándo suena el aviso (ISO UTC) = targetAt - leadMinutes. */
+  remindAt: string;
+  note?: string | null;
+  /** Null = aún no suena. */
+  sentAt?: string | null;
+}
+
+export interface SaveOrderReminderRequest {
+  targetAt: string;
+  leadMinutes: number;
+  note?: string;
+}

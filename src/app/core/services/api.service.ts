@@ -9,7 +9,7 @@ import {
     AddPaymentRequest, CreateSupplierRequest, CreateInvestmentRequest,
     CreateSalesPeriodRequest, UpdateOrderDetailsRequest, CreateAdminExpenseRequest,
     CommonProductDto, GlowUpReportDto, OrderPaymentDto, OrderPackageDto, GeneratePackagesRequest,
-    AiParsedOrder, AiInsight,
+    AiParsedOrder, AiInsight, OrderReminderDto, SaveOrderReminderRequest,
     CamiMessage, CamiChatRequest, CamiChatResponse, CamiProactiveSuggestionDto,
     AiRouteSelectionRequest, AiRouteSelectionResponse,
     AvailableTandaDto, CreateRouteResponse, PreviewRouteResponse, BulkGeocodeResultDto,
@@ -250,6 +250,19 @@ export class ApiService {
 
     deleteOrder(id: number): Observable<void> {
         return this.http.delete<void>(`${this.base}/orders/${id}`);
+    }
+
+    // ── Campanita (recordatorio) de pedido ──
+    getOrderReminders(): Observable<OrderReminderDto[]> {
+        return this.http.get<OrderReminderDto[]>(`${this.base}/order-reminders`);
+    }
+
+    saveOrderReminder(orderId: number, data: SaveOrderReminderRequest): Observable<OrderReminderDto> {
+        return this.http.put<OrderReminderDto>(`${this.base}/orders/${orderId}/reminder`, data);
+    }
+
+    deleteOrderReminder(orderId: number): Observable<void> {
+        return this.http.delete<void>(`${this.base}/orders/${orderId}/reminder`);
     }
 
     getPackages(orderId: number): Observable<OrderPackageDto[]> {
