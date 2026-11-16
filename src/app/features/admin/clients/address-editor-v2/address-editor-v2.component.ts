@@ -24,12 +24,11 @@ interface Suggestion {
     template: `
     <div class="fixed inset-0 z-[6000] bg-black/60 backdrop-blur-sm flex items-end sm:items-center sm:justify-center"
          (click)="cancel.emit()">
-        <div class="w-full sm:max-w-5xl sm:mx-4 bg-white sm:rounded-[2rem] flex flex-col overflow-hidden shadow-2xl"
-             style="height:96dvh; max-height:96dvh;"
+        <div class="w-full h-[100dvh] max-h-[100dvh] sm:h-[96dvh] sm:max-h-[96dvh] sm:max-w-5xl sm:mx-4 bg-white sm:rounded-[2rem] flex flex-col overflow-hidden shadow-2xl"
              (click)="$event.stopPropagation()">
 
             <!-- ── HEADER ── -->
-            <div class="px-6 pt-5 pb-4 shrink-0 border-b border-gray-100 flex items-center justify-between">
+            <div class="px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-4 sm:px-6 sm:pt-5 shrink-0 border-b border-gray-100 flex items-center justify-between">
                 <div>
                     <h2 class="text-xl font-black text-pink-900 leading-tight">Editar ubicación</h2>
                     @if (clientName) {
@@ -43,10 +42,10 @@ interface Suggestion {
             </div>
 
             <!-- ── BODY ── -->
-            <div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+            <div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]">
 
                 <!-- LEFT PANEL: search + details -->
-                <div class="lg:w-[360px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-100 overflow-y-auto">
+                <div class="lg:w-[360px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-100 overflow-visible lg:overflow-y-auto">
 
                     <!-- Search section -->
                     <div class="p-5 border-b border-gray-50">
@@ -149,7 +148,7 @@ interface Suggestion {
                 </div>
 
                 <!-- RIGHT: Map -->
-                <div class="flex-1 relative min-h-[45vmin] lg:min-h-0">
+                <div class="relative h-[38dvh] min-h-[260px] max-h-[380px] w-full flex-none lg:h-auto lg:max-h-none lg:flex-1 lg:min-h-0">
 
                     <!-- Hint overlay when no marker -->
                     @if (!markerPosition()) {
@@ -204,13 +203,13 @@ interface Suggestion {
             </div>
 
             <!-- ── FOOTER ── -->
-            <div class="px-6 py-4 border-t border-gray-100 shrink-0 flex gap-3 justify-end bg-white">
+            <div class="px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4 border-t border-gray-100 shrink-0 flex flex-col-reverse sm:flex-row gap-3 justify-end bg-white">
                 <button (click)="cancel.emit()"
-                        class="px-5 py-3 rounded-2xl border-2 border-gray-200 text-gray-500 font-bold text-sm hover:bg-gray-50 transition-all active:scale-95">
+                        class="w-full sm:w-auto px-5 py-3 rounded-2xl border-2 border-gray-200 text-gray-500 font-bold text-sm hover:bg-gray-50 transition-all active:scale-95">
                     Cancelar
                 </button>
                 <button (click)="onConfirm()" [disabled]="!canConfirm()"
-                        class="px-8 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none disabled:shadow-none">
+                        class="w-full sm:w-auto px-8 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-sm shadow-lg shadow-pink-200 hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none disabled:shadow-none">
                     💾 Guardar ubicación
                 </button>
             </div>

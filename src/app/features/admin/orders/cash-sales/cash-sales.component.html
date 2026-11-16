@@ -1,0 +1,680 @@
+<div class="rb-cash-shell space-y-5 animate-slide-down">
+  <!-- Header -->
+  <header class="rb-cash-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <a routerLink="/admin/orders" class="text-xs font-bold text-pink-400 hover:text-pink-600 transition-colors uppercase tracking-widest inline-flex items-center gap-1 mb-1">
+        ← Volver a Pedidos
+      </a>
+      <h1 class="text-2xl sm:text-3xl font-black text-pink-900 m-0 font-display flex items-center gap-2">
+        Ventas al Contado 🌸
+      </h1>
+      <p class="text-xs sm:text-sm text-pink-400 font-medium m-0">
+        Artículos de tanda a precio de contado con fecha abierta para entrega en ruta.
+      </p>
+    </div>
+
+    <!-- Switch de Pestañas: Nueva Venta / Pendientes -->
+    <div class="flex items-center bg-pink-100/60 p-1.5 rounded-2xl gap-1 self-start sm:self-auto border border-pink-200/50 shadow-inner">
+      <button type="button"
+              class="px-3.5 py-2 rounded-xl text-xs font-black transition-all"
+              [class.bg-white]="activeTab() === 'form'"
+              [class.text-pink-900]="activeTab() === 'form'"
+              [class.shadow-sm]="activeTab() === 'form'"
+              [class.text-pink-500]="activeTab() !== 'form'"
+              (click)="activeTab.set('form')">
+        ✨ Nueva Venta
+      </button>
+      <button type="button"
+              class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5"
+              [class.bg-white]="activeTab() === 'list'"
+              [class.text-pink-900]="activeTab() === 'list'"
+              [class.shadow-sm]="activeTab() === 'list'"
+              [class.text-pink-500]="activeTab() !== 'list'"
+              (click)="activeTab.set('list')">
+        📦 Fecha Abierta
+        @if (openOrders().length > 0) {
+          <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-pink-500 text-white font-bold">
+            {{ openOrders().length }}
+          </span>
+        }
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TAB 1: FORMULARIO DE ALTA DE VENTA AL CONTADO -->
+  <!-- ═══════════════════════════════════════════ -->
+  @if (activeTab() === 'form') {
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 pb-10">
+
+      <!-- COLUMNA IZQUIERDA: CLIENTA Y ARTÍCULOS -->
+      <div class="lg:col-span-7 space-y-5">
+
+        <!-- TARJETA: CLIENTA -->
+        <section class="card-coquette p-5 shadow-sm border border-pink-100/70 bg-white/90 backdrop-blur-md rounded-3xl relative">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-sm">1</span>
+              <div>
+                <h2 class="text-sm font-black text-pink-900 uppercase tracking-wide">Clienta</h2>
+                <p class="text-[11px] text-pink-400">Busca una clienta o escribe un nombre nuevo</p>
+              </div>
+            </div>
+            @if (selectedClient()) {
+              <button type="button" (click)="clearSelectedClient()" class="text-xs font-bold text-pink-500 hover:text-pink-700 underline">
+                Cambiar
+              </button>
+            }
+          </div>
+
+          <div class="relative">
+            <input type="text"
+                   class="input-coquette w-full text-sm font-bold"
+                   placeholder="Escribe el nombre de la clienta..."
+                   [ngModel]="clientSearch()"
+                   (ngModelChange)="clientSearch.set($event); showClientSuggestions.set(true)"
+                   (focus)="showClientSuggestions.set(true)" />
+
+            <!-- Sugerencias de clientas -->
+            @if (showClientSuggestions() && filteredClients().length > 0 && !selectedClient()) {
+              <div class="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-pink-100 z-30 max-h-56 overflow-y-auto p-1.5 animate-scale-in">
+                @for (c of filteredClients(); track c.id) {
+                  <button type="button"
+                          class="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 flex items-center justify-between text-xs transition-colors"
+                          (click)="selectClient(c)">
+                    <div>
+                      <p class="font-bold text-pink-900">{{ c.name }}</p>
+                      <p class="text-[11px] text-pink-400 truncate max-w-xs">{{ c.address || 'Sin dirección registrada' }}</p>
+                    </div>
+                    <span class="badge text-[10px] px-2 py-0.5 rounded-full"
+                          [class.bg-purple-100]="c.type === 'Frecuente'"
+                          [class.text-purple-700]="c.type === 'Frecuente'"
+                          [class.bg-sky-100]="c.type !== 'Frecuente'"
+                          [class.text-sky-700]="c.type !== 'Frecuente'">
+                      {{ c.type || 'Nueva' }}
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Campos de contacto y dirección -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label class="label-coquette text-[11px]">📱 Teléfono</label>
+              <input type="tel"
+                     class="input-coquette text-xs"
+                     placeholder="867 000 0000"
+                     [ngModel]="clientPhone()"
+                     (ngModelChange)="clientPhone.set($event)" />
+            </div>
+            <div>
+              <label class="label-coquette text-[11px]">🎀 Tipo de clienta</label>
+              <select class="input-coquette text-xs"
+                      [ngModel]="clientType()"
+                      (ngModelChange)="clientType.set($event)">
+                <option value="Nueva">Nueva</option>
+                <option value="Frecuente">Frecuente</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="label-coquette text-[11px]">📍 Dirección de entrega</label>
+              <input type="text"
+                     class="input-coquette text-xs"
+                     placeholder="Calle, número, colonia, referencias..."
+                     [ngModel]="clientAddress()"
+                     (ngModelChange)="clientAddress.set($event)" />
+            </div>
+          </div>
+        </section>
+
+        <!-- TARJETA: ARTÍCULOS DE TANDA -->
+        <section class="card-coquette p-5 shadow-sm border border-pink-100/70 bg-white/90 backdrop-blur-md rounded-3xl relative">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-sm">2</span>
+              <div>
+                <h2 class="text-sm font-black text-pink-900 uppercase tracking-wide">Artículo de Tanda</h2>
+                <p class="text-[11px] text-pink-400">Selecciona el artículo y define su costo al contado</p>
+              </div>
+            </div>
+            <button type="button"
+                    (click)="openNewProductModal()"
+                    class="text-xs font-bold text-pink-500 hover:text-pink-700 flex items-center gap-1 bg-pink-50 px-2.5 py-1 rounded-xl border border-pink-100">
+              ＋ Nuevo en Catálogo
+            </button>
+          </div>
+
+          <!-- Buscador de productos de tanda -->
+          <div class="relative">
+            <input type="text"
+                   class="input-coquette w-full text-sm font-bold"
+                   placeholder="Buscar artículo de tanda (colcha, batería, sartenes...)"
+                   [ngModel]="productSearch()"
+                   (ngModelChange)="productSearch.set($event); showProductSuggestions.set(true)"
+                   (focus)="showProductSuggestions.set(true)" />
+
+            <!-- Sugerencias de productos -->
+            @if (showProductSuggestions() && filteredProducts().length > 0 && !selectedProduct()) {
+              <div class="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-pink-100 z-30 max-h-56 overflow-y-auto p-1.5 animate-scale-in">
+                @for (p of filteredProducts(); track p.id) {
+                  <button type="button"
+                          class="w-full text-left p-2.5 rounded-xl hover:bg-pink-50 flex items-center justify-between text-xs transition-colors"
+                          (click)="selectProduct(p)">
+                    <div>
+                      <p class="font-bold text-pink-900">{{ p.name }}</p>
+                      <p class="text-[10px] text-pink-400">
+                        Ref. Tanda: {{ p.basePrice | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                        @if (p.cashPrice) {
+                          · Contado guardado: <strong class="text-pink-600">{{ p.cashPrice | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong>
+                        }
+                      </p>
+                    </div>
+                    <span class="text-xs font-black text-pink-600">
+                      {{ (p.cashPrice || p.basePrice) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Detalle de precio al contado y variante -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 mt-3 bg-pink-50/50 p-3 rounded-2xl border border-pink-100/50">
+            <!-- Precio al contado destacado -->
+            <div class="sm:col-span-5">
+              <label class="label-coquette text-[11px] font-black text-pink-700 flex items-center justify-between">
+                <span>💵 Precio Contado</span>
+                @if (itemBasePrice() > 0) {
+                  <span class="text-[10px] font-normal text-pink-400 line-through">Tanda: {{ itemBasePrice() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                }
+              </label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-pink-400 font-bold">$</span>
+                <input type="number"
+                       class="input-coquette pl-7 font-black text-pink-900 text-sm"
+                       placeholder="0.00"
+                       min="0"
+                       step="10"
+                       [ngModel]="itemCashPrice()"
+                       (ngModelChange)="itemCashPrice.set($event)" />
+              </div>
+            </div>
+
+            <!-- Cantidad -->
+            <div class="sm:col-span-3">
+              <label class="label-coquette text-[11px]">Cantidad</label>
+              <input type="number"
+                     class="input-coquette text-center font-bold text-sm"
+                     min="1"
+                     [ngModel]="itemQuantity()"
+                     (ngModelChange)="itemQuantity.set($event)" />
+            </div>
+
+            <!-- Variante -->
+            <div class="sm:col-span-4">
+              <label class="label-coquette text-[11px]">Variante (opcional)</label>
+              <input type="text"
+                     class="input-coquette text-xs"
+                     placeholder="Color, tamaño, etc."
+                     [ngModel]="itemVariant()"
+                     (ngModelChange)="itemVariant.set($event)" />
+            </div>
+
+            <!-- Guardar como default de contado -->
+            @if (selectedProduct()) {
+              <div class="sm:col-span-12 flex items-center gap-2 mt-1">
+                <input type="checkbox"
+                       id="saveDefaultPrice"
+                       class="rounded text-pink-500 focus:ring-pink-300 w-4 h-4"
+                       [ngModel]="updateProductDefaultPrice()"
+                       (ngModelChange)="updateProductDefaultPrice.set($event)" />
+                <label for="saveDefaultPrice" class="text-[11px] text-pink-600 font-medium cursor-pointer">
+                  Recordar este precio como el precio de contado por defecto para <strong>{{ selectedProduct()?.name }}</strong>
+                </label>
+              </div>
+            }
+
+            <!-- Botón Agregar a la Venta -->
+            <div class="sm:col-span-12 flex justify-end mt-1">
+              <button type="button"
+                      class="btn-coquette btn-outline-pink px-4 py-2 text-xs font-black shadow-sm"
+                      (click)="addItemToSale()">
+                ＋ Agregar a la venta
+              </button>
+            </div>
+          </div>
+
+          <!-- LISTA DE ARTÍCULOS EN ESTA VENTA -->
+          @if (saleItems().length > 0) {
+            <div class="mt-4 space-y-2">
+              <p class="text-xs font-black text-pink-900 uppercase tracking-wider">Artículos en la venta ({{ saleItems().length }})</p>
+              <div class="divide-y divide-pink-100/60 rounded-2xl border border-pink-100 bg-white overflow-hidden shadow-sm">
+                @for (item of saleItems(); track item.id; let idx = $index) {
+                  <div class="p-3 flex items-center justify-between gap-3 text-xs">
+                    <div class="min-w-0 flex-1">
+                      <p class="font-bold text-pink-900 truncate">
+                        {{ item.quantity }}x {{ item.productName }}
+                        @if (item.variant) {
+                          <span class="text-pink-400 font-normal">({{ item.variant }})</span>
+                        }
+                      </p>
+                      <p class="text-[10px] text-pink-400">
+                        Costo unitario: {{ item.cashPrice | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                      </p>
+                    </div>
+                    <div class="text-right shrink-0 flex items-center gap-3">
+                      <span class="font-black text-pink-700">
+                        {{ (item.cashPrice * item.quantity) | currency:'MXN':'symbol-narrow':'1.0-0' }}
+                      </span>
+                      <button type="button"
+                              (click)="removeItem(idx)"
+                              class="text-rose-400 hover:text-rose-600 font-bold text-sm w-6 h-6 rounded-full hover:bg-rose-50 flex items-center justify-center transition-colors">
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </section>
+      </div>
+
+      <!-- COLUMNA DERECHA: ENTREGA, PAGO Y RESUMEN -->
+      <div class="lg:col-span-5 space-y-5">
+
+        <!-- TARJETA: ENTREGA Y FECHA ABIERTA -->
+        <section class="card-coquette p-5 shadow-sm border border-pink-100/70 bg-white/90 backdrop-blur-md rounded-3xl">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-sm">3</span>
+            <div>
+              <h2 class="text-sm font-black text-pink-900 uppercase tracking-wide">Entrega y Logística</h2>
+              <p class="text-[11px] text-pink-400">Configura la entrega y fecha</p>
+            </div>
+          </div>
+
+          <!-- Selector táctil Domicilio / PickUp -->
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <button type="button"
+                    class="p-2.5 rounded-2xl border text-xs font-bold flex flex-col items-center gap-1 transition-all"
+                    [class.border-pink-500]="deliveryType() === 'Delivery'"
+                    [class.bg-pink-50]="deliveryType() === 'Delivery'"
+                    [class.text-pink-900]="deliveryType() === 'Delivery'"
+                    [class.shadow-sm]="deliveryType() === 'Delivery'"
+                    [class.border-pink-100]="deliveryType() !== 'Delivery'"
+                    [class.text-pink-500]="deliveryType() !== 'Delivery'"
+                    (click)="deliveryType.set('Delivery')">
+              <span class="text-base">🛵</span>
+              <span>A Domicilio</span>
+              <span class="text-[10px] text-pink-400 font-normal">+{{ shippingCost() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+            </button>
+            <button type="button"
+                    class="p-2.5 rounded-2xl border text-xs font-bold flex flex-col items-center gap-1 transition-all"
+                    [class.border-pink-500]="deliveryType() === 'PickUp'"
+                    [class.bg-pink-50]="deliveryType() === 'PickUp'"
+                    [class.text-pink-900]="deliveryType() === 'PickUp'"
+                    [class.shadow-sm]="deliveryType() === 'PickUp'"
+                    [class.border-pink-100]="deliveryType() !== 'PickUp'"
+                    [class.text-pink-500]="deliveryType() !== 'PickUp'"
+                    (click)="deliveryType.set('PickUp')">
+              <span class="text-base">🛍️</span>
+              <span>Recoger en Tienda</span>
+              <span class="text-[10px] text-emerald-500 font-bold">Gratis</span>
+            </button>
+          </div>
+
+          <!-- SECCIÓN CLAVE: FECHA ABIERTA -->
+          <div class="p-3.5 rounded-2xl border border-amber-200 bg-amber-50/60 mb-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-black text-amber-900 flex items-center gap-1.5 cursor-pointer">
+                <span>🌸 Fecha Abierta</span>
+              </label>
+              <input type="checkbox"
+                     id="isOpenDateToggle"
+                     class="rounded text-amber-500 focus:ring-amber-300 w-4 h-4 cursor-pointer"
+                     [ngModel]="isOpenDate()"
+                     (ngModelChange)="isOpenDate.set($event)" />
+            </div>
+            @if (isOpenDate()) {
+              <p class="text-[11px] text-amber-800 leading-relaxed m-0">
+                ✨ Este pedido <strong>no requiere fecha fija</strong> hoy. Quedará en espera y podrás agregarlo directamente a una ruta cuando la camioneta visite la colonia de la clienta.
+              </p>
+            } @else {
+              <div class="mt-2">
+                <label class="label-coquette text-[11px] text-amber-900">📅 Fecha de entrega programada</label>
+                <input type="date"
+                       class="input-coquette text-xs"
+                       [ngModel]="scheduledDate()"
+                       (ngModelChange)="scheduledDate.set($event)" />
+              </div>
+            }
+          </div>
+
+          <div>
+            <label class="label-coquette text-[11px]">📝 Notas / Instrucciones para el chofer</label>
+            <input type="text"
+                   class="input-coquette text-xs"
+                   placeholder="Ej. Casa blanca con portón rosa, tocar timbre..."
+                   [ngModel]="deliveryInstructions()"
+                   (ngModelChange)="deliveryInstructions.set($event)" />
+          </div>
+        </section>
+
+        <!-- TARJETA: COBRO Y PAGO -->
+        <section class="card-coquette p-5 shadow-sm border border-pink-100/70 bg-white/90 backdrop-blur-md rounded-3xl">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-sm">4</span>
+            <div>
+              <h2 class="text-sm font-black text-pink-900 uppercase tracking-wide">Forma de Pago</h2>
+              <p class="text-[11px] text-pink-400">¿Cómo liquida la clienta?</p>
+            </div>
+          </div>
+
+          <!-- Modos de pago -->
+          <div class="grid grid-cols-3 gap-1.5 mb-3">
+            <button type="button"
+                    class="p-2 rounded-xl border text-[11px] font-bold text-center transition-all"
+                    [class.border-pink-500]="paymentMode() === 'full'"
+                    [class.bg-pink-50]="paymentMode() === 'full'"
+                    [class.text-pink-900]="paymentMode() === 'full'"
+                    [class.border-pink-100]="paymentMode() !== 'full'"
+                    [class.text-pink-500]="paymentMode() !== 'full'"
+                    (click)="paymentMode.set('full')">
+              💖 Liquidado
+            </button>
+            <button type="button"
+                    class="p-2 rounded-xl border text-[11px] font-bold text-center transition-all"
+                    [class.border-pink-500]="paymentMode() === 'delivery'"
+                    [class.bg-pink-50]="paymentMode() === 'delivery'"
+                    [class.text-pink-900]="paymentMode() === 'delivery'"
+                    [class.border-pink-100]="paymentMode() !== 'delivery'"
+                    [class.text-pink-500]="paymentMode() !== 'delivery'"
+                    (click)="paymentMode.set('delivery')">
+              🛵 Al Entregar
+            </button>
+            <button type="button"
+                    class="p-2 rounded-xl border text-[11px] font-bold text-center transition-all"
+                    [class.border-pink-500]="paymentMode() === 'partial'"
+                    [class.bg-pink-50]="paymentMode() === 'partial'"
+                    [class.text-pink-900]="paymentMode() === 'partial'"
+                    [class.border-pink-100]="paymentMode() !== 'partial'"
+                    [class.text-pink-500]="paymentMode() !== 'partial'"
+                    (click)="paymentMode.set('partial')">
+              💳 Anticipo
+            </button>
+          </div>
+
+          @if (paymentMode() !== 'delivery') {
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              @if (paymentMode() === 'partial') {
+                <div>
+                  <label class="label-coquette text-[11px]">Monto anticipo $</label>
+                  <input type="number"
+                         class="input-coquette text-xs font-bold"
+                         placeholder="0.00"
+                         min="0"
+                         [ngModel]="partialAmount()"
+                         (ngModelChange)="partialAmount.set($event)" />
+                </div>
+              }
+              <div [class.col-span-2]="paymentMode() === 'full'">
+                <label class="label-coquette text-[11px]">Método</label>
+                <select class="input-coquette text-xs font-bold"
+                        [ngModel]="paymentMethod()"
+                        (ngModelChange)="paymentMethod.set($event)">
+                  <option value="Efectivo">💵 Efectivo</option>
+                  <option value="Transferencia">📲 Transferencia</option>
+                  <option value="Tarjeta">💳 Tarjeta</option>
+                </select>
+              </div>
+            </div>
+          }
+
+          <!-- RESUMEN FINANCIERO -->
+          <div class="bg-pink-50/70 rounded-2xl p-3.5 space-y-1.5 border border-pink-100/60 text-xs">
+            <div class="flex justify-between text-pink-600">
+              <span>Subtotal artículos:</span>
+              <span class="font-bold">{{ subtotal() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            @if (deliveryType() === 'Delivery') {
+              <div class="flex justify-between text-pink-600">
+                <span>Envío:</span>
+                <span class="font-bold">{{ shippingCost() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+            }
+            <div class="border-t border-pink-200/60 pt-1.5 flex justify-between font-black text-pink-950 text-sm">
+              <span>Total venta:</span>
+              <span>{{ total() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div class="flex justify-between text-emerald-700 text-xs font-medium">
+              <span>Pagado hoy:</span>
+              <span>{{ amountPaid() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div class="border-t border-dashed border-pink-200 pt-1 flex justify-between font-black text-xs"
+                 [class.text-rose-600]="balanceDue() > 0"
+                 [class.text-emerald-600]="balanceDue() === 0">
+              <span>Saldo al entregar:</span>
+              <span>{{ balanceDue() | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+          </div>
+
+          <!-- BOTÓN GUARDAR (CTA 3D) -->
+          <button type="button"
+                  class="btn-coquette btn-pink w-full py-3.5 mt-4 text-sm font-black shadow-lg shadow-pink-300 hover:shadow-xl active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  [disabled]="saving() || saleItems().length === 0 || !clientSearch().trim()"
+                  (click)="saveCashSale()">
+            @if (saving()) {
+              <span class="spinner mr-2"></span> Registrando venta...
+            } @else {
+              🌸 Registrar Venta al Contado
+            }
+          </button>
+        </section>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- TAB 2: VENTAS CON FECHA ABIERTA PENDIENTES  -->
+  <!-- ═══════════════════════════════════════════ -->
+  @if (activeTab() === 'list') {
+    <div class="space-y-4 pb-12">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-3xl border border-pink-100 shadow-sm">
+        <div>
+          <h2 class="text-lg font-black text-pink-900 m-0">Ventas al Contado / Fecha Abierta 🌸</h2>
+          <p class="text-xs text-pink-400 m-0">Pedidos listos para ser incluidos en una ruta de entrega</p>
+        </div>
+        <button type="button"
+                class="btn-coquette btn-pink px-4 py-2 text-xs font-black self-start sm:self-auto shadow-md"
+                (click)="goToRouteBuilder()">
+          🗺️ Armar Ruta con estas entregas
+        </button>
+      </div>
+
+      @if (loadingOrders()) {
+        <div class="space-y-3">
+          @for (i of [1,2,3]; track i) {
+            <div class="shimmer h-24 rounded-3xl"></div>
+          }
+        </div>
+      } @else if (openOrders().length === 0) {
+        <div class="card-coquette p-10 text-center rounded-3xl border border-pink-100 bg-white/80">
+          <span class="text-4xl block mb-2">🎉</span>
+          <p class="text-sm font-black text-pink-900 m-0">No hay ventas al contado con fecha abierta pendientes</p>
+          <p class="text-xs text-pink-400 mt-1">Todas las ventas están en ruta o ya fueron entregadas.</p>
+          <button type="button" (click)="activeTab.set('form')" class="btn-coquette btn-outline-pink text-xs mt-4">
+            ✨ Registrar nueva venta
+          </button>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          @for (order of openOrders(); track order.id) {
+            <article class="card-coquette p-4 rounded-3xl border border-pink-100 bg-white shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div class="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <span class="text-[10px] font-black text-pink-400 tracking-wider uppercase">Pedido #{{ order.id }}</span>
+                    <h3 class="text-sm font-black text-pink-900 leading-tight">{{ order.clientName }}</h3>
+                  </div>
+                  <span class="badge text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+                    🌸 Fecha abierta
+                  </span>
+                </div>
+
+                @if (order.clientAddress) {
+                  <p class="text-xs text-pink-500/80 flex items-start gap-1 line-clamp-2 mb-2">
+                    <span>📍</span>
+                    <span>{{ order.clientAddress }}</span>
+                  </p>
+                }
+
+                <!-- Artículos -->
+                <div class="bg-pink-50/60 rounded-xl p-2 mb-2.5 space-y-1">
+                  @for (item of order.items; track item.id) {
+                    <p class="text-[11px] text-pink-800 font-medium truncate">
+                      • {{ item.quantity }}x {{ item.productName }}
+                    </p>
+                  }
+                </div>
+
+                <!-- Balance / Saldo -->
+                <div class="flex justify-between items-center text-xs mb-3">
+                  <span class="text-pink-400">Total: <strong class="text-pink-900">{{ order.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</strong></span>
+                  @if (order.balanceDue > 0) {
+                    <span class="text-rose-600 font-black">Por cobrar: {{ order.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+                  } @else {
+                    <span class="text-emerald-600 font-black">✓ Liquidado</span>
+                  }
+                </div>
+              </div>
+
+              <!-- Acciones de la tarjeta -->
+              <div class="flex items-center gap-1.5 pt-2 border-t border-pink-100">
+                <button type="button"
+                        class="btn-coquette btn-outline-pink flex-1 py-1.5 text-[11px] font-bold"
+                        (click)="copyTrackingLink(order)">
+                  💌 Copiar Link
+                </button>
+                <button type="button"
+                        class="btn-coquette btn-outline-pink py-1.5 px-2.5 text-[11px] font-bold"
+                        (click)="sendToMessenger(order)">
+                  💬 Messenger
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODAL: REGISTRAR NUEVO ARTÍCULO EN CATÁLOGO -->
+  <!-- ═══════════════════════════════════════════ -->
+  @if (showNewProductModal()) {
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+         (click)="showNewProductModal.set(false)">
+      <div class="card-coquette bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-pink-100 animate-scale-in"
+           (click)="$event.stopPropagation()">
+        <h3 class="text-base font-black text-pink-900 mb-1">Nuevo Artículo de Tanda ✨</h3>
+        <p class="text-xs text-pink-400 mb-4">Se guardará en el catálogo para tandas y ventas al contado.</p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="label-coquette text-xs">Nombre del artículo</label>
+            <input type="text"
+                   class="input-coquette text-xs font-bold"
+                   placeholder="Ej. Batería Jade Cook 10 piezas"
+                   [ngModel]="newProductName()"
+                   (ngModelChange)="newProductName.set($event)" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="label-coquette text-xs">💵 Contado $</label>
+              <input type="number"
+                     class="input-coquette text-xs font-black text-pink-600"
+                     placeholder="0"
+                     [ngModel]="newProductCashPrice()"
+                     (ngModelChange)="newProductCashPrice.set($event)" />
+            </div>
+            <div>
+              <label class="label-coquette text-xs">Ref. Tanda $</label>
+              <input type="number"
+                     class="input-coquette text-xs"
+                     placeholder="0"
+                     [ngModel]="newProductBasePrice()"
+                     (ngModelChange)="newProductBasePrice.set($event)" />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 mt-5">
+          <button type="button"
+                  class="btn-coquette btn-outline-pink flex-1 py-2 text-xs"
+                  (click)="showNewProductModal.set(false)">
+            Cancelar
+          </button>
+          <button type="button"
+                  class="btn-coquette btn-pink flex-1 py-2 text-xs font-black shadow-md"
+                  [disabled]="savingNewProduct() || !newProductName().trim()"
+                  (click)="saveNewProduct()">
+            @if (savingNewProduct()) { Guardando... } @else { Guardar }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MODAL: ÉXITO DE VENTA REGISTRADA           -->
+  <!-- ═══════════════════════════════════════════ -->
+  @if (createdOrder()) {
+    <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+         (click)="createdOrder.set(null)">
+      <div class="card-coquette bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-pink-100 text-center animate-bounce-in"
+           (click)="$event.stopPropagation()">
+        <span class="text-5xl block mb-2">🎉</span>
+        <h3 class="text-xl font-black text-pink-900 mb-1">¡Venta al Contado Registrada! 💕</h3>
+        <p class="text-xs text-pink-400 mb-4">Pedido #{{ createdOrder()!.id }} para {{ createdOrder()!.clientName }}</p>
+
+        <div class="bg-pink-50 rounded-2xl p-3.5 mb-4 text-xs space-y-1.5 text-left border border-pink-100">
+          <div class="flex justify-between font-bold text-pink-900">
+            <span>Total:</span>
+            <span>{{ createdOrder()!.total | currency:'MXN':'symbol-narrow':'1.0-0' }}</span>
+          </div>
+          <div class="flex justify-between text-xs"
+               [class.text-rose-600]="createdOrder()!.balanceDue > 0"
+               [class.text-emerald-600]="createdOrder()!.balanceDue === 0">
+            <span>Saldo por cobrar:</span>
+            <span class="font-bold">
+              {{ createdOrder()!.balanceDue > 0 ? (createdOrder()!.balanceDue | currency:'MXN':'symbol-narrow':'1.0-0') : 'Liquidado ✓' }}
+            </span>
+          </div>
+          <p class="text-[11px] text-amber-700 pt-1 font-medium border-t border-pink-200/50 m-0">
+            🌸 <strong>Fecha Abierta:</strong> El pedido está listo para cuando armes la ruta hacia la colonia de la clienta.
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <button type="button"
+                  class="btn-coquette btn-pink w-full py-2.5 text-xs font-black shadow-md"
+                  (click)="copyTrackingLink(createdOrder()!)">
+            💌 Copiar Enlace para la Clienta
+          </button>
+          <button type="button"
+                  class="btn-coquette btn-outline-pink w-full py-2.5 text-xs font-bold"
+                  (click)="sendToMessenger(createdOrder()!)">
+            💬 Enviar por Messenger
+          </button>
+          <button type="button"
+                  class="text-xs text-pink-400 hover:text-pink-600 font-bold py-1.5 mt-1"
+                  (click)="createdOrder.set(null)">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

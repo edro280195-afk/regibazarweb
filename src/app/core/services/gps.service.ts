@@ -47,6 +47,20 @@ export class GpsService {
     }
   }
 
+  /** Pide el permiso de ubicación nativo sin arrancar ningún watcher (útil para pedirlo al abrir la app). */
+  async requestPermissions(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      const perm = await BackgroundGeolocation.addWatcher(
+        { requestPermissions: true, stale: true },
+        () => {}
+      );
+      await BackgroundGeolocation.removeWatcher({ id: perm });
+    } catch (e) {
+      console.error('[GpsService] Error solicitando permisos:', e);
+    }
+  }
+
   async start(token: string): Promise<void> {
     this.currentToken = token;
     localStorage.setItem(TOKEN_KEY, token);
@@ -55,17 +69,7 @@ export class GpsService {
     if (this.active()) return;
 
     // Solicitar permisos antes de iniciar el watcher nativo
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const perm = await BackgroundGeolocation.addWatcher(
-          { requestPermissions: true, stale: true },
-          () => {}
-        );
-        BackgroundGeolocation.removeWatcher({ id: perm });
-      } catch (e) {
-        console.error('[GpsService] Error solicitando permisos:', e);
-      }
-    }
+    await this.requestPermissions();
 
     this.active.set(true);
 

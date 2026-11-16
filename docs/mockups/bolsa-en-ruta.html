@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff4f8">
+  <meta name="description" content="Mockup para elegir dónde insertar pedidos en una ruta sin alterar el orden existente.">
+  <title>Elegir punto de entrega · Regi Bazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alice&family=Quicksand:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: light; --ink:#613d51; --soft-ink:#85667b; --muted:#a38d9e; --canvas:#fff7fa; --surface:#fffdfd; --pink:#ed73a2; --pink-dark:#bd4f7d; --pink-pale:#ffe8f1; --lavender:#f0eafb; --line:#f1dce7; --mint:#e8f3ed; --shadow:0 16px 38px #9e6d871c; --font:'Quicksand','Segoe UI',sans-serif; --heading:'Alice',Georgia,serif; }
+    * { box-sizing:border-box; }
+    html { min-width:320px; overflow-x:clip; background:var(--canvas); }
+    body { min-width:320px; min-height:100vh; min-height:100svh; margin:0; color:var(--ink); background:radial-gradient(circle at 14% 13%, #fff 0 2px, transparent 3px),linear-gradient(140deg,#fff8fb,#f8f4ff 75%,#fff9f5); background-size:68px 68px,auto; font:500 14px/1.45 var(--font); -webkit-font-smoothing:antialiased; }
+    button { color:inherit; font:inherit; -webkit-tap-highlight-color:transparent; cursor:pointer; }
+    :focus-visible { outline:3px solid var(--pink); outline-offset:3px; }
+    .note { width:min(1100px,calc(100% - 28px)); margin:18px auto 12px; color:var(--soft-ink); font-size:12px; text-align:center; }
+    .note strong { color:var(--pink-dark); }
+    .app { width:min(100% - 20px,440px); margin:0 auto 24px; padding:14px 13px calc(18px + env(safe-area-inset-bottom)); border:1px solid #fff; border-radius:30px; background:#fffdfdf2; box-shadow:9px 10px 25px #aa71851c,-8px -8px 22px #fff; }
+    .topline { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:1px 3px 14px; }
+    .brand { display:flex; align-items:center; gap:8px; color:var(--pink-dark); font:20px var(--heading); }
+    .brand-mark { display:grid; width:34px; height:34px; place-items:center; border-radius:12px; background:var(--pink-pale); box-shadow:inset 2px 2px 5px #d78da01c,2px 3px 6px #aa71851b; }
+    .chip { padding:6px 9px; border:1px solid var(--line); border-radius:999px; color:var(--soft-ink); background:#fff; font-size:10px; font-weight:800; white-space:nowrap; }
+    .step { display:flex; align-items:center; gap:8px; margin:0 4px 6px; color:var(--pink-dark); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .step b { display:grid; width:23px; height:23px; place-items:center; border-radius:9px; color:#fff; background:var(--pink); font-size:11px; box-shadow:0 3px 0 var(--pink-dark); }
+    h1 { margin:0; font:30px/1.08 var(--heading); }
+    h2 { margin:0; font-size:14px; font-weight:800; }
+    .intro { padding:0 5px 12px; }
+    .intro p { margin:5px 0 0; color:var(--muted); font-size:11px; }
+    .bundle { display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px; border:1px solid #f1c4d5; border-radius:19px; background:linear-gradient(135deg,#fff1f6,#fffafd 74%); box-shadow:inset 2px 2px 5px #d78da012,3px 4px 10px #aa718511; }
+    .bag-icon { display:grid; width:36px; height:36px; place-items:center; border-radius:13px; background:#ffe0ec; font-size:19px; }
+    .bundle-title { font-size:12px; font-weight:800; }
+    .bundle-sub { color:var(--soft-ink); font-size:9px; }
+    .bundle-total { text-align:right; white-space:nowrap; }
+    .bundle-total strong { display:block; color:var(--pink-dark); font-size:14px; }
+    .bundle-total small { color:var(--soft-ink); font-size:9px; }
+    .owner-sums { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:5px; margin-left:44px; }
+    .owner-sums span { padding:4px 7px; border:1px solid #e9dcf5; border-radius:9px; color:#76588b; background:#f7f2ff; font-size:9px; font-weight:800; }
+    .map-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:13px 3px 7px; }
+    .map-hint { color:var(--muted); font-size:9px; }
+    .map { position:relative; height:236px; overflow:hidden; border:1px solid #e9dfef; border-radius:22px; background:linear-gradient(145deg,#f3f0f8,#f7f6f2 56%,#f2f4ed); box-shadow:inset 3px 3px 9px #a88faa16,2px 4px 9px #aa718512; isolation:isolate; }
+    .park { position:absolute; border-radius:38% 62% 48% 52%; background:#dcebdc; opacity:.9; }
+    .park.one { width:92px; height:54px; left:5%; top:8%; transform:rotate(-18deg); }
+    .park.two { width:88px; height:54px; right:5%; bottom:13%; transform:rotate(18deg); }
+    .river { position:absolute; z-index:-1; width:145%; height:25px; top:57%; left:-16%; border-radius:50%; background:#dbe4f3; transform:rotate(-21deg); box-shadow:0 0 0 5px #fff9; }
+    .road { position:absolute; background:#fffdfd; border:1px solid #e9e1eb; border-radius:999px; box-shadow:0 1px 2px #a58da31a; }
+    .road.r1 { width:130%; height:13px; top:30%; left:-12%; transform:rotate(14deg); }
+    .road.r2 { width:130%; height:12px; top:76%; left:-11%; transform:rotate(-12deg); }
+    .road.r3 { width:12px; height:140%; left:35%; top:-17%; transform:rotate(24deg); }
+    .road.r4 { width:11px; height:140%; right:24%; top:-18%; transform:rotate(-19deg); }
+    .block { position:absolute; color:#a294a5; font-size:7px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
+    .block.b1 { left:8%; top:42%; }.block.b2 { right:5%; top:35%; }.block.b3 { left:52%; bottom:7%; }
+    .map-caption { position:absolute; left:9px; bottom:8px; padding:5px 8px; border:1px solid #e9ddea; border-radius:11px; color:var(--soft-ink); background:#fffefaed; font-size:9px; font-weight:800; }
+    .pin { position:absolute; z-index:2; display:grid; width:32px; height:32px; place-items:center; border:2px solid #fff; border-radius:50% 50% 50% 8px; color:#fff; background:var(--soft-ink); box-shadow:0 4px 9px #68455c45; font-size:11px; font-weight:800; transform:rotate(-45deg); transition:transform .16s,background .16s; }
+    .pin span { transform:rotate(45deg); }
+    .pin.p1 { left:14%; top:17%; }.pin.p2 { left:45%; top:38%; }.pin.p3 { right:12%; top:17%; }.pin.p4 { right:20%; bottom:18%; }
+    .pin.selected { z-index:3; color:var(--pink-dark); background:#fff; border-color:var(--pink); transform:rotate(-45deg) scale(1.2); box-shadow:0 0 0 5px #ed73a233,0 5px 11px #68455c45; }
+    .itinerary { margin-top:12px; padding:12px 11px 4px; border:1px solid var(--line); border-radius:20px; background:#fff; }
+    .itinerary-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 1px 7px; }
+    .route-list { display:grid; gap:6px; }
+    .route-option { display:grid; width:100%; grid-template-columns:27px minmax(0,1fr) 23px; gap:8px; align-items:center; min-height:58px; padding:8px; border:1px solid #f1e8ed; border-radius:15px; background:#fffdfd; text-align:left; box-shadow:0 2px 0 #f7eef2; transition:border-color .14s,background .14s,transform .14s; }
+    .route-option:hover { border-color:#e9aac3; transform:translateY(-1px); }
+    .route-option.selected { border:1.5px solid var(--pink); background:#fff2f7; box-shadow:0 3px 0 #f5c2d5; }
+    .stop-num { display:grid; width:26px; height:26px; place-items:center; border-radius:10px; color:var(--pink-dark); background:var(--pink-pale); font-size:11px; font-weight:800; }
+    .stop-name { display:block; overflow:hidden; font-size:10px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+    .stop-address { display:block; overflow:hidden; margin-top:1px; color:var(--muted); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+    .radio { display:grid; width:19px; height:19px; place-items:center; border:1.5px solid #dfc7d4; border-radius:50%; color:transparent; font-size:11px; }
+    .selected .radio { border-color:var(--pink); color:white; background:var(--pink); }
+    .insert-preview { margin:8px 0 3px; padding:8px 9px; border:1px dashed #e7b3c8; border-radius:14px; color:var(--pink-dark); background:#fff7fa; font-size:10px; font-weight:800; }
+    .insert-preview small { display:block; margin-top:2px; color:var(--soft-ink); font-size:9px; font-weight:600; }
+    .save { width:100%; min-height:53px; margin-top:11px; border:0; border-radius:18px; color:#fff; background:linear-gradient(110deg,#ee78a5,#d974c6); box-shadow:0 5px 0 #b34e80,0 10px 15px #d56a9d35; font-size:12px; font-weight:800; transition:transform .1s,box-shadow .1s; }
+    .save:active { transform:translateY(4px); box-shadow:0 1px 0 #b34e80,0 4px 8px #d56a9d2c; }
+    .reassure { margin:9px 3px 0; color:var(--soft-ink); font-size:9px; text-align:center; }
+    .desktop { display:none; }
+    @media (min-width:1000px) {
+      .app { display:none; }
+      .desktop { display:grid; grid-template-columns:230px minmax(360px,1fr) 330px; width:min(1450px,calc(100% - 48px)); min-height:min(850px,calc(100svh - 78px)); margin:0 auto 28px; overflow:hidden; border:1px solid #fff; border-radius:30px; background:#fffdfdfa; box-shadow:var(--shadow); }
+      .rail { padding:25px 16px; background:linear-gradient(155deg,#fff1f6,#faf6ff); }
+      .rail .brand { margin-bottom:43px; }
+      .rail-label { display:block; margin:13px 0 9px 8px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+      .rail-item { min-height:42px; margin:4px 0; padding:11px 10px; border-radius:13px; color:var(--soft-ink); font-size:11px; font-weight:700; }
+      .rail-item.active { color:var(--pink-dark); background:var(--pink-pale); box-shadow:inset 2px 2px 5px #d78da014; }
+      .content { padding:22px 22px 25px; }
+      .content h1 { font-size:34px; }
+      .content .intro { padding:0 0 17px; }
+      .content .bundle { margin:2px 0 14px; }
+      .content .map { height:calc(100% - 195px); min-height:420px; }
+      .content .pin { width:38px; height:38px; font-size:12px; }
+      .content .pin.p1 { left:17%; top:19%; }.content .pin.p2 { left:44%; top:39%; }.content .pin.p3 { right:13%; top:17%; }.content .pin.p4 { right:22%; bottom:17%; }
+      .content .block { font-size:9px; }
+      .content .map-caption { left:17px; bottom:15px; font-size:11px; }
+      .side { padding:22px 18px; border-left:1px solid var(--line); background:linear-gradient(180deg,#fffafd,#fff); }
+      .side .step { margin-top:3px; }
+      .side h2 { font-size:18px; }
+      .side-intro { margin:5px 0 15px; color:var(--muted); font-size:11px; }
+      .side .route-list { gap:9px; }
+      .side .route-option { min-height:70px; padding:10px; }
+      .side .stop-name { font-size:11px; }.side .stop-address { font-size:10px; }
+      .side .insert-preview { margin-top:13px; padding:11px; font-size:11px; }
+      .side .save { margin-top:15px; }
+    }
+    @media (min-width:1000px) and (max-height:700px) { .desktop { min-height:660px; } .content .map { min-height:400px; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition-duration:.01ms!important; } }
+  </style>
+</head>
+<body>
+  <p class="note"><strong>Mockup interactivo</strong> · elige una parada por su pin o por su dirección; la ruta conserva su orden actual.</p>
+
+  <main class="app" aria-label="Elegir ubicación de inserción para móvil">
+    <header class="topline"><div class="brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div><span class="chip">Ruta del viernes</span></header>
+    <div class="step"><b>2</b> Elige dónde va la entrega</div>
+    <section class="intro"><h1>¿Después de quién?</h1><p>La ruta mantiene sus paradas como están. Toca un pin o una dirección para elegir.</p></section>
+    <section class="bundle" aria-label="Selección pendiente de agregar"><span class="bag-icon">🛍️</span><div><div class="bundle-title">Bolsa #27 · Lucía + Ana Morales</div><div class="bundle-sub">3 pedidos · destino Calle Gardenia 88</div></div><div class="bundle-total"><strong>$1,780</strong><small>debe $1,080</small></div><div class="owner-sums"><span>Lucía · $1,180 / debe $680</span><span>Ana · $600 / debe $400</span></div></section>
+    <div class="map-head"><h2>Mapa de esta ruta</h2><span class="map-hint">Toca el número para elegir</span></div>
+    <section class="map" aria-label="Mapa ilustrativo de la ruta actual">
+      <div class="park one"></div><div class="park two"></div><div class="river"></div><div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div>
+      <span class="block b1">Vista Hermosa</span><span class="block b2">Jardín</span><span class="block b3">Las Torres</span>
+      <button class="pin p1" data-stop="1" aria-label="Parada 1, después de Lucía" aria-pressed="false"><span>1</span></button>
+      <button class="pin p2 selected" data-stop="2" aria-label="Parada 2, después de Marisol" aria-pressed="true"><span>2</span></button>
+      <button class="pin p3" data-stop="3" aria-label="Parada 3, después de Karla" aria-pressed="false"><span>3</span></button>
+      <button class="pin p4" data-stop="4" aria-label="Parada 4, después de Fernanda" aria-pressed="false"><span>4</span></button>
+      <span class="map-caption">4 paradas actuales · ubicación aproximada</span>
+    </section>
+    <section class="itinerary" aria-label="Direcciones de la ruta">
+      <div class="itinerary-head"><h2>Paradas actuales</h2><span class="chip">Orden intacto</span></div>
+      <div class="route-list">
+        <button class="route-option" data-stop="1" aria-pressed="false"><span class="stop-num">1</span><span><span class="stop-name">Lucía Morales</span><span class="stop-address">Gardenia 22 · Vista Hermosa</span></span><span class="radio">✓</span></button>
+        <button class="route-option selected" data-stop="2" aria-pressed="true"><span class="stop-num">2</span><span><span class="stop-name">Marisol Peña</span><span class="stop-address">Río Nazas 140 · Jardín</span></span><span class="radio">✓</span></button>
+        <button class="route-option" data-stop="3" aria-pressed="false"><span class="stop-num">3</span><span><span class="stop-name">Karla Salinas</span><span class="stop-address">Calle Nardo 306 · Jardín</span></span><span class="radio">✓</span></button>
+        <button class="route-option" data-stop="4" aria-pressed="false"><span class="stop-num">4</span><span><span class="stop-name">Fernanda Ruiz</span><span class="stop-address">Av. Reforma 51 · Las Torres</span></span><span class="radio">✓</span></button>
+      </div>
+      <div class="insert-preview" aria-live="polite">♡ Insertar después de <span data-selected-name>Marisol Peña</span><small>La nueva entrega quedará entre las paradas 2 y 3.</small></div>
+      <button class="save" type="button">♡ Agregar después de Marisol</button>
+    </section>
+    <p class="reassure">Tus entregas actuales conservan su orden y cada clienta conserva su saldo.</p>
+  </main>
+
+  <main class="desktop" aria-label="Elegir ubicación de inserción para escritorio">
+    <aside class="rail"><div class="brand"><span class="brand-mark" aria-hidden="true">♡</span> Regi Bazar</div><span class="rail-label">Operación</span><div class="rail-item">📦 Pedidos</div><div class="rail-item active">⌖ Rutas activas</div><div class="rail-item">🚚 Entregas</div></aside>
+    <section class="content">
+      <div class="step"><b>2</b> Elige dónde va la entrega</div><section class="intro"><h1>¿Después de quién?</h1><p>Selecciona un pin o una dirección. Lo que ya está en ruta conserva su orden.</p></section>
+      <section class="bundle"><span class="bag-icon">🛍️</span><div><div class="bundle-title">Bolsa #27 · Lucía + Ana Morales</div><div class="bundle-sub">3 pedidos · entrega a Calle Gardenia 88</div></div><div class="bundle-total"><strong>$1,780</strong><small>debe $1,080</small></div><div class="owner-sums"><span>Lucía · $1,180 / debe $680</span><span>Ana · $600 / debe $400</span></div></section>
+      <div class="map-head"><h2>Mapa de la ruta</h2><span class="map-hint">El mapa y la lista están conectados</span></div>
+      <section class="map" aria-label="Mapa ilustrativo de la ruta actual">
+        <div class="park one"></div><div class="park two"></div><div class="river"></div><div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div>
+        <span class="block b1">Vista Hermosa</span><span class="block b2">Jardín</span><span class="block b3">Las Torres</span>
+        <button class="pin p1" data-stop="1" aria-label="Parada 1, después de Lucía" aria-pressed="false"><span>1</span></button>
+        <button class="pin p2 selected" data-stop="2" aria-label="Parada 2, después de Marisol" aria-pressed="true"><span>2</span></button>
+        <button class="pin p3" data-stop="3" aria-label="Parada 3, después de Karla" aria-pressed="false"><span>3</span></button>
+        <button class="pin p4" data-stop="4" aria-label="Parada 4, después de Fernanda" aria-pressed="false"><span>4</span></button>
+        <span class="map-caption">4 paradas actuales · ubicaciones ilustrativas</span>
+      </section>
+    </section>
+    <aside class="side">
+      <div class="step"><b>♡</b> Ruta actual</div><h2>Elige el punto de inserción</h2><p class="side-intro">Tu selección aparecerá entre la parada elegida y la siguiente.</p>
+      <div class="route-list">
+        <button class="route-option" data-stop="1" aria-pressed="false"><span class="stop-num">1</span><span><span class="stop-name">Lucía Morales</span><span class="stop-address">Gardenia 22 · Vista Hermosa</span></span><span class="radio">✓</span></button>
+        <button class="route-option selected" data-stop="2" aria-pressed="true"><span class="stop-num">2</span><span><span class="stop-name">Marisol Peña</span><span class="stop-address">Río Nazas 140 · Jardín</span></span><span class="radio">✓</span></button>
+        <button class="route-option" data-stop="3" aria-pressed="false"><span class="stop-num">3</span><span><span class="stop-name">Karla Salinas</span><span class="stop-address">Calle Nardo 306 · Jardín</span></span><span class="radio">✓</span></button>
+        <button class="route-option" data-stop="4" aria-pressed="false"><span class="stop-num">4</span><span><span class="stop-name">Fernanda Ruiz</span><span class="stop-address">Av. Reforma 51 · Las Torres</span></span><span class="radio">✓</span></button>
+      </div>
+      <div class="insert-preview" aria-live="polite">♡ Insertar después de <span data-selected-name>Marisol Peña</span><small>La nueva parada quedará antes de Karla Salinas. Las demás conservan su lugar.</small></div>
+      <button class="save" type="button">♡ Agregar después de Marisol</button>
+      <p class="reassure">Se agregarán 3 pedidos de la bolsa juntos. Los saldos siguen separados por clienta.</p>
+    </aside>
+  </main>
+  <script>
+    const stopNames = { '1':'Lucía Morales', '2':'Marisol Peña', '3':'Karla Salinas', '4':'Fernanda Ruiz' };
+    function chooseStop(stopId) {
+      document.querySelectorAll('[data-stop]').forEach((element) => {
+        const selected = element.dataset.stop === stopId;
+        element.classList.toggle('selected', selected);
+        element.setAttribute('aria-pressed', String(selected));
+      });
+      const name = stopNames[stopId];
+      document.querySelectorAll('[data-selected-name]').forEach((element) => element.textContent = name);
+      document.querySelectorAll('.save').forEach((element) => element.textContent = `♡ Agregar después de ${name.split(' ')[0]}`);
+    }
+    document.querySelectorAll('[data-stop]').forEach((element) => element.addEventListener('click', () => chooseStop(element.dataset.stop)));
+  </script>
+</body>
+</html>

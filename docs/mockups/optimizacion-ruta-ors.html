@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff3f9">
+  <meta name="description" content="Prototipo visual de comparación de rutas para Regi Bazar. Usa datos ficticios y no se conecta a servicios externos.">
+  <title>Comparar rutas · Regi Bazar</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --pink: #ff5fa2;
+      --pink-deep: #d9367d;
+      --pink-soft: #ffd5e8;
+      --pink-pale: #fff0f7;
+      --lilac: #e9ddff;
+      --lilac-deep: #7c5caf;
+      --yellow: #ffe49b;
+      --ink: #66324f;
+      --ink-soft: #875772;
+      --muted: #a26f8e;
+      --line: #f3cade;
+      --surface: #fffafd;
+      --surface-soft: #fff3f9;
+      --canvas: #fff0f7;
+      --soft-shadow: rgb(207 137 171 / 22%);
+      --font: "Quicksand", "Trebuchet MS", system-ui, sans-serif;
+      --radius-xl: 26px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; overflow-x: clip; background: var(--canvas); }
+
+    body {
+      min-width: 320px;
+      min-height: 100svh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 12%, rgb(255 255 255 / 90%) 0 2px, transparent 3px),
+        radial-gradient(circle at 86% 31%, rgb(255 255 255 / 72%) 0 2px, transparent 3px),
+        linear-gradient(142deg, #fff7fb 0%, #f7f1ff 56%, #fff8f4 100%);
+      background-size: 76px 76px, 94px 94px, auto;
+      font: 600 14px/1.45 var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input { color: inherit; font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    button:enabled { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    :focus-visible { outline: 3px solid var(--pink-deep); outline-offset: 3px; }
+    [hidden] { display: none !important; }
+
+    .page { width: min(100% - 18px, 1540px); margin: 0 auto; padding: 13px 0 calc(102px + env(safe-area-inset-bottom)); }
+
+    .demo-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      width: min(100%, 900px);
+      margin: 0 auto 14px;
+      padding: 11px 14px;
+      border: 1px solid #ead8fa;
+      border-radius: 18px;
+      color: #634d7e;
+      background: rgb(249 244 255 / 94%);
+      box-shadow: 3px 4px 10px rgb(150 122 171 / 8%), -3px -3px 9px rgb(255 255 255 / 90%);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .demo-note .note-icon {
+      display: grid;
+      flex: 0 0 27px;
+      width: 27px;
+      height: 27px;
+      place-items: center;
+      border-radius: 10px;
+      color: #6e548b;
+      background: var(--lilac);
+    }
+
+    .demo-note strong { color: #6e548b; }
+
+    .app-shell {
+      overflow: clip;
+      border: 1px solid rgb(255 255 255 / 94%);
+      border-radius: 29px;
+      background: rgb(255 252 253 / 95%);
+      box-shadow: 10px 13px 31px rgb(177 110 145 / 13%), -7px -7px 19px rgb(255 255 255 / 94%);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 61px;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgb(243 202 222 / 72%);
+      background: rgb(255 250 253 / 94%);
+    }
+
+    .brand-cluster { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+    .back-button {
+      display: grid;
+      flex: 0 0 40px;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      color: var(--pink-deep);
+      background: var(--surface);
+      box-shadow: 3px 3px 7px rgb(207 137 171 / 13%), -3px -3px 7px rgb(255 255 255 / 94%);
+    }
+
+    .brand-mark {
+      display: grid;
+      flex: 0 0 37px;
+      width: 37px;
+      height: 37px;
+      place-items: center;
+      border-radius: 13px;
+      color: var(--pink-deep);
+      background: var(--pink-pale);
+      box-shadow: inset 2px 2px 5px rgb(207 137 171 / 9%), 2px 3px 6px rgb(170 113 133 / 9%);
+    }
+
+    .brand-copy { min-width: 0; }
+    .brand-name { display: block; color: var(--pink-deep); font-size: 16px; font-weight: 900; letter-spacing: -.035em; }
+    .brand-section { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; }
+
+    .demo-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 10px;
+      border: 1px solid #e8daf7;
+      border-radius: 999px;
+      color: #70538e;
+      background: #f7f1ff;
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .demo-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #9c75c2; }
+
+    .workspace { padding: 14px; }
+
+    .page-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin: 0 0 4px;
+      color: var(--pink-deep);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow-mark { display: inline-block; width: 7px; height: 7px; border: 2px solid var(--pink); border-radius: 50%; }
+
+    h1 { margin: 0; font-size: clamp(21px, 4.7vw, 31px); font-weight: 900; line-height: 1.13; letter-spacing: -.045em; }
+    .subtitle { max-width: 58ch; margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+
+    .step-track {
+      display: none;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--pink-deep);
+      background: var(--surface);
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .step-track .step-number { display: grid; width: 21px; height: 21px; place-items: center; border-radius: 8px; color: var(--surface); background: var(--pink); box-shadow: 0 3px 0 var(--pink-deep); }
+
+    .engine-panel {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 13px;
+      border: 1px solid #f2cadd;
+      border-radius: 23px;
+      background: linear-gradient(135deg, #fff0f7 0%, #fff9fc 61%, #f9f5ff 100%);
+      box-shadow: inset 2px 2px 6px rgb(207 137 171 / 7%), 4px 6px 13px rgb(170 113 133 / 8%);
+    }
+
+    .engine-copy { display: flex; align-items: flex-start; gap: 9px; }
+
+    .engine-icon {
+      display: grid;
+      flex: 0 0 36px;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 13px;
+      color: var(--pink-deep);
+      background: #ffe0ed;
+      box-shadow: inset 2px 2px 5px rgb(207 137 171 / 12%), 2px 3px 5px rgb(170 113 133 / 8%);
+    }
+
+    .engine-copy h2 { margin: 0; font-size: 13px; font-weight: 900; }
+    .engine-copy p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.42; }
+    .engine-copy p strong { color: var(--ink-soft); }
+
+    .engine-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      padding: 4px;
+      border: 1px solid rgb(236 211 226 / 90%);
+      border-radius: 16px;
+      background: #f7edf3;
+    }
+
+    .engine-option {
+      min-height: 45px;
+      padding: 8px 9px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: #946f86;
+      background: transparent;
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1.25;
+      transition: background .16s ease-out, box-shadow .16s ease-out, color .16s ease-out, transform .16s ease-out;
+    }
+
+    .engine-option small { display: block; margin-top: 2px; font-size: 9px; font-weight: 700; }
+
+    .engine-option[aria-pressed="true"] {
+      border-color: #f3c7db;
+      color: var(--pink-deep);
+      background: var(--surface);
+      box-shadow: 3px 3px 7px rgb(207 137 171 / 13%), -3px -3px 7px rgb(255 255 255 / 96%);
+    }
+
+    .engine-option[data-engine="candidate"][aria-pressed="true"] { border-color: #ddd0f2; color: #735494; background: #fffdff; }
+
+    .metric-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-bottom: 13px; }
+
+    .metric {
+      min-width: 0;
+      padding: 10px 9px;
+      border: 1px solid rgb(243 202 222 / 86%);
+      border-radius: 17px;
+      background: var(--surface);
+      box-shadow: 3px 4px 9px rgb(207 137 171 / 9%), -3px -3px 7px rgb(255 255 255 / 90%);
+    }
+
+    .metric-label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; font-weight: 900; letter-spacing: .045em; text-transform: uppercase; }
+    .metric-value { display: block; overflow: hidden; margin-top: 3px; color: var(--ink); font-size: clamp(17px, 4vw, 23px); font-weight: 900; letter-spacing: -.04em; text-overflow: ellipsis; white-space: nowrap; }
+    .metric-detail { display: block; margin-top: 1px; color: var(--muted); font-size: 9px; font-weight: 700; }
+    .metric[data-kind="saving"] { border-color: #e1d5f2; background: #faf7ff; }
+    .metric[data-kind="saving"] .metric-value { color: var(--lilac-deep); }
+    .metric[data-kind="saving"] .metric-label { color: #81659e; }
+
+    .compare-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 0 0 13px;
+      padding: 9px 11px;
+      border: 1px solid #e9daf7;
+      border-radius: 15px;
+      color: #6c5685;
+      background: #f8f3ff;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .compare-note strong { color: #654884; }
+    .compare-note-icon { flex: 0 0 auto; margin-top: 1px; color: #8064a0; }
+
+    .mobile-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 10px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: #f8edf3;
+    }
+
+    .mobile-tab {
+      min-height: 43px;
+      border: 1px solid transparent;
+      border-radius: 13px;
+      color: #906d83;
+      background: transparent;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .mobile-tab[aria-pressed="true"] {
+      border-color: #f1c9dc;
+      color: var(--pink-deep);
+      background: var(--surface);
+      box-shadow: 3px 3px 7px rgb(207 137 171 / 12%), -3px -3px 7px rgb(255 255 255 / 94%);
+    }
+
+    .content-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+
+    .map-panel, .list-panel {
+      min-width: 0;
+      overflow: clip;
+      border: 1px solid rgb(243 202 222 / 85%);
+      border-radius: var(--radius-xl);
+      background: var(--surface);
+      box-shadow: 5px 7px 15px rgb(177 110 145 / 9%), -4px -4px 11px rgb(255 255 255 / 96%);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 9px;
+      padding: 12px 13px 10px;
+      border-bottom: 1px solid #f5e4ec;
+    }
+
+    .panel-title { margin: 0; font-size: 12px; font-weight: 900; }
+    .panel-kicker { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; font-weight: 700; }
+
+    .map-kind {
+      padding: 6px 8px;
+      border: 1px solid #e8daf7;
+      border-radius: 999px;
+      color: #735790;
+      background: #f8f3ff;
+      font-size: 9px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .map-wrap {
+      position: relative;
+      min-height: 285px;
+      padding: 8px;
+      background:
+        radial-gradient(ellipse at 18% 82%, rgb(255 220 235 / 68%) 0 14%, transparent 15%),
+        radial-gradient(ellipse at 53% 24%, rgb(234 224 249 / 88%) 0 18%, transparent 19%),
+        radial-gradient(ellipse at 84% 60%, rgb(255 240 210 / 70%) 0 16%, transparent 17%),
+        linear-gradient(145deg, #fffafc, #f7f5fb 60%, #fffaf7);
+    }
+
+    .street-map { display: block; width: 100%; height: 292px; }
+    .street { fill: none; stroke: #fffdfd; stroke-width: 13; stroke-linecap: round; }
+    .street-edge { fill: none; stroke: #eadce5; stroke-width: 1.5; stroke-linecap: round; }
+    .minor-street { fill: none; stroke: #fffdfd; stroke-width: 7; stroke-linecap: round; }
+    .park { fill: #e7f0e7; stroke: #d4e3d6; stroke-width: 1; }
+    .park-label { fill: #7f9c83; font: 700 10px var(--font); letter-spacing: .04em; }
+    .zone-label { fill: #9a8293; font: 800 9px var(--font); letter-spacing: .08em; }
+    .route-line {
+      fill: none;
+      stroke: var(--pink);
+      stroke-width: 5.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: .79;
+      filter: drop-shadow(0 2px 2px rgb(169 45 104 / 18%));
+      transition: opacity .2s ease-out, stroke .2s ease-out;
+    }
+    .route-line.candidate { stroke: #8b6ab2; }
+    .route-line.is-hidden { opacity: 0; }
+    .route-halo { fill: none; stroke: rgb(255 255 255 / 90%); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+    .route-halo.is-hidden { opacity: 0; }
+    .map-stop { cursor: pointer; transition: transform .16s ease-out; transform-box: fill-box; transform-origin: center; }
+    .map-stop circle { fill: #f08ab3; stroke: #fffafd; stroke-width: 2.5; }
+    .map-stop.candidate circle { fill: #9275b5; }
+    .map-stop text { fill: #fffafd; font: 900 7px var(--font); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .map-stop.is-active { transform: scale(1.32); }
+    .map-stop.is-active circle { fill: #d9367d; stroke: #ffe49b; stroke-width: 3; }
+    .map-stop.candidate.is-active circle { fill: #654884; }
+    .depot-pin circle { fill: #ffda88; stroke: #fffafd; stroke-width: 3; }
+    .depot-pin text { fill: #795a33; font: 900 9px var(--font); text-anchor: middle; dominant-baseline: central; }
+
+    .map-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 13px; padding: 9px 12px 11px; border-top: 1px solid #f5e4ec; color: var(--ink-soft); font-size: 9px; font-weight: 800; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-mark { width: 10px; height: 10px; border: 2px solid var(--surface); border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 1px #e7a0bd; }
+    .legend-mark.route { width: 17px; height: 0; border: 0; border-top: 3px solid var(--pink); border-radius: 0; background: none; box-shadow: none; }
+    .legend-mark.base { border-color: #d4b26b; background: var(--yellow); box-shadow: none; }
+
+    .list-head-copy { min-width: 0; }
+    .stop-count { flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--pink-deep); background: var(--pink-pale); font-size: 9px; font-weight: 900; }
+
+    .list-tools { display: flex; align-items: center; gap: 7px; padding: 9px 10px; border-bottom: 1px solid #f5e4ec; }
+
+    .search-wrap {
+      display: flex;
+      flex: 1 1 auto;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      min-height: 43px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: var(--muted);
+      background: #fff8fb;
+    }
+
+    .search-wrap input { width: 100%; min-width: 0; height: 41px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 16px; }
+    .search-wrap input::placeholder { color: #ad849a; opacity: 1; }
+
+    .edit-order-button {
+      flex: 0 0 auto;
+      min-height: 43px;
+      padding: 8px 10px;
+      border: 1px solid #e8daf7;
+      border-radius: 13px;
+      color: #735790;
+      background: #f8f3ff;
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .edit-order-button[aria-pressed="true"] { border-color: #d1bee9; color: #60447f; background: #efe6fb; box-shadow: inset 2px 2px 5px rgb(145 116 175 / 12%); }
+
+    .stop-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 384px;
+      overflow-y: auto;
+      padding: 8px;
+      overscroll-behavior: contain;
+      scrollbar-color: #e9c6d8 transparent;
+      scrollbar-width: thin;
+    }
+
+    .stop-row {
+      display: grid;
+      grid-template-columns: 31px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 59px;
+      padding: 7px 8px;
+      border: 1px solid transparent;
+      border-radius: 16px;
+      background: #fffafd;
+      transition: background .16s ease-out, border-color .16s ease-out, transform .16s ease-out;
+    }
+
+    .stop-row:hover, .stop-row.is-active { border-color: #f2d0e0; background: #fff1f7; }
+    .stop-row.is-active { box-shadow: inset 2px 2px 5px rgb(207 137 171 / 9%); }
+    .stop-row.without-coords { border-color: #f0d18c; background: #fff9e9; }
+    .stop-number { display: grid; width: 29px; height: 29px; place-items: center; border-radius: 11px; color: var(--surface); background: var(--pink); box-shadow: 0 3px 0 var(--pink-deep); font-size: 10px; font-weight: 900; }
+    .stop-row:nth-child(4n) .stop-number { background: #9a7bbb; box-shadow: 0 3px 0 #70538f; }
+    .stop-row.without-coords .stop-number { color: #846531; background: #f5d786; box-shadow: 0 3px 0 #c7a34f; }
+    .stop-copy { min-width: 0; }
+    .stop-name { display: flex; align-items: center; gap: 5px; overflow: hidden; color: var(--ink); font-size: 10px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+    .stop-place { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .stop-status { max-width: 120px; padding: 5px 7px; border: 1px solid #efdda9; border-radius: 10px; color: #806839; background: #fff3cb; font-size: 8px; font-weight: 900; text-align: center; }
+    .time-pref { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+    .time-tag { padding: 3px 6px; border: 1px solid #e4d8f2; border-radius: 8px; color: #70568f; background: #f7f1ff; font-size: 8px; font-weight: 900; }
+    .time-tag.is-adjusted { border-color: #f4cbda; color: var(--pink-deep); background: #fff0f7; }
+    .time-edit {
+      min-width: 44px;
+      min-height: 34px;
+      padding: 4px 6px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      color: var(--pink-deep);
+      background: transparent;
+      font-size: 8px;
+      font-weight: 900;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .time-edit:hover { border-color: #f2cadc; background: #fff4f8; }
+    .move-tools { display: none; flex-direction: column; gap: 2px; }
+    .move-tools.is-visible { display: flex; }
+    .move-button { display: grid; width: 30px; height: 25px; place-items: center; border: 1px solid #ecdce8; border-radius: 8px; color: #8c6680; background: var(--surface); font-size: 11px; }
+    .move-button:disabled { color: #c9b5c1; opacity: .55; }
+
+    .list-foot {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 11px;
+      border-top: 1px solid #f5e4ec;
+      color: #826939;
+      background: #fff9e9;
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    .list-foot strong { color: #755a2c; }
+
+    .map-source-note {
+      padding: 9px 12px;
+      border-top: 1px solid #f5e4ec;
+      color: var(--muted);
+      background: #fffafd;
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    .desktop-action {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 13px;
+      padding: 12px 14px;
+      border: 1px solid #f0cadb;
+      border-radius: 20px;
+      background: linear-gradient(110deg, #fff3f8, #fffafd 62%, #faf6ff);
+      box-shadow: 4px 5px 12px rgb(177 110 145 / 8%), -3px -3px 9px rgb(255 255 255 / 94%);
+    }
+
+    .action-copy strong { display: block; font-size: 11px; font-weight: 900; }
+    .action-copy small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
+
+    .primary-button {
+      min-height: 47px;
+      padding: 10px 17px;
+      border: 0;
+      border-radius: 15px;
+      color: #fffafd;
+      background: linear-gradient(105deg, #ff67a8, #e5418b);
+      box-shadow: 0 6px 0 #c62e70, 0 10px 17px rgb(221 53 120 / 18%);
+      font-size: 10px;
+      font-weight: 900;
+      transition: transform .16s ease-out, box-shadow .16s ease-out, opacity .16s ease-out;
+    }
+
+    .primary-button:active:enabled { transform: translateY(3px); box-shadow: 0 3px 0 #c62e70, 0 6px 11px rgb(221 53 120 / 14%); }
+    .primary-button:disabled { opacity: .55; }
+
+    .bottom-action {
+      position: fixed;
+      z-index: 5;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px max(14px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+      border-top: 1px solid rgb(243 202 222 / 80%);
+      background: rgb(255 249 252 / 97%);
+      box-shadow: 0 -7px 18px rgb(153 96 126 / 8%);
+      backdrop-filter: blur(12px);
+    }
+
+    .bottom-summary { min-width: 0; }
+    .bottom-summary strong { display: block; overflow: hidden; color: var(--ink); font-size: 11px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+    .bottom-summary small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .bottom-action .primary-button { flex: 0 0 auto; min-height: 46px; padding: 9px 14px; font-size: 9px; }
+
+    .toast {
+      position: fixed;
+      z-index: 20;
+      right: 14px;
+      bottom: calc(81px + env(safe-area-inset-bottom));
+      left: 14px;
+      width: fit-content;
+      max-width: min(420px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 11px 15px;
+      border: 1px solid #ecc9db;
+      border-radius: 16px;
+      color: var(--ink);
+      background: #fffafd;
+      box-shadow: 0 9px 26px rgb(102 50 79 / 17%);
+      font-size: 11px;
+      font-weight: 800;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .18s ease-out, transform .18s ease-out;
+      pointer-events: none;
+    }
+
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+
+    .empty-list { padding: 22px 14px; color: var(--muted); font-size: 11px; text-align: center; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (min-width: 680px) {
+      .page { width: min(100% - 30px, 1540px); padding-top: 21px; }
+      .topbar { min-height: 68px; padding: 12px 20px; }
+      .workspace { padding: 20px; }
+      .page-heading { align-items: center; margin-bottom: 17px; }
+      .step-track { display: flex; }
+      .engine-panel { grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); align-items: center; padding: 13px 15px; }
+      .engine-switch { min-width: 320px; }
+      .metric-row { grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+      .metric { padding: 12px 14px; }
+      .mobile-tabs { display: none; }
+      .content-grid { grid-template-columns: minmax(0, 1.55fr) minmax(320px, .82fr); align-items: stretch; gap: 14px; }
+      .map-wrap { min-height: 390px; padding: 12px; }
+      .street-map { height: min(53vh, 490px); min-height: 366px; }
+      .stop-list { max-height: min(53vh, 488px); min-height: 366px; padding: 9px; }
+      .map-panel, .list-panel { display: block !important; }
+      .desktop-action { display: flex; }
+      .bottom-action { display: none; }
+      .toast { bottom: 22px; }
+      .demo-note { margin-bottom: 17px; }
+    }
+
+    @media (min-width: 1180px) {
+      .page { width: min(100% - 52px, 1540px); }
+      .workspace { padding: 23px 25px 22px; }
+      .engine-panel { grid-template-columns: minmax(0, 1fr) 460px; padding-inline: 17px; }
+      .content-grid { grid-template-columns: minmax(0, 1.72fr) minmax(360px, .8fr); gap: 16px; }
+      .panel-head { padding: 14px 16px 12px; }
+      .map-wrap { padding: 14px; }
+      .street-map { height: min(61vh, 540px); min-height: 440px; }
+      .stop-list { max-height: min(61vh, 540px); min-height: 440px; }
+      .metric { padding: 13px 16px; }
+    }
+
+    @media (max-width: 679px) {
+      .page { width: min(100% - 12px, 600px); padding-top: 7px; }
+      .app-shell { border-radius: 25px; }
+      .topbar { min-height: 55px; padding: 7px 9px; }
+      .back-button { flex-basis: 38px; width: 38px; height: 38px; }
+      .brand-mark { flex-basis: 32px; width: 32px; height: 32px; border-radius: 11px; }
+      .brand-name { font-size: 14px; }
+      .brand-section { font-size: 9px; }
+      .demo-status { gap: 5px; padding: 7px 8px; font-size: 9px; }
+      .workspace { padding: 12px 10px 13px; }
+      .page-heading { margin-bottom: 12px; }
+      .subtitle { max-width: 44ch; font-size: 10px; }
+      .engine-panel { gap: 10px; padding: 10px; border-radius: 20px; }
+      .engine-copy h2 { font-size: 12px; }
+      .engine-copy p { font-size: 9px; }
+      .metric-row { gap: 5px; margin-bottom: 10px; }
+      .metric { padding: 9px 7px; border-radius: 14px; }
+      .metric-label { gap: 4px; font-size: 8px; letter-spacing: .02em; }
+      .metric-value { font-size: clamp(16px, 5.5vw, 21px); }
+      .metric-detail { font-size: 8px; }
+      .compare-note { margin-bottom: 10px; padding: 8px 9px; font-size: 9px; }
+      .content-grid { gap: 0; }
+      .map-panel, .list-panel { border-radius: 21px; }
+      .panel-head { padding: 10px 11px 8px; }
+      .map-wrap { min-height: 282px; padding: 5px; }
+      .street-map { height: clamp(276px, 79vw, 370px); }
+      .stop-list { max-height: min(46svh, 380px); padding: 7px; }
+      .list-tools { padding: 7px; }
+      .edit-order-button { padding: 7px 8px; font-size: 8px; }
+      .stop-row { grid-template-columns: 30px minmax(0, 1fr) auto; min-height: 57px; gap: 7px; padding: 6px; }
+      .stop-name { font-size: 9px; }
+      .stop-place { font-size: 8px; }
+      .stop-status { max-width: 93px; padding: 5px 6px; font-size: 7px; }
+      .map-legend { gap: 7px 10px; padding: 8px 9px 10px; font-size: 8px; }
+      .map-source-note { padding: 8px 10px; font-size: 8px; }
+      .list-foot { font-size: 8px; }
+    }
+
+    @media (max-width: 370px) {
+      .demo-status { max-width: 124px; overflow: hidden; text-overflow: ellipsis; }
+      .brand-cluster { gap: 7px; }
+      .brand-copy { max-width: 128px; }
+      .engine-option { padding-inline: 6px; font-size: 9px; }
+      .engine-option small { font-size: 8px; }
+      .metric-label { font-size: 7px; }
+      .metric-detail { font-size: 7px; }
+      .bottom-action { padding-right: 10px; padding-left: 10px; }
+      .bottom-action .primary-button { padding-inline: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <p class="demo-note" role="note">
+      <span class="note-icon" aria-hidden="true">✦</span>
+      <span><strong>Maqueta visual · sin API ni direcciones reales.</strong> Las 40 paradas, los recorridos, los minutos y los kilómetros son datos inventados para revisar la experiencia. El candidato ORS todavía no se ha calculado.</span>
+    </p>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-cluster">
+          <button class="back-button" type="button" aria-label="Volver a rutas" id="backButton">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true"><path d="M14.5 5 7.5 12l7 7" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="m12 2 1.65 6.35L20 10l-6.35 1.65L12 18l-1.65-6.35L4 10l6.35-1.65L12 2Z" fill="currentColor"/><path d="m19 15 .86 3.14L23 19l-3.14.86L19 23l-.86-3.14L15 19l3.14-.86L19 15Z" fill="currentColor"/></svg>
+          </span>
+          <span class="brand-copy"><span class="brand-name">Regi Bazar</span><span class="brand-section">Rutas bonitas, entregas claras</span></span>
+        </div>
+        <span class="demo-status"><i class="demo-status-dot" aria-hidden="true"></i>Comparación de prueba</span>
+      </header>
+
+      <main class="workspace">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-mark" aria-hidden="true"></span>Paso 2 · Revisa el recorrido</p>
+            <h1>Tu ruta, con mejor orden ✨</h1>
+            <p class="subtitle">Mira cómo cambiaría el recorrido antes de confirmarlo. Tú conservas la última palabra.</p>
+          </div>
+          <div class="step-track" aria-label="Paso 2 de 3">
+            <span class="step-number">2</span><span>Optimizar</span><span aria-hidden="true">·</span><span>Confirmar</span>
+          </div>
+        </div>
+
+        <section class="engine-panel" aria-labelledby="engineTitle">
+          <div class="engine-copy">
+            <span class="engine-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5 19.5c3.5-5.5 5.5-2.5 8.5-7s5.5-5 6-8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="5" cy="19" r="2.4" fill="currentColor"/><circle cx="19.5" cy="4" r="2.4" fill="currentColor"/></svg>
+            </span>
+            <div>
+              <h2 id="engineTitle">Compara dos formas de ordenar</h2>
+              <p>La propuesta usa calles de OpenStreetMap con VROOM. <strong>En esta maqueta solo se simula el cambio.</strong></p>
+            </div>
+          </div>
+          <div class="engine-switch" role="group" aria-label="Motor de ruta para comparar">
+            <button class="engine-option" id="currentEngineButton" type="button" data-engine="current" aria-pressed="false">
+              Orden de referencia
+              <small>Haversine + 2‑opt</small>
+            </button>
+            <button class="engine-option" id="candidateEngineButton" type="button" data-engine="candidate" aria-pressed="true">
+              Propuesta por calles
+              <small>ORS + VROOM · simulada</small>
+            </button>
+          </div>
+        </section>
+
+        <section class="metric-row" aria-label="Comparación estimada">
+          <div class="metric">
+            <span class="metric-label">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 6.5v5.8l3.8 2.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Tiempo aprox.
+            </span>
+            <strong class="metric-value" id="timeMetric">02 h 41 min</strong>
+            <small class="metric-detail" id="timeDetail">Ejemplo ficticio · propuesta</small>
+          </div>
+          <div class="metric">
+            <span class="metric-label">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true"><path d="M4 18.5 9 5l6 14 5-13" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Distancia aprox.
+            </span>
+            <strong class="metric-value" id="distanceMetric">51.7 km</strong>
+            <small class="metric-detail" id="distanceDetail">Ejemplo ficticio · propuesta</small>
+          </div>
+          <div class="metric" data-kind="saving">
+            <span class="metric-label">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Frente a referencia
+            </span>
+            <strong class="metric-value" id="savingMetric">−37 min</strong>
+            <small class="metric-detail" id="savingDetail">−12.5 km · solo demostrativo</small>
+          </div>
+        </section>
+
+        <p class="compare-note" id="routeNotice" role="status">
+          <span class="compare-note-icon" aria-hidden="true">ⓘ</span>
+          <span><strong>Ejemplo, no medición.</strong> La ruta de muestra tiene 40 entregas; 38 aparecen ubicadas y 2 necesitan ubicación. Los totales ficticios no describen ahorros reales.</span>
+        </p>
+
+        <div class="mobile-tabs" role="group" aria-label="Cambiar vista">
+          <button class="mobile-tab" type="button" id="mapTab" aria-pressed="true">Mapa</button>
+          <button class="mobile-tab" type="button" id="stopsTab" aria-pressed="false">Paradas <span id="tabCount">40</span></button>
+        </div>
+
+        <div class="content-grid">
+          <section class="map-panel" id="mapPanel" aria-labelledby="mapTitle">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title" id="mapTitle">Vista de la ruta</h2>
+                <span class="panel-kicker">Base fija · destino final libre</span>
+              </div>
+              <span class="map-kind">Mapa esquemático</span>
+            </div>
+            <div class="map-wrap">
+              <svg class="street-map" id="streetMap" viewBox="0 0 620 450" role="img" aria-labelledby="mapSvgTitle mapSvgDescription">
+                <title id="mapSvgTitle">Mapa esquemático con cuarenta paradas ficticias</title>
+                <desc id="mapSvgDescription">La línea rosa muestra el orden de referencia. La línea lavanda muestra una propuesta visual agrupada por zonas. Este dibujo no corresponde a calles reales.</desc>
+                <path class="park" d="M424 45c28-15 79-13 104 5 16 11 17 36 2 51-20 20-68 24-98 11-26-12-31-50-8-67Z"/>
+                <text class="park-label" x="455" y="83">Parque ficticio</text>
+                <path class="park" d="M45 170c20-14 58-12 74 4 15 15 9 42-8 54-18 12-54 10-69-4-17-16-16-41 3-54Z"/>
+                <text class="park-label" x="50" y="205">Jardín</text>
+                <g aria-hidden="true">
+                  <path class="street" d="M25 98C150 89 205 116 326 99s182-9 270 4"/><path class="street-edge" d="M25 98C150 89 205 116 326 99s182-9 270 4"/>
+                  <path class="street" d="M15 151c117 13 180 4 287 13s176-6 288 12"/><path class="street-edge" d="M15 151c117 13 180 4 287 13s176-6 288 12"/>
+                  <path class="street" d="M14 224c92-8 205-5 294 4s186 16 287-4"/><path class="street-edge" d="M14 224c92-8 205-5 294 4s186 16 287-4"/>
+                  <path class="street" d="M17 301c93 8 181-11 287-1s199 22 291 11"/><path class="street-edge" d="M17 301c93 8 181-11 287-1s199 22 291 11"/>
+                  <path class="street" d="M18 377c98-5 193 5 289 1s186-12 286-5"/><path class="street-edge" d="M18 377c98-5 193 5 289 1s186-12 286-5"/>
+                  <path class="minor-street" d="M95 55c-7 76 12 132 3 197s-1 111 2 153"/><path class="street-edge" d="M95 55c-7 76 12 132 3 197s-1 111 2 153"/>
+                  <path class="minor-street" d="M186 45c10 70-8 144-2 206s8 117-1 171"/><path class="street-edge" d="M186 45c10 70-8 144-2 206s8 117-1 171"/>
+                  <path class="minor-street" d="M281 43c-5 72 8 125 4 198s4 122 1 180"/><path class="street-edge" d="M281 43c-5 72 8 125 4 198s4 122 1 180"/>
+                  <path class="minor-street" d="M378 42c9 81-8 141-2 206s10 110 3 171"/><path class="street-edge" d="M378 42c9 81-8 141-2 206s10 110 3 171"/>
+                  <path class="minor-street" d="M481 47c-7 73 8 137 3 201s-1 108 4 168"/><path class="street-edge" d="M481 47c-7 73 8 137 3 201s-1 108 4 168"/>
+                  <path class="minor-street" d="M564 52c-5 75 8 131 1 198s-3 110 2 164"/><path class="street-edge" d="M564 52c-5 75 8 131 1 198s-3 110 2 164"/>
+                </g>
+                <text class="zone-label" x="28" y="32">ZONA JARDÍN</text>
+                <text class="zone-label" x="241" y="32">ZONA NUEVA ERA</text>
+                <text class="zone-label" x="438" y="32">ZONA LAS PALMAS</text>
+                <text class="zone-label" x="228" y="430">ZONA CENTRO</text>
+                <polyline class="route-halo" id="routeHalo" points=""/>
+                <polyline class="route-line candidate" id="routeLine" points=""/>
+                <g class="depot-pin" transform="translate(54 397)" aria-label="Base de salida">
+                  <circle r="14"/><text y=".5">B</text>
+                </g>
+                <g id="mapStops" aria-hidden="true"></g>
+              </svg>
+            </div>
+            <div class="map-legend" aria-label="Leyenda">
+              <span class="legend-item"><i class="legend-mark base" aria-hidden="true"></i>Base de salida</span>
+              <span class="legend-item"><i class="legend-mark" aria-hidden="true"></i><span id="legendEngine">Propuesta simulada</span></span>
+              <span class="legend-item"><i class="legend-mark route" aria-hidden="true"></i>Orden de visita</span>
+            </div>
+            <div class="map-source-note">Ilustración inventada para el diseño. No muestra Nuevo Laredo ni datos de calles; la futura integración conservaría el mapa actual por etapas.</div>
+          </section>
+
+          <section class="list-panel" id="listPanel" aria-labelledby="stopsTitle">
+            <div class="panel-head">
+              <div class="list-head-copy">
+                <h2 class="panel-title" id="stopsTitle">Orden de paradas</h2>
+                <span class="panel-kicker" id="listEngineLabel">Propuesta visual · agrupada por zona</span>
+              </div>
+              <span class="stop-count"><span id="visibleCoordsCount">38</span> ubicadas · 40 total</span>
+            </div>
+            <div class="list-tools">
+              <label class="search-wrap">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span class="sr-only">Buscar parada</span>
+                <input id="searchInput" type="search" placeholder="Buscar zona o clienta ficticia">
+              </label>
+              <button class="edit-order-button" id="editOrderButton" type="button" aria-pressed="false">Ajustar orden</button>
+            </div>
+            <ol class="stop-list" id="stopList" aria-label="Lista ordenada de paradas"></ol>
+            <div class="empty-list" id="emptySearch" hidden>No hay paradas que coincidan.</div>
+            <div class="list-foot">
+              <span aria-hidden="true">!</span>
+              <span><strong>2 paradas sin ubicación.</strong> En la app real, hay que ubicar esas entregas antes de habilitar la ruta completa.</span>
+            </div>
+          </section>
+        </div>
+
+        <section class="desktop-action" aria-label="Acción de la propuesta">
+          <div class="action-copy"><strong>La ruta todavía necesita 2 ubicaciones</strong><small>El orden no se guarda desde esta maqueta.</small></div>
+          <button class="primary-button" type="button" disabled>Completa las ubicaciones</button>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="bottom-action" aria-label="Confirmación de ruta">
+    <div class="bottom-summary"><strong>40 paradas · 2 por ubicar</strong><small>Primero revisa las ubicaciones</small></div>
+    <button class="primary-button" type="button" id="mobileActionButton">Revisar 2 faltantes</button>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const zones = [
+        { name: "Jardín", centerX: 102, centerY: 284, color: "#e98bb1" },
+        { name: "Nueva Era", centerX: 267, centerY: 126, color: "#9a7bbb" },
+        { name: "Las Palmas", centerX: 494, centerY: 225, color: "#e5ad64" },
+        { name: "Centro", centerX: 317, centerY: 341, color: "#d27d9d" }
+      ];
+
+      const stops = [];
+      zones.forEach(function (zone, zoneIndex) {
+        for (let position = 0; position < 10; position += 1) {
+          const angle = (Math.PI * 2 * position / 10) + (zoneIndex * 0.31);
+          const radiusX = 27 + ((position % 3) * 5);
+          const radiusY = 22 + ((position % 4) * 4);
+          const id = (zoneIndex * 10) + position + 1;
+          stops.push({
+            id: id,
+            name: "Clienta de muestra " + String(id).padStart(2, "0"),
+            zone: zone.name,
+            x: Math.round(zone.centerX + Math.cos(angle) * radiusX),
+            y: Math.round(zone.centerY + Math.sin(angle) * radiusY),
+            hasCoords: id <= 38,
+            time: id === 7 ? "5:30–6:30 p. m." : (id === 26 ? "Antes de las 7:00 p. m." : "")
+          });
+        }
+      });
+
+      const byId = new Map(stops.map(function (stop) { return [stop.id, stop]; }));
+      const candidateOrder = stops.filter(function (stop) { return stop.hasCoords; }).map(function (stop) { return stop.id; });
+      const referenceOrder = [];
+      for (let place = 0; place < 10; place += 1) {
+        zones.forEach(function (zone, zoneIndex) {
+          const id = zoneIndex * 10 + place + 1;
+          if (id <= 38) referenceOrder.push(id);
+        });
+      }
+
+      let activeEngine = "candidate";
+      let mobileView = "map";
+      let editingOrder = false;
+      let manuallyAdjusted = false;
+      let activeStopId = null;
+      let toastTimer = 0;
+      const adjustedTimes = new Map();
+      const currentOrder = referenceOrder.slice();
+      let suggestedOrder = candidateOrder.slice();
+
+      const root = document.documentElement;
+      const mapPanel = document.getElementById("mapPanel");
+      const listPanel = document.getElementById("listPanel");
+      const routeLine = document.getElementById("routeLine");
+      const routeHalo = document.getElementById("routeHalo");
+      const mapStops = document.getElementById("mapStops");
+      const stopList = document.getElementById("stopList");
+      const emptySearch = document.getElementById("emptySearch");
+      const searchInput = document.getElementById("searchInput");
+      const toast = document.getElementById("toast");
+
+      function announce(message) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        toastTimer = window.setTimeout(function () { toast.classList.remove("is-visible"); }, 2600);
+      }
+
+      function activeOrder() {
+        return activeEngine === "candidate" ? suggestedOrder : currentOrder;
+      }
+
+      function metricText() {
+        if (activeEngine === "candidate") {
+          return {
+            time: "02 h 41 min",
+            distance: "51.7 km",
+            timeDetail: "Ejemplo ficticio · propuesta",
+            distanceDetail: "Ejemplo ficticio · propuesta",
+            saved: "−37 min",
+            savedDetail: "−12.5 km · solo demostrativo"
+          };
+        }
+        return {
+          time: "03 h 18 min",
+          distance: "64.2 km",
+          timeDetail: "Ejemplo ficticio · referencia",
+          distanceDetail: "Ejemplo ficticio · referencia",
+          saved: "Referencia",
+          savedDetail: "La propuesta sería menor en este ejemplo"
+        };
+      }
+
+      function svgElement(name, attrs) {
+        const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+        Object.keys(attrs).forEach(function (key) { element.setAttribute(key, String(attrs[key])); });
+        return element;
+      }
+
+      function renderMap() {
+        const order = activeOrder();
+        const stopsWithCoords = order.map(function (id) { return byId.get(id); }).filter(Boolean);
+        const coordinates = ["54,397"].concat(stopsWithCoords.map(function (stop) { return stop.x + "," + stop.y; })).join(" ");
+        routeLine.setAttribute("points", coordinates);
+        routeHalo.setAttribute("points", coordinates);
+        routeLine.classList.toggle("candidate", activeEngine === "candidate");
+        routeHalo.classList.remove("is-hidden");
+        routeLine.classList.remove("is-hidden");
+        mapStops.replaceChildren();
+
+        const rankById = new Map(order.map(function (id, index) { return [id, index + 1]; }));
+        stopsWithCoords.forEach(function (stop) {
+          const group = svgElement("g", {
+            class: "map-stop" + (activeEngine === "candidate" ? " candidate" : "") + (stop.id === activeStopId ? " is-active" : ""),
+            transform: "translate(" + stop.x + " " + stop.y + ")",
+            "data-stop-id": stop.id,
+            "aria-hidden": "true"
+          });
+          group.appendChild(svgElement("circle", { r: 10 }));
+          const label = svgElement("text", { y: ".5" });
+          label.textContent = String(rankById.get(stop.id) || stop.id);
+          group.appendChild(label);
+          mapStops.appendChild(group);
+        });
+      }
+
+      function moveStop(id, direction) {
+        const order = activeOrder();
+        const index = order.indexOf(id);
+        const nextIndex = index + direction;
+        if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return;
+        const moved = order.splice(index, 1)[0];
+        order.splice(nextIndex, 0, moved);
+        if (activeEngine === "candidate") manuallyAdjusted = true;
+        renderAll();
+        const movedRow = stopList.querySelector('[data-stop-id="' + id + '"]');
+        if (movedRow) movedRow.querySelector(".move-button").focus();
+        announce("El orden se ajustó solo en esta maqueta.");
+      }
+
+      function renderList() {
+        const order = activeOrder();
+        const query = searchInput.value.trim().toLocaleLowerCase("es-MX");
+        stopList.replaceChildren();
+        let visibleCount = 0;
+
+        order.forEach(function (id, index) {
+          const stop = byId.get(id);
+          if (!stop) return;
+          const searchable = (stop.name + " " + stop.zone).toLocaleLowerCase("es-MX");
+          if (query && !searchable.includes(query)) return;
+          visibleCount += 1;
+
+          const row = document.createElement("li");
+          row.className = "stop-row" + (stop.hasCoords ? "" : " without-coords") + (stop.id === activeStopId ? " is-active" : "");
+          row.dataset.stopId = String(stop.id);
+
+          const number = document.createElement("span");
+          number.className = "stop-number";
+          number.textContent = stop.hasCoords ? String(index + 1) : "!";
+
+          const copy = document.createElement("span");
+          copy.className = "stop-copy";
+          const name = document.createElement("span");
+          name.className = "stop-name";
+          name.textContent = stop.name;
+          const place = document.createElement("span");
+          place.className = "stop-place";
+          place.textContent = stop.hasCoords ? "Zona " + stop.zone + " · domicilio ficticio" : "Falta ubicar este domicilio";
+          copy.append(name, place);
+
+          if (stop.time) {
+            const timeWrap = document.createElement("span");
+            timeWrap.className = "time-pref";
+            const timeTag = document.createElement("span");
+            timeTag.className = "time-tag" + (adjustedTimes.has(stop.id) ? " is-adjusted" : "");
+            timeTag.textContent = "Pref. " + (adjustedTimes.get(stop.id) || stop.time);
+            const changeTime = document.createElement("button");
+            changeTime.className = "time-edit";
+            changeTime.type = "button";
+            changeTime.textContent = adjustedTimes.has(stop.id) ? "Restaurar" : "Ajustar";
+            changeTime.setAttribute("aria-label", (adjustedTimes.has(stop.id) ? "Restaurar horario preferido de " : "Ajustar horario preferido de ") + stop.name);
+            changeTime.addEventListener("click", function (event) {
+              event.stopPropagation();
+              if (adjustedTimes.has(stop.id)) {
+                adjustedTimes.delete(stop.id);
+                announce("Se restauró la preferencia ficticia.");
+              } else {
+                adjustedTimes.set(stop.id, stop.id === 7 ? "4:30–5:30 p. m." : "6:00–7:00 p. m.");
+                announce("Horario ajustado visualmente; no se guardó.");
+              }
+              renderList();
+            });
+            timeWrap.append(timeTag, changeTime);
+            copy.appendChild(timeWrap);
+          }
+
+          const end = document.createElement("span");
+          if (stop.hasCoords) {
+            end.className = "move-tools" + (editingOrder ? " is-visible" : "");
+            const up = document.createElement("button");
+            up.className = "move-button";
+            up.type = "button";
+            up.textContent = "↑";
+            up.disabled = index === 0;
+            up.setAttribute("aria-label", "Mover " + stop.name + " una parada arriba");
+            up.addEventListener("click", function (event) { event.stopPropagation(); moveStop(stop.id, -1); });
+            const down = document.createElement("button");
+            down.className = "move-button";
+            down.type = "button";
+            down.textContent = "↓";
+            down.disabled = index === order.length - 1;
+            down.setAttribute("aria-label", "Mover " + stop.name + " una parada abajo");
+            down.addEventListener("click", function (event) { event.stopPropagation(); moveStop(stop.id, 1); });
+            end.append(up, down);
+          } else {
+            end.className = "stop-status";
+            end.textContent = "Sin ubicación";
+          }
+
+          row.append(number, copy, end);
+          row.tabIndex = 0;
+          row.setAttribute("aria-label", (stop.hasCoords ? "Parada " + (index + 1) : "Sin ubicación") + ": " + stop.name + ", Zona " + stop.zone + (stop.time ? ", horario preferido " + (adjustedTimes.get(stop.id) || stop.time) : ""));
+          row.addEventListener("click", function (event) {
+            if (event.target.closest("button")) return;
+            activeStopId = stop.id;
+            renderMap();
+            renderList();
+          });
+          row.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              activeStopId = stop.id;
+              renderMap();
+              renderList();
+            }
+          });
+          stopList.appendChild(row);
+        });
+
+        emptySearch.hidden = visibleCount > 0;
+      }
+
+      function renderMetrics() {
+        const metrics = metricText();
+        document.getElementById("timeMetric").textContent = metrics.time;
+        document.getElementById("distanceMetric").textContent = metrics.distance;
+        document.getElementById("timeDetail").textContent = metrics.timeDetail;
+        document.getElementById("distanceDetail").textContent = metrics.distanceDetail;
+        document.getElementById("savingMetric").textContent = metrics.saved;
+        document.getElementById("savingDetail").textContent = metrics.savedDetail;
+
+        if (manuallyAdjusted && activeEngine === "candidate") {
+          document.getElementById("timeDetail").textContent = "Orden manual · ejemplo sin recalcular";
+          document.getElementById("distanceDetail").textContent = "Orden manual · ejemplo sin recalcular";
+          document.getElementById("savingDetail").textContent = "El cambio requeriría volver a calcular";
+        }
+
+        const routeLabel = activeEngine === "candidate" ? "Propuesta simulada" : "Referencia ficticia";
+        document.getElementById("legendEngine").textContent = routeLabel;
+        document.getElementById("listEngineLabel").textContent = activeEngine === "candidate"
+          ? (manuallyAdjusted ? "Orden ajustado manualmente · demo" : "Propuesta simulada · agrupada por zona")
+          : "Orden de referencia · ejemplo ficticio";
+
+        document.getElementById("currentEngineButton").setAttribute("aria-pressed", String(activeEngine === "current"));
+        document.getElementById("candidateEngineButton").setAttribute("aria-pressed", String(activeEngine === "candidate"));
+      }
+
+      function renderMobileView() {
+        const isDesktop = window.matchMedia("(min-width: 680px)").matches;
+        const showMap = isDesktop || mobileView === "map";
+        const showList = isDesktop || mobileView === "list";
+        mapPanel.hidden = !showMap;
+        listPanel.hidden = !showList;
+        document.getElementById("mapTab").setAttribute("aria-pressed", String(mobileView === "map"));
+        document.getElementById("stopsTab").setAttribute("aria-pressed", String(mobileView === "list"));
+      }
+
+      function renderAll() {
+        renderMetrics();
+        renderMap();
+        renderList();
+        renderMobileView();
+      }
+
+      document.getElementById("currentEngineButton").addEventListener("click", function () {
+        activeEngine = "current";
+        manuallyAdjusted = false;
+        renderAll();
+      });
+
+      document.getElementById("candidateEngineButton").addEventListener("click", function () {
+        activeEngine = "candidate";
+        renderAll();
+      });
+
+      document.getElementById("mapTab").addEventListener("click", function () {
+        mobileView = "map";
+        renderMobileView();
+      });
+
+      document.getElementById("stopsTab").addEventListener("click", function () {
+        mobileView = "list";
+        renderMobileView();
+      });
+
+      document.getElementById("editOrderButton").addEventListener("click", function (event) {
+        editingOrder = !editingOrder;
+        event.currentTarget.setAttribute("aria-pressed", String(editingOrder));
+        event.currentTarget.textContent = editingOrder ? "Terminar ajuste" : "Ajustar orden";
+        renderList();
+        announce(editingOrder ? "Usa las flechas para corregir el orden." : "El orden quedó revisado en esta maqueta.");
+      });
+
+      searchInput.addEventListener("input", renderList);
+
+      document.getElementById("mobileActionButton").addEventListener("click", function () {
+        mobileView = "list";
+        renderMobileView();
+        document.getElementById("listPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+        announce("Primero hay que completar las dos ubicaciones faltantes.");
+      });
+
+      document.getElementById("backButton").addEventListener("click", function () {
+        announce("Volvería a la selección de paradas. Esta maqueta no cambia la app.");
+      });
+
+      window.addEventListener("resize", renderMobileView, { passive: true });
+
+      renderAll();
+    }());
+  </script>
+</body>
+</html>
