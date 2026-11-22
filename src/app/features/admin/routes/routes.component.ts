@@ -1467,14 +1467,20 @@ export class RoutesComponent implements OnInit, OnDestroy {
     return this.routes().filter((r: RouteDto) => r.status === 'Active').length;
   });
 
-  driverMarkerOptions: google.maps.MarkerOptions = {
-    icon: {
-      path: 'M29.395,0H17.636c-3.117,0-5.643,2.527-5.643,5.643v23.752c0,3.116,2.526,5.644,5.643,5.644h11.759' +
-        'c3.116,0,5.644-2.527,5.644-5.644V5.643C35.039,2.527,32.511,0,29.395,0z M34.039,29.395c0,2.56-2.084,4.644-4.644,4.644' +
-        'H17.636c-2.56,0-4.643-2.084-4.643-4.644V5.643c0-2.56,2.083-4.643,4.643-4.643h11.759c2.56,0,4.644,2.083,4.644,4.643V29.395z',
-      fillColor: '#3b82f6', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2, scale: 0.8, anchor: new google.maps.Point(25, 25)
-    }
-  };
+  // Se crea al primer uso (solo dentro del modal del mapa) y se memoiza para mantener la referencia estable.
+  // NO tocar `google` al construir el componente: el script de Maps carga con async defer y, si llega
+  // después que esta página, `new google.maps.Point` lanza "google is not defined" y la página queda en blanco.
+  private _driverMarkerOptions?: google.maps.MarkerOptions;
+  get driverMarkerOptions(): google.maps.MarkerOptions {
+    return this._driverMarkerOptions ??= {
+      icon: {
+        path: 'M29.395,0H17.636c-3.117,0-5.643,2.527-5.643,5.643v23.752c0,3.116,2.526,5.644,5.643,5.644h11.759' +
+          'c3.116,0,5.644-2.527,5.644-5.644V5.643C35.039,2.527,32.511,0,29.395,0z M34.039,29.395c0,2.56-2.084,4.644-4.644,4.644' +
+          'H17.636c-2.56,0-4.643-2.084-4.643-4.644V5.643c0-2.56,2.083-4.643,4.643-4.643h11.759c2.56,0,4.644,2.083,4.644,4.643V29.395z',
+        fillColor: '#3b82f6', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2, scale: 0.8, anchor: new google.maps.Point(25, 25)
+      }
+    };
+  }
 
   // Live Tracking
   driverMarkers = signal<Map<string, { lat: number, lng: number }>>(new Map());
