@@ -1451,6 +1451,7 @@ export class RoutesComponent implements OnInit, OnDestroy {
   // ─── AUTO-REFRESH ───
   private refreshInterval: any = null;
   private counterInterval: any = null;
+  private routesRequestSeq = 0;
   lastRefreshedAt = signal<Date>(new Date());
   refreshAgo = signal<string>('');
 
@@ -1780,10 +1781,10 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   private startAutoRefresh(): void {
-    // Refresca cada 45s solo si hay rutas activas
+    // Refresca cada 45s solo si hay rutas activas, en silencio (sin esqueletos ni perder el scroll)
     this.refreshInterval = setInterval(() => {
       if (this.routes().some(r => r.status === 'Active')) {
-        this.loadRoutes();
+        this.loadRoutes(true);
       }
     }, 45_000);
 
@@ -2078,13 +2079,13 @@ export class RoutesComponent implements OnInit, OnDestroy {
       } else {
         this.latestEvent.set(`[${time}] Actualización de ruta detectada 🔄`);
       }
-      this.loadRoutes();
+      this.loadRoutes(true);
     });
 
     this.signalr.expenseAdded$.subscribe((data: any) => {
       const time = new Date().toLocaleTimeString('es-MX', { hour12: false });
       this.latestEvent.set(`[${time}] GASTO REGISTRADO: $${data.amount} (${data.type}) 💸`);
-      this.loadRoutes();
+      this.loadRoutes(true);
     });
 
     this.signalr.clientChatUpdate$.subscribe((msg: any) => {
@@ -2462,10 +2463,19 @@ export class RoutesComponent implements OnInit, OnDestroy {
   }
 
   // ─── DATA LOADING ───
-  loadRoutes(): void {
-    this.loading.set(true);
+  /**
+   * Carga las rutas. Con `silent = true` (refrescos automáticos: timer y eventos SignalR) NO activa
+   * `loading`, así que la lista no se reemplaza por esqueletos: se conservan el scroll, las tarjetas
+   * abiertas y el mapa del radar. Tampoco recarga los pedidos pendientes (openAddSheet ya lo hace) ni
+   * muestra toast si falla. El botón «Actualizar» y las acciones del admin siguen usando la carga normal.
+   */
+  loadRoutes(silent = false): void {
+    // Si hay varias cargas en vuelo (ráfaga de eventos SignalR), solo vale la más reciente
+    const requestId = ++this.routesRequestSeq;
+    if (!silent) this.loading.set(true);
     this.api.getRoutes().subscribe({
       next: (r) => {
+        if (requestId !== this.routesRequestSeq) return;
         r.sort((a, b) => b.id - a.id);
         this.routes.set(r);
         this.loading.set(false);
@@ -2477,9 +2487,13 @@ export class RoutesComponent implements OnInit, OnDestroy {
           setTimeout(() => this.initGodModeMap(), 300);
         }
       },
-      error: () => { this.loading.set(false); this.toast.error('Error al cargar rutas'); }
+      error: () => {
+        if (requestId !== this.routesRequestSeq) return;
+        this.loading.set(false);
+        if (!silent) this.toast.error('Error al cargar rutas');
+      }
     });
-    this.loadPendingOrders(); // Also load pending orders for quick-add feature
+    if (!silent) this.loadPendingOrders(); // Also load pending orders for quick-add feature
   }
 
   loadPendingOrders(): void {
