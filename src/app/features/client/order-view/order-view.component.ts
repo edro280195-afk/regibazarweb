@@ -636,7 +636,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                             <div class="bg-white rounded-2xl p-5 border-2 border-emerald-200 shadow-md mb-3">
                               <div class="flex items-center gap-2 mb-4">
                                 <span class="text-2xl">✅</span>
-                                <span class="font-black text-emerald-700 text-base">Aprobado · Aviso enviado a Regi Bazar</span>
+                                <span class="font-black text-emerald-700 text-base">Pago recibido</span>
                               </div>
                               <div class="space-y-2 text-sm">
                                 <div class="flex justify-between">
@@ -659,6 +659,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                             </div>
                             <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100 text-center space-y-3">
                               <p class="text-sm font-black text-blue-900">📸 Toma captura de esta pantalla</p>
+                              <p class="text-xs text-blue-800 font-semibold leading-relaxed">Pago recibido, favor de notificar a Regi Bazar con esta captura de que tu pago fue realizado para que Regi confirme de recibido 💕</p>
                               <a [href]="messengerUrl" target="_blank" rel="noopener"
                                  class="flex items-center justify-center gap-3 bg-[#0099FF] text-white font-black text-sm py-4 px-5 rounded-2xl active:scale-95 transition-all shadow-xl w-full">
                                 <svg class="w-6 h-6 fill-white" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.672V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.974 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26 5.887-3.26-6.559 6.863z"/></svg>
@@ -1374,19 +1375,21 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
           this.etaText.set(this.formatEtaFromDate(data.estimatedArrival));
         }
 
-        // Check Unboxing Session Status
-        const unboxedKey = `regibazar_unboxed_${this.accessToken}`;
-        if (!sessionStorage.getItem(unboxedKey)) {
-          this.isUnboxed.set(false);
-        } else {
-          this.isUnboxed.set(true);
-        }
+        // Check Unboxing Session Status (solo en la carga inicial para no volver a mostrar el regalito)
+        if (!this.hasLoadedOrder) {
+          const unboxedKey = `regibazar_unboxed_${this.accessToken}`;
+          if (!sessionStorage.getItem(unboxedKey)) {
+            this.isUnboxed.set(false);
+          } else {
+            this.isUnboxed.set(true);
+          }
 
-        if (this.isUnboxed()) {
-          setTimeout(() => {
-            this.animateTicketReveal();
-            if (data.status === 'Delivered') this.fireConfetti('unboxing');
-          }, 500);
+          if (this.isUnboxed()) {
+            setTimeout(() => {
+              this.animateTicketReveal();
+              if (data.status === 'Delivered') this.fireConfetti('unboxing');
+            }, 500);
+          }
         }
 
         // Seguimiento y evidencia deben ser lo primero que vea la clienta.
