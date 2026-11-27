@@ -568,31 +568,17 @@ export class ApiService {
         return this.http.patch(`${this.base}/pedido/${accessToken}/instructions`, { instructions });
     }
 
-    publicCreateCheckoutPro(accessToken: string): Observable<{
-        preferenceId: string;
-        initPoint: string;
-        amount: number;
-    }> {
-        return this.http.post<{ preferenceId: string; initPoint: string; amount: number }>(
-            `${this.base}/pedido/${accessToken}/payment/checkout-pro`, {});
-    }
-
-    publicVerifyOrderPayment(accessToken: string, paymentId: string): Observable<{
-        status: string;
-        statusDetail: string;
-        amount: number;
-        message: string;
-        paymentId?: number;
-        orderPaid: boolean;
-    }> {
-        return this.http.post<{
-            status: string;
-            statusDetail: string;
-            amount: number;
-            message: string;
-            paymentId?: number;
-            orderPaid: boolean;
-        }>(`${this.base}/pedido/${accessToken}/payment/verify/${paymentId}`, {});
+    publicCardPayment(accessToken: string, body: {
+        cardToken: string;
+        paymentMethodId: string;
+        issuerId: string | null;
+        installments: number;
+        payerEmail?: string;
+        cardholderName?: string;
+        deviceSessionId?: string;
+    }): Observable<{ status: string; statusDetail: string; amount: number; message: string; paymentId?: number }> {
+        return this.http.post<{ status: string; statusDetail: string; amount: number; message: string; paymentId?: number }>(
+            `${this.base}/pedido/${accessToken}/payment/card`, body);
     }
 
     // ── AI Voice Routes ──
