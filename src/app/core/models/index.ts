@@ -119,6 +119,24 @@ export interface OrderPaymentDto {
     notes?: string;
 }
 
+export interface OrderPaymentReportDto {
+    id: number;
+    orderId: number;
+    amount: number;
+    method: string;
+    reference?: string;
+    notes?: string;
+    proofImageUrl?: string;
+    status: 'Pending' | 'Confirmed' | 'Rejected' | string;
+    createdAt: string;
+    reviewedAt?: string;
+    rejectionReason?: string;
+    clientName?: string;
+    clientPhone?: string;
+    orderTotal?: number;
+    orderBalanceDue?: number;
+}
+
 export type PublicOrderViewMode =
     | 'Payment'
     | 'Tracking'

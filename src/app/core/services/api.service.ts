@@ -581,6 +581,26 @@ export class ApiService {
             `${this.base}/pedido/${accessToken}/payment/card`, body);
     }
 
+    publicReportOrderPayment(accessToken: string, formData: FormData): Observable<any> {
+        return this.http.post<any>(`${this.base}/pedido/${accessToken}/payment/report`, formData);
+    }
+
+    getPendingOrderPaymentReports(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/orders/payment-reports/pending`);
+    }
+
+    getOrderPaymentReports(orderId: number): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/orders/${orderId}/payment-reports`);
+    }
+
+    confirmOrderPaymentReport(reportId: number): Observable<any> {
+        return this.http.post<any>(`${this.base}/orders/payment-reports/${reportId}/confirm`, {});
+    }
+
+    rejectOrderPaymentReport(reportId: number, reason?: string): Observable<any> {
+        return this.http.post<any>(`${this.base}/orders/payment-reports/${reportId}/reject`, { reason });
+    }
+
     // ── AI Voice Routes ──
     getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<AiRouteSelectionResponse> {
         return this.http.post<AiRouteSelectionResponse>(`${this.base}/routes/ai-select`, {

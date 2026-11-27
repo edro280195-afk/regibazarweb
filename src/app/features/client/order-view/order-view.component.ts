@@ -174,6 +174,48 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             </div>
           </div>
 
+          <!-- Estado de avisos de pago (Pendiente de confirmar / Confirmado / Rechazado) -->
+          @if (pendingPaymentReports().length > 0) {
+            <div class="mb-4 bg-gradient-to-br from-amber-50 to-pink-50 rounded-3xl p-4 border-2 border-amber-200/80 shadow-md animate-fade-in-up space-y-2">
+              <div class="flex items-center gap-2.5">
+                <span class="text-2xl">⏳</span>
+                <div class="min-w-0">
+                  <p class="font-black text-amber-900 text-sm leading-tight">Pago en validación por Regi Bazar</p>
+                  <p class="text-[11px] text-amber-800/90 font-medium mt-0.5">Ya recibimos tu aviso. En cuanto confirmemos el depósito en cuenta, tu pedido quedará marcado como pagado aquí mismo 💕</p>
+                </div>
+              </div>
+              <div class="space-y-1.5 pt-1">
+                @for (rep of pendingPaymentReports(); track rep.id) {
+                  <div class="bg-white/80 rounded-2xl px-3 py-2 border border-amber-100 flex items-center justify-between gap-2 text-xs">
+                    <div class="min-w-0">
+                      <span class="font-black text-[#52232b]">{{ rep.method }}</span>
+                      @if (rep.reference) {
+                        <span class="ml-1.5 font-mono text-[10px] text-amber-700 font-bold">{{ rep.reference }}</span>
+                      }
+                    </div>
+                    <span class="font-black text-pink-700 shrink-0">{{ rep.amount | currency:'MXN':'symbol-narrow' }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          } @else if (o.balanceDue <= 0 && o.amountPaid > 0) {
+            <div class="mb-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-4 border-2 border-emerald-200/80 shadow-md animate-fade-in-up flex items-center gap-3">
+              <span class="text-2xl">✅</span>
+              <div class="min-w-0">
+                <p class="font-black text-emerald-800 text-sm leading-tight">¡Pago confirmado por Regi Bazar!</p>
+                <p class="text-[11px] text-emerald-700 font-medium mt-0.5">Tu pedido está 100% liquidado. ¡Muchas gracias por tu compra! 💖✨</p>
+              </div>
+            </div>
+          } @else if (latestRejectedPaymentReport(); as rej) {
+            <div class="mb-4 bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-4 border-2 border-rose-200 shadow-md animate-fade-in-up space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">⚠️</span>
+                <p class="font-black text-rose-800 text-sm">No pudimos confirmar tu pago reportado ({{ rej.amount | currency:'MXN':'symbol-narrow' }})</p>
+              </div>
+              <p class="text-xs text-rose-700 font-medium pl-7">{{ rej.rejectionReason || 'Por favor verifica tu comprobante y vuelve a enviarlo.' }}</p>
+            </div>
+          }
+
           <!-- Smart Dashboard Top Bar (Sticky): Estilo Rediseño -->
           @if (o.paymentVisible !== false && o.balanceDue > 0) {
             <div id="balance-summary" class="sticky top-2 z-30 mb-4" [style.opacity]="isUnboxed() ? 1 : 0">
@@ -491,6 +533,36 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           </div>
                         </div>
                         <p class="text-[10px] text-blue-700/80 text-center font-bold">A nombre de: Yazmin Vara ✨</p>
+                        <div class="mt-4 pt-3 border-t border-blue-200/60 relative z-10">
+                          @if (showReportForm() !== 'Transferencia') {
+                            <button type="button" (click)="openReportPaymentForm('Transferencia')"
+                                    class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all">
+                              ✨ Ya transferí — Avisar a Regi Bazar
+                            </button>
+                          } @else {
+                            <div class="bg-white/85 rounded-2xl p-3.5 border border-pink-200 space-y-2.5 animate-fade-in">
+                              <p class="text-xs font-black text-pink-900 text-center">💖 Avisa tu transferencia</p>
+                              <div class="flex items-center gap-2">
+                                <span class="text-xs font-black text-pink-700">$</span>
+                                <input type="number" [(ngModel)]="reportAmount" min="1" step="0.5" placeholder="Monto pagado"
+                                       class="rb-input-neumorphic flex-1 text-base py-2 px-3">
+                              </div>
+                              <input type="text" [(ngModel)]="reportNotes" placeholder="Nombre de quien transfirió o referencia (opcional)"
+                                     class="rb-input-neumorphic w-full text-base py-2 px-3">
+                              <label class="block w-full text-center py-2.5 px-3 rounded-xl border border-dashed border-pink-300 bg-pink-50/70 text-xs font-bold text-pink-700 cursor-pointer">
+                                {{ reportFileName() ? '📸 ' + reportFileName() : '📸 Adjuntar comprobante (opcional)' }}
+                                <input type="file" accept="image/*" class="hidden" (change)="onReportFileSelected($event)">
+                              </label>
+                              <div class="flex gap-2">
+                                <button type="button" (click)="showReportForm.set(null)" class="py-2.5 px-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold">Cancelar</button>
+                                <button type="button" [disabled]="submittingReport()" (click)="submitPaymentReport('Transferencia')"
+                                        class="flex-1 py-2.5 px-4 rounded-xl bg-pink-500 text-white text-xs font-black uppercase tracking-wider shadow disabled:opacity-50">
+                                  {{ submittingReport() ? 'Enviando...' : 'Confirmar aviso 💖' }}
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        </div>
                       </div>
                     }
                     @case ('oxxo') {
@@ -513,6 +585,36 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           </div>
                         </div>
                         <p class="text-[10px] text-red-700/80 text-center font-bold">Envía foto del ticket a tu vendedora ✨</p>
+                        <div class="mt-4 pt-3 border-t border-red-200/60 relative z-10">
+                          @if (showReportForm() !== 'OXXO') {
+                            <button type="button" (click)="openReportPaymentForm('OXXO')"
+                                    class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all">
+                              ✨ Ya deposité en OXXO — Avisar a Regi Bazar
+                            </button>
+                          } @else {
+                            <div class="bg-white/85 rounded-2xl p-3.5 border border-pink-200 space-y-2.5 animate-fade-in">
+                              <p class="text-xs font-black text-pink-900 text-center">💖 Avisa tu depósito OXXO</p>
+                              <div class="flex items-center gap-2">
+                                <span class="text-xs font-black text-pink-700">$</span>
+                                <input type="number" [(ngModel)]="reportAmount" min="1" step="0.5" placeholder="Monto pagado"
+                                       class="rb-input-neumorphic flex-1 text-base py-2 px-3">
+                              </div>
+                              <input type="text" [(ngModel)]="reportNotes" placeholder="Folio o nota (opcional)"
+                                     class="rb-input-neumorphic w-full text-base py-2 px-3">
+                              <label class="block w-full text-center py-2.5 px-3 rounded-xl border border-dashed border-pink-300 bg-pink-50/70 text-xs font-bold text-pink-700 cursor-pointer">
+                                {{ reportFileName() ? '📸 ' + reportFileName() : '📸 Foto de tu ticket OXXO (opcional)' }}
+                                <input type="file" accept="image/*" class="hidden" (change)="onReportFileSelected($event)">
+                              </label>
+                              <div class="flex gap-2">
+                                <button type="button" (click)="showReportForm.set(null)" class="py-2.5 px-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold">Cancelar</button>
+                                <button type="button" [disabled]="submittingReport()" (click)="submitPaymentReport('OXXO')"
+                                        class="flex-1 py-2.5 px-4 rounded-xl bg-pink-500 text-white text-xs font-black uppercase tracking-wider shadow disabled:opacity-50">
+                                  {{ submittingReport() ? 'Enviando...' : 'Confirmar aviso 💖' }}
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        </div>
                       </div>
                     }
                     @case ('card') {
@@ -534,7 +636,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                             <div class="bg-white rounded-2xl p-5 border-2 border-emerald-200 shadow-md mb-3">
                               <div class="flex items-center gap-2 mb-4">
                                 <span class="text-2xl">✅</span>
-                                <span class="font-black text-emerald-700 text-base">Pago aprobado</span>
+                                <span class="font-black text-emerald-700 text-base">Aprobado · Aviso enviado a Regi Bazar</span>
                               </div>
                               <div class="space-y-2 text-sm">
                                 <div class="flex justify-between">
@@ -968,6 +1070,24 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   mpReceipt = signal<{ amount: number; date: Date; ref: string } | null>(null);
   private mp: any = null;
   private cardFormInstance: any = null;
+
+  // Reporte manual de pago (Transferencia / OXXO) y estados de validación
+  showReportForm = signal<'Transferencia' | 'OXXO' | null>(null);
+  reportAmount = 0;
+  reportNotes = '';
+  reportFile: File | null = null;
+  reportFileName = signal<string>('');
+  submittingReport = signal(false);
+
+  pendingPaymentReports = computed(() => {
+    const reports = this.order()?.paymentReports || [];
+    return reports.filter((r: any) => r.status === 'Pending');
+  });
+
+  latestRejectedPaymentReport = computed(() => {
+    const reports = this.order()?.paymentReports || [];
+    return reports.find((r: any) => r.status === 'Rejected') || null;
+  });
 
   // Parallax Scroll Tracking
   scrollY = signal(0);
@@ -1911,9 +2031,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
             ref: result.paymentId ? `MP-${result.paymentId}` : '—'
           });
           this.fireConfetti('celebration');
-          this.order.update(o => o
-            ? { ...o, balanceDue: 0, amountPaid: o.total }
-            : null);
+          this.loadOrder();
         }
         this.unmountCardForm();
       },
@@ -1931,6 +2049,52 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.mpResult.set(null);
     this.mpReceipt.set(null);
     setTimeout(() => this.mountCardForm(), 150);
+  }
+
+  openReportPaymentForm(method: 'Transferencia' | 'OXXO') {
+    this.reportAmount = Number(this.order()?.balanceDue || 0);
+    this.reportNotes = '';
+    this.reportFile = null;
+    this.reportFileName.set('');
+    this.showReportForm.set(method);
+  }
+
+  onReportFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] || null;
+    this.reportFile = file;
+    this.reportFileName.set(file ? file.name : '');
+  }
+
+  submitPaymentReport(method: 'Transferencia' | 'OXXO') {
+    if (this.submittingReport()) return;
+    if (!this.reportAmount || this.reportAmount <= 0) {
+      this.showToast('Indica el monto que pagaste 💕');
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('method', method);
+    fd.append('amount', String(this.reportAmount));
+    if (this.reportNotes.trim()) fd.append('notes', this.reportNotes.trim());
+    if (this.reportFile) fd.append('file', this.reportFile);
+
+    this.submittingReport.set(true);
+    this.api.publicReportOrderPayment(this.accessToken, fd).subscribe({
+      next: () => {
+        this.submittingReport.set(false);
+        this.showReportForm.set(null);
+        this.reportFile = null;
+        this.reportFileName.set('');
+        this.fireConfetti('celebration');
+        this.showToast('¡Aviso enviado! Regi Bazar confirmará tu pago pronto 💖');
+        this.loadOrder();
+      },
+      error: (err) => {
+        this.submittingReport.set(false);
+        this.showToast(err?.error?.message || 'No se pudo enviar tu aviso. Intenta de nuevo.');
+      }
+    });
   }
 
   copyText(val: string) {

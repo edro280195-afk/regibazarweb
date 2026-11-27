@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { LabelPrintService } from '../../../core/services/label-print.service';
 import { BluetoothPrinterService } from '../../../core/services/bluetooth/bluetooth-printer.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderPaymentDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto, OrderReminderDto } from '../../../core/models';
+import { OrderItemDto, OrderSummaryDto, ORDER_STATUS_CSS, ORDER_STATUS_LABELS, OrderPackageDto, OrderPaymentDto, OrderPaymentReportDto, OrderStatus, LoyaltyRewardDto, OrderStatsDto, OrderReminderDto } from '../../../core/models';
 import { gsap } from 'gsap';
 import * as QRCode from 'qrcode';
 import { BirthdayCouponComponent } from '../../../shared/components/birthday-coupon/birthday-coupon.component';
@@ -96,6 +96,11 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
           <strong class="text-rose-600">{{ getUnpaidDeliveredCount() | number:'1.0-0' }}</strong>
           <small class="text-rose-400">Entregados sin cobrar</small>
         </article>
+        <article class="rb-orders-summary-card cursor-pointer transition-all hover:scale-105" [class.border-amber-300]="pendingPaymentReports().length > 0" [class.bg-amber-50]="pendingPaymentReports().length > 0" (click)="showPendingReportsPanel.set(!showPendingReportsPanel())">
+          <span class="text-amber-800 font-bold flex items-center gap-1">🔔 Por confirmar</span>
+          <strong class="text-amber-700">{{ pendingPaymentReports().length | number:'1.0-0' }}</strong>
+          <small class="text-amber-600">Pagos reportados</small>
+        </article>
       </section>
 
       <section class="rb-orders-priority-note" aria-label="Prioridad de pedidos">
@@ -106,6 +111,54 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
         </div>
         <span class="rb-orders-priority-icon" aria-hidden="true">↓</span>
       </section>
+
+      <!-- Bandeja de Pagos Reportados por Confirmar -->
+      @if (pendingPaymentReports().length > 0 && showPendingReportsPanel()) {
+        <section class="rounded-3xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 via-pink-50/70 to-white p-4 shadow-md space-y-3 animate-fade-in">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">🔔 Revisión de pagos</p>
+              <h3 class="text-sm font-black text-pink-900">Pagos reportados esperando tu confirmación ({{ pendingPaymentReports().length }})</h3>
+            </div>
+            <button type="button" class="text-xs font-bold text-amber-700 hover:text-amber-900 px-2 py-1" (click)="showPendingReportsPanel.set(false)">Ocultar</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            @for (rep of pendingPaymentReports(); track rep.id) {
+              <div class="bg-white/90 rounded-2xl p-3.5 border border-amber-200 shadow-sm space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="text-xs font-black text-pink-900 truncate">{{ rep.clientName || 'Clienta' }} · Pedido #{{ rep.orderId }}</p>
+                    <p class="text-[11px] font-bold text-amber-700">{{ rep.method }} @if (rep.reference) { · <span class="font-mono">{{ rep.reference }}</span> }</p>
+                    <p class="text-[10px] text-pink-400">{{ rep.createdAt | date:'dd MMM HH:mm' }}</p>
+                  </div>
+                  <span class="text-base font-black text-emerald-700 shrink-0">{{ rep.amount | currency:'MXN':'symbol-narrow' }}</span>
+                </div>
+                @if (rep.notes) {
+                  <p class="text-[11px] text-pink-700 bg-pink-50/70 rounded-xl px-2.5 py-1.5">{{ rep.notes }}</p>
+                }
+                @if (rep.proofImageUrl) {
+                  <a [href]="rep.proofImageUrl" target="_blank" rel="noopener"
+                     class="inline-flex items-center gap-1.5 text-[11px] font-black text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-xl hover:bg-violet-100">
+                    📸 Ver comprobante
+                  </a>
+                }
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <button type="button" [disabled]="reviewingReportId() === rep.id"
+                          class="btn-coquette py-2 px-3 text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm disabled:opacity-50"
+                          (click)="confirmPaymentReport(rep)">
+                    {{ reviewingReportId() === rep.id ? '⏳...' : '✅ Confirmar recibido' }}
+                  </button>
+                  <button type="button" [disabled]="reviewingReportId() === rep.id"
+                          class="btn-coquette py-2 px-3 text-xs font-black bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 disabled:opacity-50"
+                          (click)="rejectPaymentReport(rep)">
+                    ❌ Rechazar
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
 
       <!-- Filters -->
       <div class="rb-orders-filters card-coquette p-4 animate-slide-up delay-100" style="opacity:0">
@@ -419,6 +472,55 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                     </div>
                   }
 
+                  @for (rep of getPendingReportsForOrder(order.id); track rep.id) {
+                    <div class="mt-3 p-3 bg-gradient-to-r from-amber-50 to-pink-50 border-2 border-amber-300 rounded-2xl flex flex-col gap-2 shadow-sm">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="inline-flex items-center gap-1 text-[11px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg">
+                          🔔 Pago reportado ({{ rep.method }})
+                        </span>
+                        <span class="text-xs font-black text-emerald-700">{{ rep.amount | currency:'MXN':'symbol-narrow' }}</span>
+                      </div>
+                      @if (rep.reference || rep.notes) {
+                        <p class="text-[10px] text-amber-900 bg-white/80 px-2 py-1 rounded-lg border border-amber-100 truncate">
+                          {{ rep.reference ? rep.reference + ' · ' : '' }}{{ rep.notes || '' }}
+                        </p>
+                      }
+                      <div class="grid grid-cols-2 gap-2">
+                        <button type="button" [disabled]="reviewingReportId() === rep.id"
+                                class="btn-coquette py-1.5 px-2 text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm disabled:opacity-50"
+                                (click)="$event.stopPropagation(); confirmPaymentReport(rep)">
+                          ✅ Confirmar
+                        </button>
+                        <button type="button" [disabled]="reviewingReportId() === rep.id"
+                                class="btn-coquette py-1.5 px-2 text-[10px] font-black bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 disabled:opacity-50"
+                                (click)="$event.stopPropagation(); rejectPaymentReport(rep)">
+                          ❌ Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                  @if (order.amountPaid > 0 && getPendingReportsForOrder(order.id).length === 0) {
+                    <div class="mt-3 p-2.5 bg-gradient-to-r from-emerald-50/90 to-teal-50/80 border border-emerald-200 rounded-2xl flex flex-col gap-1.5">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-black text-emerald-800">
+                          {{ order.balanceDue <= 0 ? '✅ Pagado y confirmado' : '💚 Abono recibido' }}
+                        </span>
+                        <span class="text-[11px] font-black text-emerald-700">{{ order.amountPaid | currency:'MXN':'symbol-narrow' }}</span>
+                      </div>
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button type="button" class="btn-coquette py-1.5 px-2 text-[10px] font-bold flex items-center justify-center gap-1 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50"
+                                (click)="$event.stopPropagation(); copyPaymentConfirmedMessage(order)">
+                          📋 Copiar aviso
+                        </button>
+                        <button type="button" class="btn-coquette py-1.5 px-2 text-[10px] font-bold flex items-center justify-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm"
+                                (click)="$event.stopPropagation(); sendPaymentConfirmedWhatsApp(order)">
+                          💬 Avisar pago
+                        </button>
+                      </div>
+                    </div>
+                  }
+
                 <!-- Actions (Bottom) -->
                 <div class="rb-order-actions flex flex-col gap-2.5 mt-auto">
                   <button class="btn-coquette btn-pink w-full py-3 shadow-md shadow-pink-200/30 hover:shadow-lg hover:shadow-pink-300/40 transition-all flex justify-center items-center gap-2 group/btn text-sm" (click)="selectOrder(order)">
@@ -589,6 +691,65 @@ type OrderDrawerTab = 'summary' | 'items' | 'delivery' | 'payment';
                 </div>
               </div>
             }
+            @for (rep of getPendingReportsForOrder(selectedOrder()!.id); track rep.id) {
+              <div class="rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-pink-50 to-white p-4 shadow-sm space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex items-center gap-1.5 text-xs font-black text-amber-900 bg-amber-100 px-3 py-1 rounded-xl">
+                    🔔 Pago por confirmar ({{ rep.method }})
+                  </span>
+                  <span class="text-base font-black text-emerald-700">{{ rep.amount | currency:'MXN':'symbol-narrow' }}</span>
+                </div>
+                @if (rep.reference || rep.notes) {
+                  <p class="text-xs text-amber-900 bg-white/85 p-2.5 rounded-xl border border-amber-100">
+                    @if (rep.reference) { <strong class="font-mono">{{ rep.reference }}</strong> }
+                    @if (rep.reference && rep.notes) { · }
+                    {{ rep.notes }}
+                  </p>
+                }
+                @if (rep.proofImageUrl) {
+                  <a [href]="rep.proofImageUrl" target="_blank" rel="noopener"
+                     class="inline-flex items-center gap-1.5 text-xs font-black text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-xl hover:bg-violet-100">
+                    📸 Ver foto del comprobante
+                  </a>
+                }
+                <div class="flex flex-wrap gap-2 pt-1">
+                  <button type="button" [disabled]="reviewingReportId() === rep.id"
+                          class="btn-coquette py-2.5 px-3 text-xs font-black flex-1 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm disabled:opacity-50"
+                          (click)="confirmPaymentReport(rep)">
+                    {{ reviewingReportId() === rep.id ? 'Confirmando...' : '✅ Confirmar pago recibido' }}
+                  </button>
+                  <button type="button" [disabled]="reviewingReportId() === rep.id"
+                          class="btn-coquette py-2.5 px-3 text-xs font-black bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 disabled:opacity-50"
+                          (click)="rejectPaymentReport(rep)">
+                    ❌ Rechazar
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (selectedOrder()!.amountPaid > 0) {
+              <div class="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-pink-50/40 p-4 shadow-sm space-y-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex items-center gap-1.5 text-xs font-black text-emerald-800 bg-emerald-100/90 px-3 py-1 rounded-xl">
+                    {{ selectedOrder()!.balanceDue <= 0 ? '✅ Pago recibido y confirmado' : '💚 Abono recibido' }}
+                  </span>
+                  <span class="text-sm font-black text-emerald-700">
+                    Pagado: {{ selectedOrder()!.amountPaid | currency:'MXN':'symbol-narrow' }}
+                  </span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="btn-coquette py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1.5 bg-white text-emerald-700 border border-emerald-200 shadow-sm hover:bg-emerald-50"
+                          (click)="copyPaymentConfirmedMessage(selectedOrder()!)">
+                    📋 Copiar aviso de pagado
+                  </button>
+                  <button type="button" class="btn-coquette py-2 px-3 text-xs flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm"
+                          (click)="sendPaymentConfirmedWhatsApp(selectedOrder()!)">
+                    💬 Notificar por WhatsApp
+                  </button>
+                </div>
+              </div>
+            }
+
             <div class="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-pink-100/50 shadow-sm">
               <div class="flex items-center justify-between gap-3 mb-3">
                 <div>
@@ -1044,6 +1205,9 @@ export class OrdersComponent implements OnInit, OnDestroy {
   bagsEditFor = signal<number | null>(null);
   savingQuickBags = signal(false);
   unpaidDeliveredOrders = signal<OrderSummaryDto[]>([]);
+  pendingPaymentReports = signal<OrderPaymentReportDto[]>([]);
+  showPendingReportsPanel = signal<boolean>(true);
+  reviewingReportId = signal<number | null>(null);
   dailyExchangeRate = signal<number>(18);
   showExchangeRateModal = signal<boolean>(false);
   tempExchangeRate = 18;
@@ -1119,6 +1283,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
     });
     this.initSignalR();
     this.loadUnpaidDelivered();
+    this.loadPendingPaymentReports();
     this.loadExchangeRate();
     this.api.getLoyaltyRewards().subscribe({
       next: (r) => this.rewards.set(r),
@@ -1177,6 +1342,11 @@ export class OrdersComponent implements OnInit, OnDestroy {
     this.signalr.deliveryUpdate$.subscribe({
       next: (data) => {
         // ✨ Sincronización Magistral recibida
+        if (data?.changeType === 'payment_report') {
+          this.toast.success(`🔔 ${data.clientName || 'Clienta'} avisó un pago de ${Number(data.amountPaid || 0).toFixed(2)} — Por confirmar`);
+          this.showPendingReportsPanel.set(true);
+        }
+        this.loadPendingPaymentReports();
         this.loadOrders();
         if (this.selectedOrder()?.id === data.orderId) {
           this.reloadSelectedOrder();
@@ -1188,6 +1358,7 @@ export class OrdersComponent implements OnInit, OnDestroy {
 
   loadOrders(): void {
     this.loadUnpaidDelivered();
+    this.loadPendingPaymentReports();
     this.loading.set(true);
     this.api.getOrdersPaged(this.currentPage(), this.pageSize, this.statusFilter, this.search, this.orderTypeFilter, undefined, undefined, this.typeFilter).subscribe({
       next: (res) => {
@@ -1515,6 +1686,99 @@ export class OrdersComponent implements OnInit, OnDestroy {
     }
     const cleanPhone = order.clientPhone.replace(/\D/g, '');
     const msg = encodeURIComponent(this.buildUnpaidPaymentReminderMessage(order));
+    window.open(`https://wa.me/52${cleanPhone}?text=${msg}`, '_blank');
+  }
+
+  loadPendingPaymentReports(): void {
+    this.api.getPendingOrderPaymentReports().subscribe({
+      next: (reports) => this.pendingPaymentReports.set(reports || []),
+      error: () => {}
+    });
+  }
+
+  getPendingReportsForOrder(orderId: number): OrderPaymentReportDto[] {
+    return this.pendingPaymentReports().filter(r => r.orderId === orderId);
+  }
+
+  confirmPaymentReport(rep: OrderPaymentReportDto): void {
+    if (this.reviewingReportId() !== null) return;
+    const amountText = rep.amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+    const refText = rep.reference ? ` (${rep.reference})` : '';
+    if (!confirm(`¿Confirmas que ya recibiste ${amountText} por ${rep.method}${refText} para el pedido #${rep.orderId}?
+
+Esto marcará el pago como recibido y actualizará el enlace de la clienta en vivo.`)) {
+      return;
+    }
+
+    this.reviewingReportId.set(rep.id);
+    this.api.confirmOrderPaymentReport(rep.id).subscribe({
+      next: () => {
+        this.reviewingReportId.set(null);
+        this.toast.success(`✅ Pago de ${amountText} confirmado en pedido #${rep.orderId} 💖`);
+        this.loadPendingPaymentReports();
+        this.loadOrders();
+        if (this.selectedOrder()?.id === rep.orderId) {
+          this.reloadSelectedOrder();
+        }
+      },
+      error: (err) => {
+        this.reviewingReportId.set(null);
+        this.toast.error(err?.error?.message || 'No se pudo confirmar el pago');
+      }
+    });
+  }
+
+  rejectPaymentReport(rep: OrderPaymentReportDto): void {
+    if (this.reviewingReportId() !== null) return;
+    const reason = prompt('Motivo del rechazo (opcional, la clienta lo verá en su enlace):', 'No se reflejó el pago en la cuenta. Por favor verifica tu comprobante.');
+    if (reason === null) return;
+
+    this.reviewingReportId.set(rep.id);
+    this.api.rejectOrderPaymentReport(rep.id, reason).subscribe({
+      next: () => {
+        this.reviewingReportId.set(null);
+        this.toast.warning(`Aviso de pago rechazado en pedido #${rep.orderId}`);
+        this.loadPendingPaymentReports();
+        if (this.selectedOrder()?.id === rep.orderId) {
+          this.reloadSelectedOrder();
+        }
+      },
+      error: (err) => {
+        this.reviewingReportId.set(null);
+        this.toast.error(err?.error?.message || 'No se pudo rechazar el aviso');
+      }
+    });
+  }
+
+  buildPaymentConfirmedMessage(order: OrderSummaryDto): string {
+    const clientFirstName = order.clientName?.trim() ? order.clientName.trim().split(' ')[0] : 'Hermosa';
+    const orderLink = this.getOrderPublicLink(order);
+    const linkSection = orderLink
+      ? `\n\n🔗 *Aquí puedes ver tu pedido actualizado:*\n${orderLink}`
+      : '';
+    const balanceLine = order.balanceDue <= 0
+      ? `Tu pedido #*${order.id}* ya quedó *100% PAGADO y confirmado* ✅🎉`
+      : `Recibimos tu abono de *${order.amountPaid.toFixed(2)} MXN* para tu pedido #*${order.id}* ✅ (saldo restante: *${order.balanceDue.toFixed(2)} MXN*).`;
+
+    return `¡Hola ${clientFirstName}! 🌸✨\n\nTe confirmamos con mucho cariño que ya recibimos y validamos tu pago en *Regi Bazar* 💖🎀\n${balanceLine}${linkSection}\n\n¡Muchísimas gracias por tu compra y confianza siempre! 💕🌷`;
+  }
+
+  copyPaymentConfirmedMessage(order: OrderSummaryDto): void {
+    const msg = this.buildPaymentConfirmedMessage(order);
+    navigator.clipboard.writeText(msg).then(() => {
+      this.toast.success('¡Aviso de pago confirmado copiado! 📋💖');
+    }).catch(() => {
+      this.toast.error('No se pudo copiar el mensaje');
+    });
+  }
+
+  sendPaymentConfirmedWhatsApp(order: OrderSummaryDto): void {
+    if (!order.clientPhone) {
+      this.toast.error('Este pedido no tiene número de teléfono registrado');
+      return;
+    }
+    const cleanPhone = order.clientPhone.replace(/\D/g, '');
+    const msg = encodeURIComponent(this.buildPaymentConfirmedMessage(order));
     window.open(`https://wa.me/52${cleanPhone}?text=${msg}`, '_blank');
   }
 
