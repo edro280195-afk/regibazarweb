@@ -2,13 +2,13 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-export const authGuard: CanActivateFn = () => {
+export const authGuard: CanActivateFn = (_route, state) => {
     const auth = inject(AuthService);
     const router = inject(Router);
 
     if (auth.isLoggedIn()) {
         const role = auth.userRole();
-        const url = router.getCurrentNavigation()?.extractedUrl.toString() || window.location.pathname;
+        const url = state.url;
 
         // Security check for Driver
         if (role === 'Driver' && !url.startsWith('/admin/routes')) {
@@ -20,8 +20,13 @@ export const authGuard: CanActivateFn = () => {
             return router.parseUrl('/pos-mobile/home');
         }
 
+        // Bodega sólo puede abrir el módulo de cajas e inventario.
+        if (role === 'Bodega' && !url.startsWith('/admin/inventory')) {
+            return router.parseUrl('/admin/inventory');
+        }
+
         return true;
     }
 
-    return router.parseUrl('/login');
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };

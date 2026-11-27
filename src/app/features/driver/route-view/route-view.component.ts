@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, computed, ElementRef, ViewChild, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { moveItemInArray } from '@angular/cdk/drag-drop';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
@@ -10,13 +10,15 @@ import { ApiService } from '../../../core/services/api.service';
 import { SignalRService } from '../../../core/services/signalr.service';
 import { PushNotificationService } from '../../../core/services/push-notification.service';
 import { GpsService } from '../../../core/services/gps.service';
-import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage } from '../../../core/models';
+import { OrderStatus, ORDER_STATUS_LABELS, CamiMessage, RouteDeliveryDto, CashDenominations, createEmptyCashDenominations, calculateCashTotalMxn, calculateCashTotalUsd, calculateCashTotalInMxn, ActiveTandaInfo, DriverTandaPaymentRequest, RouteSettlementRequest, RouteSettlementDto } from '../../../core/models';
 import { effect } from '@angular/core';
 
 declare const google: any;
 
 /** GPS key for localStorage persistence */
 const GPS_KEY = 'regi_gps_granted';
+type DriverPaymentMethod = 'Efectivo' | 'Transferencia' | 'Deposito';
+type DeliveryPaymentMode = 'collect' | 'leaveBalance';
 
 @Component({
     selector: 'app-route-view',
@@ -30,10 +32,38 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     @ViewChild('clientChatScroll') clientChatScroll?: ElementRef;
 
     private routeParam = inject(ActivatedRoute);
+    private host = inject<ElementRef<HTMLElement>>(ElementRef);
     private api = inject(ApiService);
     private signalr = inject(SignalRService);
     private push = inject(PushNotificationService);
     public gps = inject(GpsService);
+    public router = inject(Router);
+
+    // ── Caja chica inicial ──
+    showStartRouteModal = signal(false);
+    initialBreakdown: CashDenominations = createEmptyCashDenominations(18);
+
+    // ── Abono de Tanda en Parada ──
+    showTandaModal = signal(false);
+    tandaModalDelivery = signal<any>(null);
+    submittingTanda = signal(false);
+    tandaForm = {
+        participantId: '',
+        clientName: '',
+        tandaName: '',
+        weekNumber: 1,
+        amount: null as number | null,
+        paymentMethod: 'Efectivo' as 'Efectivo' | 'Transferencia',
+        notes: '',
+        cashReceived: null as number | null
+    };
+
+    // ── Corte de Caja Final ──
+    showSettlementModal = signal(false);
+    finalBreakdown: CashDenominations = createEmptyCashDenominations(18);
+    settlementNotes = '';
+    submittingSettlement = signal(false);
+    settlementResult = signal<RouteSettlementDto | null>(null);
 
     route = signal<any>(null);
     loading = signal(true);
@@ -50,7 +80,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     totalCobrado = computed(() => {
         const r = this.route();
         if (!r) return 0;
-        return r.deliveries?.filter((d: any) => d.status === 'Delivered').reduce((s: number, d: any) => s + (d.total || 0), 0) || 0;
+        return r.deliveries?.filter((d: any) => d.status === 'Delivered').reduce((sum: number, d: any) => sum + (d.amountPaid || 0), 0) || 0;
     });
     totalGastos = computed(() => this.route()?.expenses?.reduce((s: number, e: any) => s + e.amount, 0) || 0);
 
@@ -81,16 +111,26 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     failReasons = ['No estaba 🏠', 'Dirección incorrecta 📍', 'No contestó 📱', 'Rechazó pedido ❌'];
 
     deliveryNotes: Record<number, string> = {};
-    paymentMethods: Record<number, string> = {};
+    paymentModes: Record<number, DeliveryPaymentMode> = {};
+    paymentMethods: Record<number, DriverPaymentMethod> = {};
+    cashReceived: Record<number, number | null> = {};
     photos: Record<number, { file: File; preview: string }[]> = {};
+
+    // ── Signature pad ──
+    signatures: Record<number, { svg: string; name?: string }> = {};
+    signatureModalId = signal(0);
+    signatureName = '';
+    private sigCtx: CanvasRenderingContext2D | null = null;
+    private sigDrawing = false;
+    private sigHasInk = false;
+    @ViewChild('signatureCanvas') signatureCanvasRef?: ElementRef<HTMLCanvasElement>;
     expenseForm = { type: 'Gasolina', amount: null as number | null, notes: '', photo: null as File | null };
 
     private token = '';
     mapInitialized = false;
     map: any;
-    directionsService: any;
-    directionsRenderer: any;
-    fullRouteRenderer: any;
+    routePolyline: any;
+    fullRoutePolyline: any;
     markers: any[] = [];
 
     // Navigation Overlay Signals
@@ -134,6 +174,8 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             this.showToast('🔄 ¡Ruta actualizada por la base!');
             this.loadRoute();
         });
+
+        this.signalr.orderDataChanged$.subscribe(() => this.loadRoute());
 
         this.initPush();
     }
@@ -253,6 +295,28 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         });
     }
 
+    physicalStopNumber(target: RouteDeliveryDto): number {
+        const orderedDeliveries = [...(this.route()?.deliveries ?? [])] as RouteDeliveryDto[];
+        orderedDeliveries.sort((first, second) => first.sortOrder - second.sortOrder);
+        const seenStops = new Set<string>();
+        let stopNumber = 0;
+        for (const delivery of orderedDeliveries) {
+            const key = delivery.kind === 'Tanda'
+                ? `tanda:${delivery.tandaParticipantId ?? delivery.deliveryId}`
+                : delivery.consolidationId != null
+                    ? `bag:${delivery.consolidationId}`
+                    : `order:${delivery.orderId ?? delivery.deliveryId}`;
+            if (seenStops.has(key)) {
+                if (delivery.deliveryId === target.deliveryId) return stopNumber;
+                continue;
+            }
+            seenStops.add(key);
+            stopNumber++;
+            if (delivery.deliveryId === target.deliveryId) return stopNumber;
+        }
+        return target.sortOrder;
+    }
+
     // ═══ GPS ═══
     startGps(): void {
         this.gps.start(this.token);
@@ -287,21 +351,31 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         return R * c;
     }
 
-    // Calls DirectionsService to draw the route line to the next pending stop.
-    // Kept separate from plotRoute so GPS updates don't redraw markers or change viewport.
+    private formatMeters(meters: number): string {
+        return meters < 1000
+            ? `${Math.round(meters)} m aprox.`
+            : `${(meters / 1000).toFixed(1)} km aprox.`;
+    }
+
+    private formatApproxEta(meters: number): string {
+        const minutes = Math.max(1, Math.round((meters / 1000) / 25 * 60));
+        return `${minutes} min aprox.`;
+    }
+
+    // Dibuja una ruta aproximada sin pedir rutas reales en cada movimiento.
     private updateRouteDirection(forceCalc = false): void {
         const r = this.route();
         const pos = this.gps.lastPosition();
-        if (!pos || !this.map || !r || !this.directionsService) return;
+        if (!pos || !this.map || !r) return;
         const pending = r.deliveries.filter((d: any) => d.status !== 'Delivered' && d.status !== 'NotDelivered' && d.latitude);
         if (!pending.length) {
-            if (this.directionsRenderer) this.directionsRenderer.setDirections({ routes: [] });
-            if (this.fullRouteRenderer) this.fullRouteRenderer.setDirections({ routes: [] });
+            this.routePolyline?.setMap(null);
+            this.fullRoutePolyline?.setMap(null);
             return;
         }
 
-        const origin = new google.maps.LatLng(pos.lat, pos.lng);
-        const dest = new google.maps.LatLng(pending[0].latitude, pending[0].longitude);
+        const origin = { lat: pos.lat, lng: pos.lng };
+        const dest = { lat: pending[0].latitude, lng: pending[0].longitude };
 
         // Update Overlay UI
         this.navNextAddress.set(pending[0].alternativeAddress || pending[0].address || pending[0].clientAddress || 'Sin dirección');
@@ -311,7 +385,6 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         // We removed the aggressive fitBounds to ensure the driver stays centered in the view, 
         // as watchPosition already calls map.panTo(driverLocation) every second.
 
-        // Throttle API usage
         const distMoved = this.getDistance(pos.lat, pos.lng, this.lastRouteCalcLat, this.lastRouteCalcLng);
         if (!forceCalc && pending[0].id === this.lastRouteCalcDestId && distMoved < 50) return;
 
@@ -319,47 +392,33 @@ export class RouteViewComponent implements OnInit, OnDestroy {
         this.lastRouteCalcLng = pos.lng;
         this.lastRouteCalcDestId = pending[0].id;
 
-        // 1. NEON ROUTE (Next Leg)
-        this.directionsService.route(
-            { origin, destination: dest, travelMode: google.maps.TravelMode.DRIVING },
-            (result: any, status: string) => {
-                if (status === 'OK') {
-                    this.directionsRenderer.setOptions({
-                        polylineOptions: { strokeColor: '#f472b6', strokeWeight: 6, strokeOpacity: 0.9 }
-                    });
-                    this.directionsRenderer.setDirections(result);
-                    const leg = result.routes[0].legs[0];
-                    if (leg && leg.duration && leg.distance) {
-                        this.navEta.set(leg.duration.text);
-                        this.navDistance.set(leg.distance.text);
-                    }
-                } else {
-                    console.warn('[RouteView] DirectionsService status:', status);
-                    this.navEta.set('');
-                    this.navDistance.set('');
-                }
-            }
-        );
+        const metersToNext = this.getDistance(origin.lat, origin.lng, dest.lat, dest.lng);
+        this.navDistance.set(this.formatMeters(metersToNext));
+        this.navEta.set(this.formatApproxEta(metersToNext));
+        this.routePolyline?.setMap(null);
+        this.routePolyline = new google.maps.Polyline({
+            path: [origin, dest],
+            map: this.map,
+            strokeColor: '#f472b6',
+            strokeWeight: 6,
+            strokeOpacity: 0.9
+        });
 
-        // 2. PREDICTIVE MULTI-ROUTING (Faded full day route for context)
         if (pending.length > 1) {
-            const waypoints = pending.slice(0, Math.min(pending.length - 1, 20)).map((d: any) => ({
-                location: new google.maps.LatLng(d.latitude, d.longitude),
-                stopover: true
-            }));
-            const finalDest = pending[Math.min(pending.length - 1, 20)];
-            const fullDest = new google.maps.LatLng(finalDest.latitude, finalDest.longitude);
-
-            this.directionsService.route(
-                { origin, destination: fullDest, waypoints, travelMode: google.maps.TravelMode.DRIVING },
-                (result: any, status: string) => {
-                    if (status === 'OK') {
-                        this.fullRouteRenderer.setDirections(result);
-                    }
-                }
-            );
+            const fullPath = [
+                origin,
+                ...pending.slice(0, 21).map((d: any) => ({ lat: d.latitude, lng: d.longitude }))
+            ];
+            this.fullRoutePolyline?.setMap(null);
+            this.fullRoutePolyline = new google.maps.Polyline({
+                path: fullPath,
+                map: this.map,
+                strokeColor: '#a1a1aa',
+                strokeWeight: 3,
+                strokeOpacity: 0.4
+            });
         } else {
-            if (this.fullRouteRenderer) this.fullRouteRenderer.setDirections({ routes: [] });
+            this.fullRoutePolyline?.setMap(null);
         }
     }
 
@@ -371,18 +430,7 @@ export class RouteViewComponent implements OnInit, OnDestroy {
             this.map = new google.maps.Map(this.mapEl.nativeElement, {
                 center: { lat: 27.48, lng: -99.50 }, zoom: 13, disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy'
             });
-            this.directionsService = new google.maps.DirectionsService();
-            this.directionsRenderer = new google.maps.DirectionsRenderer({
-                map: this.map, suppressMarkers: true,
-                polylineOptions: { strokeColor: '#db2777', strokeWeight: 4, strokeOpacity: 0.8 }
-            });
-            this.fullRouteRenderer = new google.maps.DirectionsRenderer({
-                map: this.map, suppressMarkers: true,
-                polylineOptions: { strokeColor: '#a1a1aa', strokeWeight: 3, strokeOpacity: 0.4 }
-            });
         }
-        // Geocode any deliveries that lack coordinates (they are not persisted by the backend)
-        await this.geocodeDeliveries(route);
         this.plotRoute(route);
         this.updateRouteDirection(true);
     }
@@ -452,22 +500,347 @@ export class RouteViewComponent implements OnInit, OnDestroy {
     }
     markDelivered(id: number): void {
         if (this.isDelivering()) return;
-        this.isDelivering.set(true);
         const notes = this.deliveryNotes[id] || '';
         const photoFiles = (this.photos[id] || []).map(p => p.file);
+        const paymentMode = this.paymentModes[id];
         const method = this.paymentMethods[id];
         const delivery = this.route()?.deliveries?.find((d: any) => d.id === id);
-        const due = delivery?.balanceDue ?? delivery?.total ?? 0;
-        const payments = method && due > 0 ? [{ amount: due, method }] : undefined;
-        this.api.markDelivered(this.token, id, notes, photoFiles, payments).subscribe({
+        const due = this.roundMoney(Math.max(0, delivery?.balanceDue ?? delivery?.total ?? 0));
+        if (!this.canMarkDelivered(id, due, delivery?.kind)) return;
+
+        this.isDelivering.set(true);
+        let payments: { amount: number; method: string; notes?: string }[] | undefined;
+        if (due > 0 && paymentMode === 'collect' && method === 'Efectivo') {
+            const received = this.roundMoney(Math.max(0, this.cashReceived[id] ?? 0));
+            const applied = this.roundMoney(Math.min(received, due));
+            const change = this.roundMoney(Math.max(0, received - due));
+            const remaining = this.roundMoney(Math.max(0, due - applied));
+            const paymentNotes = change > 0
+                ? `Recibió $${received.toFixed(2)} en efectivo; entregó $${change.toFixed(2)} de cambio.`
+                : remaining > 0
+                    ? `Recibió $${received.toFixed(2)} en efectivo; quedaron $${remaining.toFixed(2)} pendientes.`
+                    : `Recibió $${received.toFixed(2)} en efectivo.`;
+            payments = [{ amount: applied, method, notes: paymentNotes }];
+        } else if (due > 0 && paymentMode === 'collect' && method) {
+            payments = [{ amount: due, method }];
+        }
+        const sig = this.signatures[id];
+        const signature = sig ? { svg: sig.svg, signedByName: sig.name } : undefined;
+        const deliveredWithoutPayment = paymentMode === 'leaveBalance' || (due > 0 && (!payments || payments.length === 0));
+        const unpaidReason = deliveredWithoutPayment ? (notes || 'Entregado con saldo pendiente') : undefined;
+
+        this.api.markDelivered(this.token, id, notes, photoFiles, payments, signature, deliveredWithoutPayment, unpaidReason).subscribe({
             next: () => {
-                this.showToast(`¡${ORDER_STATUS_LABELS[2]}! ✨`);
+                const toast = paymentMode === 'leaveBalance'
+                    ? `¡Entregada! · $${due.toFixed(2)} quedan pendientes`
+                    : `¡${ORDER_STATUS_LABELS[2]}! ✨`;
+                this.showToast(toast);
                 this.photos[id] = []; this.deliveryNotes[id] = '';
+                delete this.signatures[id];
                 this.isDelivering.set(false);
                 this.loadRoute();
             },
             error: () => { this.isDelivering.set(false); }
         });
+    }
+
+    selectPaymentMethod(deliveryId: number, method: DriverPaymentMethod): void {
+        this.paymentModes[deliveryId] = 'collect';
+        this.paymentMethods[deliveryId] = method;
+        if (method === 'Efectivo' && this.cashReceived[deliveryId] == null) {
+            this.cashReceived[deliveryId] = null;
+        }
+        this.revealInSheet(method === 'Efectivo' ? '.cash-payment-card' : '.non-cash-panel');
+    }
+
+    selectPaymentMode(deliveryId: number, mode: DeliveryPaymentMode): void {
+        this.paymentModes[deliveryId] = mode;
+        if (mode === 'leaveBalance') {
+            delete this.paymentMethods[deliveryId];
+            delete this.cashReceived[deliveryId];
+        }
+        this.revealInSheet(mode === 'collect' ? '.payment-detail-panel' : '.no-charge-panel');
+    }
+
+    /** La tarjeta de la entrega hace scroll interno: al abrir un panel de cobro lo acercamos a la vista. */
+    private revealInSheet(selector: string): void {
+        setTimeout(() => {
+            const el = (this.host.nativeElement as HTMLElement).querySelector(selector);
+            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 60);
+    }
+
+    canMarkDelivered(deliveryId: number, balanceDue: number, kind?: string): boolean {
+        if (kind === 'Tanda' || balanceDue <= 0) return true;
+        if (this.paymentModes[deliveryId] === 'leaveBalance') return true;
+        if (this.paymentModes[deliveryId] !== 'collect') return false;
+        const method = this.paymentMethods[deliveryId];
+        if (!method) return false;
+        return method !== 'Efectivo' || (this.cashReceived[deliveryId] ?? 0) > 0;
+    }
+
+    cashChange(deliveryId: number, balanceDue: number): number {
+        const received = this.roundMoney(Math.max(0, this.cashReceived[deliveryId] ?? 0));
+        return this.roundMoney(Math.max(0, received - balanceDue));
+    }
+
+    balanceAfterCash(deliveryId: number, balanceDue: number): number {
+        const received = this.roundMoney(Math.max(0, this.cashReceived[deliveryId] ?? 0));
+        return this.roundMoney(Math.max(0, balanceDue - Math.min(received, balanceDue)));
+    }
+
+    hasScheduledTime(value?: string | null): boolean {
+        if (!value) return false;
+        const date = new Date(value);
+        return !Number.isNaN(date.getTime()) && (date.getHours() !== 0 || date.getMinutes() !== 0);
+    }
+
+    // ── Operaciones de Caja Chica y Denominaciones ──
+    openStartRouteModal(): void {
+        const rate = this.route()?.dailyExchangeRate || 18;
+        this.initialBreakdown = createEmptyCashDenominations(rate);
+        this.showStartRouteModal.set(true);
+    }
+
+    closeStartRouteModal(): void {
+        this.showStartRouteModal.set(false);
+    }
+
+    initialCashTotal(): number {
+        return calculateCashTotalInMxn(this.initialBreakdown);
+    }
+
+    confirmStartRoute(): void {
+        const total = this.initialCashTotal();
+        this.api.startRoute(this.token, total, this.initialBreakdown, this.initialBreakdown.exchangeRate).subscribe({
+            next: () => {
+                this.showToast('🚀 ¡Ruta Iniciada! Caja chica: $' + total.toFixed(2));
+                this.closeStartRouteModal();
+                this.loadRoute();
+            },
+            error: () => {
+                this.showToast('Error al iniciar ruta');
+            }
+        });
+    }
+
+    // Calculadora rápida de billetes al cobrar entrega
+    setQuickCash(deliveryId: number, amount: number): void {
+        this.paymentModes[deliveryId] = 'collect';
+        this.paymentMethods[deliveryId] = 'Efectivo';
+        this.cashReceived[deliveryId] = amount;
+    }
+
+    // Modal de Tanda en Parada
+    openTandaModal(delivery: any, tanda?: ActiveTandaInfo): void {
+        this.tandaModalDelivery.set(delivery);
+        this.tandaForm = {
+            participantId: tanda?.participantId || '',
+            clientName: delivery?.clientName || '',
+            tandaName: tanda?.tandaName || 'Tanda',
+            weekNumber: tanda?.nextPendingWeek || 1,
+            amount: tanda?.weeklyAmount || null,
+            paymentMethod: 'Efectivo',
+            notes: '',
+            cashReceived: null
+        };
+        this.showTandaModal.set(true);
+    }
+
+    closeTandaModal(): void {
+        this.showTandaModal.set(false);
+        this.tandaModalDelivery.set(null);
+    }
+
+    tandaChange(): number {
+        const received = Math.max(0, this.tandaForm.cashReceived ?? 0);
+        const amount = Math.max(0, this.tandaForm.amount ?? 0);
+        return Math.max(0, received - amount);
+    }
+
+    submitTandaPayment(): void {
+        if (!this.tandaForm.amount || this.tandaForm.amount <= 0) return;
+        this.submittingTanda.set(true);
+
+        const delivery = this.tandaModalDelivery();
+        const req: DriverTandaPaymentRequest = {
+            deliveryId: delivery?.id,
+            tandaParticipantId: this.tandaForm.participantId || undefined,
+            clientName: this.tandaForm.clientName,
+            weekNumber: this.tandaForm.weekNumber,
+            amount: this.tandaForm.amount,
+            paymentMethod: this.tandaForm.paymentMethod,
+            notes: this.tandaForm.notes,
+            cashReceived: this.tandaForm.cashReceived ?? undefined,
+            cashChange: this.tandaChange() > 0 ? this.tandaChange() : undefined
+        };
+
+        this.api.recordDriverTandaPayment(this.token, req).subscribe({
+            next: () => {
+                this.showToast('🌸 ¡Pago de tanda registrado exitosamente!');
+                this.submittingTanda.set(false);
+                this.closeTandaModal();
+                this.loadRoute();
+            },
+            error: () => {
+                this.showToast('Error al registrar pago de tanda');
+                this.submittingTanda.set(false);
+            }
+        });
+    }
+
+    // Arqueo y Corte de Caja
+    openSettlementModal(): void {
+        const rate = this.route()?.initialExchangeRate || this.route()?.dailyExchangeRate || 18;
+        this.finalBreakdown = createEmptyCashDenominations(rate);
+        this.settlementNotes = '';
+        this.settlementResult.set(null);
+        this.showSettlementModal.set(true);
+    }
+
+    closeSettlementModal(): void {
+        this.showSettlementModal.set(false);
+    }
+
+    expectedCashAtClose(): number {
+        const r = this.route();
+        const initial = r?.initialCash || 0;
+        const totalCash = this.totalCobrado();
+        const expenses = this.totalGastos();
+        return initial + totalCash - expenses;
+    }
+
+    finalBreakdownTotal(): number {
+        return calculateCashTotalInMxn(this.finalBreakdown);
+    }
+
+    settlementDifference(): number {
+        return this.finalBreakdownTotal() - this.expectedCashAtClose();
+    }
+
+    submitSettlement(): void {
+        this.submittingSettlement.set(true);
+        const totalContado = this.finalBreakdownTotal();
+        const req: RouteSettlementRequest = {
+            finalCashActual: totalContado,
+            breakdown: this.finalBreakdown,
+            notes: this.settlementNotes
+        };
+
+        this.api.settleRoute(this.token, req).subscribe({
+            next: (res) => {
+                this.settlementResult.set(res);
+                this.submittingSettlement.set(false);
+                this.showToast('🏁 ¡Corte de caja guardado con éxito!');
+            },
+            error: () => {
+                this.showToast('Error al guardar corte de caja');
+                this.submittingSettlement.set(false);
+            }
+        });
+    }
+
+    shareWhatsAppReport(text?: string): void {
+        const share = text || this.settlementResult()?.whatsAppShareText;
+        if (!share) return;
+        window.open('https://wa.me/?text=' + encodeURIComponent(share), '_blank');
+    }
+
+    goToCorteWeb(): void {
+        this.router.navigate(['/repartidor', this.token, 'corte']);
+    }
+
+    private roundMoney(value: number): number {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
+    }
+
+    // ── Signature pad methods ──
+    openSignaturePad(deliveryId: number): void {
+        this.signatureModalId.set(deliveryId);
+        this.signatureName = '';
+        this.sigHasInk = false;
+        setTimeout(() => this.initSignaturePad(), 50);
+    }
+
+    closeSignaturePad(): void {
+        this.signatureModalId.set(0);
+        this.sigCtx = null;
+    }
+
+    private initSignaturePad(): void {
+        const canvas = this.signatureCanvasRef?.nativeElement;
+        if (!canvas) return;
+        // Ajustar al tamaño real del display (mejora definición en retina)
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.scale(dpr, dpr);
+        ctx.strokeStyle = '#831843';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        this.sigCtx = ctx;
+    }
+
+    onSignatureStart(ev: PointerEvent): void {
+        if (!this.sigCtx) return;
+        ev.preventDefault();
+        const canvas = this.signatureCanvasRef!.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.sigCtx.beginPath();
+        this.sigCtx.moveTo(ev.clientX - rect.left, ev.clientY - rect.top);
+        this.sigDrawing = true;
+        try { canvas.setPointerCapture(ev.pointerId); } catch {}
+    }
+
+    onSignatureMove(ev: PointerEvent): void {
+        if (!this.sigCtx || !this.sigDrawing) return;
+        ev.preventDefault();
+        const canvas = this.signatureCanvasRef!.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        this.sigCtx.lineTo(ev.clientX - rect.left, ev.clientY - rect.top);
+        this.sigCtx.stroke();
+        this.sigHasInk = true;
+    }
+
+    onSignatureEnd(): void {
+        this.sigDrawing = false;
+    }
+
+    clearSignaturePad(): void {
+        const canvas = this.signatureCanvasRef?.nativeElement;
+        if (canvas && this.sigCtx) this.sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+        this.sigHasInk = false;
+    }
+
+    signatureHasInk(): boolean { return this.sigHasInk; }
+
+    saveSignaturePad(): void {
+        const id = this.signatureModalId();
+        if (!id || !this.signatureCanvasRef?.nativeElement) return;
+        const svg = this.canvasToSvg(this.signatureCanvasRef.nativeElement);
+        this.signatures[id] = { svg, name: this.signatureName.trim() || undefined };
+        this.closeSignaturePad();
+        this.showToast('✍️ Firma guardada');
+    }
+
+    skipSignaturePad(): void {
+        // No se guarda nada; el botón "Entregar" seguirá funcionando sin firma.
+        this.closeSignaturePad();
+    }
+
+    private canvasToSvg(canvas: HTMLCanvasElement): string {
+        const rect = canvas.getBoundingClientRect();
+        const w = rect.width;
+        const h = rect.height;
+        // Para una entrega real se podría vectorizar; aquí usamos la imagen del
+        // canvas dentro de un <foreignObject> para fidelidad total con un SVG
+        // pequeño (~2-5 KB).
+        const dataUrl = canvas.toDataURL('image/png');
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><img xmlns="http://www.w3.org/1999/xhtml" src="${dataUrl}" style="width:100%;height:100%"/></foreignObject></svg>`;
     }
 
     // ═══ FAIL ═══
