@@ -174,6 +174,76 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
             </div>
           </div>
 
+          <!-- Mercado Pago Checkout Pro Return Banner -->
+          @if (mpBanner(); as banner) {
+            <div class="mb-4 animate-fade-in-up">
+              @if (banner.state === 'verifying') {
+                <div class="bg-white/90 backdrop-blur-md rounded-3xl p-5 border-2 border-violet-200 shadow-lg flex items-center gap-3">
+                  <div class="w-8 h-8 shrink-0 border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin"></div>
+                  <div class="min-w-0">
+                    <p class="font-black text-violet-900 text-sm">Verificando tu pago...</p>
+                    <p class="text-xs text-violet-600 font-medium">{{ banner.message }}</p>
+                  </div>
+                </div>
+              } @else if (banner.state === 'approved') {
+                <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-5 border-2 border-emerald-200 shadow-lg space-y-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-2xl">✅</span>
+                      <div>
+                        <p class="font-black text-emerald-800 text-base leading-tight">¡Pago aprobado!</p>
+                        <p class="text-xs text-emerald-700 font-medium mt-0.5">{{ banner.message }}</p>
+                      </div>
+                    </div>
+                    <button (click)="mpBanner.set(null)" class="text-emerald-500 hover:text-emerald-700 text-xs font-black px-2 py-1">✕</button>
+                  </div>
+                  @if (banner.amount || banner.ref) {
+                    <div class="bg-white/80 rounded-2xl p-3 border border-emerald-100 text-xs space-y-1">
+                      @if (banner.amount) {
+                        <div class="flex justify-between">
+                          <span class="text-emerald-700/80 font-medium">Monto pagado</span>
+                          <span class="font-black text-emerald-900">{{ banner.amount | currency:'MXN':'symbol-narrow' }}</span>
+                        </div>
+                      }
+                      @if (banner.ref) {
+                        <div class="flex justify-between">
+                          <span class="text-emerald-700/80 font-medium">Referencia</span>
+                          <span class="font-mono font-bold text-emerald-900">{{ banner.ref }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              } @else if (banner.state === 'pending') {
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border-2 border-amber-200 shadow-lg space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-2xl">⏳</span>
+                      <div>
+                        <p class="font-black text-amber-800 text-sm leading-tight">Pago en revisión</p>
+                        <p class="text-xs text-amber-700 font-medium mt-0.5">{{ banner.message }}</p>
+                      </div>
+                    </div>
+                    <button (click)="mpBanner.set(null)" class="text-amber-500 hover:text-amber-700 text-xs font-black px-2 py-1">✕</button>
+                  </div>
+                </div>
+              } @else if (banner.state === 'rejected') {
+                <div class="bg-gradient-to-br from-rose-50 to-pink-50 rounded-3xl p-5 border-2 border-rose-200 shadow-lg space-y-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-2xl">💔</span>
+                      <div>
+                        <p class="font-black text-rose-800 text-sm leading-tight">No se pudo completar el pago</p>
+                        <p class="text-xs text-rose-700 font-medium mt-0.5">{{ banner.message }}</p>
+                      </div>
+                    </div>
+                    <button (click)="mpBanner.set(null)" class="text-rose-400 hover:text-rose-600 text-xs font-black px-2 py-1">✕</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
           <!-- Smart Dashboard Top Bar (Sticky): Estilo Rediseño -->
           @if (o.paymentVisible !== false && o.balanceDue > 0) {
             <div id="balance-summary" class="sticky top-2 z-30 mb-4" [style.opacity]="isUnboxed() ? 1 : 0">
@@ -445,16 +515,19 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                 <p class="text-center text-xs text-[#8C5D50] font-medium mb-4">Elige cómo quieres pagar tu saldo restante</p>
 
                 <!-- Custom Tabs -->
-                <div class="grid grid-cols-3 gap-1.5 p-1.5 bg-white/70 backdrop-blur-md rounded-2xl mb-4 border border-white/80 shadow-sm">
-                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
-                          [ngClass]="paymentTab() === 'cash' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
-                          (click)="setPaymentTab('cash')">💵 Efectivo</button>
-                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
+                <div class="grid grid-cols-2 gap-1.5 p-1.5 bg-white/70 backdrop-blur-md rounded-2xl mb-4 border border-white/80 shadow-sm">
+                  <button class="py-2.5 text-xs font-bold rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'card' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
+                          (click)="setPaymentTab('card')">💳 Tarjeta / MP</button>
+                  <button class="py-2.5 text-xs font-bold rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'transfer' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
                           (click)="setPaymentTab('transfer')">🏦 Transfer</button>
-                  <button class="py-2 text-xs font-bold rounded-xl transition-all"
+                  <button class="py-2.5 text-xs font-bold rounded-xl transition-all"
                           [ngClass]="paymentTab() === 'oxxo' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
                           (click)="setPaymentTab('oxxo')">🏪 OXXO</button>
+                  <button class="py-2.5 text-xs font-bold rounded-xl transition-all"
+                          [ngClass]="paymentTab() === 'cash' ? 'bg-[#5C2318] text-amber-100 shadow-sm' : 'text-[#9A503D]'"
+                          (click)="setPaymentTab('cash')">💵 Efectivo</button>
                 </div>
 
                 <!-- Tab Content -->
@@ -510,6 +583,47 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                           </div>
                         </div>
                         <p class="text-[10px] text-red-700/80 text-center font-bold">Envía foto del ticket a tu vendedora ✨</p>
+                      </div>
+                    }
+                    @case ('card') {
+                      <div class="bg-gradient-to-br from-pink-50 via-fuchsia-50/70 to-violet-50 rounded-3xl p-5 border border-pink-200/80 shadow-sm animate-fade-in relative overflow-hidden space-y-4">
+                        <div class="absolute -right-4 -top-4 text-7xl opacity-10 rotate-12">💳</div>
+
+                        <div class="flex items-center gap-3 relative z-10">
+                          <div class="w-11 h-11 rounded-2xl bg-white/90 border border-pink-100 flex items-center justify-center text-2xl shadow-sm shrink-0">💳</div>
+                          <div class="min-w-0">
+                            <h4 class="font-black text-[#52232b] text-sm leading-tight">Tarjeta o Mercado Pago</h4>
+                            <span class="text-[11px] font-bold text-fuchsia-600">🔒 Pago oficial protegido por Mercado Pago</span>
+                          </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-1.5 relative z-10">
+                          <span class="px-2.5 py-1 rounded-full bg-white/85 border border-pink-100 text-[10px] font-extrabold text-[#6b3441]">💳 Débito y Crédito</span>
+                          <span class="px-2.5 py-1 rounded-full bg-white/85 border border-pink-100 text-[10px] font-extrabold text-[#6b3441]">⚡ Acreditación inmediata</span>
+                          <span class="px-2.5 py-1 rounded-full bg-white/85 border border-pink-100 text-[10px] font-extrabold text-[#6b3441]">📱 App Mercado Pago</span>
+                        </div>
+
+                        <p class="text-xs text-[#7c4b55] font-medium leading-relaxed relative z-10">
+                          Te llevaremos a la pantalla segura de <strong>Mercado Pago</strong> para pagar con tu tarjeta o tu cuenta. Al terminar regresas automáticamente aquí ✨
+                        </p>
+
+                        @if (mpCheckoutError()) {
+                          <div class="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-xs font-bold text-rose-700 text-center relative z-10">
+                            {{ mpCheckoutError() }}
+                          </div>
+                        }
+
+                        <button type="button"
+                                [disabled]="mpCheckoutLoading()"
+                                (click)="startMercadoPagoCheckout()"
+                                class="rb-btn-autumn w-full py-4 text-xs font-black uppercase tracking-wider shadow-xl disabled:opacity-60 flex items-center justify-center gap-2 relative z-10">
+                          @if (mpCheckoutLoading()) {
+                            <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                            <span>Conectando con Mercado Pago...</span>
+                          } @else {
+                            <span>💳 Pagar {{ o.balanceDue | currency:'MXN':'symbol-narrow' }}</span>
+                          }
+                        </button>
                       </div>
                     }
                   }
@@ -823,7 +937,12 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
   etaText = signal<string>('');
 
 
-  paymentTab = signal<'cash' | 'transfer' | 'oxxo'>('transfer');
+  paymentTab = signal<'cash' | 'transfer' | 'oxxo' | 'card'>('card');
+
+  // Mercado Pago Checkout Pro
+  mpCheckoutLoading = signal(false);
+  mpCheckoutError = signal<string | null>(null);
+  mpBanner = signal<{ state: 'verifying' | 'approved' | 'pending' | 'rejected'; message: string; amount?: number; ref?: string } | null>(null);
 
   // Parallax Scroll Tracking
   scrollY = signal(0);
@@ -923,6 +1042,7 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.loadOrder();
+    this.handleMercadoPagoReturn();
     this.initSignalR(this.accessToken);
     this.initPush();
   }
@@ -1623,8 +1743,100 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     return dots;
   }
 
-  setPaymentTab(tab: 'cash' | 'transfer' | 'oxxo') {
+  setPaymentTab(tab: 'cash' | 'transfer' | 'oxxo' | 'card') {
     this.paymentTab.set(tab);
+    this.mpCheckoutError.set(null);
+  }
+
+  startMercadoPagoCheckout() {
+    if (this.mpCheckoutLoading()) return;
+    this.mpCheckoutLoading.set(true);
+    this.mpCheckoutError.set(null);
+
+    this.api.publicCreateCheckoutPro(this.accessToken).subscribe({
+      next: (res) => {
+        if (res?.initPoint) {
+          window.location.href = res.initPoint;
+        } else {
+          this.mpCheckoutLoading.set(false);
+          this.mpCheckoutError.set('No se recibió el enlace de Mercado Pago. Intenta de nuevo.');
+        }
+      },
+      error: (err) => {
+        this.mpCheckoutLoading.set(false);
+        const msg = err?.error?.message || 'No se pudo conectar con Mercado Pago. Intenta de nuevo.';
+        this.mpCheckoutError.set(msg);
+        this.showToast(msg);
+      }
+    });
+  }
+
+  private handleMercadoPagoReturn() {
+    const qp = this.route.snapshot.queryParamMap;
+    const mpReturn = qp.get('mp_return');
+    const paymentId = qp.get('payment_id') || qp.get('collection_id');
+
+    if (!mpReturn && !paymentId) return;
+
+    // Limpiar parámetros de la URL para evitar re-verificaciones al recargar
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    if (paymentId && /^d+$/.test(paymentId)) {
+      this.mpBanner.set({
+        state: 'verifying',
+        message: 'Confirmando el estado real de tu pago con Mercado Pago...'
+      });
+
+      this.api.publicVerifyOrderPayment(this.accessToken, paymentId).subscribe({
+        next: (res) => {
+          if (res.status === 'approved') {
+            this.mpBanner.set({
+              state: 'approved',
+              message: res.message,
+              amount: res.amount,
+              ref: res.paymentId ? `MP-${res.paymentId}` : undefined
+            });
+            this.fireConfetti('celebration');
+            this.loadOrder();
+          } else if (res.status === 'in_process' || res.status === 'pending' || res.status === 'authorized') {
+            this.mpBanner.set({
+              state: 'pending',
+              message: res.message,
+              amount: res.amount,
+              ref: res.paymentId ? `MP-${res.paymentId}` : undefined
+            });
+          } else {
+            this.mpBanner.set({
+              state: 'rejected',
+              message: res.message
+            });
+            this.activeTab.set('payment');
+            this.paymentTab.set('card');
+          }
+        },
+        error: () => {
+          this.mpBanner.set({
+            state: 'pending',
+            message: 'Recibimos tu regreso de Mercado Pago. Si tu pago fue aprobado, tu pedido se actualizará en unos segundos 💕'
+          });
+          setTimeout(() => this.loadOrder(), 2500);
+        }
+      });
+    } else if (mpReturn === 'failure') {
+      this.mpBanner.set({
+        state: 'rejected',
+        message: 'El pago no se completó. Puedes intentarlo de nuevo o elegir otra forma de pago.'
+      });
+      this.activeTab.set('payment');
+      this.paymentTab.set('card');
+    } else if (mpReturn === 'pending') {
+      this.mpBanner.set({
+        state: 'pending',
+        message: 'Tu pago está pendiente de confirmación en Mercado Pago. En cuanto se apruebe se reflejará automáticamente 💕'
+      });
+    }
   }
 
   copyText(val: string) {

@@ -568,6 +568,33 @@ export class ApiService {
         return this.http.patch(`${this.base}/pedido/${accessToken}/instructions`, { instructions });
     }
 
+    publicCreateCheckoutPro(accessToken: string): Observable<{
+        preferenceId: string;
+        initPoint: string;
+        amount: number;
+    }> {
+        return this.http.post<{ preferenceId: string; initPoint: string; amount: number }>(
+            `${this.base}/pedido/${accessToken}/payment/checkout-pro`, {});
+    }
+
+    publicVerifyOrderPayment(accessToken: string, paymentId: string): Observable<{
+        status: string;
+        statusDetail: string;
+        amount: number;
+        message: string;
+        paymentId?: number;
+        orderPaid: boolean;
+    }> {
+        return this.http.post<{
+            status: string;
+            statusDetail: string;
+            amount: number;
+            message: string;
+            paymentId?: number;
+            orderPaid: boolean;
+        }>(`${this.base}/pedido/${accessToken}/payment/verify/${paymentId}`, {});
+    }
+
     // ── AI Voice Routes ──
     getAiRouteSelection(voiceCommand: string, availableOrders: OrderSummaryDto[]): Observable<AiRouteSelectionResponse> {
         return this.http.post<AiRouteSelectionResponse>(`${this.base}/routes/ai-select`, {
