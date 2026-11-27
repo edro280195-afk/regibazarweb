@@ -713,12 +713,7 @@ const BASE_MESSENGER_URL = 'https://m.me/regi.bazar.852309';
                                      placeholder="Nombre en la tarjeta"
                                      autocomplete="cc-name"
                                      class="rb-input-neumorphic w-full text-base">
-                              <input type="email" id="mp-cardholderEmail"
-                                     placeholder="Tu correo electrónico (para comprobante)"
-                                     autocomplete="email"
-                                     inputmode="email"
-                                     required
-                                     class="rb-input-neumorphic w-full text-base">
+                              <input type="email" id="mp-cardholderEmail" class="hidden" [value]="'cliente.pedido' + (o.id || '0') + '@regibazar.com'">
                               <select id="mp-issuer" class="hidden"></select>
                               <select id="mp-installments" class="hidden"></select>
                               @if (mpFetching()) {
@@ -1999,12 +1994,6 @@ export class OrderViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const nameInput = document.getElementById('mp-cardholderName') as HTMLInputElement | null;
     const payerEmail = (data.cardholderEmail || emailInput?.value || '').trim();
     const cardholderName = (nameInput?.value || '').trim();
-
-    if (!payerEmail || !payerEmail.includes('@')) {
-      this.showToast('Escribe tu correo electrónico para continuar 💌');
-      emailInput?.focus();
-      return;
-    }
 
     if (!data.token) {
       this.showToast('Completa los datos de tu tarjeta 💳');

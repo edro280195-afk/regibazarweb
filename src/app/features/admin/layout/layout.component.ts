@@ -1,6 +1,7 @@
-import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { PushNotificationService } from '../../../core/services/push-notification.service';
 
 interface NavItem {
   label: string;
@@ -14,8 +15,27 @@ interface NavItem {
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css'
 })
-export class LayoutComponent {
+export class LayoutComponent implements OnInit {
   readonly auth = inject(AuthService);
+  private readonly push = inject(PushNotificationService);
+
+  ngOnInit(): void {
+    this.syncAdminPushSubscription();
+  }
+
+  private async syncAdminPushSubscription(): Promise<void> {
+    if (this.auth.userRole() === 'Driver') return;
+    try {
+      const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+        ? true
+        : await this.push.requestPermission();
+      if (granted) {
+        await this.push.subscribeToNotifications('admin');
+      }
+    } catch {
+      // No bloquear la navegación si el navegador/dispositivo no soporta WebPush
+    }
+  }
 
   readonly isMobile = signal(this.viewportWidth() <= 1024);
   readonly moreOpen = signal(false);
